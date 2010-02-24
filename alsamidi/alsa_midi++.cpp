@@ -11,6 +11,11 @@
 
 static const char *evtypename[256] = {};
 
+static inline void get_channel(VALUE v_midievent, int channel)
+{
+  rb_iv_set(v_midievent, "@channel", UINT2NUM((channel & 0xf) + 1));
+}
+
 /* AlsaMidiEvent_i#populate Sequencer, MidiEvent
 To avoid confusion, the MidiEvent's in alsa_midi_event.cpp are all AlsaMidiEvent_i's
 */
@@ -83,7 +88,7 @@ alsaMidiEventClass_populate(VALUE v_ev, VALUE v_sequencer, VALUE v_midievent)
     case SND_SEQ_EVENT_NOTEON:
     case SND_SEQ_EVENT_NOTEOFF:
     case SND_SEQ_EVENT_KEYPRESS:
-      rb_iv_set(v_midievent, "@channel", INT2NUM(ev->data.note.channel & 0xf));
+      get_channel(v_midievent, ev->data.note.channel);
       rb_iv_set(v_midievent, "@value", INT2NUM(ev->data.note.note & 0x7f));
       rb_iv_set(v_midievent, "@velocity", INT2NUM(ev->data.note.velocity & 0x7f));
       break;
@@ -97,22 +102,22 @@ alsaMidiEventClass_populate(VALUE v_ev, VALUE v_sequencer, VALUE v_midievent)
     case SND_SEQ_EVENT_QFRAME:
     case SND_SEQ_EVENT_TIMESIGN:
     case SND_SEQ_EVENT_KEYSIGN:
-      rb_iv_set(v_midievent, "@channel", UINT2NUM(ev->data.control.channel & 0xf));
+      get_channel(v_midievent, ev->data.control.channel);
       rb_iv_set(v_midievent, "@value", INT2NUM(ev->data.control.value & 0x7f));
       break;
     case SND_SEQ_EVENT_REGPARAM:
     case SND_SEQ_EVENT_NONREGPARAM:
-      rb_iv_set(v_midievent, "@channel", UINT2NUM(ev->data.control.channel & 0xf));
+      get_channel(v_midievent, ev->data.control.channel);
       rb_iv_set(v_midievent, "@param", INT2NUM(ev->data.control.param));
       rb_iv_set(v_midievent, "@value", INT2NUM(ev->data.control.value));
       break;
     case SND_SEQ_EVENT_CONTROL14:
-      rb_iv_set(v_midievent, "@channel", UINT2NUM(ev->data.control.channel & 0xf));
+      get_channel(v_midievent, ev->data.control.channel);
       rb_iv_set(v_midievent, "@param", INT2NUM(ev->data.control.param & 0x7f));
       rb_iv_set(v_midievent, "@value", INT2NUM(ev->data.control.value & 0x7f));
       break;
     case SND_SEQ_EVENT_PITCHBEND:
-      rb_iv_set(v_midievent, "@channel", UINT2NUM(ev->data.control.channel & 0xf));
+      get_channel(v_midievent, ev->data.control.channel);
         // rb_iv_set(v_midievent, "@param", INT2NUM(ev->data.control.param & 0x7f)); ????
       rb_iv_set(v_midievent, "@value", INT2NUM(ev->data.control.value));
       break;

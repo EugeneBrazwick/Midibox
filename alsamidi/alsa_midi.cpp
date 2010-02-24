@@ -37,7 +37,7 @@ wrap_snd_seq_open(int argc, VALUE *v_params, VALUE v_alsamod)
   fprintf(DUMP_STREAM, "snd_seq_open(null, %s, %d, %d)\n", name, streams, mode);
 #endif
   const int r = snd_seq_open(&seq, name, streams, mode);
-  if (r) RAISE_MIDI_ERROR(r);
+  if (r) RAISE_MIDI_ERROR("opening sequencer", r);
   return Data_Wrap_Struct(alsaSequencerClass, 0, 0, seq);
 }
 
@@ -177,9 +177,9 @@ wrap_snd_strerror(VALUE v_module, VALUE v_err)
 extern "C" void
 Init_alsa_midi()
 {
-  VALUE rttsModule = rb_define_module("RRTS");
-  alsaDriver = rb_define_module_under(rttsModule, "Driver");
-  alsaMidiError = rb_define_class_under(rttsModule, "AlsaMidiError", rb_eStandardError);
+  VALUE rrtsModule = rb_define_module("RRTS");
+  alsaDriver = rb_define_module_under(rrtsModule, "Driver");
+  alsaMidiError = rb_define_class_under(rrtsModule, "AlsaMidiError", rb_eStandardError);
   // class to store the result of snd_seq_port_subscribe_malloc: a snd_seq_port_subscribe_t*
   // alsaPortClass = rb_define_class_under(alsaDriver, "AlsaPort_i", rb_cObject);
   rb_define_module_function(alsaDriver, "snd_seq_open", RUBY_METHOD_FUNC(wrap_snd_seq_open), -1);

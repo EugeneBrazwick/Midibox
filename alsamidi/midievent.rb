@@ -19,43 +19,45 @@ To create an event use Sequencer.input_event
 
     private
 
-    Symbool2Param = { :bank_select=>MIDI_CTL_MSB_BANK, :modwheel=>MIDI_CTL_MSB_MODWHEEL,
-                      :modulation_wheel=>MIDI_CTL_MSB_MODWHEEL,
-                      :breath_controller=>MIDI_CTL_MSB_BREATH, :breath=>MIDI_CTL_MSB_BREATH,
-                      :foot=>MIDI_CTL_MSB_FOOT, :foot_pedal=>MIDI_CTL_MSB_FOOT,
-                      :portamento_time=>MIDI_CTL_MSB_PORTAMENTO_TIME,
-                      :volume=>MIDI_CTL_MSB_MAIN_VOLUME, :main_volume=>MIDI_CTL_MSB_MAIN_VOLUME,
-                      :balance=>MIDI_CTL_MSB_BALANCE,
-                      :pan_position=>MIDI_CTL_MSB_PAN, :pan=>MIDI_CTL_MSB_PAN,
-                      :expression=>MIDI_CTL_MSB_EXPRESSION,
-                      :hold_pedal=>MIDI_CTL_SUSTAIN, :sustain=>MIDI_CTL_SUSTAIN,
-                      :hold=>MIDI_CTL_SUSTAIN,
-                      :portamento=>MIDI_CTL_PORTAMENTO,
-                      :sostenuto=>MIDI_CTL_SOSTENUTO,
-                      :soft_pedal=>MIDI_CTL_SOFT_PEDAL,
-                      :legato=>MIDI_CTL_LEGATO_FOOTSWITCH, :legato_footswitch=>MIDI_CTL_LEGATO_FOOTSWITCH,
-                      :hold2_pedal=>MIDI_CTL_HOLD2, :hold2=>MIDI_CTL_HOLD2,
-                      :timbre=>MIDI_CTL_SC2_TIMBRE,
-                      :release=>MIDI_CTL_SC3_RELEASE_TIME,
-                      :release_time=>MIDI_CTL_SC3_RELEASE_TIME,
-                      :attack=>MIDI_CTL_SC4_ATTACK_TIME, :attack_time=>MIDI_CTL_SC4_ATTACK_TIME,
-                      :brightness=>MIDI_CTL_SC5_BRIGHTNESS,
-                      :reverb=>MIDI_CTL_E1_REVERB_DEPTH,
-                      :tremolo=>MIDI_CTL_E2_TREMOLO_DEPTH,
-                      :chorus=>MIDI_CTL_E3_CHORUS_DEPTH,
-                      :detune=>MIDI_CTL_E4_DETUNE_DEPTH, :celeste=>MIDI_CTL_E4_DETUNE_DEPTH,
-                      :phaser=>MIDI_CTL_E5_PHASER_DEPTH,
-                      :all_controllers_off=>MIDI_CTL_RESET_CONTROLLERS,
-                      :reset_controllers=>MIDI_CTL_RESET_CONTROLLERS,
-                      :all_notes_off=>MIDI_CTL_ALL_NOTES_OFF,
-                      :all_sounds_off=>MIDI_CTL_ALL_SOUNDS_OFF, :panic=>MIDI_CTL_ALL_SOUNDS_OFF,
-                      :omni_off=>MIDI_CTL_OMNI_OFF, :omni_on=>MIDI_CTL_OMNI_ON,
-                      :mono=>MIDI_CTL_MONO1,
-                      :poly=>MIDI_CTL_MONO2 # ???
+    Symbol2Param = { :bank_select=>MIDI_CTL_MSB_BANK, :modwheel=>MIDI_CTL_MSB_MODWHEEL,
+                     :modulation_wheel=>MIDI_CTL_MSB_MODWHEEL,
+                     :breath_controller=>MIDI_CTL_MSB_BREATH, :breath=>MIDI_CTL_MSB_BREATH,
+                     :foot=>MIDI_CTL_MSB_FOOT, :foot_pedal=>MIDI_CTL_MSB_FOOT,
+                     :portamento_time=>MIDI_CTL_MSB_PORTAMENTO_TIME,
+                     :volume=>MIDI_CTL_MSB_MAIN_VOLUME, :main_volume=>MIDI_CTL_MSB_MAIN_VOLUME,
+                     :balance=>MIDI_CTL_MSB_BALANCE,
+                     :pan_position=>MIDI_CTL_MSB_PAN, :pan=>MIDI_CTL_MSB_PAN,
+                     :expression=>MIDI_CTL_MSB_EXPRESSION,
+                     :hold_pedal=>MIDI_CTL_SUSTAIN, :sustain=>MIDI_CTL_SUSTAIN,
+                     :hold=>MIDI_CTL_SUSTAIN,
+                     :portamento=>MIDI_CTL_PORTAMENTO,
+                     :sostenuto=>MIDI_CTL_SOSTENUTO,
+                     :soft_pedal=>MIDI_CTL_SOFT_PEDAL,
+                     :legato=>MIDI_CTL_LEGATO_FOOTSWITCH, :legato_footswitch=>MIDI_CTL_LEGATO_FOOTSWITCH,
+                     :hold2_pedal=>MIDI_CTL_HOLD2, :hold2=>MIDI_CTL_HOLD2,
+                     :timbre=>MIDI_CTL_SC2_TIMBRE,
+                     :release=>MIDI_CTL_SC3_RELEASE_TIME,
+                     :release_time=>MIDI_CTL_SC3_RELEASE_TIME,
+                     :attack=>MIDI_CTL_SC4_ATTACK_TIME, :attack_time=>MIDI_CTL_SC4_ATTACK_TIME,
+                     :brightness=>MIDI_CTL_SC5_BRIGHTNESS,
+                     :reverb=>MIDI_CTL_E1_REVERB_DEPTH,
+                     :tremolo=>MIDI_CTL_E2_TREMOLO_DEPTH,
+                     :chorus=>MIDI_CTL_E3_CHORUS_DEPTH,
+                     :detune=>MIDI_CTL_E4_DETUNE_DEPTH, :celeste=>MIDI_CTL_E4_DETUNE_DEPTH,
+                     :phaser=>MIDI_CTL_E5_PHASER_DEPTH,
+                     :all_controllers_off=>MIDI_CTL_RESET_CONTROLLERS,
+                     :reset_controllers=>MIDI_CTL_RESET_CONTROLLERS,
+                     :all_notes_off=>MIDI_CTL_ALL_NOTES_OFF,
+                     :all_sounds_off=>MIDI_CTL_ALL_SOUNDS_OFF, :panic=>MIDI_CTL_ALL_SOUNDS_OFF,
+                     :omni_off=>MIDI_CTL_OMNI_OFF, :omni_on=>MIDI_CTL_OMNI_ON,
+                     :mono=>MIDI_CTL_MONO1,
+                     :poly=>MIDI_CTL_MONO2 # ???
                     }
-    # IMPORTANT: all events must support this way of construction
-    # new Sequencer, AlsaMidiEvent_i
-    # new typesymbol [,...]
+=begin
+    IMPORTANT: all events must support this way of construction
+    new Sequencer, AlsaMidiEvent_i
+    new typesymbol [,...]
+=end
     def initialize arg0, arg1 = {}
       case arg1 when AlsaMidiEvent_i
         arg1.populate(arg0, self)
@@ -63,6 +65,9 @@ To create an event use Sequencer.input_event
       else
         @type = arg0
         @flags = { :time_mode_absolute=>true, :time_mode_ticks=>true }  # since this is SND_SEQ_TIME_MODE_ABS which is 0.
+        @channel = @velocity = @duration = @value = @param = @source = @dest = @queue = nil
+        @off_velocity = @tick = nil
+#         puts "#{File.basename(__FILE__)}:#{__LINE__}:@tick:=nil"
         for k, v in arg1
           case k
           when :value
@@ -75,13 +80,20 @@ To create an event use Sequencer.input_event
             else
               @value = v
             end
-          when :channel then @channel = v
+          when :channel
+            #RTTSError.new("illegal channel #{v}") unless v.between?(0, 15)
+            @channel = v
           when :duration then @duration = v
-          when :source then @source = v
-          when :dest then @dest = v
+          when :velocity then @velocity = v
+          when :off_velocity then @off_velocity = v
+          when :source, :sender
+            @source = v
+          when :dest, :destination then @dest = v
           when :sender_queue
             @sender_queue = v # LEAVE THE HACKING to alsa_midi_event yes please... .respond_to(:id) ? v.id : v
-          when :tick then @tick = v
+          when :tick
+            @tick = v
+            puts "#{File.basename(__FILE__)}:#{__LINE__}:@tick:=#{v}"
           when :time_mode_tick then @flags[:time_mode_tick] = v; @flags[:time_mode_real] = !v
           when :time_mode_real then @flags[:time_mode_tick] = !v; @flags[:time_mode_real] = v
           when :time_mode_relative
@@ -91,18 +103,73 @@ To create an event use Sequencer.input_event
             @flags[:time_mode_relative] = !v
             @flags[:time_mode_absolute] = v
           when :coarse
-            if arg1[:value] > 0x7f
+            if v && arg1[:value] > 0x7f
               raise RRTSError.new("overflowing coarse controller value[#{arg1[:param]}] #{arg1[:value]}")
             end
-          when :param
-            case v
-            when Symbol then @param = Symbol2Param[v]
-            else @param = v
-            end
-          else raise RRTSError.new("illegal parameter '#{k}' for #{self.class}")
+            @flags[:coarse] = v
+          when :param then @param = v
+          else raise RRTSError.new("illegal option '#{k}' for #{self.class}")
           end
         end
       end
+    end
+
+    # returns tuple [param_id, coarse_b]
+    # coarse_b should be true if we need to send a single event.
+    # otherwise an MSB + LSB should both be send
+    def debunkparam_i
+      return (Symbol === @param ? Symbol2Param[@param] : @param), @flags[:coarse]
+    end
+
+    Flag2IntMap = {
+                    :time_mode_real=>SND_SEQ_TIME_STAMP_REAL,
+                    :time_mode_ticks=>SND_SEQ_TIME_STAMP_TICK,
+                    :time_mode_tick=>SND_SEQ_TIME_STAMP_TICK,
+                    :time_mode_relative=>SND_SEQ_TIME_MODE_REL,
+                    :time_mode_absolute=>SND_SEQ_TIME_MODE_ABS,
+                    :time_real=>SND_SEQ_TIME_STAMP_REAL,
+                    :time_ticks=>SND_SEQ_TIME_STAMP_TICK,
+                    :time_tick=>SND_SEQ_TIME_STAMP_TICK,
+                    :time_relative=>SND_SEQ_TIME_MODE_REL,
+                    :time_absolute=>SND_SEQ_TIME_MODE_ABS
+                  }
+    Type2IntMap = { :noteon=>SND_SEQ_EVENT_NOTEON,
+                    :noteoff=>SND_SEQ_EVENT_NOTEOFF,
+                    :note=>SND_SEQ_EVENT_NOTE,
+                    :keypress=>SND_SEQ_EVENT_KEYPRESS,
+                    :controller=>SND_SEQ_EVENT_CONTROLLER,
+                    :control14=>SND_SEQ_EVENT_CONTROL14,
+                    :pgmchange=>SND_SEQ_EVENT_PGMCHANGE,
+                    :pitchbend=>SND_SEQ_EVENT_PITCHBEND,
+                    :chanpress=>SND_SEQ_EVENT_CHANPRESS,
+                    :songpos=>SND_SEQ_EVENT_SONGPOS,
+                    :songsel=>SND_SEQ_EVENT_SONGSEL,
+                    :sysex=>SND_SEQ_EVENT_SYSEX,
+                    :start=>SND_SEQ_EVENT_START,
+                    :stop=>SND_SEQ_EVENT_STOP,
+                    :continue=>SND_SEQ_EVENT_CONTINUE,
+                    :clock=>SND_SEQ_EVENT_CLOCK,
+                    :tick=>SND_SEQ_EVENT_TICK,
+                    :setpos_tick=>SND_SEQ_EVENT_SETPOS_TICK,
+                    :setpos_time=>SND_SEQ_EVENT_SETPOS_TIME,
+                    :syncpos=>SND_SEQ_EVENT_SYNC_POS,
+                    :sync_pos=>SND_SEQ_EVENT_SYNC_POS,
+                    :tempo=>SND_SEQ_EVENT_TEMPO,
+                    :queue_skew=>SND_SEQ_EVENT_QUEUE_SKEW,
+                    :skew=>SND_SEQ_EVENT_QUEUE_SKEW,
+                    :tune_request=>SND_SEQ_EVENT_TUNE_REQUEST,
+                    :reset=>SND_SEQ_EVENT_RESET,
+                    :sensing=>SND_SEQ_EVENT_SENSING,
+                    :echo=>SND_SEQ_EVENT_ECHO
+                    }
+    # returns [type, flags] as two integers from the current @type and @flags
+    def debunktypeflags_i
+      flags = 0
+      for k, v in @flags
+        v and f = Flag2IntMap[k] and flags |= f
+      end
+      type = Type2IntMap[@type] or RRTSError.new("internal error: no mapping for :#{@type}")
+      return type, flags
     end
 
     public
@@ -125,7 +192,9 @@ To create an event use Sequencer.input_event
     attr_accessor :source, :dest
     # receiver queue.
     attr :receiver_queue_id
-    # notes and control event have a channel
+    # notes and control events have a channel. We use the range 1..16
+    # The channel can be set to an enumerable. This will make the
+    # messages be sent to all the given channels
     attr :channel
     # notes have these:
     attr :velocity, :off_velocity, :duration
@@ -264,6 +333,7 @@ To create an event use Sequencer.input_event
     arg0 is a Sequencer, arg1 is a LOW LEVEL AlsaMidiEvent_i.
     new sequencer, event
     new channel, param, value [, params ]
+    new channel, param [, params ]
 
     'param' can be a symbol from:
     :bank_select (14 bits)
@@ -298,6 +368,7 @@ To create an event use Sequencer.input_event
     def initialize arg0, arg1 = nil, value = 0, params = {}
       case arg1 when AlsaMidiEvent_i then super(arg0, arg1)
       else
+        params, value = value, 0 if Hash === value
         params[:param] = arg1
         super :controller, arg0, value, params
       end

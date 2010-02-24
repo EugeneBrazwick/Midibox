@@ -1,5 +1,5 @@
 
-require_relative 'rtts'
+require_relative 'rrts'
 require_relative 'midievent'
 require 'forwardable'
 
@@ -213,6 +213,8 @@ Returns:
   # Access to level lower.  PRUNE THIS ASAP!
   def_delegators :@handle, :poll_descriptors, :poll_descriptors_count, :poll_descriptors_revents,
                  :drain_output, :start_queue, :nonblock, :alloc_named_queue, :set_queue_tempo,
+                 :set_output_buffer_size, :output_buffer_size,
+                 :set_input_buffer_size, :input_buffer_size, :sync_output_queue,
                  :create_port, :event_output, :connect_from, :connect_to, :queue_status
 
   # this means a sequencer behaves a lot like a client
@@ -222,6 +224,7 @@ Returns:
 
   # self << MidiEvent
   def << event
+#     puts "#{File.basename(__FILE__)}:#{__LINE__}: << event(#{event.inspect})"
     @handle.event_output event
     self
   end

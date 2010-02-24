@@ -95,7 +95,7 @@ class Metronome
 #  Metronome implementation. Context: pattern
   private
   # metronome default settings
-  CHANNEL = 9
+  CHANNEL = 10
   STRONG_NOTE = 34
   WEAK_NOTE = 33
   VELOCITY = 100
@@ -133,11 +133,11 @@ class Metronome
   end
 
   def note aNote, tick
-    ev = NoteOnEvent.new @channel, aNote, @velocity,
+    ev = NoteOnEvent.new(@channel, aNote, @velocity,
                          duration: 1,
                          source: @myport, dest: @sequencer.subscribers_unknown_port,
                          sender_queue: @queue, time_mode_absolute: true, # the default actually
-                         tick: tick
+                         tick: tick)
     @sequencer << ev
   end
 
@@ -256,50 +256,48 @@ def record_event ev
     @metronome.pattern(ev.time) if ev.type == :usr0
     return
   end
-  if @channel_split
-    i *= TRACKS_PER_PORT
-    i += 1 + (ev.channel & 0xf) if ev.channel
-  end
+  ch = ev.channel ? ev.channel - 1 : 0
+  i = i * TRACKS_PER_PORT + ch if @channel_split
   return if i >= @tracks.length
   track = @tracks[i]
   case ev.type
   when :noteon
     delta_time track, ev
-    command(track, Driver::MIDI_CMD_NOTE_ON | ev.channel)
+    command(track, Driver::MIDI_CMD_NOTE_ON | ch)
     add_byte(track, ev.note)
     add_byte(track, ev.velocity)
   when :noteoff
     delta_time track, ev
-    command(track, Driver::MIDI_CMD_NOTE_OFF | ev.channel)
+    command(track, Driver::MIDI_CMD_NOTE_OFF | ch)
     add_byte(track, ev.note)
     add_byte(track, ev.velocity)
   when :keypress
     delta_time track, ev
-    command(track, Driver::MIDI_CMD_NOTE_PRESSURE | ev.channel)
+    command(track, Driver::MIDI_CMD_NOTE_PRESSURE | ch)
     add_byte(track, ev.note)
     add_byte(track, ev.velocity)
   when :controller
     delta_time(track, ev)
-    command(track, Driver::MIDI_CMD_CONTROL | ev.channel)
+    command(track, Driver::MIDI_CMD_CONTROL | ch)
     add_byte(track, ev.param)
     add_byte(track, ev.value & 0x7f)
   when :pgmchange
     delta_time(track, ev)
-    command(track, Driver::MIDI_CMD_PGM_CHANGE | ev.channel)
+    command(track, Driver::MIDI_CMD_PGM_CHANGE | ch)
     add_byte(track, ev.value & 0x7f)
   when :chanpress
     delta_time track, ev
-    command(track, Driver::MIDI_CMD_CHANNEL_PRESSURE | ev.channel)
+    command(track, Driver::MIDI_CMD_CHANNEL_PRESSURE | ch)
     add_byte(track, ev.value & 0x7f)
   when :pitchbend
     delta_time track, ev
-    command(track, Driver::MIDI_CMD_BENDER | ev.channel)
+    command(track, Driver::MIDI_CMD_BENDER | ch)
     add_byte(track, (ev.value + 8192) & 0x7f)
     add_byte(track, ((ev.value + 8192) >> 7) & 0x7f)
   when :control14
 #    create two commands for MSB and LSB
     delta_time track, ev
-    command(track, Driver::MIDI_CMD_CONTROL | ev.channel)
+    command(track, Driver::MIDI_CMD_CONTROL | ch)
     add_byte(track, ev.param)
     add_byte(track, (ev.value >> 7) & 0x7f)
     if ev.param < 0x20
@@ -310,7 +308,7 @@ def record_event ev
     end
   when :nonregparam
     delta_time track, ev
-    command(track, Driver::MIDI_CMD_CONTROL | ev.channel)
+    command(track, Driver::MIDI_CMD_CONTROL | ch)
     add_byte(track, Driver::MIDI_CTL_NONREG_PARM_NUM_LSB)
     add_byte(track, ev.param & 0x7f)
     delta_time(track, ev)
@@ -324,7 +322,7 @@ def record_event ev
     add_byte(track, ev.value & 0x7f)
   when :regparam
     delta_time track, ev
-    command(track, Driver::MIDI_CMD_CONTROL | ev.channel)
+    command(track, Driver::MIDI_CMD_CONTROL | ch)
     add_byte(track, Driver::MIDI_CTL_REGIST_PARM_NUM_LSB)
     add_byte(track, ev.param & 0x7f)
     delta_time track, ev
@@ -467,9 +465,9 @@ opts.on('--metronome-weak-note=VAL', "key for the sub beats (#{Metronome::WEAK_N
   raise OptionParser::InvalidArgument.new("Invalid note (#{v})") unless (1 .. 127) === v
   @metronome_weak_note = v
 end
-opts.on('--metronome-channel=VAL', "channel for the metronome (#{Metronome::CHANNEL + 1})") do |v|
+opts.on('--metronome-channel=VAL', "channel for the metronome (#{Metronome::CHANNEL})") do |v|
   raise OptionParser::InvalidArgument.new("Invalid channel (#{v})") unless (1 .. 16) === v
-  @metronome_channel = v - 1
+  @metronome_channel = v
 end
 opts.on('--metronome-volume=VAL', "volume for the metronome (#{Metronome::VELOCITY})") do |v|
   raise OptionParser::InvalidArgument.new("Invalid volume (#{v})") unless (1 .. 127) === v

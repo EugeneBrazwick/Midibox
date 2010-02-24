@@ -301,7 +301,7 @@ wrap_snd_seq_port_info_copy_to(int argc, VALUE *argv, VALUE v_port_info)
   if (NIL_P(v_dst))
   {
     const int r = snd_seq_port_info_malloc(&dst);
-    if (r < 0) RAISE_MIDI_ERROR(r);
+    if (r < 0) RAISE_MIDI_ERROR("allocating port_info", r);
     v_dst = Data_Wrap_Struct(alsaPortInfoClass, 0/*mark*/, snd_seq_port_info_free/*free*/, dst);
     retval = v_dst;
   }

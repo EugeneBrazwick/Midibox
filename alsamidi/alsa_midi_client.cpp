@@ -25,7 +25,7 @@ wrap_snd_seq_client_info_copy_to(int argc, VALUE *argv, VALUE v_client_info)
   if (NIL_P(v_dst))
     {
       const int r = snd_seq_client_info_malloc(&dst);
-      if (r < 0) RAISE_MIDI_ERROR(r);
+      if (r < 0) RAISE_MIDI_ERROR("allocation client info", r);
       v_dst = Data_Wrap_Struct(alsaClientInfoClass, 0/*mark*/, snd_seq_client_info_free/*free*/, dst);
       retval = v_dst;
     }

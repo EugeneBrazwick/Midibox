@@ -1,0 +1,29 @@
+alsa midi bindings:  finished
+
+requirements:
+    - ruby1.9.1 or higher, including rdoc, gem etc.
+    - libasound2-dev (on Ubuntu at least), alsa development headers
+    - shoulda, testing machinery (sudo gem install shoulda)
+    - graphviz, for documentation (optional)
+    - make
+
+BUILD:
+    cd alsamidi
+    ruby ./extruby.rb
+    make
+
+Plan de campagne:
+    1a implement Alsa MIDI API. Done. 14 days.
+    1b rdocs, alsa docs are unfortunately rather vague. Tried rdoc, needs tuning a lot.
+    1c testset for 1a
+    2a build OO ruby framework around 1
+    2b rdocs
+    2c testset
+    - Node framework a la Blender nodes, except for tracks, effects etc..
+    - Extending basic framework with loop tools
+    - Style tools, for example morphing + random adaptation
+    - Chord support, including automatic harmonies
+    - Support for building/constructing/supporting a song based on general layout
+
+
+

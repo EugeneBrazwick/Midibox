@@ -338,7 +338,7 @@ To create an event use Sequencer.input_event
     new channel, param [, params ]
 
     'param' can be a symbol from:
-    :bank_select (14 bits)
+    :bank_select (14 bits), or better 7+7
     :modulation_wheel (14)
     :breath_controller (14)
     :foot_pedal (14)
@@ -366,6 +366,9 @@ To create an event use Sequencer.input_event
 
     In addition the option 'coarse:true' can be given to actually only send to coarse
     value where we use value<<7 as effictive value
+    It is also possible to pass a tuple as 'value'. 
+    ControllerEvent.new channel, :bank_select, [1, 23]
+    This would select bank 1*128+23.
 =end
     def initialize arg0, arg1 = nil, value = 0, params = {}
       case arg1 when AlsaMidiEvent_i then super(arg0, arg1)
@@ -403,7 +406,9 @@ To create an event use Sequencer.input_event
     IMPORTANT: all events must support this way of construction
     arg0 is a Sequencer, arg1 is a LOW LEVEL AlsaMidiEvent_i.
     new sequencer, event
-    new channel, program, params
+    new channel, program [, params ]
+    new channel, [bank_msb, program] [, params]
+    new channel , [bank_msb, bank_lsb, program] ...
 =end
     def initialize arg0, arg1 = nil, params = {}
       case arg1 when AlsaMidiEvent_i then super(arg0, arg1)

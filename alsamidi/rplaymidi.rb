@@ -45,11 +45,21 @@ class Track
     @events = []
     @end_tick = 0 # length of this track, in ticks
     @channel = nil # as originally recorded
+    @time_signature = [4, 4] # ie 4/4
+    @ticks_per_beat = 384
+    @key = :C; # then :'C#', :D .... :B
+    @sequencenr = 0
+    @description = @copyright = @name = @voicename = @lyrics = ''
+    @marker = ''
+    @cue_point = ''
   end
 
   public
   attr_accessor :channel, :end_tick
   attr :owner, :events
+  attr_accessor :time_signature, :ticks_per_beat
+  attr_accessor :description, :copyright, :name, :voicename, :lyrics, :marker
+  attr_accessor :cue_point
 end
 
 # Let's use 'block' for a specific timeline-part of some bars.
@@ -247,7 +257,6 @@ class MidifileParser
               # FIXME: I doubt TempoEvent knows anything about mspq???
               # It must be converted to what TempoEvent expects...
               # and what about the queue?
-              fail("FIXME")
               event = TempoEvent.new queue, (a << 16) + (b << 8) + c
                # ?????
               skip(len - 3) if len > 3

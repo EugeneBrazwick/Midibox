@@ -403,6 +403,7 @@ send_callback(VALUE v_channel, VALUE v_val3)
   return Qnil;
 }
 
+// v_ev is a MidiEvent!
 static VALUE
 do_event_output(bool ch_ref, snd_seq_t *seq, VALUE v_seq, VALUE v_ev, snd_seq_event_t &ev)
 {
@@ -441,6 +442,23 @@ PARAM_IS_MSB_LSB_PAIR(uint param)
     }
   return 0;
 }
+
+static inline void
+WRITE_TICK_IN_CHANNEL_i(VALUE v_tick, snd_seq_event_t &ev, bool have_sender_queue)
+{
+  if (!RTEST(v_tick)) return;
+  if (!have_sender_queue)
+    RAISE_MIDI_ERROR_FMT0("attempt to set timestamps, but no MidiQueue supplied");
+  if (ev.flags & SND_SEQ_TIME_STAMP_TICK)
+      ev.time.tick = NUM2UINT(v_tick);
+  else
+    {
+      ev.time.time.tv_sec = NUM2UINT(rb_ary_entry(v_tick, 0));
+      ev.time.time.tv_nsec = NUM2UINT(rb_ary_entry(v_tick, 1));
+    }
+}
+
+#define WRITE_TICK_IN_CHANNEL(t, e) WRITE_TICK_IN_CHANNEL_i(t, e, have_sender_queue)
 
 /*
 int AlsaSequencer_i#event_output(ev)
@@ -503,22 +521,11 @@ wrap_snd_seq_event_output(VALUE v_seq, VALUE v_ev)
           ev.source.client = NUM2INT(rb_ivar_get(v_sourceport, id_iv_client_id));
         }
       VALUE v_typeflags = rb_funcall(v_ev, rb_intern("debunktypeflags_i"), 0);
-      ev.flags = NUM2INT(rb_ary_entry(v_typeflags, 1)); // from event.flags SND_SEQ_TIME_STAMP_TICK | SND_SEQ_TIME_STAMP_ABS;
       ev.type = NUM2INT(rb_ary_entry(v_typeflags, 0));
+      ev.flags = NUM2INT(rb_ary_entry(v_typeflags, 1)); // from event.flags SND_SEQ_TIME_STAMP_TICK | SND_SEQ_TIME_STAMP_ABS;
       VALUE v_tick = rb_iv_get(v_ev, "@tick");
-      unsigned char *ch_ref = 0;
-      if (RTEST(v_tick))
-        {
-          if (!have_sender_queue)
-            RAISE_MIDI_ERROR_FMT0("attempt to set timestamps, but no MidiQueue supplied");
-          if (ev.flags & SND_SEQ_TIME_STAMP_TICK)
-              ev.time.tick = NUM2UINT(v_tick);
-          else
-            {
-              ev.time.time.tv_sec = NUM2UINT(rb_ary_entry(v_tick, 0));
-              ev.time.time.tv_nsec = NUM2UINT(rb_ary_entry(v_tick, 1));
-            }
-        }
+      unsigned char *ch_ref = 0; // We only use that it is 0 or not !!!!
+      WRITE_TICK_IN_CHANNEL(v_tick, ev);
       VALUE v_destport = rb_iv_get(v_ev, "@dest");
 
       /* This is probably incorrect. But aplaymidi uses explicit senders iso a connection
@@ -560,24 +567,73 @@ wrap_snd_seq_event_output(VALUE v_seq, VALUE v_ev)
 //             fprintf(stderr, "got param\n");
             //const int bits = NUM2INT(rb_ary_entry(v_param_coarse, 2));
             //fprintf(stderr, "got bits\n");
-            const int value = NUM2INT(rb_iv_get(v_ev, "@value"));
-//             fprintf(stderr, "%d: coarse=%d, value=%d,param=%u\n", __LINE__, coarse, value,ev.data.control.param);
-            if (!coarse)
+            VALUE v_value = rb_iv_get(v_ev, "@value");
+            int value;
+            uint lsb_version = PARAM_IS_MSB_LSB_PAIR(param);
+            if (lsb_version)
               {
-                const uint lsb_version = PARAM_IS_MSB_LSB_PAIR(param);
-                if (lsb_version)
+                int msb, lsb = 0;
+  //             fprintf(stderr, "%d: coarse=%d, value=%d,param=%u\n", __LINE__, coarse, value,ev.data.control.param);
+                if (coarse)
+                  msb = NUM2INT(v_value);
+                else if FIXNUM_P(v_value)
                   {
-                    ev.data.control.value = value >> 7; // MSB
-// fprintf(stderr, "%s:%d: CONTROLLER(param=%u,value=%d)\n", __FILE__,__LINE__, lsb_version, value >> 7);
-                    do_event_output(ch_ref, seq, v_seq, v_ev, ev);
-                    ev.data.control.param = lsb_version;
+                    const int v = NUM2INT(v_value);
+                    msb = v << 7;
+                    lsb = v & 0x7f;
                   }
-                ev.data.control.value = value & 0x7f; // LSB or just as is.
-// fprintf(stderr, "%s:%d: CONTROLLER(param=%u,value=%d)\n", __FILE__,__LINE__, param, value & 0x7f);
+                else
+                  {
+                    VALUE v_ar = rb_check_array_type(v_value);
+                    if (NIL_P(v_ar)) msb = 0;
+                    else
+                      {
+                        msb = NUM2INT(rb_ary_entry(v_ar, 0));
+                        lsb = NUM2INT(rb_ary_entry(v_ar, 1));
+                      }
+                  }
+                ev.data.control.value = msb;
+// fprintf(stderr, "%s:%d: CONTROLLER(param=%u,value=%d)\n", __FILE__,__LINE__, lsb_version, value >> 7);
+                do_event_output(ch_ref, seq, v_seq, v_ev, ev);
+                ev.data.control.param = lsb_version;
+                value = msb;
               }
+            else
+                value = NUM2INT(v_value) & 0x7f;
+            ev.data.control.value = value;
+// fprintf(stderr, "%s:%d: CONTROLLER(param=%u,value=%d)\n", __FILE__,__LINE__, param, value & 0x7f);
             break;
           }
         case SND_SEQ_EVENT_PGMCHANGE:
+          {
+            snd_seq_ev_set_fixed(&ev);
+            ch_ref = &ev.data.control.channel;
+            VALUE v_value = rb_iv_get(v_ev, "@value");
+            int value = 0;
+            if (FIXNUM_P(v_value))
+                value = NUM2INT(v_value);
+            else
+              {
+                VALUE v_ar = rb_check_array_type(v_value);
+                if (!NIL_P(v_ar))
+                  {
+                    const int len = NUM2INT(rb_funcall(v_ar, rb_intern("length"), 0));
+                    const int msb = NUM2INT(rb_ary_entry(v_ar, 0));
+                    const int lsb = len == 2 ? 0 : NUM2INT(rb_ary_entry(v_ar, 1));
+                    value = NUM2INT(rb_ary_entry(v_ar, len == 2 ? 1 : 2));
+                    snd_seq_event_t ev_bank = ev;
+                    ev_bank.type = SND_SEQ_EVENT_CONTROLLER;
+                    ev_bank.data.control.param = MIDI_CTL_MSB_BANK;
+                    ev_bank.data.control.value = msb;
+                    do_event_output(ch_ref, seq, v_seq, v_ev, ev_bank);
+                    ev_bank.data.control.param = MIDI_CTL_LSB_BANK;
+                    ev_bank.data.control.value = lsb;
+                    do_event_output(ch_ref, seq, v_seq, v_ev, ev_bank);
+                  }
+              }
+            ev.data.control.value = value;
+            break;
+          }
         case SND_SEQ_EVENT_CHANPRESS:
         case SND_SEQ_EVENT_PITCHBEND:
           {
@@ -591,8 +647,16 @@ wrap_snd_seq_event_output(VALUE v_seq, VALUE v_ev)
           RAISE_MIDI_ERROR_FMT0("NOT IMPLEMENTED YET: SYSEX");
           break;
         case SND_SEQ_EVENT_TEMPO:
-          RAISE_MIDI_ERROR_FMT0("NOT IMPLEMENTED YET: TEMPO");
-          break;
+          {
+            snd_seq_ev_set_fixed(&ev);
+            const int queue = NUM2INT(rb_iv_get(v_ev, "@queue_id"));
+            const uint tempo = NUM2UINT(rb_iv_get(v_ev, "@value"));
+            ev.dest.client = SND_SEQ_CLIENT_SYSTEM;
+            ev.dest.port = SND_SEQ_PORT_SYSTEM_TIMER;
+            ev.data.queue.queue = queue;
+            ev.data.queue.param.value = tempo;
+            break;
+          }
         case SND_SEQ_EVENT_RESET:
         case SND_SEQ_EVENT_TUNE_REQUEST:
         case SND_SEQ_EVENT_SENSING:

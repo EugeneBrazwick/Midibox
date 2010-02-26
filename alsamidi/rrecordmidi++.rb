@@ -234,7 +234,7 @@ def record_port_numbers
     var_value track, 0
     add_byte track, 0xff
     add_byte track, 0x21
-    var_value track, 1
+    var_value track, 1 # length of data
     if @channel_split
       add_byte track, i / TRACKS_PER_PORT
     else

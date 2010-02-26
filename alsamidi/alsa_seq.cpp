@@ -15,6 +15,7 @@
 #include "alsa_midi_event.h"
 #include "alsa_midi_queue.h"
 #include "alsa_midi_client.h"
+#include "alsa_midi_port.h"
 #include <ruby/dl.h>
 #include <alsa/asoundlib.h>
 
@@ -269,6 +270,28 @@ wrap_snd_seq_delete_simple_port(VALUE v_seq, VALUE v_portid)
 #endif
   const int r = snd_seq_delete_simple_port(seq, NUM2INT(v_portid));
   return r ? INT2NUM(r) : Qnil;
+}
+
+/*
+int AlsaSequencer_i#delete_port  port
+
+delete a sequencer port on the current client
+
+Parameters:
+  port    port to be deleted
+
+Returns: 0 on success, a negative errorcode otherwise
+*/
+static VALUE
+wrap_snd_seq_delete_port(VALUE v_seq, VALUE v_portid)
+{
+  snd_seq_t *seq;
+  Data_Get_Struct(v_seq, snd_seq_t, seq);
+#if defined(DUMP_API)
+  fprintf(DUMP_STREAM, "snd_seq_delete_port(%p, %d)\n", seq, NUM2INT(v_portid));
+#endif
+  const int r = snd_seq_delete_port(seq, NUM2INT(v_portid));
+  return r ? INT2NUM(r) : Qnil; // C++ rule, do not raise exceptions on destructors
 }
 
 /* event, more event_input
@@ -1278,6 +1301,67 @@ wrap_snd_seq_set_output_buffer_size(VALUE v_seq, VALUE v_sz)
   return Qnil;
 }
 
+/*
+AlsaPortInfo_i AlsaSequencer_i#port_info  port
+
+obtain the information of a port on the current client
+
+Parameters:
+  port    port id to get
+
+Returns:
+  port instance
+*/
+static VALUE
+wrap_snd_seq_get_port_info(VALUE v_seq, VALUE v_portid)
+{
+  snd_seq_t *seq;
+  Data_Get_Struct(v_seq, snd_seq_t, seq);
+  snd_seq_port_info_t * info;
+  int r = snd_seq_port_info_malloc(&info);
+  if (r < 0) RAISE_MIDI_ERROR("allocating port_info", r);
+  r = snd_seq_get_port_info(seq, NUM2INT(v_portid), info);
+  if (r < 0) RAISE_MIDI_ERROR("retrieving port_info", r);
+  return Data_Wrap_Struct(alsaPortInfoClass, 0/*mark*/, snd_seq_port_info_free/*free*/, info);
+}
+
+static VALUE
+wrap_snd_seq_get_any_port_info(VALUE v_seq, VALUE v_clientid, VALUE v_portid)
+{
+  snd_seq_t *seq;
+  Data_Get_Struct(v_seq, snd_seq_t, seq);
+  snd_seq_port_info_t * info;
+  int r = snd_seq_port_info_malloc(&info);
+  if (r < 0) RAISE_MIDI_ERROR("allocating port_info", r);
+  r = snd_seq_get_any_port_info(seq, NUM2INT(v_clientid), NUM2INT(v_portid), info);
+  if (r < 0) RAISE_MIDI_ERROR("retrieving port_info", r);
+  return Data_Wrap_Struct(alsaPortInfoClass, 0/*mark*/, snd_seq_port_info_free/*free*/, info);
+}
+
+/*
+self AlsaSequencer_i#set_port_info  portno, port_info
+
+set the information of a port on the current client
+
+Parameters:
+  port    port to be set
+  info    port information to be set
+
+Returns:
+  self
+*/
+static VALUE
+wrap_snd_seq_set_port_info(VALUE v_seq, VALUE v_portid, VALUE v_portinfo)
+{
+  snd_seq_t *seq;
+  Data_Get_Struct(v_seq, snd_seq_t, seq);
+  snd_seq_port_info_t * info;
+  Data_Get_Struct(v_portinfo, snd_seq_port_info_t, info);
+  const int r = snd_seq_set_port_info(seq, NUM2INT(v_portid), info);
+  if (r < 0) RAISE_MIDI_ERROR("setting port_info", r);
+  return v_seq;
+}
+
 void alsa_seq_init()
 {
   WRAP_CONSTANT(POLLIN);
@@ -1298,6 +1382,7 @@ void alsa_seq_init()
   rb_define_method(alsaSequencerClass, "client_name=", RUBY_METHOD_FUNC(wrap_snd_seq_set_client_name), 1);
   rb_define_method(alsaSequencerClass, "create_simple_port", RUBY_METHOD_FUNC(wrap_snd_seq_create_simple_port), 3);
   rb_define_method(alsaSequencerClass, "create_port", RUBY_METHOD_FUNC(wrap_snd_seq_create_port), 1);
+  rb_define_method(alsaSequencerClass, "delete_port", RUBY_METHOD_FUNC(wrap_snd_seq_delete_port), 1);
   rb_define_method(alsaSequencerClass, "nonblock", RUBY_METHOD_FUNC(wrap_snd_seq_nonblock), -1);
   rb_define_method(alsaSequencerClass, "subscribe_port", RUBY_METHOD_FUNC(wrap_snd_seq_subscribe_port), 1);
   rb_define_method(alsaSequencerClass, "unsubscribe_port", RUBY_METHOD_FUNC(wrap_snd_seq_unsubscribe_port), 1);
@@ -1335,4 +1420,7 @@ void alsa_seq_init()
   rb_define_method(alsaSequencerClass, "input_buffer_size", RUBY_METHOD_FUNC(wrap_snd_seq_get_input_buffer_size), 0);
   rb_define_method(alsaSequencerClass, "output_buffer_size=", RUBY_METHOD_FUNC(wrap_snd_seq_set_output_buffer_size), 1);
   rb_define_method(alsaSequencerClass, "input_buffer_size=", RUBY_METHOD_FUNC(wrap_snd_seq_set_input_buffer_size), 1);
+  rb_define_method(alsaSequencerClass, "port_info", RUBY_METHOD_FUNC(wrap_snd_seq_get_port_info), 1);
+  rb_define_method(alsaSequencerClass, "any_port_info", RUBY_METHOD_FUNC(wrap_snd_seq_get_any_port_info), 2);
+  rb_define_method(alsaSequencerClass, "set_port_info", RUBY_METHOD_FUNC(wrap_snd_seq_set_port_info), 2);
 }

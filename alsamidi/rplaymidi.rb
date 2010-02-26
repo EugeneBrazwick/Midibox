@@ -35,20 +35,42 @@ MIDI_BYTES_PER_SEC = 31_250 / (1 + 8 + 2)
 # aka nodetree. But in our case it just a linear Array of MidiEvents.
 # With one complication: there are tracks (or parts/voices)
 
+# My idea of a track was a single channel input.
+# However it seems more that it is a complete song.
+# Well that depends on the rrecordmidi param --split-channels!!
 class Track
   private
-  def initialize
+  def initialize chunk_or_block
+    @owner = chunk_or_block
     @events = []
     @end_tick = 0 # length of this track, in ticks
+    @channel = nil # as originally recorded
   end
+
+  public
+  attr_accessor :channel, :end_tick
+  attr :owner, :events
 end
 
-class Soundblock
+# Let's use 'block' for a specific timeline-part of some bars.
+# Blocks can be nested and stuck together.
+# While a chunk describes a piece without any internal ordering
+class Soundchunk
   private
-  def initialize
+  def initialize source_port, time_division
+    # MIDI files don't store this!
+    @source_clientname = source_port && source_port.client.name
+    @source_portname = source_port && source_port.name
     @tracks = []
-    @smpte_timing = false
+    @smpte_timing = (time_division & 0x8000) != 0;
   end
+  public
+
+  def << track
+    @tracks << track
+  end
+
+  attr :smpte_timing, :tracks, :source_clientname, :source_portname
 end
 
 @options = {:end_delay=>2,
@@ -58,6 +80,8 @@ end
 
 require 'forwardable'
 
+# The Parser will be a class that is basically used in the chunk constructor.
+# It builds a single chunk from an inputfile
 class MidifileParser
   extend Forwardable
   private
@@ -66,19 +90,20 @@ class MidifileParser
     @file = nil
   end
 
-  def_delegator :@file, :read_byte, :getbyte
+  def_delegator :@file, :getbyte, :read_byte
 
   def skip bytes
-    bytes.times { read_byte }
+    @file.pos += bytes
+     # bytes.times { read_byte }  rather crude
   end
 
   # reads a little-endian 32-bit integer
   def read_32_le
     # careful with expression evaluation order
     a = read_byte or return nil
-    b = read_byte or return nil
-    c = read_byte or return nil
-    d = read_byte or return nil
+    b = read_byte or invalid
+    c = read_byte or invalid
+    d = read_byte or invalid
     a + (b << 8) + (c << 16) + (d << 24)
   end
 
@@ -88,43 +113,46 @@ class MidifileParser
   # reads a fixed-size big-endian number
   def read_int bytes
     value = 0
-    bytes.timed do
+    bytes.times do
       c = read_byte or return nil
       value = (value << 8) + c
     end
     value
   end
 
-  # reads a variable-length number
+  # reads a variable-length number, at most 4 bytes.
+  # the end is indicated by the absense of bit 8 (0x80).
+  # This may however be the end of the file
   def read_var
-    c = read_byte or return nil
+    c = read_byte or return nil  # eof
     value = c & 0x7f
     return value if (c & 0x80) == 0
-    c = read_byte or return nil
+    c = read_byte or invalid
     value = (value << 7) | (c & 0x7f)
     return value if (c & 0x80) == 0
-    c = read_byte or return nil
+    c = read_byte or invalid
     value = (value << 7) | (c & 0x7f)
     return value if (c & 0x80) == 0
-    c = read_byte or return nil
+    c = read_byte or invalid
     (value << 7) | c
   end
 
   def read_fixed bytes
     value = 0
     bytes.times do
-      c = read_byte or return nil
+      c = read_byte or invalid
       value = (value << 7) | (c & 0x7f)
     end
     value
   end
 
+  # Used to create the constants below at class-parse-time
   def self.make_id c
     c[0].ord | (c[1].ord << 8) | (c[2].ord << 16) | (c[3].ord << 24)
   end
 
   Encoding.default_internal = 'ascii-8bit'
-  MTHD = make_id('Mthd')
+  MTHD = make_id('MThd')
   RIFF = make_id('RIFF')
   MTRK = make_id('MTrk')
   RMID = make_id('RMID')
@@ -135,19 +163,12 @@ class MidifileParser
     raise RRTSError.new("#@file_name: invalid MIDI data (offset %x)" % @file.pos)
   end
 
-  # maps SMF events to RRTS MidiEvents
-  CmdType = { 0x8=>NoteOffEvent,
-              0x9=>NoteOnEvent,
-              0xa=>KeypressEvent,
-              0xb=>ControllerEvent,
-              0xc=>ProgramChangeEvent,
-              0xd=>ChannelPressureEvent,
-              0xe=>PitchbendEvent }
-
-  # reads one complete track from the file
+  # reads one complete track (MTrk) from the file
   def read_track track, track_end
     tick = 0
     last_cmd = nil
+#     fixed_channel = nil
+    port = 0
     #  the current file position is after the track ID and length
     while @file.pos < track_end do
       delta_ticks = read_var or break
@@ -158,18 +179,24 @@ class MidifileParser
         cmd = c
         last_cmd = cmd if cmd < 0xf0
       else
-        # running status
+        # running status. Take the cmd and the channel from the prev. event
         @file.ungetbyte c
         cmd = last_cmd or invalid
       end
       status = cmd >> 4
       ch = cmd & 0x0f # but not always
+#       if fixed_channel
+#         puts "ALERT: fixed_channel=#{fixed_channel}, ch=#{ch}" if fixed_channel != ch
+#       else
+#         fixed_channel = ch
+#       end
       case status
       when 0x8
         value = read_byte & 0x7f
         read_byte
         event = NoteOffEvent.new ch, value
       when 0x9, 0xa
+        track.channel = ch
         value = read_byte & 0x7f
         vel = read_byte & 0x7f
         event = (status == 0x9 ? NoteOnEvent : KeypressEvent).new ch, value, vel
@@ -180,7 +207,7 @@ class MidifileParser
       when 0xe
         event = PitchbendEvent.new ch, read_fixed(2)
       when 0xc
-        event = ProgramChange.new ch, (read_byte & 0x7f)
+        event = ProgramChangeEvent.new ch, (read_byte & 0x7f)
       when 0xd
         event = ChannelPressureEvent.new ch, (read_byte & 0x7f)
       when 0xf
@@ -198,29 +225,68 @@ class MidifileParser
           when 0x21  # port number
             invalid if len < 1
             port = read_byte % @port_count
-            skip len - 1
+            # This is the recorded port number. See rrecordmidi.
+            # But since this is basicly an internal number it is rather useless.
+            # What we need is the name!!
+            skip(len - 1) if len > 1
+            puts "#{File.basename(__FILE__)}:#{__LINE__}:Received META event with portnr: #{port}"
           when 0x2f  # end of track
             track.end_tick = tick
-            skip(track_end - @file.pos)
+            @file.pos = track_end
             return
           when 0x51 # tempo
             invalid if len < 3
-            if (smpte_timing) # SMPTE timing doesn't change
-              skip(len)
+            if track.owner.smpte_timing # SMPTE timing doesn't change
+              skip len
             else
-              event = TempoEvent.new
-              NOFRIGGINGIDEA
-=begin
-                                     event->type = SND_SEQ_EVENT_TEMPO;
-                                     event->port = port;
-                                     event->tick = tick;
-                                     event->data.tempo = read_byte() << 16;
-                                     event->data.tempo |= read_byte() << 8;
-                                     event->data.tempo |= read_byte();
-                                     skip(len - 3);
-=end
+              a = read_byte
+              b = read_byte
+              c = read_byte
+              queue = 0 # ???
+              # this is microseconds per q.   so 120qpm => 60_000ms/120q = 500mspq
+              # FIXME: I doubt TempoEvent knows anything about mspq???
+              # It must be converted to what TempoEvent expects...
+              # and what about the queue?
+              fail("FIXME")
+              event = TempoEvent.new queue, (a << 16) + (b << 8) + c
+               # ?????
+              skip(len - 3) if len > 3
             end
-          else # ignore all other meta events
+          when 0x0 # sequence nr of the track
+            invalid unless len == 1
+            track.sequencenr = read_int(2)
+          when 0x1 # description
+            track.description = @file.read(len)
+          when 0x2 # copyright
+            track.copyright = @file.read(len)
+          when 0x3 # name
+            track.name = @file.read(len)
+          when 0x4 # voicename
+            track.voicename = @file.read(len)
+          when 0x5 # lyrics
+            track.lyrics = @file.read(len)
+          when 0x6 # lyrics
+            track.marker = @file.read(len)
+          when 0x7 # cue point
+            track.cue_point = @file.read(len)
+          when 0x58 # time signature
+            invalid unless len == 4
+            numerator = read_byte
+            denominator = read_byte
+            ticks_per_beat = read_byte
+            skip 1  # last byte == ????
+            track.time_signature = numerator, denominator
+            track.ticks_per_beat = ticks_per_beat
+          when 0x59 # key signature
+            invalid unless len == 2
+            sf = read_byte # 0 == C, 1 == G, 2 == D
+                # but it says -7 is B so is that 11 now ???? This is stupid
+                # -128 = 0xff -127  = 0xfe
+                # so -7 should be 135 up to -1 which is 128
+            sf = 128 - sf if sf > 127  # and now F = -1 (at least I hope so)
+            # the next byte is 0 for Major.
+            track.key = [:C, :G, :D, :A, :E, :B, :'F#', :F, :'A#', :'D#', :'G#', :'C#'][sf], read_byte == 0
+          else # ignore all other meta events (ie 7f, sequencer specific)
             skip len
           end
         else
@@ -238,10 +304,14 @@ class MidifileParser
   def read_smf
     #    int header_len, type, time_division, i, err;
      # snd_seq_queue_tempo_t *queue_tempo;
-    #  the curren position is immediately after the "MThd" id
+    #  the curren position is immediately after the "MThd" id  MidiTracksHeaDer
     header_len = read_int(4)
     fail("#@file_name: invalid file format") if header_len < 6
     type = read_int 2
+    # OK, See http://faydoc.tripod.com/formats/mid.htm
+    # 0 == single track
+    # 1 = multiple tracks. They all start at the same time.
+    # 2 = multiple tracks, async. They may start at different times, using relative ticks.
     if type != 0 && type != 1
       fail "#@file_name: type #{type} format is not supported"
     end
@@ -249,14 +319,15 @@ class MidifileParser
     unless num_tracks.between?(1, 1000)
       fail "#@file_name: invalid number of tracks (#{num_tracks})"
     end
-    time_division = read_int 2
-    if time_division < 0
-      fail "#@file_name: invalid time division (#{time_division})"
-    end
-    soundblock = Soundblock.new(time_division)
+    time_division = read_int(2) or  # the number of deltaticks per beat (q)
+    # there is a problem here. The read_int will never ever return a negative number...
+    # So let's put it this way:  Interesting enough it can never be more than 2*28.
+      fail("#@file_name: premature end of file")
+    chunk = Soundchunk.new(nil, time_division)
     # read tracks
     num_tracks.times do
       # search for MTrk chunk
+      len = 0
       loop do
         id = read_id
         len = read_int 4 || fail("#@file_name: unexpected end of file when reading chunk")
@@ -266,9 +337,9 @@ class MidifileParser
         break if id == MTRK
         skip len
       end
-      track = new Track
+      track = Track.new chunk
       read_track(track, @file.pos + len)
-      soundblock << track
+      chunk << track  # only add it when complete
     end
   end
 
@@ -348,12 +419,26 @@ class MidifileParser
     File.open(@file_name == '-' ? 0 : @file_name, "rb:binary") do |file|
       @file = file
       file_offset = 0
-      case read_id
+      id = read_id
+#       puts "#{File.basename(__FILE__)}:#{__LINE__}:id=#{'%x' % id},MTHD=#{'%x' % MTHD},RIFF=#{'%x' % RIFF}"
+      case
       when MTHD then read_smf
       when RIFF then read_riff
       else fail("#@file_name is not a Standard MIDI File")
       end
     end
+  end
+end # class MidifileParser
+
+# plays a chunk
+class Player
+  private
+  def initialize sequencer, ports
+    @sequencer, @ports = sequencer, ports
+  end
+  public
+
+  def play chunk
   end
 end
 
@@ -393,6 +478,7 @@ Sequencer.new('rplaymidi') do |sequencer|
 #   puts "options=#@options"
   fail("Please specify [a] destination port[s] with --port.") if @options[:ports].empty?
   #  the first created port is 0 anyway, but let's make sure ...
+  require_relative 'midiqueue'
   MidiPort.new(sequencer, 'rplaymidi', port: 0, midi_generic: true, application: true) do |source_port|
     MidiQueue.new(sequencer, 'rplaymidi') do |queue|
                                      #  the queue is now locked, which is just fine
@@ -408,7 +494,7 @@ Sequencer.new('rplaymidi') do |sequencer|
       end
       for file_name in file_names
         soundblock = MidifileParser.new(file_name, @options[:ports].length, source_port).run
-        Player.new(sequencer, soundblock, @options[:ports]).play
+        Player.new(sequencer, @options[:ports]).play soundblock
       end
     end
   end

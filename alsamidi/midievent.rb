@@ -93,7 +93,9 @@ To create an event use Sequencer.input_event
             @sender_queue = v # LEAVE THE HACKING to alsa_midi_event yes please... .respond_to(:id) ? v.id : v
           when :tick
             @tick = v
-            puts "#{File.basename(__FILE__)}:#{__LINE__}:@tick:=#{v}"
+#             puts "#{File.basename(__FILE__)}:#{__LINE__}:@tick:=#{v}"
+          when :queue_id
+            @queue_id = v
           when :time_mode_tick then @flags[:time_mode_tick] = v; @flags[:time_mode_real] = !v
           when :time_mode_real then @flags[:time_mode_tick] = !v; @flags[:time_mode_real] = v
           when :time_mode_relative
@@ -480,6 +482,8 @@ To create an event use Sequencer.input_event
     alias :data :value
   end
 
+  SysexEvent = SystemExclusiveEvent
+
   class StartEvent < MidiEvent
     private
     # new Sequencer, event
@@ -613,6 +617,7 @@ To create an event use Sequencer.input_event
     alias :position :value
   end
 
+   # There is also a META Tempo bit in a MIDI file.
   class TempoEvent < QueueEvent
     private
 =begin

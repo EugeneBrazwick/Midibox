@@ -29,24 +29,7 @@ IMPORTANT: never been tested on writing correct MIDI files!
 
 # /* TODO: sequencer queue timer selection */
 
-require_relative './alsa_midi.so'
-
-def trace onoff = true
-  if onoff
-    set_trace_func -> event, file, line, id, binding, classname do
-      printf "%8s %s:%-2d %-15s %-15s\n", event, file, line, classname, id
-    end
-    if block_given?
-      begin
-        yield
-      ensure
-        set_trace_func nil
-      end
-    end
-  else
-    set_trace_func nil
-  end
-end
+require_relative 'rrts'
 
 include RRTS::Driver
 

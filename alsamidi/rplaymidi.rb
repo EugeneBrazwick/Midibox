@@ -40,11 +40,12 @@ MIDI_BYTES_PER_SEC = 31_250 / (1 + 8 + 2)
 # Well that depends on the rrecordmidi param --split-channels!!
 class Track
   private
-  def initialize chunk_or_block
+  def initialize chunk_or_block = nil, params = nil
     @owner = chunk_or_block
-    @events = []
-    @end_tick = 0 # length of this track, in ticks
-    @channel = nil # as originally recorded
+    @events = nil
+#     @end_tick = 0 # length of this track, in ticks  WE DO NOT CARE
+    @channel = nil # as originally recorded. A track can have at most one channel
+    @portname = nil # as originally recorded
     @time_signature = [4, 4] # ie 4/4
     @ticks_per_beat = 384
     @key = :C; # then :'C#', :D .... :B
@@ -52,6 +53,21 @@ class Track
     @description = @copyright = @name = @voicename = @lyrics = ''
     @marker = ''
     @cue_point = ''
+    set(params) if params
+  end
+
+  def handleNoteOff event
+    # locate the last NoteOn in @events with the same value.
+    i = @events.length
+    v = event.value
+    i -= 1 while i > 0 && @events[i - 1].value != v
+    return false if i == 0
+    i -= 1
+    on_ev = @events[i]
+    @events[i] = NoteEvent.new(event.channel, v, on_ev.velocity,
+                               duration: event.tick - on_ev.tick, off_velocity: event.velocity,
+                               source: event.source, time: on_ev.time)
+    return true
   end
 
   public
@@ -60,7 +76,50 @@ class Track
   attr_accessor :time_signature, :ticks_per_beat
   attr_accessor :description, :copyright, :name, :voicename, :lyrics, :marker
   attr_accessor :cue_point
-end
+
+  def << event
+    case event.type
+    when :controller
+      if event.param == RRTS::Driver::MIDI_CTL_LSB_BANK &&
+          last = @events.last && last && last.type == :controller &&
+          last.param == RRTS::Driver::MIDI_CTL_MSB_BANK
+        last.value = [last.value, event.value]
+        return
+      end
+    when :pgmchange
+      if last && last.param == RRTS::Driver::MIDI_CTL_MSB_BANK
+        value = Array === last.value ? last.value : [last.value]
+        value << event.value
+        event.value = value
+        @events[-1] = event
+        return
+      end
+    when :noteon
+      return if event.velocity == 0 && handleNoteOff(event)
+    when :noteoff
+      handleNoteOff(event) and return
+    end
+    @events << event
+  end
+
+  def set params
+    for k, v in params
+      case k
+      when :seqnr, :sequencenr then @sequencenr = v
+      when :portnr then @portnr = v
+      when :channel then @channel = v
+      when :owner then @owner = v
+      else raise RRTSError.new("illegal param '#{k}' for track")
+      end
+    end
+    @events ||= []
+  end
+
+  def each &block
+    @events.each &block
+  end
+
+end # Track
 
 # Let's use 'block' for a specific timeline-part of some bars.
 # Blocks can be nested and stuck together.
@@ -68,19 +127,25 @@ end
 class Soundchunk
   private
   def initialize source_port, time_division
-    # MIDI files don't store this!
-    @source_clientname = source_port && source_port.client.name
-    @source_portname = source_port && source_port.name
-    @tracks = []
+    @tracks = {}
     @smpte_timing = (time_division & 0x8000) != 0;
+    @template_track = nil
   end
   public
 
-  def << track
-    @tracks << track
-  end
-
   attr :smpte_timing, :tracks, :source_clientname, :source_portname
+
+  # for each recorded group of metadata we store that in this 'template'
+  attr_accessor :template_track
+
+  # returns (may create) a track for this seq, port and channel
+  def [](seqnr, portnr, channel)
+    key = "#{seqnr}:#{portnr}:#{channel}"
+    t = @tracks[key] and return t
+    t = @template_track.dup
+    t.set(owner: self, seqnr: seqnr, portnr: portnr, channel: channel)
+    @tracks[key] = t
+  end
 end
 
 @options = {:end_delay=>2,
@@ -174,13 +239,19 @@ class MidifileParser
   end
 
   # reads one complete track (MTrk) from the file
-  def read_track track, track_end
+  def read_track chunk, track_end_pos
     tick = 0
     last_cmd = nil
-#     fixed_channel = nil
-    port = 0
+    # metadata:
+    sequencenr = 0
+    portnr = 0
+    channel = 0
+
+    # track solely for storing metadata, only usefull if this arrives before
+#     # any other stuff!
+    chunk.template_track = Track.new
     #  the current file position is after the track ID and length
-    while @file.pos < track_end do
+    while @file.pos < track_end_pos do
       delta_ticks = read_var or break
       tick += delta_ticks
       c = read_byte or break
@@ -194,23 +265,25 @@ class MidifileParser
         cmd = last_cmd or invalid
       end
       status = cmd >> 4
-      ch = cmd & 0x0f # but not always
+      ch = (cmd & 0x0f) + 1 # but not always. And MidiEvent uses 1..16!
 #       if fixed_channel
 #         puts "ALERT: fixed_channel=#{fixed_channel}, ch=#{ch}" if fixed_channel != ch
 #       else
 #         fixed_channel = ch
 #       end
       case status
-      when 0x8
+      when 0x8 # NoteOff
         value = read_byte & 0x7f
         read_byte
+        puts "#{File.basename(__FILE__)}:#{__LINE__}:NoteOffEvent"
         event = NoteOffEvent.new ch, value
-      when 0x9, 0xa
-        track.channel = ch
+      when 0x9, 0xa  # NoteOn KeyPress
+#         track.channel = ch
         value = read_byte & 0x7f
         vel = read_byte & 0x7f
+#         puts "#{File.basename(__FILE__)}:#{__LINE__}:NoteOnEvent"
         event = (status == 0x9 ? NoteOnEvent : KeypressEvent).new ch, value, vel
-      when 0xb
+      when 0xb # Controller
         param = read_byte & 0x7f
         value = read_byte & 0x7f
         event = ControllerEvent.new ch, param, value
@@ -231,22 +304,23 @@ class MidifileParser
         when 0xff # meta event
           c = read_byte
           len = read_var or invalid
+          # I assume here that normally sequencenr + portnr are in front of the file.
           case c
           when 0x21  # port number
             invalid if len < 1
-            port = read_byte % @port_count
+            chunk.template_track.portnr = portnr = read_byte # ????? % @port_count
             # This is the recorded port number. See rrecordmidi.
             # But since this is basicly an internal number it is rather useless.
             # What we need is the name!!
             skip(len - 1) if len > 1
             puts "#{File.basename(__FILE__)}:#{__LINE__}:Received META event with portnr: #{port}"
           when 0x2f  # end of track
-            track.end_tick = tick
-            @file.pos = track_end
+#             chunk.end_tick = tick
+            @file.pos = track_end_pos
             return
           when 0x51 # tempo
             invalid if len < 3
-            if track.owner.smpte_timing # SMPTE timing doesn't change
+            if chunk.smpte_timing # SMPTE timing doesn't change
               skip len
             else
               a = read_byte
@@ -263,29 +337,29 @@ class MidifileParser
             end
           when 0x0 # sequence nr of the track
             invalid unless len == 1
-            track.sequencenr = read_int(2)
+            chunk.template_track.sequencenr = sequencenr = read_int(2)
           when 0x1 # description
-            track.description = @file.read(len)
+            chunk.template_track.description = @file.read(len)
           when 0x2 # copyright
-            track.copyright = @file.read(len)
+            chunk.template_track.copyright = @file.read(len)
           when 0x3 # name
-            track.name = @file.read(len)
+            chunk.template_track.name = @file.read(len)
           when 0x4 # voicename
-            track.voicename = @file.read(len)
+            chunk.template_track.voicename = @file.read(len)
           when 0x5 # lyrics
-            track.lyrics = @file.read(len)
+            chunk.template_track.lyrics = @file.read(len)
           when 0x6 # lyrics
-            track.marker = @file.read(len)
+            chunk.template_track.marker = @file.read(len)
           when 0x7 # cue point
-            track.cue_point = @file.read(len)
+            chunk.template_track.cue_point = @file.read(len)
           when 0x58 # time signature
             invalid unless len == 4
             numerator = read_byte
             denominator = read_byte
             ticks_per_beat = read_byte
             skip 1  # last byte == ????
-            track.time_signature = numerator, denominator
-            track.ticks_per_beat = ticks_per_beat
+            chunk.template_track.time_signature = numerator, denominator
+            chunk.template_track.ticks_per_beat = ticks_per_beat
           when 0x59 # key signature
             invalid unless len == 2
             sf = read_byte # 0 == C, 1 == G, 2 == D
@@ -294,7 +368,7 @@ class MidifileParser
                 # so -7 should be 135 up to -1 which is 128
             sf = 128 - sf if sf > 127  # and now F = -1 (at least I hope so)
             # the next byte is 0 for Major.
-            track.key = [:C, :G, :D, :A, :E, :B, :'F#', :F, :'A#', :'D#', :'G#', :'C#'][sf], read_byte == 0
+            chunk.template_track.key = [:C, :G, :D, :A, :E, :B, :'F#', :F, :'A#', :'D#', :'G#', :'C#'][sf], read_byte == 0
           else # ignore all other meta events (ie 7f, sequencer specific)
             skip len
           end
@@ -304,9 +378,11 @@ class MidifileParser
       else
         invalid
       end
+      event.source = @source_port
+      event.time = tick
+      chunk[sequencenr, portnr, event.channel || 0] << event
+#       puts "#{File.basename(__FILE__)}:#{__LINE__}:Adding event to track #{track}"
     end
-    event.port = @source_port
-    event.tick = tick
   end
 
   # read an entire MIDI file
@@ -346,10 +422,9 @@ class MidifileParser
         break if id == MTRK
         skip len
       end
-      track = Track.new chunk
-      read_track(track, @file.pos + len)
-      chunk << track  # only add it when complete
+      read_track(chunk, @file.pos + len)
     end
+    chunk
   end
 
   def read_riff
@@ -430,16 +505,59 @@ class MidifileParser
       file_offset = 0
       id = read_id
 #       puts "#{File.basename(__FILE__)}:#{__LINE__}:id=#{'%x' % id},MTHD=#{'%x' % MTHD},RIFF=#{'%x' % RIFF}"
-      case
+#       RRTS::trace {
+      return case
       when MTHD then read_smf
       when RIFF then read_riff
       else fail("#@file_name is not a Standard MIDI File")
       end
+#       }
     end
   end
 end # class MidifileParser
 
-# plays a chunk
+=begin
+
+plays a chunk
+We now have tracks to be played 'merged'. Each track is an array of events.
+All tracks are in chunk.tracks.values.
+
+So we must keep track of what goes first. The crude method would be to
+check all tracks for there first note to play. Which is not the first note
+of the track. So we need an enumerator per track.
+1)   1 1            6                    41
+2)      2  3  4
+3)   1  2 2         6 7                 40
+4)                                            234 ...
+
+   Enumerator has no current or peek, only next.
+   Oh, in 1.9.1 it has peek.
+   In the example above track 4 is not really interesting until far in the
+   future.
+
+   So we can then store the enumerators in a priority queue. Where the peek
+   (which is I assume the next, without removing it) time makes the order,
+   followed by channel to keep chords lined out if they are over several channels.
+
+   BinTree
+   Top.left  left >= self
+   Top.right right >= self
+
+   (1)   ->   (1(2)) -> (1(2)(1)) -> (1(2(234))(1))
+   When discarding the top the next time comes forward. If it is still
+   less or equal than both subbranches, we don't have to do anything.
+   Otherwise the treetrunk is cut off and either the left or the right
+   (the smallest) becomes the new trunk after which we store the top of
+   the losing branch in the new top. However that top may have branches too.
+
+   Ordinarily you cannot expect more than 100 tracks playing.
+
+   Nodes in the tree are PriorityTree for branching nodes and single
+   Tracks for leaves. But it seems better to pack each track in a tree
+   node, branches or not. When reordening the tree no node creation
+   will be required.
+=end
+
 class Player
   private
   def initialize sequencer, ports
@@ -448,6 +566,9 @@ class Player
   public
 
   def play chunk
+    require 'yaml'
+#     puts "#{File.basename(__FILE__)}:#{__LINE__}:chunk=#{chunk.inspect}"  A MESS!
+    YAML.dump(chunk, STDOUT)
   end
 end
 

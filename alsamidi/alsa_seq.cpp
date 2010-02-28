@@ -444,21 +444,22 @@ PARAM_IS_MSB_LSB_PAIR(uint param)
 }
 
 static inline void
-WRITE_TICK_IN_CHANNEL_i(VALUE v_tick, snd_seq_event_t &ev, bool have_sender_queue)
+WRITE_TIME_IN_CHANNEL_i(VALUE v_time, snd_seq_event_t &ev, bool have_sender_queue)
 {
-  if (!RTEST(v_tick)) return;
+  if (!RTEST(v_time)) return;
   if (!have_sender_queue)
     RAISE_MIDI_ERROR_FMT0("attempt to set timestamps, but no MidiQueue supplied");
   if (ev.flags & SND_SEQ_TIME_STAMP_TICK)
-      ev.time.tick = NUM2UINT(v_tick);
+      ev.time.tick = NUM2UINT(v_time);
   else
     {
-      ev.time.time.tv_sec = NUM2UINT(rb_ary_entry(v_tick, 0));
-      ev.time.time.tv_nsec = NUM2UINT(rb_ary_entry(v_tick, 1));
+      ev.time.time.tv_sec = NUM2UINT(rb_ary_entry(v_time, 0));
+      ev.time.time.tv_nsec = NUM2UINT(rb_ary_entry(v_time, 1));
     }
 }
 
-#define WRITE_TICK_IN_CHANNEL(t, e) WRITE_TICK_IN_CHANNEL_i(t, e, have_sender_queue)
+// depending on ev.flags we use tick or tv_sec/tv_nsec tuple (array)
+#define WRITE_TIME_IN_CHANNEL(t, e) WRITE_TIME_IN_CHANNEL_i(t, e, have_sender_queue)
 
 /*
 int AlsaSequencer_i#event_output(ev)
@@ -523,9 +524,9 @@ wrap_snd_seq_event_output(VALUE v_seq, VALUE v_ev)
       VALUE v_typeflags = rb_funcall(v_ev, rb_intern("debunktypeflags_i"), 0);
       ev.type = NUM2INT(rb_ary_entry(v_typeflags, 0));
       ev.flags = NUM2INT(rb_ary_entry(v_typeflags, 1)); // from event.flags SND_SEQ_TIME_STAMP_TICK | SND_SEQ_TIME_STAMP_ABS;
-      VALUE v_tick = rb_iv_get(v_ev, "@tick");
+      VALUE v_time = rb_iv_get(v_ev, "@time");
       unsigned char *ch_ref = 0; // We only use that it is 0 or not !!!!
-      WRITE_TICK_IN_CHANNEL(v_tick, ev);
+      WRITE_TIME_IN_CHANNEL(v_time, ev);
       VALUE v_destport = rb_iv_get(v_ev, "@dest");
 
       /* This is probably incorrect. But aplaymidi uses explicit senders iso a connection

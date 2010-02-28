@@ -64,9 +64,12 @@ To create an event use Sequencer.input_event
         #       puts "called populate, @type=#@type, type=#{type}"
       else
         @type = arg0
+        # Don't use flags, as it seems rather costly using a hash here.
         @flags = { :time_mode_absolute=>true, :time_mode_ticks=>true }  # since this is SND_SEQ_TIME_MODE_ABS which is 0.
-        @channel = @velocity = @duration = @value = @param = @source = @dest = @queue = nil
-        @off_velocity = @tick = nil
+        @channel = @velocity = @value = @param = @source = nil
+        # @dest = @queue = nil  used???
+        # @off_velocity = @duration = hardly ever used
+        @time = nil
 #         puts "#{File.basename(__FILE__)}:#{__LINE__}:@tick:=nil"
         for k, v in arg1
           case k
@@ -81,8 +84,11 @@ To create an event use Sequencer.input_event
               @value = v
             end
           when :channel
-            #RTTSError.new("illegal channel #{v}") unless v.between?(0, 15)
+            #RTTSError.new("illegal channel #{v}") unless v.between?(1, 16)
+             # can be a range or maybe even an array of channels!!
+            # or an array of ranges...
             @channel = v
+#             puts "#{File.basename(__FILE__)}:#{__LINE__}:channel:=#@channel"
           when :duration then @duration = v
           when :velocity then @velocity = v
           when :off_velocity then @off_velocity = v
@@ -91,8 +97,8 @@ To create an event use Sequencer.input_event
           when :dest, :destination then @dest = v
           when :sender_queue
             @sender_queue = v # LEAVE THE HACKING to alsa_midi_event yes please... .respond_to(:id) ? v.id : v
-          when :tick
-            @tick = v
+          when :tick, :time
+            @time = v
 #             puts "#{File.basename(__FILE__)}:#{__LINE__}:@tick:=#{v}"
           when :queue_id
             @queue_id = v
@@ -189,7 +195,8 @@ To create an event use Sequencer.input_event
     # Examples: :start, :sensing, :pgmchange, :noteon
     attr :type
     # timestamp of event, either in ticks (int) or realtime [secs, nanosecs]
-    attr :time
+    attr_accessor :time
+    alias :tick :time
     # this should be kept simple. These are MidiPorts
     attr_accessor :source, :dest
     # receiver queue.
@@ -314,6 +321,7 @@ To create an event use Sequencer.input_event
 
   class NoteEvent < VoiceEvent
     private
+    # NoteEvent.new channel, note, velocity [, ...]
     def initialize arg0, arg1 = nil, velocity = nil, params = {}
       case arg1 when AlsaMidiEvent_i then super(arg0, arg1)
       else
@@ -366,7 +374,7 @@ To create an event use Sequencer.input_event
 
     In addition the option 'coarse:true' can be given to actually only send to coarse
     value where we use value<<7 as effictive value
-    It is also possible to pass a tuple as 'value'. 
+    It is also possible to pass a tuple as 'value'.
     ControllerEvent.new channel, :bank_select, [1, 23]
     This would select bank 1*128+23.
 =end

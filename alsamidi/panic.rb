@@ -1,4 +1,4 @@
-#!/usr/bin/ruby1.9.1
+#!/usr/bin/ruby
 
 # Sends a SHUT UP event to port ARGV[0]
 
@@ -18,7 +18,12 @@
 require_relative 'sequencer'
 include RRTS
 Sequencer.new('rplaymidi') do |sequencer|
-  out_port = sequencer.parse_address ARGV[0]
+  if ARGV[0]
+    out_port = sequencer.parse_address ARGV[0]
+  else
+    STDERR.puts("Please specify a port address (like '20:1')")
+    exit 1
+  end
   src_port = MidiPort.new sequencer, 'panic', midi_generic:true, application:true
   src_port.connect_to out_port
   require_relative 'midiqueue'

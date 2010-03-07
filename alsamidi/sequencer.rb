@@ -14,6 +14,8 @@ extend Forwardable
   OutputOnly = SND_SEQ_OPEN_OUTPUT
   Blocking = false
   NonBlocking = true
+  PollIn = POLLIN
+  PollOut = POLLOUT
 private
 =begin
    Sequencer.new name, [params] [ block]
@@ -25,10 +27,14 @@ private
       clientname - unset
       map_ports - default true if clientname yields true
       blockingmode - default Blocking
-    block - encapsulation for automatic close. Works like IO::open.
+      dump_notes - if true dump snd_seq_event_t dumps to stderr and do NOT play them!!
+    block - encapsulation for automatic close. Works like IO::open. But notice that he ensures
+    the sequencer is closed.  This means also that it will not respond to ^C immediately, since
+    it will flush its buffers first.  To avoid this install a proper signal handler.
 =end
   def initialize client_name = nil, params = nil, &block
     @client = @handle = nil
+    @client_id = @ports = @ports_index = @clients = nil  # not guaranteed open does this
     open client_name, params, &block
   end
 
@@ -62,9 +68,9 @@ Just use 'new'.
   def open client_name = nil, params = nil
     close
     name = 'default'
-    openmode = Duplex
-    blockingmode = Blocking
+    openmode, blockingmode = Duplex, Blocking
     map_ports = client_name
+    dump_notes = false
     if params
       for key, value in params
         case key
@@ -73,6 +79,7 @@ Just use 'new'.
         when :blockingmode then blockingmode = value
         when :clientname then clientname = value
         when :map_ports then map_ports = value
+        when :dump_notes then dump_notes = true
         else
           raise RRTSError.new("Illegal parameter '#{key}' for Sequencer")
         end
@@ -80,6 +87,7 @@ Just use 'new'.
     end
     @handle = snd_seq_open name, openmode, blockingmode
     begin
+      @handle.dump_notes = true if dump_notes
       @handle.client_name = client_name if client_name
       @client_id = @handle.client_id
       ports! if map_ports
@@ -101,8 +109,10 @@ Just use 'new'.
   # closes the sequencer. Must be called to free resources, unless a block is passed to 'new'
   def close
     return unless @handle
-    @handle.close
-    @handle = @client = @client_id = @ports = @ports_index == @clients = nil
+    t = @handle
+    @handle = nil
+    t.close
+    @client = @client_id = @ports = @ports_index = @clients = nil
   end
 
   # MidiClient client. us.
@@ -210,15 +220,27 @@ Returns:
     return klass.new(self, ev), more
   end
 
-  # Access to level lower.  PRUNE THIS ASAP!
   def_delegators :@handle, :poll_descriptors, :poll_descriptors_count, :poll_descriptors_revents,
-                 :drain_output, :start_queue, :nonblock, :alloc_named_queue, :set_queue_tempo,
+                 :drain_output, :start_queue, :nonblock,
+                 # do not use alloc_named_queue, but say 'MidiQueue.new'
+                 :alloc_named_queue,
+                 :set_queue_tempo,
                  :set_output_buffer_size, :output_buffer_size,
                  :set_input_buffer_size, :input_buffer_size, :sync_output_queue,
-                 :create_port, :event_output, :connect_from, :connect_to, :queue_status
+                 :create_port, :event_output, :queue_status,
+                 :event_output_buffer, :event_output_direct, :client_name,
+                 :remove_events, :client_pool, :client_pool=, :client_pool_output=,
+                 :client_pool_output_room=, :client_pool_input=, :reset_pool_output,
+                 :reset_pool_input
+
+  # the following two are here for completeness sake. Please use the MidiPort methods instead!
+  def_delegators :@handle, :connect_from, :connect_to
+
+  # drain_output is just a flush, so let's support that name:
+  def_delegator :@handle, :drain_output, :flush
 
   # this means a sequencer behaves a lot like a client
-  def_delegator :@client, :name, :client_name
+  #def_delegator :@client, :client_name, :name  CONFLICTS with 'name == default'... COnfusing
   def_delegators :@client, :broadcast_filter?, :error_bounce?, :event_lost, :events_lost,
                            :num_ports, :num_open_ports, :type
 
@@ -232,17 +254,27 @@ Returns:
   # MidiPort parse_address pattern. In addition to '0:0' or 'UM-2:1' we also understand 'UM-2 PORT2'
   # May throw AlsaMidiError if the port is invalid or does not exist
   def parse_address portspec
-#     puts "#{File.basename(__FILE__)}:#{__LINE__}:parse_address(#{portspec.inspect})"
+#     puts "#{File.basename(__FILE__)}:#{__LINE__}:parse_address(#{portspec.inspect}),ports=#{ports.keys.inspect}"
     midiport = ports[portspec] and return midiport
 #     puts "#{File.basename(__FILE__)}:#{__LINE__}:parse_address(#{portspec.inspect})"
     port(@handle.parse_address(portspec))
   end
 
-  # MidiPort port_with_id clientid, portid
+  # MidiPort port clientid, portid
+  # MidiPort port portspecstring
+  # MidiPort port clientstring, portid
+  # MidiPort port :specialportsymbol ,  supported are :system_timer and :subscribers_unknown
+  # MidiPort port [clientid, portid]
   # The port must exist
   def port clientid, portid = nil
-    case clientid when Array then clientid, portid = clientid end
-    t = @ports_index[clientid]
+    case clientid
+    when Array then return port(clientid[0], clientid[1])
+    when String
+      return parse_address(clientid) unless portid
+    when :subscribers_unknown then return subscribers_unknown
+    when :system_timer then return system_timer
+    end
+    t = @ports_index && @ports_index[clientid]
     unless t && t[portid]
       ports!
       t = @ports_index[clientid]
@@ -255,15 +287,24 @@ Returns:
   end
 
   @@subscribers_unknown_port = nil
+  @@system_timer_port = nil
 
   # The special port 254:253
   def subscribers_unknown_port
     @@subscribers_unknown_port ||= MidiPort.new(self, 'SUBSCRIBERS UNKNOWN',
-                                                port: SND_SEQ_ADDRESS_SUBSCRIBERS,
-                                                client_id: SND_SEQ_ADDRESS_UNKNOWN)
+                                                client_id: SND_SEQ_ADDRESS_SUBSCRIBERS,
+                                                port: SND_SEQ_ADDRESS_UNKNOWN)
+  end
+
+  # The special port 0:0
+  def system_timer_port
+    @@system_timer_port ||= MidiPort.new(self, 'SYSTEM TIMER',
+                                         client_id: SND_SEQ_CLIENT_SYSTEM,
+                                         port: SND_SEQ_PORT_SYSTEM_TIMER)
   end
 
   alias :subscribers_unknown :subscribers_unknown_port
+  alias :system_timer :system_timer_port
 
   def open?
     @handle
@@ -272,7 +313,7 @@ Returns:
   # MidiClient[clientid] clients
   # The result is cached, use clients! or ports! to reload
   def clients
-    return @clients if @clients
+    @clients and return @clients
     @clients = {}
     cinfo = snd_seq_client_info_malloc
     cinfo.client = -1

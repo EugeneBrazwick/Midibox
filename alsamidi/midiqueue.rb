@@ -63,7 +63,8 @@ module RRTS
     # free
     def free
       return unless @id
-      @seq_handle.free_queue @id
+      t, @seq_handle = @seq_handle, nil
+      t.free_queue @id
       @id = @seq_handle = @sequencer = nil
     end
 
@@ -94,38 +95,111 @@ module RRTS
       self
     end
 
+#     ConditionMap = {:input=>SND_SEQ_REMOVE_INPUT, :output=>SND_SEQ_REMOVE_OUTPUT,
+#                     :dest=>SND_SEQ_R
+
+=begin
+    Remove elements according to specification
+    With no arguments it removes all output events except NoteOffs.
+    Otherwise pass a bitset as expected by snd_seq_remove_events_set_condition
+    Or a hash with the following options:
+      - input: true
+      - output: true
+      - tag: string,  must match this tag
+      - time_before: time
+      - time_after: time
+      - time_ticks or ticks:  int. With exactly this 'tick' value
+      - dest_channel or channel: on this channel
+      - dest: on this destination port
+      - ignore_off: do NOT remove any NoteOffs.
+
+    A mix of options requires each one to be set. There is no constraint on options
+    that are not set. To remove all events pass 0 or {}.
+
+    Experimentation must confirm that NoteOn with velocity 0 is taken as a NoteOff.
+=end
+    def clear events_to_remove = nil
+      return unless @seq_handle
+      cond = 0
+      remove_ev = snd_seq_remove_events_malloc
+      if Hash === events_to_remove
+        for k, v in events_to_remove
+          case k
+          when :input then cond |= SND_SEQ_REMOVE_INPUT
+          when :output then cond |= SND_SEQ_REMOVE_OUTPUT
+          when :ignore_off then cond |= SND_SEQ_REMOVE_IGNORE_OFF
+          when :dest_channel, :channel
+            cond |= SND_SEQ_REMOVE_CHANNEL
+            remove_ev.channel = v
+          when :dest
+            cond |= SND_SEQ_REMOVE_DEST
+            remove_ev.dest = v
+          when :time_before
+            cond |= SND_SEQ_REMOVE_TIME_BEFORE
+            remove_ev.time = v
+          when :time_after
+            cond |= SND_SEQ_REMOVE_TIME_AFTER
+            remove_ev.time = v
+          when :time_tick, :tick
+            cond |= SND_SEQ_REMOVE_TIME_TICK
+            remove_ev.time_tick = v
+          when :tag_match, :tag
+            cond |= SND_SEQ_REMOVE_TAG_MATCH
+            remove_ev.tag = v
+          else
+            RAISE_MIDI_ERROR_FMT1("illegal option '#{k}' for clear")
+          end
+        end
+      else
+        cond = events_to_remove || (SND_SEQ_REMOVE_IGNORE_OFF | SND_SEQ_REMOVE_OUTPUT)
+      end
+      #   snd_seq_remove_events_t *remove_ev;
+      remove_ev.queue = @id
+      remove_ev.condition = cond
+      @seq_handle.remove_events remove_ev
+    end
+
+    alias :remove_events :clear
     attr :sequencer
   end # MidiQueue
 
   class Tempo
     extend Forwardable
+    include Driver
     private
 
 =begin
      Tempo.new beats [,params]
-     Tempo.new frames, smtp_timing: true [,params]
+     Tempo.new frames, smpte_timing: true [,params]
      Parameters:
-         beats - quarters per minute
-         smpte_timing - using frames, not beats
+         beats - quarters per minute, defaults to 120
+         smpte_timing - using frames, not beats (quarters)
          ticks - overrides default of 384 for beats, or 40 for frames
 =end
 
      Frames2TempoPPQ = { 24=>[500_000, 12], 25=>[400_000, 10], 29=>[100_000_000, 2997], 30=>[500_000, 15] }
 
-     def initialize beats, params = nil
+     def initialize beats = 120, params = nil
        frames = nil
-       smpte_timing, ticks = false, 384
+       @smpte_timing, ticks = false, 384
        if params
          for k, v in params
            case k
            when :smpte_timing
-             smpte_timing, ticks = true, 40 if v
-           when :ticks then ticks = v
+             @smpte_timing, ticks = true, 40 if v
+           when :ticks
+             ticks = v
+           when :ticks_per_quarter, :ticks_per_beat
+             raise RRTSError.new("illegal parameter '#{k}' for Tempo") if @smpte_timing
+             ticks = v
+           when :ticks_per_frame
+             raise RRTSError.new("illegal parameter '#{k}' for Tempo") unless @smpte_timing
+             ticks = v
            else raise RRTSError.new("illegal parameter '#{k}' for Tempo")
            end
          end
        end
-       if smpte_timing
+       if @smpte_timing
          frames, beats = beats, nil
          fail if frames > 255
          # ALSA doesn't know about the SMPTE time divisions, so
@@ -145,7 +219,6 @@ module RRTS
        @handle = other.copy_to_i
      end
 
-
      protected
 
 #      attr :handle  DIRTY!
@@ -163,5 +236,8 @@ module RRTS
                               :tempo, :skew, :skew_base, :ppq
      def_delegator :@handle, :queue, :queue_id
 
+     def smpte_timing?
+       @smpte_timing
+     end
   end  # Tempo
 end # RRTS

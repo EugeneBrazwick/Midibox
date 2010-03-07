@@ -1,7 +1,12 @@
 0001  wo feb 24 11:40:47 CET 2010 TODO event_output MidiEvent support
-0002  do feb 25 22:22:53 CET 2010 TODO make rplaymidi work as a two step system
+      za mrt  6 22:48:43 CET 2010 DONE
+0002  do feb 25 22:22:53 CET 2010 TODO make rplaymidi++ work as a two step system
                                        a) build an in-memory chunk     NODE -> midifile->chunk
                                        b) play the tracks in the chunk NODE -> chunk -> device[s]
 0003 za feb 27 21:50:12 CET 2010 BUG rplaymidi reads a NoteOn without a NoteOff
          in fixtures/eurodance.midi.  Note 12, Rhythm track. I believe this was recorded
          with arecordmidi. So who's to blame? Is there an official midi file dumper somewhere?
+0004 do mrt  4 23:20:06 CET 2010 BUG rmidiroute.rb:14:in `block in midi_route': undefined method `set_subs'
+0005 do mrt  4 23:24:01 CET 2010 TODO writing ev: param := ':modwheel', reading same event -> param == 1.
+                                      This is an inconsistency. Must be mapped back.
+     za mrt  6 22:48:43 CET 2010 DONE

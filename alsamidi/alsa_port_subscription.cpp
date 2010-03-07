@@ -9,6 +9,8 @@
 
 VALUE alsaPortSubscriptionClass;
 
+// External doc: http://www.alsa-project.org/~tiwai/alsa-subs.html
+
 /* client, port PortSubscription#dest
 
 Get destination address of a port_subscribe container.

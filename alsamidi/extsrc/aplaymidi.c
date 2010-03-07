@@ -31,6 +31,35 @@
 #include "aconfig.h"
 #include "version.h"
 
+static void
+DUMP_EVENT(snd_seq_event_t *ev)
+{
+  // some types: NoTE == 5. NOTEON == 6 NOTEOFF = 7
+  // CONTROLLER = 10, PGMCHANGE = 11
+  // SYSEX = 130
+  fprintf(stderr, "DUMP(ev)->{type:%d, flags:%d, tag:%d, queue:%d\n", ev->type, ev->flags,
+          ev->tag, ev->queue);
+          if (snd_seq_ev_is_real(ev))
+            fprintf(stderr, "\ttime: %d seconds, %d nanoseconds\n", ev->time.time.tv_sec,
+                    ev->time.time.tv_nsec);
+                    else
+                      fprintf(stderr, "\ttime: %d ticks\n", ev->time.tick);
+                    fprintf(stderr, "\tfrom %d:%d  to  %d:%d\n", ev->source.client, ev->source.port,
+                    ev->dest.client, ev->dest.port);
+                    if (snd_seq_ev_is_note_type(ev))
+                    {
+                      fprintf(stderr, "\tchannel: %d, note: %d, vel: %d, duration: %d, off_vel: %d\n",
+                      ev->data.note.channel, ev->data.note.note, ev->data.note.velocity,
+                      ev->data.note.duration, ev->data.note.off_velocity);
+                    }
+                    else if (snd_seq_ev_is_control_type(ev))
+                    {
+                      fprintf(stderr, "\tchannel: %d, param: %d, value: %d\n", ev->data.control.channel,
+                      ev->data.control.param, ev->data.control.value);
+                    }
+}
+
+
 /*
  * 31.25 kbaud, one start bit, eight data bits, two stop bits.
  * (The MIDI spec says one stop bit, but every transmitter uses two, just to be
@@ -738,6 +767,7 @@ static void play_midi(void)
 		/* this blocks when the output pool has been filled */
 		err = snd_seq_event_output(seq, &ev);
 		check_snd("output event", err);
+                DUMP_EVENT(ev);
 	}
 
 	/* schedule queue stop at end of song */

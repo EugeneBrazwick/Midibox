@@ -3,6 +3,7 @@
 // To create Makefile:    ruby ./extruby.rb
 
 // #define DUMP_API
+#define DEBUG
 
 #pragma implementation
 
@@ -16,11 +17,25 @@
 #include "alsa_midi_queue.h"
 #include "alsa_midi_client.h"
 #include "alsa_midi_port.h"
+#include "alsa_client_pool.h"
 #include <ruby/dl.h>
 #include <alsa/asoundlib.h>
 
 VALUE alsaSequencerClass;
 static VALUE alsaPollFdsClass;
+
+static size_t MIDI_BYTES_PER_SEC = 31250 / (1 + 8 + 2);
+
+#if defined (DEBUG)
+static bool AlsaSequencer_dump_notes = false;
+static VALUE
+AlsaSequencer_set_dump_notes(VALUE v_seq, VALUE v_on)
+{
+  AlsaSequencer_dump_notes = BOOL2INT(v_on);
+  return Qnil;
+}
+#endif
+
 
 /*
 int AlsaSequencer_i#close
@@ -34,6 +49,7 @@ Closes the sequencer client and releases its resources. After a client is closed
 SND_SEQ_EVENT_CLIENT_EXIT is broadcast to announce port. The connection between other clients are disconnected.
 Call this just before exiting your program.
 */
+
 
 static VALUE
 wrap_snd_seq_close(VALUE v_seq)
@@ -198,7 +214,7 @@ wrap_snd_seq_create_port(VALUE v_seq, VALUE v_portinfo)
 /*
 int AlsaSequencer_i#create_simple_port(name, caps, type)
 
-create a port - simple version
+create a port - simple version, buffering and queueing is not supported
 
 Parameters:
 seq     sequencer handle
@@ -340,38 +356,46 @@ wrap_snd_seq_event_input(VALUE v_seq)
   return rb_ary_new3(2, Data_Wrap_Struct(alsaMidiEventClass, 0/*mark*/, 0/*free*/, ev), INT2BOOL(r > 0));
 }
 
+static void
+DUMP_EVENT(snd_seq_event_t *ev, int line)
+{
+  // some types: NoTE == 5. NOTEON == 6 NOTEOFF = 7
+  // CONTROLLER = 10, PGMCHANGE = 11
+  // TEMPO = 35
+  // SYSEX = 130
+  const char *b = dump_event(ev, __FILE__, line);
+  fprintf(stderr, "%s\n", b);
+  free((void *)b);
+}
+
+typedef int (output_method)(snd_seq_t *, snd_seq_event_t *);
+
 // returns remaining nr of events (>=0)
-static inline VALUE do_event_output(snd_seq_t *seq, snd_seq_event_t *ev)
+static inline VALUE do_event_output(snd_seq_t *seq, snd_seq_event_t *ev, output_method *func)
 {
 //   fprintf(stderr, "***do_event_output tp=%d, ch=%d, source.client=%d,flags=%d\n", ev->type, snd_seq_ev_is_note_type(ev) ? ev->data.note.channel : snd_seq_ev_is_control_type(ev) ? ev->data.control.channel : -1, ev->source.client, ev->flags);
-  const int r = snd_seq_event_output(seq, ev);
+#if defined(DEBUG)
+  if (AlsaSequencer_dump_notes)
+    {
+      fprintf(stderr, "event_output(%s)\n", dump_event(ev));
+      return INT2NUM(0);
+    }
+#endif
+  const int r = (*func)(seq, ev);
   if (r < 0)
     {
       if (r == -EINVAL)
         {
           //HEURISTICS, probably this overflowed the queue.
-           // NOTEON=6, NOTEOFF=7
-          fprintf(stderr, "DUMP(ev)->{type:%d, flags:%d, tag:%d, queue:%d\n", ev->type, ev->flags,
-                  ev->tag, ev->queue);
-          if (snd_seq_ev_is_real(ev))
-            fprintf(stderr, "\ttime: %d seconds, %d nanoseconds\n", ev->time.time.tv_sec,
-                    ev->time.time.tv_nsec);
-          else
-            fprintf(stderr, "\ttime: %d ticks\n", ev->time.tick);
-          fprintf(stderr, "\tfrom %d:%d  to  %d:%d\n", ev->source.client, ev->source.port,
-                  ev->dest.client, ev->dest.port);
-          if (snd_seq_ev_is_note_type(ev))
-            {
-              fprintf(stderr, "\tchannel: %d, note: %d, vel: %d, duration: %d, off_vel: %d\n",
-                      ev->data.note.channel, ev->data.note.note, ev->data.note.velocity,
-                      ev->data.note.duration, ev->data.note.off_velocity);
-            }
+          // NOTEON=6, NOTEOFF=7
+          DUMP_EVENT(ev, __LINE__);
           RAISE_MIDI_ERROR_FMT1("sending event failed with alsa error %d, invalid data, but it "
                                 "could well be an outputqueue-overflow", r);
         }
       RAISE_MIDI_ERROR("sending event", r);
     }
-//   fprintf(stderr, "Event sent, remaining in queue: %d, outbufsz=%ld\n", r, snd_seq_get_output_buffer_size(seq));
+//DUMP_EVENT(ev, __LINE__); // Use ev.inspect
+    //   fprintf(stderr, "Event sent, remaining in queue: %d, outbufsz=%ld\n", r, snd_seq_get_output_buffer_size(seq));
   return INT2NUM(r);
 }
 
@@ -383,6 +407,8 @@ WRITE_CHANNEL_IN_EVENT(snd_seq_event_t &ev, VALUE v_channel)
   else
     ev.data.control.channel = (NUM2INT(v_channel) - 1) & 0xf;
 }
+
+static output_method *SENDCALLBACK_OUTPUTMETHOD_HACKFUNC = 0;
 
 static VALUE  // callback for rb_iterate, val3 = seq+ev+retval
 send_callback(VALUE v_channel, VALUE v_val3)
@@ -397,7 +423,7 @@ send_callback(VALUE v_channel, VALUE v_val3)
   Data_Get_Struct(v_seq, snd_seq_t, seq);
 //   fprintf(stderr, "%s:%d: in send_callback\n", __FILE__, __LINE__);
   WRITE_CHANNEL_IN_EVENT(*ev, v_channel);
-  VALUE v_retval = do_event_output(seq, ev);
+  VALUE v_retval = do_event_output(seq, ev, SENDCALLBACK_OUTPUTMETHOD_HACKFUNC);
 //   fprintf(stderr, "%s:%d: in send_callback\n", __FILE__, __LINE__);
   rb_ary_store(v_val3, 2, v_retval);
   return Qnil;
@@ -405,7 +431,8 @@ send_callback(VALUE v_channel, VALUE v_val3)
 
 // v_ev is a MidiEvent!
 static VALUE
-do_event_output(bool ch_ref, snd_seq_t *seq, VALUE v_seq, VALUE v_ev, snd_seq_event_t &ev)
+do_event_output(bool ch_ref, snd_seq_t *seq, VALUE v_seq, VALUE v_ev, snd_seq_event_t &ev,
+                output_method func)
 {
   if (ch_ref) // but no longer used. Bit of heuristics instead
     {
@@ -418,13 +445,16 @@ do_event_output(bool ch_ref, snd_seq_t *seq, VALUE v_seq, VALUE v_ev, snd_seq_ev
           VALUE val3 = rb_ary_new3(3, v_seq, vev, retval);
           // I hope this cast is valid?
 //           fprintf(stderr, "callng rb_iterate on v_channel\n");
+// FIXME: Not thread safe....
+          SENDCALLBACK_OUTPUTMETHOD_HACKFUNC = func;
           rb_iterate(rb_each, v_channel, (VALUE (*)(...))send_callback, val3);
+          SENDCALLBACK_OUTPUTMETHOD_HACKFUNC = 0;
           // return r; This is the enum!! (so v_channel)
           return rb_ary_entry(val3, 2);
         }
       WRITE_CHANNEL_IN_EVENT(ev, v_channel);
     }
-  VALUE r = do_event_output(seq, &ev);
+  VALUE r = do_event_output(seq, &ev, func);
 //   fprintf(stderr, "did do_event_output\n");
   return r;
 }
@@ -446,13 +476,22 @@ PARAM_IS_MSB_LSB_PAIR(uint param)
 static inline void
 WRITE_TIME_IN_CHANNEL_i(VALUE v_time, snd_seq_event_t &ev, bool have_sender_queue)
 {
+//   fprintf(stderr, "WRITE_TIME_IN_CHANNEL_i, have_sender_queue=%d\n", have_sender_queue);
   if (!RTEST(v_time)) return;
   if (!have_sender_queue)
     RAISE_MIDI_ERROR_FMT0("attempt to set timestamps, but no MidiQueue supplied");
-  if (ev.flags & SND_SEQ_TIME_STAMP_TICK)
+  // if (ev.flags & SND_SEQ_TIME_STAMP_TICK)  flags is 0!!!!!
+  if (!(ev.flags & SND_SEQ_TIME_STAMP_REAL))
+    {
+//       fprintf(stderr, "using time\n");
       ev.time.tick = NUM2UINT(v_time);
+    }
   else
     {
+//       fprintf(stderr, "splittin time in sec + nsec\n");
+      VALUE v_time = rb_check_array_type(v_time);
+      if (!RTEST(v_time))
+        RAISE_MIDI_ERROR_FMT1("flags = %x -> SND_SEQ_TIME_STAMP_REAL, but no array", ev.flags);
       ev.time.time.tv_sec = NUM2UINT(rb_ary_entry(v_time, 0));
       ev.time.time.tv_nsec = NUM2UINT(rb_ary_entry(v_time, 1));
     }
@@ -460,6 +499,41 @@ WRITE_TIME_IN_CHANNEL_i(VALUE v_time, snd_seq_event_t &ev, bool have_sender_queu
 
 // depending on ev.flags we use tick or tv_sec/tv_nsec tuple (array)
 #define WRITE_TIME_IN_CHANNEL(t, e) WRITE_TIME_IN_CHANNEL_i(t, e, have_sender_queue)
+
+static uint decode_a_note(const char *pat)
+{
+  int base; // 0..11  where C == 0 , C#==Db == 1 upto B=11
+  //int oct; // 0..9. 12*oct+base is the midi notenr. Max 12*9+11 = 119
+   // Chances are keyboards will refuse to play anything outside C1..C8 though
+
+  switch (*pat)
+    {
+    case 'C': case 'c': base = 0; break;
+    case 'D': case 'd': base = 2; break;
+    case 'E': case 'e': base = 4; break;
+    case 'F': case 'f': base = 5; break;
+    case 'G': case 'g': base = 7; break;
+    case 'A': case 'a': base = 9; break;
+    case 'B': case 'b': base = 11; break;
+    default: RAISE_MIDI_ERROR_FMT1("illegal note pattern '%s'", pat);
+    }
+  int i = 1;
+  if (pat[1] == '#')
+    {
+      if (base == 11)
+        RAISE_MIDI_ERROR_FMT1("illegal note pattern '%s'", pat);
+      base++, i++;
+    }
+  else if (pat[1] == 'b')
+  {
+    if (base == 0)
+      RAISE_MIDI_ERROR_FMT1("illegal note pattern '%s'", pat);
+    base--, i++;
+  }
+  if (pat[i] < '0' || pat[i] > '9')
+    RAISE_MIDI_ERROR_FMT1("illegal note pattern '%s'", pat);
+  return (pat[i] - '0') * 12 + base;
+}
 
 /*
 int AlsaSequencer_i#event_output(ev)
@@ -478,205 +552,277 @@ If events remain unprocessed on output buffer before drained, the size of total 
 returned. If the output buffer is empty, this returns zero.
 */
 static VALUE
-wrap_snd_seq_event_output(VALUE v_seq, VALUE v_ev)
+wrap_snd_seq_event_output_func(VALUE v_seq, VALUE v_ev, output_method func)
 {
   snd_seq_t *seq;
   Data_Get_Struct(v_seq, snd_seq_t, seq);
-  /* Now it's gonna be hairy. v_ev might be a MidiEvent descendant and not 'Data'.
-  */
-  /*
-  VALUE v_MidiEvent = rb_funcall(rb_mKernel, ID2SYM(rb_intern("const_get")), 1,
-                                 ID2SYM(rb_intern("MidiEvent")));
-                                 */
-  VALUE v_MidiEvent = rb_const_get(rb_mKernel, rb_intern("MidiEvent"));
-//   VALUE v_is_a_MidiEvent = rb_funcall(v_ev, ID2SYM(rb_intern("kind_of?")), 1, v_MidiEvent);
-  if (RTEST(rb_obj_is_kind_of(v_ev, v_MidiEvent)))
+  // Now it's gonna be hairy. v_ev might be a MidiEvent descendant and not 'Data'.
+  const ID id_MidiEvent = rb_intern("MidiEvent");
+  if (rb_const_defined(rb_mKernel, id_MidiEvent))
     {
-      //       fprintf(stderr, "MIDIEVENT\n"); exit(0); OK!!
-      snd_seq_event_t ev;  // I follow the code from aplymidi.c
-      snd_seq_ev_clear(&ev);
-      /* v_ev has the following properties (recap), which may all be nil as well.
-        type: a symbol and never nil
-        flags: a hash with bool values! and never nil either
-        param: a symbol or integer
-        value: note or queueparam etc. sometimes 14 bits or maybe even 21 so may issue 2 or 3 events!
-        specifics:
-            - channel 4 bit
-            - duration 7 bit
-            - source, dest  MidiPort
-            - sender_queue MidiQueue
-            - tick, either tick or realtime-tuple [sec, nsec]
-      */
-      VALUE v_sender_queue = rb_iv_get(v_ev, "@sender_queue");
-      // IMPORTANT @queue is the queue for queue notifications, which may differ
-      RRTS_DEREF_DIRTY(v_sender_queue, @id);
-      const bool have_sender_queue = RTEST(v_sender_queue);
-      if (have_sender_queue)
-        ev.queue = NUM2INT(v_sender_queue);
-      VALUE v_sourceport = rb_iv_get(v_ev, "@source");
-      const ID id_iv_port = rb_intern("@port");
-      const ID id_iv_client_id = rb_intern("@client_id");
-      if (RTEST(v_sourceport))  // TODO: can you actually leave this out?? Should be an error?
+      VALUE v_MidiEvent = rb_const_get(rb_mKernel, id_MidiEvent);
+    //   VALUE v_is_a_MidiEvent = rb_funcall(v_ev, ID2SYM(rb_intern("kind_of?")), 1, v_MidiEvent);
+      if (RTEST(rb_obj_is_kind_of(v_ev, v_MidiEvent)))
         {
-          ev.source.port = NUM2INT(rb_ivar_get(v_sourceport, id_iv_port));
-          ev.source.client = NUM2INT(rb_ivar_get(v_sourceport, id_iv_client_id));
-        }
-      VALUE v_typeflags = rb_funcall(v_ev, rb_intern("debunktypeflags_i"), 0);
-      ev.type = NUM2INT(rb_ary_entry(v_typeflags, 0));
-      ev.flags = NUM2INT(rb_ary_entry(v_typeflags, 1)); // from event.flags SND_SEQ_TIME_STAMP_TICK | SND_SEQ_TIME_STAMP_ABS;
-      VALUE v_time = rb_iv_get(v_ev, "@time");
-      unsigned char *ch_ref = 0; // We only use that it is 0 or not !!!!
-      WRITE_TIME_IN_CHANNEL(v_time, ev);
-      VALUE v_destport = rb_iv_get(v_ev, "@dest");
+    //       fprintf(stderr, "MIDIEVENT\n");
+          snd_seq_event_t ev;  // I follow the code from aplymidi.c
+          snd_seq_ev_clear(&ev);
+          /* v_ev has the following properties (recap), which may all be nil as well.
+            type: a symbol and never nil
+            flags: a hash with bool values! and never nil either
+            param: a symbol or integer
+            value: note or queueparam etc. sometimes 14 bits or maybe even 21 so may issue 2 or 3 events!
+            specifics:
+                - channel 4 bit
+                - duration 7 bit
+                - source, dest  MidiPort
+                - sender_queue MidiQueue
+                - tick, either tick or realtime-tuple [sec, nsec]
+          */
+          const ID id_sender_queue = rb_intern("@sender_queue");
+          bool have_sender_queue = false; // used later on through macro!!!
+          VALUE v_sender_queue;
+          if (rb_ivar_defined(v_ev, id_sender_queue))
+            {
+              v_sender_queue = rb_ivar_get(v_ev, id_sender_queue);
+              // IMPORTANT @queue is the queue for queue notifications, which may differ
+              RRTS_DEREF_DIRTY(v_sender_queue, @id);
+              have_sender_queue = RTEST(v_sender_queue);
+              if (have_sender_queue)
+                ev.queue = NUM2INT(v_sender_queue);
+            }
+          else
+            snd_seq_ev_set_direct(&ev); // !
+    //       fprintf(stderr, "get source\n");
+          VALUE v_sourceport = rb_iv_get(v_ev, "@source");
+          const ID id_iv_port = rb_intern("@port");
+          const ID id_iv_client_id = rb_intern("@client_id");
+    //       fprintf(stderr, "test v_sourceport\n");
+          if (RTEST(v_sourceport))  // TODO: can you actually leave this out?? Should be an error?
+            {
+              ev.source.port = NUM2INT(rb_ivar_get(v_sourceport, id_iv_port));
+              ev.source.client = NUM2INT(rb_ivar_get(v_sourceport, id_iv_client_id));
+            }
+    //       fprintf(stderr, "callback debunktypeflags_i\n");
+          VALUE v_typeflags = rb_funcall(v_ev, rb_intern("debunktypeflags_i"), 0);
+    //       fprintf(stderr, "split result\n");
+          v_typeflags = rb_check_array_type(v_typeflags);
+          if (!RTEST(v_typeflags)) RAISE_MIDI_ERROR_FMT0("BUG: bad type returned from debunktypeflags_i");
+          ev.type = NUM2INT(rb_ary_entry(v_typeflags, 0));
+          ev.flags = NUM2INT(rb_ary_entry(v_typeflags, 1)); // from event.flags SND_SEQ_TIME_STAMP_TICK | SND_SEQ_TIME_STAMP_ABS;
+    //       fprintf(stderr, "time\n");
+          VALUE v_time = rb_iv_get(v_ev, "@time");
+          unsigned char *ch_ref = 0; // We only use that it is 0 or not !!!!
+          WRITE_TIME_IN_CHANNEL(v_time, ev);
+    //       fprintf(stderr, "dest\n");
+          VALUE v_destport = rb_iv_get(v_ev, "@dest");
 
-      /* This is probably incorrect. But aplaymidi uses explicit senders iso a connection
-      so it may not be a good example
-      */
-      if (!RTEST(v_destport))
-        RAISE_MIDI_ERROR_FMT0("no destination set in event");
-      ev.dest.port = NUM2INT(rb_ivar_get(v_destport, id_iv_port));
-      ev.dest.client = NUM2INT(rb_ivar_get(v_destport, id_iv_client_id));
-      switch (ev.type)
-        {
-        case SND_SEQ_EVENT_NOTE:
-          {
-            ev.data.note.duration = NUM2INT(rb_iv_get(v_ev, "@duration"));
-            VALUE v_off_vel = rb_iv_get(v_ev, "@off_velocity");
-            ev.data.note.off_velocity = RTEST(v_off_vel) ? NUM2INT(v_off_vel) : 0;
-            // fall through !
-          }
-        case SND_SEQ_EVENT_NOTEON:
-        case SND_SEQ_EVENT_NOTEOFF:
-        case SND_SEQ_EVENT_KEYPRESS: // == aftertouch
-          {
-// fprintf(stderr, "type=%d,NOTEON/OFF/KEYPRES\n", ev.type);
-            snd_seq_ev_set_fixed(&ev);
-            ch_ref = &ev.data.note.channel;
-            ev.data.note.note = NUM2INT(rb_iv_get(v_ev, "@value"));
-            VALUE v_vel = rb_iv_get(v_ev, "@velocity");
-            ev.data.note.velocity = RTEST(v_vel) ? NUM2INT(v_vel) : 0;
-            break;
-          }
-        case SND_SEQ_EVENT_CONTROLLER:
-          {
-            snd_seq_ev_set_fixed(&ev);
-            ch_ref = &ev.data.control.channel;
-            VALUE v_param_coarse = rb_funcall(v_ev, rb_intern("debunkparam_i"), 0);
-//             fprintf(stderr, "%s:%d: debunking done\n", __FILE__, __LINE__);
-            const bool coarse = RTEST(rb_ary_entry(v_param_coarse, 1));
-            const uint param = ev.data.control.param = NUM2INT(rb_ary_entry(v_param_coarse, 0));
-//             fprintf(stderr, "got param\n");
-            //const int bits = NUM2INT(rb_ary_entry(v_param_coarse, 2));
-            //fprintf(stderr, "got bits\n");
-            VALUE v_value = rb_iv_get(v_ev, "@value");
-            int value;
-            uint lsb_version = PARAM_IS_MSB_LSB_PAIR(param);
-            if (lsb_version)
+          /* This is probably incorrect. But aplaymidi uses explicit senders iso a connection
+          so it may not be a good example
+          */
+          if (!RTEST(v_destport))
+            RAISE_MIDI_ERROR_FMT0("no destination set in event");
+          ev.dest.port = NUM2INT(rb_ivar_get(v_destport, id_iv_port));
+          ev.dest.client = NUM2INT(rb_ivar_get(v_destport, id_iv_client_id));
+    //       fprintf(stderr, "typeswitch\n");
+          switch (ev.type)
+            {
+            case SND_SEQ_EVENT_NOTE:
               {
-                int msb, lsb = 0;
-  //             fprintf(stderr, "%d: coarse=%d, value=%d,param=%u\n", __LINE__, coarse, value,ev.data.control.param);
-                if (coarse)
-                  msb = NUM2INT(v_value);
-                else if FIXNUM_P(v_value)
+                ev.data.note.duration = NUM2UINT(rb_iv_get(v_ev, "@duration"));
+                VALUE v_off_vel = rb_iv_get(v_ev, "@off_velocity");
+                ev.data.note.off_velocity = RTEST(v_off_vel) ? NUM2UINT(v_off_vel) : 0;
+                // fall through !
+              }
+            case SND_SEQ_EVENT_NOTEON:
+            case SND_SEQ_EVENT_NOTEOFF:
+            case SND_SEQ_EVENT_KEYPRESS: // == aftertouch
+              {
+    // fprintf(stderr, "type=%d,NOTEON/OFF/KEYPRES\n", ev.type);
+                snd_seq_ev_set_fixed(&ev);
+                ch_ref = &ev.data.note.channel;
+                VALUE v_note = rb_iv_get(v_ev, "@value");
+                if (FIXNUM_P(v_note))
+                  ev.data.note.note = NUM2UINT(v_note);
+                else
+                  ev.data.note.note = decode_a_note(StringValueCStr(v_note));
+                VALUE v_vel = rb_iv_get(v_ev, "@velocity");
+                ev.data.note.velocity = RTEST(v_vel) ? NUM2UINT(v_vel) : 0;
+                break;
+              }
+            case SND_SEQ_EVENT_CONTROLLER:
+              {
+                snd_seq_ev_set_fixed(&ev);
+                ch_ref = &ev.data.control.channel;
+                VALUE v_param_coarse = rb_check_array_type(rb_funcall(v_ev, rb_intern("debunkparam_i"), 0));
+                if (!RTEST(v_param_coarse)) RAISE_MIDI_ERROR_FMT0("BUG: bad type returned by debunkparam_i");
+//                 fprintf(stderr, "%s:% : debunking done\n", __FILE__, __LINE__);
+                const bool coarse = RTEST(rb_ary_entry(v_param_coarse, 1));
+                const uint param = ev.data.control.param = NUM2INT(rb_ary_entry(v_param_coarse, 0));
+//                 fprintf(stderr, "got param\n");
+                VALUE v_value = rb_iv_get(v_ev, "@value");
+                int value;
+                uint lsb_version = PARAM_IS_MSB_LSB_PAIR(param);
+                if (lsb_version)
                   {
-                    const int v = NUM2INT(v_value);
-                    msb = v << 7;
-                    lsb = v & 0x7f;
+                    int msb, lsb = 0;
+//                     fprintf(stderr, "%d: coarse=%d, value=%d,param=%u\n", __LINE__, coarse, value,ev.data.control.param);
+                    if (coarse)
+                      msb = NUM2INT(v_value);
+                    else if FIXNUM_P(v_value)
+                      {
+                        const int v = NUM2INT(v_value);
+                        msb = v << 7;
+                        lsb = v & 0x7f;
+                      }
+                    else
+                      {
+                        VALUE v_ar = rb_check_array_type(v_value);
+                        if (NIL_P(v_ar)) msb = 0;
+                        else
+                          {
+                            VALUE v0 = rb_ary_entry(v_ar, 0), v1 = rb_ary_entry(v_ar, 1);
+                            if (!RTEST(v0)) RAISE_MIDI_ERROR_FMT1("Bad args for param %d", param);
+                            msb = NUM2INT(v0);
+                            lsb = RTEST(v1) ? NUM2INT(v1) : 0;
+                          }
+                      }
+                    ev.data.control.value = msb;
+                    do_event_output(ch_ref, seq, v_seq, v_ev, ev, func);
+//             fprintf(stderr, "%s:%d: CONTROLLER(param=%u,value=%d)\n", __FILE__,__LINE__, lsb_version, lsb);
+                    ev.data.control.param = lsb_version;
+                    value = lsb;
                   }
+                else
+                    value = NUM2INT(v_value) & 0x7f;
+                ev.data.control.value = value;
+    // fprintf(stderr, "%s:%d: CONTROLLER(param=%u,value=%d)\n", __FILE__,__LINE__, param, value & 0x7f);
+                break;
+              }
+            case SND_SEQ_EVENT_PGMCHANGE:
+              {
+                snd_seq_ev_set_fixed(&ev);
+                ch_ref = &ev.data.control.channel;
+                VALUE v_value = rb_iv_get(v_ev, "@value");
+                int value = 0;
+                if (FIXNUM_P(v_value))
+                    value = NUM2INT(v_value);
                 else
                   {
                     VALUE v_ar = rb_check_array_type(v_value);
-                    if (NIL_P(v_ar)) msb = 0;
-                    else
+                    if (!NIL_P(v_ar))
                       {
-                        msb = NUM2INT(rb_ary_entry(v_ar, 0));
-                        lsb = NUM2INT(rb_ary_entry(v_ar, 1));
+                        const int len = NUM2INT(rb_funcall(v_ar, rb_intern("length"), 0));
+                        const int msb = NUM2INT(rb_ary_entry(v_ar, 0));
+                        const int lsb = len == 2 ? 0 : NUM2INT(rb_ary_entry(v_ar, 1));
+                        value = NUM2INT(rb_ary_entry(v_ar, len == 2 ? 1 : 2));
+                        snd_seq_event_t ev_bank = ev;
+                        ev_bank.type = SND_SEQ_EVENT_CONTROLLER;
+                        ev_bank.data.control.param = MIDI_CTL_MSB_BANK;
+                        ev_bank.data.control.value = msb;
+                        do_event_output(ch_ref, seq, v_seq, v_ev, ev_bank, func);
+                        ev_bank.data.control.param = MIDI_CTL_LSB_BANK;
+                        ev_bank.data.control.value = lsb;
+                        do_event_output(ch_ref, seq, v_seq, v_ev, ev_bank, func);
                       }
                   }
-                ev.data.control.value = msb;
-// fprintf(stderr, "%s:%d: CONTROLLER(param=%u,value=%d)\n", __FILE__,__LINE__, lsb_version, value >> 7);
-                do_event_output(ch_ref, seq, v_seq, v_ev, ev);
-                ev.data.control.param = lsb_version;
-                value = msb;
+                ev.data.control.value = value;
+                break;
               }
-            else
-                value = NUM2INT(v_value) & 0x7f;
-            ev.data.control.value = value;
-// fprintf(stderr, "%s:%d: CONTROLLER(param=%u,value=%d)\n", __FILE__,__LINE__, param, value & 0x7f);
-            break;
-          }
-        case SND_SEQ_EVENT_PGMCHANGE:
-          {
-            snd_seq_ev_set_fixed(&ev);
-            ch_ref = &ev.data.control.channel;
-            VALUE v_value = rb_iv_get(v_ev, "@value");
-            int value = 0;
-            if (FIXNUM_P(v_value))
-                value = NUM2INT(v_value);
-            else
+            case SND_SEQ_EVENT_CHANPRESS:
+            case SND_SEQ_EVENT_PITCHBEND:
               {
-                VALUE v_ar = rb_check_array_type(v_value);
-                if (!NIL_P(v_ar))
-                  {
-                    const int len = NUM2INT(rb_funcall(v_ar, rb_intern("length"), 0));
-                    const int msb = NUM2INT(rb_ary_entry(v_ar, 0));
-                    const int lsb = len == 2 ? 0 : NUM2INT(rb_ary_entry(v_ar, 1));
-                    value = NUM2INT(rb_ary_entry(v_ar, len == 2 ? 1 : 2));
-                    snd_seq_event_t ev_bank = ev;
-                    ev_bank.type = SND_SEQ_EVENT_CONTROLLER;
-                    ev_bank.data.control.param = MIDI_CTL_MSB_BANK;
-                    ev_bank.data.control.value = msb;
-                    do_event_output(ch_ref, seq, v_seq, v_ev, ev_bank);
-                    ev_bank.data.control.param = MIDI_CTL_LSB_BANK;
-                    ev_bank.data.control.value = lsb;
-                    do_event_output(ch_ref, seq, v_seq, v_ev, ev_bank);
-                  }
+                snd_seq_ev_set_fixed(&ev);
+                ch_ref = &ev.data.control.channel;
+                const int value = NUM2INT(rb_iv_get(v_ev, "@value"));
+                ev.data.control.value = value;
+                break;
               }
-            ev.data.control.value = value;
-            break;
-          }
-        case SND_SEQ_EVENT_CHANPRESS:
-        case SND_SEQ_EVENT_PITCHBEND:
-          {
-            snd_seq_ev_set_fixed(&ev);
-            ch_ref = &ev.data.control.channel;
-            const int value = NUM2INT(rb_iv_get(v_ev, "@value"));
-            ev.data.control.value = value;
-            break;
-          }
-        case SND_SEQ_EVENT_SYSEX:
-          RAISE_MIDI_ERROR_FMT0("NOT IMPLEMENTED YET: SYSEX");
-          break;
-        case SND_SEQ_EVENT_TEMPO:
-          {
-            snd_seq_ev_set_fixed(&ev);
-            const int queue = NUM2INT(rb_iv_get(v_ev, "@queue_id"));
-            const uint tempo = NUM2UINT(rb_iv_get(v_ev, "@value"));
-            ev.dest.client = SND_SEQ_CLIENT_SYSTEM;
-            ev.dest.port = SND_SEQ_PORT_SYSTEM_TIMER;
-            ev.data.queue.queue = queue;
-            ev.data.queue.param.value = tempo;
-            break;
-          }
-        case SND_SEQ_EVENT_RESET:
-        case SND_SEQ_EVENT_TUNE_REQUEST:
-        case SND_SEQ_EVENT_SENSING:
-        case SND_SEQ_EVENT_ECHO:
-        case SND_SEQ_EVENT_NONE:
-          snd_seq_ev_set_fixed(&ev);
-          break;
-        default:
-          RAISE_MIDI_ERROR_FMT1("invalid/unsupported type %d", ev.type);
-          break;
+            case SND_SEQ_EVENT_SYSEX:
+              {
+                // value is a string.
+                VALUE v_val = rb_iv_get(v_ev, "@value");
+                rb_check_type(v_val, T_STRING);
+                size_t length = RSTRING_LEN(v_val);
+                snd_seq_ev_set_variable(&ev, length, RSTRING_PTR(v_val));
+                if (length > MIDI_BYTES_PER_SEC)
+                  ev.data.ext.len = MIDI_BYTES_PER_SEC; // ??
+                size_t event_size = snd_seq_event_length(&ev); // used to crash ?
+                if (event_size + 1 > snd_seq_get_output_buffer_size(seq))
+                  {
+                    int err = snd_seq_drain_output(seq);
+                    if (err < 0) RAISE_MIDI_ERROR("draining output", err);
+                    err = snd_seq_set_output_buffer_size(seq, event_size + 1);
+                    if (err < 0) RAISE_MIDI_ERROR("growing output buffer", err);
+                  }
+                while (length > MIDI_BYTES_PER_SEC)
+                  {
+                    int err = snd_seq_event_output(seq, &ev);
+                    if (err < 0) RAISE_MIDI_ERROR("sending sysex", err);
+                    err = snd_seq_drain_output(seq);
+                    if (err < 0) RAISE_MIDI_ERROR("draining output", err);
+                    err = snd_seq_sync_output_queue(seq);
+                    if (err < 0) RAISE_MIDI_ERROR("syncing queue", err);
+                    // sleep(1) ; // AARGH ?
+                    *(char **)ev.data.ext.ptr += MIDI_BYTES_PER_SEC;
+                    length -= MIDI_BYTES_PER_SEC; // > 0
+                  }
+                ev.data.ext.len = length; // > 0
+                // end send the remainder as well.
+                break;
+              }
+            case SND_SEQ_EVENT_TEMPO:
+              {
+                snd_seq_ev_set_fixed(&ev);
+                const int queue = NUM2INT(rb_iv_get(v_ev, "@queue"));
+                const uint tempo = NUM2UINT(rb_iv_get(v_ev, "@value"));
+                ev.dest.client = SND_SEQ_CLIENT_SYSTEM;
+                ev.dest.port = SND_SEQ_PORT_SYSTEM_TIMER;
+                ev.data.queue.queue = queue;
+                ev.data.queue.param.value = tempo;
+                break;
+              }
+            case SND_SEQ_EVENT_RESET:
+            case SND_SEQ_EVENT_TUNE_REQUEST:
+            case SND_SEQ_EVENT_SENSING:
+            case SND_SEQ_EVENT_ECHO:
+            case SND_SEQ_EVENT_NONE:
+            case SND_SEQ_EVENT_STOP:
+            case SND_SEQ_EVENT_START:
+            case SND_SEQ_EVENT_CONTINUE:
+              snd_seq_ev_set_fixed(&ev);
+              break;
+            default:
+              RAISE_MIDI_ERROR_FMT1("invalid/unsupported type %d", ev.type);
+              break;
+            }
+          return do_event_output(ch_ref, seq, v_seq, v_ev, ev, func);
         }
-      return do_event_output(ch_ref, seq, v_seq, v_ev, ev);
     }
   snd_seq_event_t *ev;
   Data_Get_Struct(v_ev, snd_seq_event_t, ev);
 #if defined(DUMP_API)
   fprintf(DUMP_STREAM, "snd_seq_event_output(%p, %p)\n", seq, ev);
 #endif
-  return do_event_output(seq, ev);
+  return do_event_output(seq, ev, func);
+}
+
+static VALUE
+wrap_snd_seq_event_output(VALUE v_seq, VALUE v_ev)
+{
+  return wrap_snd_seq_event_output_func(v_seq, v_ev, snd_seq_event_output);
+}
+
+static VALUE
+wrap_snd_seq_event_output_buffer(VALUE v_seq, VALUE v_ev)
+{
+  return wrap_snd_seq_event_output_func(v_seq, v_ev, snd_seq_event_output_buffer);
+}
+
+static VALUE
+wrap_snd_seq_event_output_direct(VALUE v_seq, VALUE v_ev)
+{
+  return wrap_snd_seq_event_output_func(v_seq, v_ev, snd_seq_event_output_direct);
 }
 
 /*
@@ -808,7 +954,7 @@ Connect from the given sender client:port to the given destination port in the c
 static VALUE
 wrap_snd_seq_connect_from(int argc, VALUE *v_params, VALUE v_seq)
 {
-  fprintf(stderr, "connect_from(argc=%d)\n", argc);
+//   fprintf(stderr, "connect_from(argc=%d)\n", argc);
   FETCH_CONNECTION_ADDRESSES(src);
   snd_seq_t *seq;
   Data_Get_Struct(v_seq, snd_seq_t, seq);
@@ -890,7 +1036,7 @@ wrap_snd_seq_parse_address(VALUE v_seq, VALUE v_arg)
   snd_seq_addr_t ret;
   const char *const arg = StringValuePtr(v_arg);
   const int r = snd_seq_parse_address(seq, &ret, arg);
-  if (r < 0) RAISE_MIDI_ERROR_FMT2("Invalid port %s - %s", arg, snd_strerror(r));
+  if (r < 0) RAISE_MIDI_ERROR_FMT2("Invalid port '%s' - %s", arg, snd_strerror(r));
   return rb_ary_new3(2, INT2NUM(ret.client), INT2NUM(ret.port));
 }
 
@@ -1023,6 +1169,7 @@ wrap_snd_seq_set_queue_tempo(VALUE v_seq, VALUE v_qid, VALUE v_tempo)
   snd_seq_t *seq;
   Data_Get_Struct(v_seq, snd_seq_t, seq);
   RRTS_DEREF_DIRTY(v_tempo, @handle);
+  RRTS_DEREF_DIRTY(v_qid, @id);
   snd_seq_queue_tempo_t *tempo;
   Data_Get_Struct(v_tempo, snd_seq_queue_tempo_t, tempo);
 #if defined(DUMP_API)
@@ -1065,6 +1212,41 @@ wrap_snd_seq_get_queue_info(int argc, VALUE *v_params, VALUE v_seq)
   const int r = snd_seq_get_queue_info(seq, NUM2INT(v_qid), qi);
   if (r < 0) RAISE_MIDI_ERROR("retrieving queue info", r);
   return v_qi;
+}
+
+/* self AlsaSequencer_i#remove_events  remove_event_descriptor
+
+remove events on input/output buffers and pools
+
+Parameters:
+  rmp     remove event container. If nil is passed all output events except OFFS are erased.
+
+Removes matching events with the given condition from input/output buffers and pools.
+The removal condition is specified in rmp argument.
+This can be used to erase events that are currently underway, parked in qeueus etc.
+Use it to cleanly exit a process
+*/
+static VALUE
+wrap_snd_seq_remove_events(int argc, VALUE *argv, VALUE v_seq)
+{
+  snd_seq_t *seq;
+  Data_Get_Struct(v_seq, snd_seq_t, seq);
+  VALUE v_rmp;
+  rb_scan_args(argc, argv, "01", &v_rmp);
+  snd_seq_remove_events_t *m;
+  const bool allocated = NIL_P(v_rmp);
+  if (allocated)
+    {
+      const int r = snd_seq_remove_events_malloc(&m);
+      if (r < 0) RAISE_MIDI_ERROR("allocating remove_events", r);
+      snd_seq_remove_events_set_condition(m, SND_SEQ_REMOVE_IGNORE_OFF | SND_SEQ_REMOVE_OUTPUT);
+    }
+  else
+      Data_Get_Struct(v_rmp, snd_seq_remove_events_t, m);
+  snd_seq_remove_events(seq, m);
+  if (allocated)
+    free(m);
+  return v_seq;
 }
 
 /*
@@ -1136,7 +1318,7 @@ self AlsaSequencer_i#start_queue q
 start the specified queue
 
 Parameters:
-q       queue id to start
+q       queue id to start or the MidiQueue
 ev      optional event record (see snd_seq_control_queue)   CURRENTLY NOT SUPPORTED!
 */
 static VALUE
@@ -1144,6 +1326,7 @@ wrap_snd_seq_start_queue(VALUE v_seq, VALUE v_qid)
 {
   snd_seq_t *seq;
   Data_Get_Struct(v_seq, snd_seq_t, seq);
+  RRTS_DEREF_DIRTY(v_qid, @id);
 #if defined(DUMP_API)
   fprintf(DUMP_STREAM, "snd_seq_start_queue(%p, %d, %d)\n", seq, NUM2INT(v_qid), 0);
 #endif
@@ -1200,11 +1383,11 @@ int AlsaSequencer_i#poll_descriptors_count  events
 
 Returns the number of poll descriptors.
 
-                                                Parameters:
-                                                events  the poll events to be checked (POLLIN and POLLOUT)
+Parameters:
+  events  the poll events to be checked (POLLIN and POLLOUT)
 
-                                                Returns:
-                                                the number of poll descriptors.
+Returns:
+  the number of poll descriptors.
 
  Get the number of poll descriptors. The polling events to be checked can be specified by the second argument.
  When both input and output are checked, pass POLLIN|POLLOUT
@@ -1219,14 +1402,13 @@ wrap_snd_seq_poll_descriptors_count(VALUE v_seq, VALUE v_pollflags)
 }
 
 /*
-pollfds AlsaSequencer_i#poll_descriptors(space, events
-                                        )
+pollfds AlsaSequencer_i#poll_descriptors(space, events)
+pollfds AlsaSequencer_i#poll_descriptors(events)
+Get poll descriptors. The second form uses snd_seq_poll_descriptors_count first.
 
-Get poll descriptors.
-
-                                        Parameters:
-                                        space   space in the poll descriptor array
-                                        events  polling events to be checked (POLLIN and POLLOUT)
+ Parameters:
+    space   space in the poll descriptor array
+    events  polling events to be checked (POLLIN and POLLOUT)
 
 Returns:
   descriptors
@@ -1235,20 +1417,32 @@ Get poll descriptors assigned to the sequencer handle. Since a sequencer handle 
 you need to set which direction(s) is/are polled in events argument. When POLLIN bit is specified,
 the incoming events to the ports are checked.
 
-To check the returned poll-events, call snd_seq_poll_descriptors_revents() instead of reading the pollfd structs directly.
+To check the returned poll-events, call snd_seq_poll_descriptors_revents()
+instead of reading the pollfd structs directly.
+
+Alsa examples call fds.poll(timeout_msec) since revents has a fixed and/or unknown timeout.
+Whatever.
 */
 
 static VALUE
-wrap_snd_seq_poll_descriptors(VALUE v_seq, VALUE v_fdcount, VALUE v_pollflags)
+wrap_snd_seq_poll_descriptors(int argc, VALUE *argv, VALUE v_seq)
 {
-  // 1
-  const size_t space = NUM2UINT(v_fdcount); // rb_funcall2(v_pollfds, rb_intern("length")));
+  VALUE v_fdcount, v_pollflags;
+  rb_scan_args(argc, argv, "11", &v_fdcount, &v_pollflags);
+  snd_seq_t *seq;
+  Data_Get_Struct(v_seq, snd_seq_t, seq);
+  size_t space;
+  if (NIL_P(v_pollflags))
+    {
+      v_pollflags = v_fdcount;
+      space = snd_seq_poll_descriptors_count(seq, NUM2INT(v_pollflags));
+    }
+  else
+      space = NUM2UINT(v_fdcount);
   // 2
   struct pollfd * const fds = ALLOC_N(struct pollfd, space + sizeof(size_t));
   if (!fds) return INT2NUM(-ENOMEM);
   // 3
-  snd_seq_t *seq;
-  Data_Get_Struct(v_seq, snd_seq_t, seq);
   *(size_t *)fds = space;
   /*const int fill = */ snd_seq_poll_descriptors(seq, (struct pollfd *)(((size_t *)fds) + 1), space, NUM2INT(v_pollflags));
 //  return rb_ary_new3(2, INT2NUM(fill), v_room);
@@ -1264,8 +1458,11 @@ get returned events from poll descriptors
                                                 pollfds    array of poll descriptors
 
 Returns:
-  revents array or negative int on failure.
-  The revents array holds an entry per fd, holding the fd itself or 0
+  revents array or nil if there are no events.
+  The revents array holds an entry per fd, in the same order, holding true if
+  there was an event at that index.
+
+  However, you cannot specify a poll timeout, and the alsa examples use poll!!
 */
 static VALUE
 wrap_snd_seq_poll_descriptors_revents(VALUE v_seq, VALUE v_fds)
@@ -1277,14 +1474,43 @@ wrap_snd_seq_poll_descriptors_revents(VALUE v_seq, VALUE v_fds)
   Data_Get_Struct(v_seq, snd_seq_t, seq);
   unsigned short revents[nfds];
   const int r = snd_seq_poll_descriptors_revents(seq, (struct pollfd *)(((size_t *)fds) + 1), nfds, revents);
-  VALUE v_revents = rb_ary_new2(nfds);
   if (r < 0)
       RAISE_MIDI_ERROR("polling descriptors", r);
-  else
+  bool located = false;
+  for (size_t i = 0; i < nfds && !located; i++)
+    located = revents[i];
+  if (!located) return Qnil;
+  VALUE v_revents = rb_ary_new2(nfds);
+  for (size_t i = 0; i < nfds; i++)
     {
-      for (size_t i = 0; i < nfds; i++)
-        rb_ary_store(v_revents, i, UINT2NUM(revents[i]));
+      const bool b = revents[i];
+      rb_ary_store(v_revents, i, INT2BOOL(b));
     }
+  return v_revents;
+}
+
+/* revents Pollfds.poll(timeout_msec)
+
+Wrapper around poll (not ppoll -- currently)
+Returns nil if no events where present
+Returns an array of booleans where the index matches the polldescriptors passed.
+At least one of them will be true.
+*/
+static VALUE
+wrapPoll(VALUE v_descriptors, VALUE v_timeout_msec)
+{
+  struct pollfd *fds;
+  Data_Get_Struct(v_descriptors, struct pollfd, fds);
+  const size_t nfds = *(size_t *)fds;
+  fds = (struct pollfd *)(((size_t *)fds) + 1);
+  const int r = poll(fds, nfds, NUM2UINT(v_timeout_msec));
+  if (r < 0)
+    RAISE_MIDI_ERROR("polling descriptors", r);
+  else if (r == 0)
+    return Qnil;
+  VALUE v_revents = rb_ary_new2(nfds);
+  for (size_t i = 0; i < nfds; i++)
+    rb_ary_store(v_revents, i, INT2BOOL(fds[i].revents));
   return v_revents;
 }
 
@@ -1427,6 +1653,117 @@ wrap_snd_seq_set_port_info(VALUE v_seq, VALUE v_portid, VALUE v_portinfo)
   return v_seq;
 }
 
+/*
+int     snd_seq_get_client_pool (snd_seq_t *handle, snd_seq_client_pool_t *info)
+obtain the pool information of the current client
+*/
+static VALUE
+wrap_snd_seq_get_client_pool(int argc, VALUE *argv, VALUE v_seq)
+{
+  VALUE v_pool;
+  rb_scan_args(argc, argv, "01", &v_pool);
+  snd_seq_t *seq;
+  Data_Get_Struct(v_seq, snd_seq_t, seq);
+  snd_seq_client_pool_t *pool;
+  if (NIL_P(v_pool))
+    {
+      const int r = snd_seq_client_pool_malloc(&pool);
+      if (r < 0) RAISE_MIDI_ERROR("allocating client_pool", r);
+      v_pool = Data_Wrap_Struct(alsaClientPoolClass, 0/*mark*/, snd_seq_client_pool_free/*free*/, pool);
+    }
+  else
+      Data_Get_Struct(v_pool, snd_seq_client_pool_t, pool);
+  const int r = snd_seq_get_client_pool(seq, pool);
+  if (r < 0) RAISE_MIDI_ERROR("retrieving client pool", r);
+  return v_pool;
+}
+
+/*
+int     snd_seq_set_client_pool (snd_seq_t *handle, snd_seq_client_pool_t *info)
+set the pool information
+*/
+static VALUE
+wrap_snd_seq_set_client_pool(VALUE v_seq, VALUE v_pool)
+{
+  snd_seq_t *seq;
+  Data_Get_Struct(v_seq, snd_seq_t, seq);
+  snd_seq_client_pool_t * info;
+  Data_Get_Struct(v_pool, snd_seq_client_pool_t, info);
+  const int r = snd_seq_set_client_pool(seq, info);
+  if (r < 0) RAISE_MIDI_ERROR("setting client_pool", r);
+  return v_seq;
+}
+
+/*
+t       snd_seq_set_client_pool_output (snd_seq_t *seq, size_t size)
+change the output pool size of the given client
+*/
+static VALUE
+wrap_snd_seq_set_client_pool_output(VALUE v_seq, VALUE v_sz)
+{
+  snd_seq_t *seq;
+  Data_Get_Struct(v_seq, snd_seq_t, seq);
+  const int r = snd_seq_set_client_pool_output(seq, NUM2UINT(v_sz));
+  if (r < 0) RAISE_MIDI_ERROR("setting client pool output size", r);
+  return Qnil;
+}
+
+/*
+int     snd_seq_set_client_pool_output_room (snd_seq_t *seq, size_t size)
+change the output room size of the given client
+*/
+static VALUE
+wrap_snd_seq_set_client_pool_output_room(VALUE v_seq, VALUE v_sz)
+{
+  snd_seq_t *seq;
+  Data_Get_Struct(v_seq, snd_seq_t, seq);
+  const int r = snd_seq_set_client_pool_output_room(seq, NUM2UINT(v_sz));
+  if (r < 0) RAISE_MIDI_ERROR("setting client pool output room", r);
+  return Qnil;
+}
+
+/*
+int     snd_seq_set_client_pool_input (snd_seq_t *seq, size_t size)
+change the input pool size of the given client
+*/
+static VALUE
+wrap_snd_seq_set_client_pool_input(VALUE v_seq, VALUE v_sz)
+{
+  snd_seq_t *seq;
+  Data_Get_Struct(v_seq, snd_seq_t, seq);
+  const int r = snd_seq_set_client_pool_input(seq, NUM2UINT(v_sz));
+  if (r < 0) RAISE_MIDI_ERROR("setting client pool input size", r);
+  return Qnil;
+}
+
+/*
+self snd_seq_reset_pool_output (snd_seq_t *seq)
+reset client output pool
+*/
+static VALUE
+wrap_snd_seq_reset_pool_output(VALUE v_seq)
+{
+  snd_seq_t *seq;
+  Data_Get_Struct(v_seq, snd_seq_t, seq);
+  const int r = snd_seq_reset_pool_output(seq);
+  if (r < 0) RAISE_MIDI_ERROR("resetting client pool output", r);
+  return v_seq;
+}
+
+/*
+self snd_seq_reset_pool_input (snd_seq_t *seq)
+reset client input pool
+*/
+static VALUE
+wrap_snd_seq_reset_pool_input(VALUE v_seq)
+{
+  snd_seq_t *seq;
+  Data_Get_Struct(v_seq, snd_seq_t, seq);
+  const int r = snd_seq_reset_pool_input(seq);
+  if (r < 0) RAISE_MIDI_ERROR("resetting client pool input", r);
+  return v_seq;
+}
+
 void alsa_seq_init()
 {
   WRAP_CONSTANT(POLLIN);
@@ -1436,6 +1773,8 @@ void alsa_seq_init()
   WRAP_CONSTANT(SND_SEQ_ADDRESS_SUBSCRIBERS);
   WRAP_CONSTANT(SND_SEQ_ADDRESS_BROADCAST);
   WRAP_CONSTANT(SND_SEQ_CLIENT_SYSTEM);
+  WRAP_CONSTANT(SND_SEQ_PORT_SYSTEM_TIMER);
+  WRAP_CONSTANT(SND_SEQ_PORT_SYSTEM_ANNOUNCE);
   WRAP_CONSTANT(SND_SEQ_TYPE_HW); //       hardware
   WRAP_CONSTANT(SND_SEQ_TYPE_SHM); //       shared memory (NYI)
   WRAP_CONSTANT(SND_SEQ_TYPE_INET); //        network (NYI)
@@ -1463,6 +1802,8 @@ void alsa_seq_init()
   rb_define_method(alsaSequencerClass, "drain_output", RUBY_METHOD_FUNC(wrap_snd_seq_drain_output), 0);
   rb_define_method(alsaSequencerClass, "event_input", RUBY_METHOD_FUNC(wrap_snd_seq_event_input), 0);
   rb_define_method(alsaSequencerClass, "event_output", RUBY_METHOD_FUNC(wrap_snd_seq_event_output), 1);
+  rb_define_method(alsaSequencerClass, "event_output_buffer", RUBY_METHOD_FUNC(wrap_snd_seq_event_output_buffer), 1);
+  rb_define_method(alsaSequencerClass, "event_output_direct", RUBY_METHOD_FUNC(wrap_snd_seq_event_output_direct), 1);
   rb_define_method(alsaSequencerClass, "event_input_pending", RUBY_METHOD_FUNC(wrap_snd_seq_event_input_pending), -1);
   rb_define_method(alsaSequencerClass, "drop_input", RUBY_METHOD_FUNC(wrap_snd_seq_drop_input), 0);
   rb_define_method(alsaSequencerClass, "drop_input_buffer", RUBY_METHOD_FUNC(wrap_snd_seq_drop_input_buffer), 0);
@@ -1477,9 +1818,11 @@ void alsa_seq_init()
   rb_define_method(alsaSequencerClass, "query_named_queue", RUBY_METHOD_FUNC(wrap_snd_seq_query_named_queue), 1);
   rb_define_method(alsaSequencerClass, "next_client", RUBY_METHOD_FUNC(wrap_snd_seq_query_next_client), 1);
   rb_define_method(alsaSequencerClass, "next_port", RUBY_METHOD_FUNC(wrap_snd_seq_query_next_port), 1);
+  rb_define_method(alsaSequencerClass, "query_next_client", RUBY_METHOD_FUNC(wrap_snd_seq_query_next_client), 1);
+  rb_define_method(alsaSequencerClass, "query_next_port", RUBY_METHOD_FUNC(wrap_snd_seq_query_next_port), 1);
   rb_define_method(alsaSequencerClass, "alloc_named_queue", RUBY_METHOD_FUNC(wrap_snd_seq_alloc_named_queue), 1);
   rb_define_method(alsaSequencerClass, "poll_descriptors_count", RUBY_METHOD_FUNC(wrap_snd_seq_poll_descriptors_count), 1);
-  rb_define_method(alsaSequencerClass, "poll_descriptors", RUBY_METHOD_FUNC(wrap_snd_seq_poll_descriptors), 2);
+  rb_define_method(alsaSequencerClass, "poll_descriptors", RUBY_METHOD_FUNC(wrap_snd_seq_poll_descriptors), -1);
   rb_define_method(alsaSequencerClass, "poll_descriptors_revents", RUBY_METHOD_FUNC(wrap_snd_seq_poll_descriptors_revents), 1);
   rb_define_method(alsaSequencerClass, "output_buffer_size", RUBY_METHOD_FUNC(wrap_snd_seq_get_output_buffer_size), 0);
   rb_define_method(alsaSequencerClass, "input_buffer_size", RUBY_METHOD_FUNC(wrap_snd_seq_get_input_buffer_size), 0);
@@ -1488,4 +1831,16 @@ void alsa_seq_init()
   rb_define_method(alsaSequencerClass, "port_info", RUBY_METHOD_FUNC(wrap_snd_seq_get_port_info), 1);
   rb_define_method(alsaSequencerClass, "any_port_info", RUBY_METHOD_FUNC(wrap_snd_seq_get_any_port_info), 2);
   rb_define_method(alsaSequencerClass, "set_port_info", RUBY_METHOD_FUNC(wrap_snd_seq_set_port_info), 2);
+  rb_define_method(alsaPollFdsClass, "poll", RUBY_METHOD_FUNC(wrapPoll), 1);
+  rb_define_method(alsaSequencerClass, "remove_events", RUBY_METHOD_FUNC(wrap_snd_seq_remove_events), -1);
+  rb_define_method(alsaSequencerClass, "client_pool", RUBY_METHOD_FUNC(wrap_snd_seq_get_client_pool), -1);
+  rb_define_method(alsaSequencerClass, "client_pool=", RUBY_METHOD_FUNC(wrap_snd_seq_set_client_pool), 1);
+  rb_define_method(alsaSequencerClass, "client_pool_output=", RUBY_METHOD_FUNC(wrap_snd_seq_set_client_pool_output), 1);
+  rb_define_method(alsaSequencerClass, "client_pool_output_room=", RUBY_METHOD_FUNC(wrap_snd_seq_set_client_pool_output_room), 1);
+  rb_define_method(alsaSequencerClass, "client_pool_input=", RUBY_METHOD_FUNC(wrap_snd_seq_set_client_pool_input), 1);
+  rb_define_method(alsaSequencerClass, "reset_pool_output", RUBY_METHOD_FUNC(wrap_snd_seq_reset_pool_output), 0);
+  rb_define_method(alsaSequencerClass, "reset_pool_input", RUBY_METHOD_FUNC(wrap_snd_seq_reset_pool_input), 0);
+#if defined(DEBUG)
+  rb_define_method(alsaSequencerClass, "dump_notes=", RUBY_METHOD_FUNC(AlsaSequencer_set_dump_notes), 1);
+#endif
 }

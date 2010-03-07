@@ -2,8 +2,8 @@
 # 1.9.1 required (1.8 does NOT work!)
 
 =begin
- * rplaymidi.rb - play Standard MIDI Files to sequencer port(s)
- * This is a one on one port of aplaymidi.c by Clemens Ladish
+ * rplaymidi++.rb - play Standard MIDI Files to sequencer port(s)
+ * This is a object oriented port of aplaymidi.c by Clemens Ladish
  *
  * Copyright (c) 2004-2006 Clemens Ladisch <clemens@ladisch.de>
  * Copyright (c) 2010 Eugene Brazwick <eugene.brazwick@rattink.com>
@@ -26,24 +26,10 @@
 #  TODO: sequencer queue timer selection
 
 =begin
-KNOWN BUGS
-
-Somehow I get a duration of 500_000 for all notes.... ??
-But then again, the program writes tempo in ev and it uses only a single ev that
-is overwritten (partly!).
-So this may very well be 'normal' behaviour.
 
 Violates MIDI standard by not sending NOTEOFF for all NOTEONs.  Fails when INTR
 is pressed (or whatever other killing signal).
 This too is an issue with aplaymidi to begin with.
-
-NOTEON-OFF : OK.
-anything else cause Roland to behave badly with hanging notes etc..
-panic.rb helps only temporarily!!
-Removing sysex did not help. Something is off with the programchanges, at least.
-
-And Roland E-80 is not idiot proof so it seems ):
-
 =end
 
 require_relative 'rrts'
@@ -53,10 +39,9 @@ require_relative 'rrts'
  * (The MIDI spec says one stop bit, but every transmitter uses two, just to be
  * sure, so we better not exceed that to avoid overflowing the output buffer.)
 =end
-
 MIDI_BYTES_PER_SEC = 31_250 / (1 + 8 + 2)
 
-include RRTS::Driver
+include RRTS
 
 =begin
  * A MIDI event after being parsed/loaded from the file.
@@ -107,18 +92,7 @@ public
   end
 end # class Track
 
-# static snd_seq_t *seq;
-# static int client;
-# static int port_count;
-# static snd_seq_addr_t *ports;
-# static int queue;
 @end_delay = 2
-# static const char *file_name;
-# static FILE *file;
-# static int file_offset;		/* current offset in input file */
-# static int num_tracks;
-# static struct track *tracks;
-# static int smpte_timing;
 
 # /* prints an error message to stderr */
 def errormsg msg, *args
@@ -133,24 +107,7 @@ def fatal msg, *args
   exit 1
 end
 
-# /* error handling for ALSA functions */    rrts uses exceptions...
-# static void check_snd(const char *operation, int err)
-# {
-# 	if (err < 0)
-# 		fatal("Cannot %s - %s", operation, snd_strerror(err));
-# }
-
-def init_seq
-#   /* open sequencer */
-  @seq = snd_seq_open
-#   	/* set our name (otherwise it's "Client-xxx") */
-  @seq.client_name = "aplaymidi"
-  #@seq.dump_notes = true  # requires DEBUG to be set. This disables output!!!
-# 	/* find out who we actually are */
-  @client = @seq.client_id
-end
-
-@port_count = 0
+# @port_count = 0  == @ports.length
 
 # /* parses one or more port addresses from the string */
 def parse_ports arg
@@ -158,48 +115,7 @@ def parse_ports arg
 # 	int err;
 
 # 	/* make a copy of the string because we're going to modify it */
-  portnames = arg.split(',')
-  @ports = []
-  for name in portnames
-    @port_count += 1
-    @ports << @seq.parse_address(name)  # returns a tuple....
-  end
-end
-
-def create_source_port
-# 	snd_seq_port_info_t *pinfo;
-# 	int err;
-
-  pinfo = snd_seq_port_info_malloc
-
-# 	/* the first created port is 0 anyway, but let's make sure ... */
-  pinfo.port = 0
-  pinfo.port_specified = true
-  pinfo.name = "aplaymidi"
-
-  pinfo.capability = 0 # /* sic */
-  pinfo.type = SND_SEQ_PORT_TYPE_MIDI_GENERIC | SND_SEQ_PORT_TYPE_APPLICATION
-  @seq.create_port(pinfo)
-end
-
-def create_queue
-  @queue = @seq.alloc_named_queue "aplaymidi"
-#   	/* the queue is now locked, which is just fine */
-end
-
-def connect_ports
-# 	int i, err;
-
-=begin
-	 * We send MIDI events with explicit destination addresses, so we don't
-	 * need any connections to the playback ports.  But we connect to those
-	 * anyway to force any underlying RawMIDI ports to remain open while
-	 * we're playing - otherwise, ALSA would reset the port after every
-	 * event.
-=end
-  for i in (0...@port_count)
-    @seq.connect_to(0, @ports[i][0], @ports[i][1])
-  end
+  @ports = arg.split(',').map { |name| @seq.parse_address(name)  }
 end
 
 def read_byte
@@ -277,13 +193,13 @@ def read_error
   errormsg("%s: invalid MIDI data (offset %#x)", @file_name, @file_offset);
 end
 
-CmdType = { 0x8=>SND_SEQ_EVENT_NOTEOFF,
-            0x9=>SND_SEQ_EVENT_NOTEON,
-            0xa => SND_SEQ_EVENT_KEYPRESS,
-            0xb => SND_SEQ_EVENT_CONTROLLER,
-            0xc => SND_SEQ_EVENT_PGMCHANGE,
-            0xd => SND_SEQ_EVENT_CHANPRESS,
-            0xe => SND_SEQ_EVENT_PITCHBEND
+CmdType = { 0x8=>Driver::SND_SEQ_EVENT_NOTEOFF,
+            0x9=>Driver::SND_SEQ_EVENT_NOTEON,
+            0xa => Driver::SND_SEQ_EVENT_KEYPRESS,
+            0xb => Driver::SND_SEQ_EVENT_CONTROLLER,
+            0xc => Driver::SND_SEQ_EVENT_PGMCHANGE,
+            0xd => Driver::SND_SEQ_EVENT_CHANPRESS,
+            0xe => Driver::SND_SEQ_EVENT_PITCHBEND
          }
 
 # /* reads one complete track from the file */
@@ -340,7 +256,7 @@ def read_track track, track_end
         len = read_var or read_error
         len += 1 if (cmd == 0xf0)
         event = new_event(track, len)
-        event.type = SND_SEQ_EVENT_SYSEX;
+        event.type = Driver::SND_SEQ_EVENT_SYSEX;
         event.port = port;
         event.tick = tick;
 #         event.length = len;
@@ -362,7 +278,7 @@ def read_track track, track_end
         case (c)
         when 0x21 # * port number */
           read_error if (len < 1)
-          port = read_byte() % @port_count;
+          port = read_byte() % @ports.length
           skip(len - 1);
         when 0x2f # /* end of track */
           track.end_tick = tick;
@@ -370,12 +286,12 @@ def read_track track, track_end
           return true
         when 0x51 # /* tempo */
           read_error if (len < 3)
-          if (@smpte_timing)
+          if @smpte_timing
 # 						/* SMPTE timing doesn't change */
-            skip(len);
+            skip len
           else
             event = new_event(track, 0);
-            event.type = SND_SEQ_EVENT_TEMPO;
+            event.type = Driver::SND_SEQ_EVENT_TEMPO;
             event.port = port;
             event.tick = tick;
             event.tempo = read_byte() << 16;
@@ -417,48 +333,28 @@ def read_smf
     return false;
   end
 
-  @num_tracks = read_int(2);
-  if (@num_tracks < 1 || @num_tracks > 1000)
-    errormsg("%s: invalid number of tracks (%d)", @file_name, @num_tracks);
-    @num_tracks = 0;
+  @num_tracks = read_int 2
+  unless (1..1000) === @num_tracks
+    errormsg("%s: invalid number of tracks (%d)", @file_name, @num_tracks)
+    @num_tracks = 0
     return false
   end
   @tracks = []
-  time_division = read_int(2);
+  time_division = read_int 2
 #   puts "time_division=#{time_division}"
 # 	/* interpret and set tempo */
-  queue_tempo = snd_seq_queue_tempo_malloc
+  queue_tempo = Driver::snd_seq_queue_tempo_malloc
   @smpte_timing = (time_division & 0x8000) != 0
-  if (!@smpte_timing)
-# 		/* time_division is ticks per quarter */
-    queue_tempo.tempo = 500_000 #); /* default: 120 bpm */
-    queue_tempo.ppq = time_division
+  unless @smpte_timing
+      # time_division is ticks per quarter
+    queue_tempo = Tempo.new 120, ticks_per_beat: time_division
   else
-# 		/* upper byte is negative frames per second */
-    i = 0x80 - ((time_division >> 8) & 0x7f);
-# 		/* lower byte is ticks per frame */
-    time_division &= 0xff;
-# 		/* now pretend that we have quarter-note based timing */
-    case (i)
-    when 24
-      queue_tempo.tempo = 500_000
-      queue_tempo.ppq = 12 * time_division
-    when 25
-      queue_tempo.tempo = 400_000
-      queue_tempo.ppq = 10 * time_division
-    when 29 # /* 30 drop-frame */
-      queue_tempo.tempo = 100_000_000
-      queue_tempo.ppq = 2997 * time_division
-    when 30
-      queue_tempo.tempo = 500_000
-      queue_tempo.ppq = 15 * time_division
-    else
-      errormsg("%s: invalid number of SMPTE frames per second (%d)",
-				 @file_name, i);
-      return false
-    end
+    queue_tempo = Tempo.new(0x80 - ((time_division >> 8) & 0x7f), smpte_timing: true,
+                            ticks_per_frame: (time_division & 0xff))
+    # upper byte is negative frames per second
+    # lower byte is ticks per frame
   end
-  @seq.set_queue_tempo(@queue, queue_tempo)
+  @queue.tempo = queue_tempo
 #    	/* read tracks */
   for i in (0...@num_tracks)
 # 		int len;
@@ -521,8 +417,8 @@ def handle_big_sysex ev
   offset = 0
   while l > MIDI_BYTES_PER_SEC
     ev.sysex = sysex[0, MIDI_BYTES_PER_SEC]
-    @seq.event_output ev
-    @seq.drain_output
+    @seq << ev
+    @seq.flush
     @seq.sync_output_queue
     sleep(1)  # AARGH
     l -= MIDI_BYTES_PER_SEC
@@ -547,15 +443,15 @@ def play_midi
 #   	/* initialize current position in each track */
   for i in (0...@num_tracks) do @tracks[i].rewind end
 # 	/* common settings for all our events */
-  ev = ev_malloc # non alsa
+  ev = Driver::ev_malloc # non alsa
   ev.clear
 #   puts "ev cleared-> #{ev.inspect}"
-  ev.queue = @queue;
-  ev.source_port = 0;
-  ev.flags = SND_SEQ_TIME_STAMP_TICK;
+  ev.queue = @queue
+  ev.source_port = @source_port
+  ev.flags = Driver::SND_SEQ_TIME_STAMP_TICK;
 #   puts "ev used for all-> #{ev.inspect}"
 
-  @seq.start_queue(@queue);
+  @queue.start
 # 	/* The queue won't be started until the START_QUEUE event is
 # 	 * actually drained to the kernel, which is exactly what we want. */
 
@@ -584,19 +480,19 @@ def play_midi
     ev.dest = @ports[event.port];
 #     puts "ev before typeswitch-> #{ev.inspect}"
     case (ev.type)
-    when SND_SEQ_EVENT_NOTEON, SND_SEQ_EVENT_NOTEOFF
+    when Driver::SND_SEQ_EVENT_NOTEON, Driver::SND_SEQ_EVENT_NOTEOFF
       ev.set_fixed
       ev.channel = event.d[0];
       ev.note = event.d[1];
       ev.velocity = event.d[2];
 #       puts "ev NOTEON/OFF:-> #{ev.inspect}"
-    when SND_SEQ_EVENT_KEYPRESS
+    when Driver::SND_SEQ_EVENT_KEYPRESS
       next if @only_notes
       ev.set_fixed
       ev.channel = event.d[0];
       ev.note = event.d[1];
       ev.velocity = event.d[2];
-    when SND_SEQ_EVENT_CONTROLLER
+    when Driver::SND_SEQ_EVENT_CONTROLLER
       next if @only_notes
       ev.set_fixed
       ev.channel = event.d[0];
@@ -604,42 +500,40 @@ def play_midi
       ev.param = event.d[1]
       ev.value = event.d[2]
 #       STDERR.puts("ev.param=#{ev.param}, ev.value=#{ev.value}")
-    when SND_SEQ_EVENT_PGMCHANGE, SND_SEQ_EVENT_CHANPRESS
+    when Driver::SND_SEQ_EVENT_PGMCHANGE, Driver::SND_SEQ_EVENT_CHANPRESS
       next if @only_notes
       ev.set_fixed
       ev.channel = event.d[0];
       ev.value = event.d[1];
-    when SND_SEQ_EVENT_PITCHBEND
+    when Driver::SND_SEQ_EVENT_PITCHBEND
       next if @only_notes
       ev.set_fixed
       ev.channel = event.d[0];
       ev.value = ((event.d[1]) | ((event.d[2]) << 7)) - 0x2000;
-    when SND_SEQ_EVENT_SYSEX
+    when Driver::SND_SEQ_EVENT_SYSEX
       next if @no_sysex
       ev.set_variable event.sysex
       handle_big_sysex ev
-    when SND_SEQ_EVENT_TEMPO
+    when Driver::SND_SEQ_EVENT_TEMPO
       ev.set_fixed
-      ev.dest_client = SND_SEQ_CLIENT_SYSTEM;
-      ev.dest_port = SND_SEQ_PORT_SYSTEM_TIMER;
+      ev.dest = @seq.system_timer
       ev.queue_queue = @queue;
       ev.queue_value = event.tempo;
     else
       fatal("Invalid event type %d!", ev.type);
     end
   # 		/* this blocks when the output pool has been filled */
-    @seq.event_output ev
+    @seq << ev
   end
 #  	/* schedule queue stop at end of song */
   ev.set_fixed
-  ev.type = SND_SEQ_EVENT_STOP;
+  ev.type = Driver::SND_SEQ_EVENT_STOP;
   ev.time_tick = max_tick;
-  ev.dest_client = SND_SEQ_CLIENT_SYSTEM;
-  ev.dest_port = SND_SEQ_PORT_SYSTEM_TIMER;
+  ev.dest = @seq.system_timer
   ev.queue_queue = @queue;
-  @seq.event_output ev
+  @seq << ev
 # 	/* make sure that the sequencer sees all our events */
-  @seq.drain_output
+  @seq.flush
 =begin
       /*
        * There are three possibilities how to wait until all events have
@@ -654,7 +548,7 @@ def play_midi
   @seq.sync_output_queue
 #
 # 	/* give the last notes time to die away */
-  sleep(@end_delay) if (@end_delay > 0)
+  sleep(@end_delay) if @end_delay > 0
 end
 
 def play_file
@@ -682,80 +576,90 @@ def play_file
   cleanup_file_data
 end
 
-def list_ports
-# 	snd_seq_client_info_t *cinfo;
-# 	snd_seq_port_info_t *pinfo;
-
-  cinfo = snd_seq_client_info_malloc
-  pinfo = snd_seq_port_info_malloc
-  puts " Port    Client name                      Port name"
-  cinfo.client = -1
-  while @seq.query_next_client(cinfo)
-    client = cinfo.client
-    pinfo.client = client
-    pinfo.port = -1
-    while @seq.query_next_port(pinfo)
-# 			/* port must understand MIDI messages */
-      next if (!(pinfo.type & SND_SEQ_PORT_TYPE_MIDI_GENERIC))
-# 			/* we need both WRITE and SUBS_WRITE */
-      next if (pinfo.capability & (SND_SEQ_PORT_CAP_WRITE | SND_SEQ_PORT_CAP_SUBS_WRITE)) !=
-              (SND_SEQ_PORT_CAP_WRITE | SND_SEQ_PORT_CAP_SUBS_WRITE)
-      printf("%3d:%-3d  %-32.32s %s\n",
-	pinfo.client, pinfo.port, cinfo.name, pinfo.name);
-    end
-  end
-end
-
-def usage argv0
-  printf(
-		"Usage: %s -p client:port[,...] [-d delay] midifile ...\n" +
-		"-h, --help                  this help\n" +
-		"-V, --version               print current version\n" +
-		"-l, --list                  list all possible output ports\n" +
-		"-p, --port=client:port,...  set port(s) to play to\n" +
-		"-d, --delay=seconds         delay after song ends\n",
-		argv0);
-end
-
 SND_UTIL_VERSION_STR = '1.0'
-
-def version
-  puts("aplaymidi version " + SND_UTIL_VERSION_STR);
-end
 
 require 'optparse'
 @no_sysex = @only_notes = false
 opts = OptionParser.new
 opts.banner = "Usage: #$PROGRAM_NAME [options] inputfile ..."
-opts.on('-h', '--help', 'this help') { usage($0); exit 1; }
-opts.on('-V', '--version', 'show version') { version; exit }
-opts.on('-l', '--list', 'list output ports') { list_ports; exit }
+opts.on('-h', '--help', 'this help') { puts opts.to_s; exit 1; }
+opts.on('-V', '--version', 'show version') do
+  puts "rplaymidi version " + SND_UTIL_VERSION_STR
+  exit 0
+end
+opts.on('-l', '--list', 'list output ports') do
+  puts " Port    Client name                      Port name"
+  for portname, port in @seq.ports
+      # port must understand MIDI messages
+    if port.type?(:midi_generic) &&
+      #  we need both WRITE and SUBS_WRITE
+      port.capability?(:write, :subscription_write)
+        printf "%3d:%-3d  %-32.32s %s\n", port.client_id, port.port, port.client.name, portname
+    end
+  end
+  exit 0
+end
+
 opts.on('-p', '--port=VAL', 'comma separated list of ports') { |arg| parse_ports(arg) }
 opts.on('-d', '--delay=VAL', 'exit delay', Integer) { |d| @end_delay = d }
 opts.on('-S', '--no-sysex', 'do not play sysex') { @no_sysex = true }
 opts.on('-N', '--only-note', 'only_notes') { @no_sysex = @only_notes = true }
-init_seq();
-file_names = opts.parse ARGV
 
-if @port_count < 1
-# 			/* use env var for compatibility with pmidi */
-  ports_str = ENV["ALSA_OUTPUT_PORTS"]
-  parse_ports(ports_str) if ports_str && !ports_str.empty?
-  if @port_count < 1
-    errormsg "Please specify at least one port with --port."
+def sigterm_exit
+  STDERR.print("Closing, please wait...");
+  @queue.clear
+  sleep 2
+  @queue.stop
+  @queue.free
+  STDERR.puts
+  exit 0
+end
+
+require_relative 'sequencer'
+
+  #   /* open sequencer */
+Sequencer.new('rplaymidi') do |seq|
+  @seq = seq
+
+  file_names = opts.parse ARGV
+
+  if @ports.empty?
+  # 			/* use env var for compatibility with pmidi */
+    ports_str = ENV["ALSA_OUTPUT_PORTS"]
+    parse_ports(ports_str) if ports_str && !ports_str.empty?
+    if @ports.empty?
+      errormsg "Please specify at least one port with --port."
+      exit 1
+    end
+  end
+  if file_names.empty?
+    errormsg "Please specify a file to play."
     exit 1
   end
-end
-if file_names.empty?
-  errormsg "Please specify a file to play."
-  exit 1
-end
-create_source_port
-create_queue
-connect_ports
+  @source_port = MidiPort.new(seq, 'rplaymidi', port: 0, midi_generic: true, application: true)
+  #       the first created port is 0 anyway, but let's make sure ...
+  require_relative 'midiqueue'
+  MidiQueue.new(@seq, 'rplaymidi') do |queue|
+    @queue = queue
+    Signal.trap(:INT) { sigterm_exit } # strangely enough it does not respong immediately?
+    Signal.trap(:TERM) { sigterm_exit }
 
-for file_name in file_names
-  @file_name = file_name
-  play_file
-end
-@seq.close
+      #       /* the queue is now locked, which is just fine */
+
+=begin
+      We send MIDI events with explicit destination addresses, so we don't
+      need any connections to the playback ports.  But we connect to those
+      anyway to force any underlying RawMIDI ports to remain open while
+      we're playing - otherwise, ALSA would reset the port after every
+      event.
+=end
+    for port in @ports
+      @source_port.connect_to port
+    end
+
+    for file_name in file_names
+      @file_name = file_name
+      play_file
+    end
+  end # free queue
+end # seq.close

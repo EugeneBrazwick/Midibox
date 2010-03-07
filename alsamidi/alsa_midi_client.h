@@ -1,4 +1,3 @@
-// $Id: alsa_midi_client.h,v 1.4 2010/02/20 20:52:50 ara Exp $
 
 #include "alsa_midi.h"
 #pragma interface
@@ -14,6 +13,8 @@ static inline void solve_address(VALUE &v_clientid, VALUE &v_portid)
     {
       // Now it may be that clientid responds to 'address'
       RRTS_DEREF(v_clientid, address);
+      v_clientid = rb_check_array_type(v_clientid);
+      if (!RTEST(v_clientid)) RAISE_MIDI_ERROR_FMT0("API call error: address is not a tuple");
         // and we can continue...
       v_portid = rb_ary_entry(v_clientid, 1);
       v_clientid = rb_ary_entry(v_clientid, 0);
@@ -21,4 +22,9 @@ static inline void solve_address(VALUE &v_clientid, VALUE &v_portid)
   RRTS_DEREF(v_clientid, client);
   RRTS_DEREF(v_portid, port);
 }
+
+#define FETCH_ADDRESSES() \
+VALUE v_clientid, v_portid; \
+rb_scan_args(argc, argv, "11", &v_clientid, &v_portid); \
+solve_address(v_clientid, v_portid)
 

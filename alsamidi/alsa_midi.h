@@ -84,10 +84,23 @@ But it is slightly less flexible for the same reason
 
 - in some cases, some parameters became meaningless.
 
+- normally in C, you would operate on the event object direct, using the structure definition.
+This is no longer possible, and where names where unique within the union the fieldname became
+a setter, getter. For ambiguous situations, the same approach is chosen, but the backend uses
+the type as set in the event. So:
+  ev = ev_malloc
+  ev.channel = 7
+is wrong as the type is not yet set.
+
 - in some cases, alsa uses ambigues names. Example the macro snd_seq_ev_set_source only sets
-  the port, and not the client. ev.source.port = p.
-  This has been renamed to source_port, similarly source_client source, and the three setters are
-  included.
+the port, and not the client. ev.source.port = p.
+This has been renamed to source_port, similarly source_client source, and the three setters are
+included. However for 'queue' this would not work, so
+ev.queue refers to the queue on which the event was send or received while
+ev.queue_queue refers to the queue as a subject of a queue control event
+
+- all other queue params have a queue_ prefix, including value.  ev.value is the control value.
+Example: ev.data.queue.param.value  should be replaced with ev.queue_value.
 
 IMPORTANT: using this API as is, will not be the most efficient way to deal with
 alsa_midi.so.  Please use the ruby classes and additional methods in this library.
@@ -96,8 +109,11 @@ This yields in particular for the MidiEvent API since the only way to write or r
 a field is through a wrapped method. Even more, the C API has a lot of macros that
 are now implemented as ruby methods. Again, this is not efficient.
 However, it implies that existing programs can easily be ported, see for instance
-rrecordmidi.rb which is a 1 on 1 port of arecordmidi.c
+rrecordmidi.rb which is a 1 on 1 port of arecordmidi.c.
+Same for rplaymidi.rb
 
+- The revents method is rather vague and the examples do not use it. What is the timeout?
+Or isn't there any.  Anyway, the result is made consistent with that of poll.
 */
 
 /* This class behaves similar to VALUE except that the Garbage Collector will
@@ -114,5 +130,7 @@ public:
   VALUE operator *() const { return V; }
   operator VALUE() const { return V; }
 };
+
+extern VALUE param2sym(uint param);
 
 #endif // _RRTS_ALSA_MIDI_H

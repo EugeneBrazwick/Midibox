@@ -50,7 +50,8 @@ Parameters:
   portinfo - internal reference. Please use Sequencer.ports
   sequencer - owning Sequencer
   name - name of the port to be
-  params - any one of
+  params - a hash with any one of the following symbols (use 'true' as value):
+        (Example: midi_generic: true, duplex: true )
     read - true, to announce read capabilities
     write - true, similar
     duplex - true, read  + write
@@ -62,7 +63,7 @@ Parameters:
     specific - uses device specific messages
     hardware_specific - better name for specific
     midi_generic - announce generic (any) MIDI support
-    midi_gm - general MIDI support
+    midi_gm - true, for general MIDI support
     midi_gm2 - general MIDI 2 support
     midi_gs - compatible with Roland GS standard
     midi_xg - compatible with Yamaha XG standard
@@ -85,7 +86,8 @@ Parameters:
     synth_voices - number of midi voices supported, may leave this 0
     port - portnumber to use, sets port_specified as well
     port_specified - passed on as is, might be overwritten by setting port, so do not use this.
-
+    simple - should be true, make it a simple port without buffering or queueing
+    direct - same as simple
 =end
   AllowedParams = {:timestamping=>:timestamping=, :timestamp_queue=>:timestamp_queue=,
                    :timestamp_real=>:timestamp_real=, :midi_channels=>:midi_channels=,
@@ -95,6 +97,7 @@ Parameters:
                   }
   def initialize sequencer, name, params = nil, &block
     @handle = nil
+    @simple = false
     open sequencer, name, params, &block
   end
 
@@ -104,7 +107,7 @@ Parameters:
 
 protected
   def copy_to_i handle
-    @handle.copy_to handle
+    @handle.copy_to(handle) if @handle
   end
 
 public
@@ -127,26 +130,39 @@ public
       @port = @handle.port # int
     else
       capsbits = typebits = 0
-      @handle = snd_seq_port_info_malloc
       @client_id = sequencer.client_id
+      @simple = false
       if params
         for k, v in params
-          if lu = CapsBitsMap[k]
-            capsbits |= lu
-          elsif lu = TypeBitsMap[k]
-            typebits |= lu
-          elsif lu = AllowedParams[k]
-            @handle.send(lu, v)
+          case k
+          when :simple, :direct
+            raise RRTSError.new("Invalid parameters specified for simple MidiPort") if @handle
+            @simple = true
           else
-            raise RRTSError.new("Invalid parameter '#{k}' for MidiPort")
+            if lu = CapsBitsMap[k]
+              capsbits |= lu
+            elsif lu = TypeBitsMap[k]
+              typebits |= lu
+            elsif lu = AllowedParams[k]
+              raise RRTSError.new("Invalid parameter '#{k}' for simple MidiPort") if @simple
+              @handle ||= snd_seq_port_info_malloc
+              @handle.send(lu, v)
+            else
+              raise RRTSError.new("Invalid parameter '#{k}' for MidiPort")
+            end
           end
         end
       end
-      @handle.capability = capsbits
-      @handle.type = typebits
-      @handle.name = name
-      @seq_handle.create_port(@handle)
-      @port = @handle.port # int !
+      if @simple
+        @port = @seq_handle.create_simple_port(name, capsbits, typebits)
+      else
+        @handle ||= snd_seq_port_info_malloc
+        @handle.capability = capsbits
+        @handle.type = typebits
+        @handle.name = name
+        @seq_handle.create_port(@handle)
+        @port = @handle.port # int !
+      end
       if block_given?
         begin
           yield self
@@ -159,10 +175,17 @@ public
   end
 
   def close
-    return unless @handle
-    @seq_handle.delete_port @port
+    return unless @handle or @simple
+    if @handle
+      @handle = nil # prevent endless loop
+      @seq_handle.delete_port @port
+    else
+      @simple = false # prevent endless loop
+      @seq_handle.delete_simple_port @port
+    end
     # let's help the gc:
     @handle = @seq_handle = @sequencer = nil
+    @simple = false
   end
 
   def open?
@@ -184,19 +207,20 @@ public
     [@client_id, @port]
   end
 
+  # Create a simple connection that cannot be locked, and has no queue
+  # The current port will be the sender (write)
   def connect_to port
     @seq_handle.connect_to self, port
   end
 
-
+  # Create a simple connection that cannot be locked, and has no queue
+  # The current port will be the receiver (read)
   def connect_from port
     @seq_handle.connect_from self, port
   end
 
-  #:stopdoc:
-  alias :⇒ :connect_to  # rdoc FAILS !!
-  alias :⇐ :connect_from # rdoc FAILS !!
-  #:startdoc:
+  alias :>> :connect_to
+  alias :<< :connect_from
 
   # better way to query caps. Pass the symbols that must then be all set
   def capability?(*keys)
@@ -240,6 +264,12 @@ public
   # MidiClient client
   def client
     @sequencer.clients[@client_id]
+  end
+
+  # clientid[0] and portid[1]. This to enable using the result of parse_address
+  # as either AlsaMidiPort_i as well as MidiPort.
+  def []v
+    v == 0 ? @client_id : @port
   end
 end # MidiPort
 

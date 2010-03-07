@@ -17,7 +17,6 @@ static inline void get_channel(VALUE v_midievent, int channel)
 }
 
 /* AlsaMidiEvent_i#populate Sequencer, MidiEvent
-To avoid confusion, the MidiEvent's in alsa_midi_event.cpp are all AlsaMidiEvent_i's
 */
 static VALUE
 alsaMidiEventClass_populate(VALUE v_ev, VALUE v_sequencer, VALUE v_midievent)
@@ -93,7 +92,10 @@ alsaMidiEventClass_populate(VALUE v_ev, VALUE v_sequencer, VALUE v_midievent)
       rb_iv_set(v_midievent, "@velocity", INT2NUM(ev->data.note.velocity & 0x7f));
       break;
     case SND_SEQ_EVENT_CONTROLLER:
-      rb_iv_set(v_midievent, "@param", INT2NUM(ev->data.control.param & 0x7f));
+      {
+        const uint param = ev->data.control.param & 0x7f;
+        rb_iv_set(v_midievent, "@param", param2sym(param));
+      }
       // fall through
     case SND_SEQ_EVENT_PGMCHANGE:
     case SND_SEQ_EVENT_CHANPRESS:

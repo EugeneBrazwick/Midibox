@@ -3,7 +3,7 @@
 module RRTS
 
   # basicly Enumerator WITH peek then
-  class EventStream
+  class MyEnumerator
 
     private
     def initialize array
@@ -28,6 +28,8 @@ module RRTS
     def <=> other
       peek <=> other.peek
     end
+
+    attr :array
   end
 
 =begin
@@ -52,7 +54,7 @@ module RRTS
   class PriorityNode
     private
     def initialize enumerable
-      @enum = EventStream.new enumerable
+      @enum = MyEnumerator.new enumerable
       @left = @right = nil
     end
 
@@ -63,22 +65,25 @@ module RRTS
     def reorder
 #       puts "#{File.basename(__FILE__)}:#{__LINE__}: reorder"
       peek = @enum.peek rescue nil
-      r = self
+      r = peek && self
 #       puts "#{File.basename(__FILE__)}:#{__LINE__}: Node::reorder peek=#{peek}, left=#{@left && @left.peek}, right=#{@right && @right.peek}"
       if @left
         if !peek || @left.peek < peek
+          raise RRTSError.new("crapcode") if @right && @right.enum && !@right.peek
           if @right && @right.peek < @left.peek
-#             puts "whoops right must become root"
             @enum, @right.enum = @right.enum, @enum
             @right = @right.reorder
+            raise RRTSError.new("crapcode") if @right && !@right.enum
           else
 #             puts "whoops left must become root"
             if peek
               @enum, @left.enum = @left.enum, @enum
               @left = @left.reorder
+              raise RRTSError.new("crapcode") if @left&& !@left.enum
             else
               r, @left = @left, nil
               r.enqueue(@right) if @right
+              raise RRTSError.new("crapcode") unless r.enum
             end
           end
         end
@@ -86,10 +91,12 @@ module RRTS
         if peek
           @enum, @right.enum = @right.enum, @enum
           @right = @right.reorder
+          raise RRTSError.new("crapcode") if @right && !@right.enum
         else
           r, @right = @right, nil
 #           puts "whoops right must become root, since there is no left"
           r.enqueue(@left) if @left
+          raise RRTSError.new("crapcode") unless r.enum
         end
       end
       r
@@ -134,6 +141,10 @@ module RRTS
       r = @enum.next
       return reorder, r
     end
+
+    def array
+      @enum && @enum.array
+    end
   end
 
   class PriorityTree
@@ -152,13 +163,18 @@ module RRTS
 
     def dequeue
       return nil unless @node
+      array = @node.array
       @node, result = @node.dequeue
   #     puts "#{File.basename(__FILE__)}:#{__LINE__}: dequeue node is now #{@node.inspect}"
-      result
+      return result, array
     end
 
     def peek
       @node && @node.peek rescue nil
+    end
+
+    def array
+      @node.enum.array
     end
   end
 
@@ -167,7 +183,7 @@ end # RRTS
 if $0 == __FILE__
   include RRTS
   e = [1, 2, 3, 4]
-  i = EventStream.new(e)
+  i = MyEnumerator.new(e)
   puts "i.first=#{i.first}"
   i.next
   puts "i.first=#{i.first}, i.next=#{i.next}"

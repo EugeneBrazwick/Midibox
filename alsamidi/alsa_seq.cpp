@@ -477,7 +477,15 @@ static inline void
 WRITE_TIME_IN_CHANNEL_i(VALUE v_time, snd_seq_event_t &ev, bool have_sender_queue)
 {
 //   fprintf(stderr, "WRITE_TIME_IN_CHANNEL_i, have_sender_queue=%d\n", have_sender_queue);
-  if (!RTEST(v_time)) return;
+  if (!RTEST(v_time))
+    {
+      if (!have_sender_queue)
+        {
+          fprintf(stderr, __FILE__ ":%d: applying DIRECT\n", __LINE__);
+          snd_seq_ev_set_direct(&ev);
+        }
+      return;
+    }
   if (!have_sender_queue)
     RAISE_MIDI_ERROR_FMT0("attempt to set timestamps, but no MidiQueue supplied");
   // if (ev.flags & SND_SEQ_TIME_STAMP_TICK)  flags is 0!!!!!

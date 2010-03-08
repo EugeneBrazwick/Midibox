@@ -8,6 +8,7 @@ module RRTS
 
   class MidiQueue
     include Comparable
+    include Driver
     extend Forwardable
 
     private

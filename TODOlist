@@ -10,3 +10,9 @@
 0005 do mrt  4 23:24:01 CET 2010 TODO writing ev: param := ':modwheel', reading same event -> param == 1.
                                       This is an inconsistency. Must be mapped back.
      za mrt  6 22:48:43 CET 2010 DONE
+0006 ma mrt  8 21:08:06 CET 2010 BUG emptying the buffers is no good enough to avoid hanging notes.
+                                     NoteOns may already have arrived in a device so we MUST send the NoteOffs.
+                                     First make sure we use MidiEvent.
+          I noticed the following: the INT-handler truly gets first. So we flush the queue.
+          After that NoteOff's for hanging notes are sent, but to no avail
+          Finally we get in the ensure of the Sequencer constructor.

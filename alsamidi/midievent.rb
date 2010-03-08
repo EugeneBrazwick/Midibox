@@ -151,6 +151,7 @@ To create an event use Sequencer.input_event
             end
             @flags[:coarse] = v
           when :param then @param = v
+          when :direct then @sender_queue = @time = nil # bit of a hack...
           else raise RRTSError.new("illegal option '#{k}' for #{self.class}")
           end
         end
@@ -223,18 +224,11 @@ To create an event use Sequencer.input_event
 
     public
 
-#     attr :abstime?, :reltime?, :direct?, :reserved?, :prior?, :fixed?, :variable?, :tick?, :real?
-#     attr :result_type?, :note_type?, :control_type?, :channel_type?, :message_type?,
-#          :subscribe_type?, :sample_type?, :user_type?, :instr_type?, :fixed_type?,
-#          :variable_type?, :varusr_type?
-
-#     def type_check?
-#       not_implemented
-#     end
-
-    # the typeid, a symbol equal to the suffix of the event name in lower case
+    # :nodoc: the typeid, a symbol equal to the suffix of the event name in lower case
     # Examples: :start, :sensing, :pgmchange, :noteon
+    # DO NOT USE. It is redundant!!
     attr :type
+
     # timestamp of event, either in ticks (int) or realtime [secs, nanosecs]
     attr_accessor :time
     alias :tick :time

@@ -96,6 +96,7 @@ Just use 'new'.
         begin
           yield self
         ensure
+          puts "#{File.basename(__FILE__)}:#{__LINE__}:ensure close"
           close
         end
       end

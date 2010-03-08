@@ -23,8 +23,6 @@
  *  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307 USA
 =end
 
-#  TODO: sequencer queue timer selection
-
 =begin
 
 Violates MIDI standard by not sending NOTEOFF for all NOTEONs.  Fails when INTR
@@ -47,23 +45,6 @@ include RRTS
  * A MIDI event after being parsed/loaded from the file.
  * There could be made a case for using snd_seq_event_t instead.
 =end
-class Event
-
-  attr_accessor :type, :port, :tick, :d, :tempo, :length, :sysex
-
-  # struct event *next;		/* linked list */
-
- #	unsigned char type;		/* SND_SEQ_EVENT_xxx */
-# 	unsigned char port;		/* port index */
-# 	unsigned int tick;
-# 	union {
-# 		unsigned char d[3];	/* channel and data bytes */
-# 		int tempo;
-# 		unsigned int length;	/* length of sysex data */
-# 	} data;
-# 	unsigned char sysex[0];
-end # event
-
 class Track
 # 	struct event *first_event;	/* list of all events in this track */
 # 	int end_tick;			/* length of this track */
@@ -90,496 +71,409 @@ public
   def rewind
     @ptr = 0
   end
+
+  def << event
+    @events << event
+  end
 end # class Track
 
 @end_delay = 2
 
-# /* prints an error message to stderr */
-def errormsg msg, *args
-  STDERR.printf(msg, *args)
-  STDERR.puts
-end
-
-# /* prints an error message to stderr, and dies */
-def fatal msg, *args
-  STDERR.printf(stderr, msg, *args)
-  STDERR.puts
-  exit 1
-end
-
-# @port_count = 0  == @ports.length
-
-# /* parses one or more port addresses from the string */
+# parses one or more port addresses from the string
 def parse_ports arg
-# 	char *buf, *s, *port_name;
-# 	int err;
-
-# 	/* make a copy of the string because we're going to modify it */
   @ports = arg.split(',').map { |name| @seq.parse_address(name)  }
 end
 
-def read_byte
-  @file_offset += 1
-  @file.readbyte  # throws EOFError
+class SoundChunk
+  private
+  def initialize
+    @tracks = []
+  end
+  public
+  attr_accessor :tempo
+  attr_accessor :tracks
+  attr_accessor :num_tracks
 end
 
-#  reads a little-endian 32-bit integer
-def read_32_le
-# 	int value;
-  value = read_byte
-  value |= read_byte << 8
-  value |= read_byte() << 16;
-  (value |= read_byte() << 24)
-#   .tap{|v| puts "read_32_le -> #{v}" }
-end
+# The Parser will be a class that is basically used in the chunk constructor.
+# It builds a single chunk from an inputfile
+class MidifileParser
+  private
+  def initialize file_name, chunk, destination_ports
+    @file = file_name == "-" ? STDIN : File::open(file_name, "rb")
+    begin
+      @file_name, @chunk, @destination_ports = file_name, chunk, destination_ports
+      case read_id
+      when MTHD
+        read_smf
+      when RIFF
+        read_riff
+      else
+        raise RRTSError.new("%s is not a Standard MIDI File", @file_name)
+      end
+    ensure
+      @file.close unless @file == STDIN
+    end
+  end
 
-# /* reads a 4-character identifier */
-alias :read_id :read_32_le
+  def read_byte
+    @file.readbyte  # throws EOFError
+  end
 
-def make_id(c1, c2, c3, c4)
-  ((c1.ord) | ((c2.ord) << 8) | ((c3.ord) << 16) | ((c4.ord) << 24))
-end
+  #  reads a little-endian 32-bit integer
+  def read_32_le
+    #       int value;
+    value = read_byte
+    value |= read_byte << 8
+    value |= read_byte << 16
+    value |= read_byte << 24
+    #   .tap{|v| puts "read_32_le -> #{v}" }
+  end
 
-# /* reads a fixed-size big-endian number */
-def read_int bytes
-#   int c, value = 0;
-  value = 0
+  # /* reads a 4-character identifier */
+  alias :read_id :read_32_le
 
-  bytes.times {
-    c = read_byte
+  # Used to create the constants below at class-parse-time
+  def self.make_id c
+    c[0].ord | (c[1].ord << 8) | (c[2].ord << 16) | (c[3].ord << 24)
+  end
+
+  Encoding.default_internal = 'ascii-8bit'
+  MTHD = make_id('MThd')
+  RIFF = make_id('RIFF')
+  MTRK = make_id('MTrk')
+  RMID = make_id('RMID')
+  DATA = make_id('data')
+  Encoding.default_internal = 'utf-8'
+
+  # /* reads a fixed-size big-endian number */
+  def read_int bytes
+    #   int c, value = 0;
+    value = 0
+    bytes.times {
+      c = read_byte
     value = (value << 8) | c;
-  }
-#   puts "read_int -> #{value}"
-  value
-end
+    }
+    #   puts "read_int -> #{value}"
+    value
+  end
 
-# /* reads a variable-length number */
-def read_var
-# 	int value, c;
-  c = read_byte
-  value = c & 0x7f;
-  if (c & 0x80) != 0
+  # /* reads a variable-length number */
+  def read_var
+    #       int value, c;
     c = read_byte
-    value = (value << 7) | (c & 0x7f);
+    value = c & 0x7f;
     if (c & 0x80) != 0
       c = read_byte
       value = (value << 7) | (c & 0x7f);
-      if (c & 0x80)  != 0
+      if (c & 0x80) != 0
         c = read_byte
-        value = (value << 7) | c;
-        return false if (c & 0x80) != 0
+        value = (value << 7) | (c & 0x7f);
+        if (c & 0x80)  != 0
+          c = read_byte
+          value = (value << 7) | c;
+          return false if (c & 0x80) != 0
+        end
       end
     end
+    #   puts "read_var -> #{value}"
+    value
   end
-#   puts "read_var -> #{value}"
-  value
-end
 
-# /* allocates a new event */
-def new_event track, sysex_length
-#   	struct event *event;
-  event = Event.new
+  def skip bytes
+    bytes.times { read_byte }
+  end
 
-# 	/* append at the end of the track's linked list */
-  track.events << event
-  event
-end
+  def read_error
+    raise RRTSError.new("%s: invalid MIDI data (offset %#x)", @file_name, @file.pos)
+  end
 
-def skip bytes
-  bytes.times { read_byte }
-end
-
-def read_error
-  errormsg("%s: invalid MIDI data (offset %#x)", @file_name, @file_offset);
-end
-
-CmdType = { 0x8=>Driver::SND_SEQ_EVENT_NOTEOFF,
-            0x9=>Driver::SND_SEQ_EVENT_NOTEON,
-            0xa => Driver::SND_SEQ_EVENT_KEYPRESS,
-            0xb => Driver::SND_SEQ_EVENT_CONTROLLER,
-            0xc => Driver::SND_SEQ_EVENT_PGMCHANGE,
-            0xd => Driver::SND_SEQ_EVENT_CHANPRESS,
-            0xe => Driver::SND_SEQ_EVENT_PITCHBEND
-         }
-
-# /* reads one complete track from the file */
-def read_track track, track_end
-#
-  tick = 0;
-  last_cmd = 0;
-  port = 0;
-
-# 	/* the current file position is after the track ID and length */
-  while @file_offset < track_end
-#     unsigned char cmd;
-# 		struct event *event;
-# 		int delta_ticks, len, c;
-
-    delta_ticks = read_var or break
-#     puts "delta_ticks=#{delta_ticks}"
-    tick += delta_ticks;
-
-    c = read_byte
-    if (c & 0x80) != 0
-#    		/* have command */
-      cmd = c
-      last_cmd = cmd if cmd < 0xf0
-    else#          			/* running status */
-      @file.ungetbyte(c);
-      @file_offset -= 1;
-      cmd = last_cmd;
-      read_error if cmd == 0
+  # read 7bit components.
+  def read_fixed bytes
+    value = 0
+    bytes.times do
+      c = read_byte or invalid
+      value = (value << 7) | (c & 0x7f)
     end
-    case cmd >> 4
-# 			/* maps SMF events to ALSA sequencer events */
-    when 0x8, 0x9, 0xb, 0xe #* channel msg with 2 parameter bytes */
-      event = new_event(track, 0)
-      event.type = CmdType[cmd >> 4]
-      event.port = port
-      event.tick = tick
-      d1 = read_byte & 0x7f
-      d2 = read_byte & 0x7f
-      event.d = [cmd & 0x0f, d1, d2]
-#       puts "#{File.basename(__FILE__)}:#{__LINE__}:2 byte channel message #{event.type}, d1=#{d1},d2=#{d2}"
-    when 0xc, 0xd  #/* channel msg with 1 parameter byte */
-#       puts "1 byte channel message"
-      event = new_event(track, 0);
-      event.type = CmdType[cmd >> 4];
-      event.port = port;
-      event.tick = tick;
-      d1 = read_byte() & 0x7f;
-      event.d = [cmd & 0x0f, d1]
-    when 0xf
-      case cmd
-      when 0xf0, 0xf7 #/* sysex */
-                      #/* continued sysex, or escaped commands */
-        len = read_var or read_error
-        len += 1 if (cmd == 0xf0)
-        event = new_event(track, len)
-        event.type = Driver::SND_SEQ_EVENT_SYSEX;
-        event.port = port;
-        event.tick = tick;
-#         event.length = len;
-        event.sysex = ''
-        event.sysex.force_encoding('ascii-8bit')
-        if (cmd == 0xf0)
-          event.sysex += 0xf0.chr
-          c = 1;
-        else
-          c = 0
-        end
-        while c < len
-          event.sysex += read_byte.chr
-          c += 1
-        end
-      when 0xff #/* meta event */
-        c = read_byte()
-        len = read_var or read_error
-        case (c)
-        when 0x21 # * port number */
-          read_error if (len < 1)
-          port = read_byte() % @ports.length
-          skip(len - 1);
-        when 0x2f # /* end of track */
-          track.end_tick = tick;
-          skip(track_end - @file_offset)
-          return true
-        when 0x51 # /* tempo */
-          read_error if (len < 3)
-          if @smpte_timing
-# 						/* SMPTE timing doesn't change */
-            skip len
+#     puts "read_fixed->#{value}"
+    value
+  end
+
+  #  reads one complete track from the file
+  def read_track track, track_end
+    #
+    tick = 0
+    last_cmd = 0
+    port = @destination_ports[0] # in case there are none set
+    #  the current file position is after the track ID and length
+    while @file.pos < track_end
+      delta_ticks = read_var or break
+      #     puts "delta_ticks=#{delta_ticks}"
+      tick += delta_ticks;
+      c = read_byte
+      if (c & 0x80) != 0
+        # have command
+        cmd = c
+        last_cmd = cmd if cmd < 0xf0
+      else # running status
+        @file.ungetbyte c
+        cmd = last_cmd
+        read_error if cmd == 0
+      end
+      status = cmd >> 4
+      channel = (cmd & 0x0f) + 1
+      case status
+        #  maps SMF events to ALSA sequencer events
+      when 0x8
+        note = read_byte & 0x7f
+        off_vel = read_byte & 0x7f
+        event = NoteOffEvent.new(channel, note, off_velocity: off_vel, destination: port, tick: tick)
+        track << event
+      when 0x9, 0xb #* channel msg with 2 parameter bytes */
+        note = read_byte & 0x7f
+        vel =  read_byte & 0x7f
+        event = (status == 0x9 ? NoteOnEvent : KeypressEvent).new(channel, note, vel,
+                                                                  destination: port, tick: tick)
+        track << event
+      when 0xe
+        event = PitchbendEvent.new(cmd & 0x0f, read_fixed(2) - 0x2000, destination: port, tick: tick)
+        track << event
+      when 0xc
+        event = ProgramChangeEvent.new(channel, read_byte & 0x7f, destination: port, tick: tick)
+        track << event
+      when  0xd
+        event = ChannelPressureEvent.new(channel, read_byte & 0x7f, destination: port, tick: tick)
+        track << event
+      when 0xf
+        case cmd
+        when 0xf0, 0xf7 # sysex, continued sysex, or escaped commands
+          len = read_var or read_error
+          len += 1 if cmd == 0xf0
+          sysex = ''
+          sysex.force_encoding 'ascii-8bit'
+          if cmd == 0xf0
+            sysex += 0xf0.chr
+            c = 1
           else
-            event = new_event(track, 0);
-            event.type = Driver::SND_SEQ_EVENT_TEMPO;
-            event.port = port;
-            event.tick = tick;
-            event.tempo = read_byte() << 16;
-            event.tempo |= read_byte() << 8;
-            event.tempo |= read_byte();
-            skip(len - 3);
+            c = 0
           end
-        else # /* ignore all other meta events */
-          skip(len);
-        end
-      else  #  /* invalid Fx command */
+          while c < len
+            sysex += read_byte.chr
+            c += 1
+          end
+          event = SysexEvent.new sysex, dest: port, tick: tick
+        when 0xff # meta event
+          c = read_byte
+          len = read_var or read_error
+          case (c)
+          when 0x21 # port number
+            read_error if len < 1
+            port = @destination_ports[read_byte % @destination_ports.length]
+            skip(len - 1);
+          when 0x2f # end of track
+            track.end_tick = tick
+            @file.pos = track_end
+            return true
+          when 0x51 # tempo
+            read_error if len < 3
+            if @smpte_timing
+              #  SMPTE timing doesn't change
+              skip len
+            else
+              tempo = read_byte << 16
+              tempo |= read_byte << 8
+              tempo |= read_byte
+              event = TempoEvent.new 0, tempo, dest: port, tick: tick
+              track << event
+              skip(len - 3) if len > 3
+            end
+          else # ignore all other meta events
+              skip len
+          end
+        else  #  invalid Fx command
          read_error
+        end
+      else
+        #  cannot happen
+        read_error
       end
-    else
-      #  /* cannot happen */
-      read_error
     end
-  end
-  errormsg("%s: invalid MIDI data (offset %#x)", @file_name, @file_offset);
-  false
-end
-
-def invalid_format
-  errormsg("%s: invalid file format", @file_name);
-end
-
-# /* reads an entire MIDI file */
-def read_smf
-# 	int header_len, type, time_division, i, err;
-# 	snd_seq_queue_tempo_t *queue_tempo;
-
-# 	/* the curren position is immediately after the "MThd" id */
-  header_len = read_int(4);
-  invalid_format if (header_len < 6)
-
-  type = read_int(2);
-  if (type != 0 && type != 1)
-    errormsg("%s: type %d format is not supported", @file_name, type);
-    return false;
+    raise RRTSError.new("%s: invalid MIDI data (offset %#x)", @file_name, @file.pos)
   end
 
-  @num_tracks = read_int 2
-  unless (1..1000) === @num_tracks
-    errormsg("%s: invalid number of tracks (%d)", @file_name, @num_tracks)
-    @num_tracks = 0
-    return false
+  def invalid_format
+    raise RRTSError.new("%s: invalid file format", @file_name)
   end
-  @tracks = []
-  time_division = read_int 2
-#   puts "time_division=#{time_division}"
-# 	/* interpret and set tempo */
-  queue_tempo = Driver::snd_seq_queue_tempo_malloc
-  @smpte_timing = (time_division & 0x8000) != 0
-  unless @smpte_timing
+
+  # /* reads an entire MIDI file */
+  def read_smf
+    #       int header_len, type, time_division, i, err;
+    #       snd_seq_queue_tempo_t *queue_tempo;
+
+    # the curren position is immediately after the "MThd" id
+    header_len = read_int(4);
+    invalid_format if (header_len < 6)
+
+    type = read_int(2);
+    if type != 0 && type != 1
+      raise RRTSError.new("%s: type %d format is not supported", @file_name, type)
+    end
+    num_tracks = @chunk.num_tracks = read_int(2)
+    unless (1..1000) === num_tracks
+      raise RRTSError.new("%s: invalid number of tracks (%d)", @file_name, num_tracks)
+    end
+    time_division = read_int 2
+    #   puts "time_division=#{time_division}"
+    #       /* interpret and set tempo */
+    @smpte_timing = (time_division & 0x8000) != 0
+    unless @smpte_timing
       # time_division is ticks per quarter
-    queue_tempo = Tempo.new 120, ticks_per_beat: time_division
-  else
-    queue_tempo = Tempo.new(0x80 - ((time_division >> 8) & 0x7f), smpte_timing: true,
-                            ticks_per_frame: (time_division & 0xff))
-    # upper byte is negative frames per second
-    # lower byte is ticks per frame
-  end
-  @queue.tempo = queue_tempo
-#    	/* read tracks */
-  for i in (0...@num_tracks)
-# 		int len;
-
-# 		/* search for MTrk chunk */
-    len = 0
-    loop do
-      id = read_id();
-      len = read_int(4);
-      if (len < 0 || len >= 0x10000000)
-        errormsg("%s: invalid chunk length %d", @file_name, len);
-        return false
-      end
-      break if (id == make_id('M', 'T', 'r', 'k'))
-      skip(len);
+      queue_tempo = Tempo.new 120, ticks_per_beat: time_division
+    else
+      queue_tempo = Tempo.new(0x80 - ((time_division >> 8) & 0x7f), smpte_timing: true,
+                              ticks_per_frame: (time_division & 0xff))
+      # upper byte is negative frames per second
+      # lower byte is ticks per frame
     end
-    @tracks[i] = Track.new
-    return false unless read_track(@tracks[i], @file_offset + len)
+    @chunk.tempo = queue_tempo
+    #   read tracks
+    for i in (0...num_tracks)
+      # search for MTrk chunk
+      len = 0
+      loop do
+        id = read_id();
+        len = read_int(4);
+        if len < 0 || len >= 0x10000000
+          raise RRTSError.new("%s: invalid chunk length %d", @file_name, len)
+          return false
+        end
+        break if id == MTRK
+        skip len
+      end
+      track = @chunk.tracks[i] = Track.new
+      return false unless read_track(track, @file.pos + len)
+    end
+    true
   end
-  true
-end
 
-def read_riff
-# 	/* skip file length */
-  4.times { read_byte(); }
-#   	/* check file type ("RMID" = RIFF MIDI) */
-  invalid_format if (read_id() != make_id('R', 'M', 'I', 'D'))
-#  	/* search for "data" chunk */
-  loop do
-    id = read_id();
-    len = read_32_le();
-    break if (id == make_id('d', 'a', 't', 'a'))
-    skip((len + 1) & ~1);
+  def read_riff
+    # skip file length
+    4.times { read_byte }
+    #  check file type ("RMID" = RIFF MIDI)
+    invalid_format unless read_id == RMID
+    #  search for "data" chunk
+    loop do
+      id = read_id
+      len = read_32_le
+      break if id == DATA
+      skip((len + 1) & ~1)
+    end
+    #  the "data" chunk must contain data in SMF format
+    invalid_format unless read_id == MTHD
+    read_smf
   end
-#   	/* the "data" chunk must contain data in SMF format */
-  invalid_format if (read_id() != make_id('M', 'T', 'h', 'd'))
-  read_smf
-end
 
-def cleanup_file_data
-# 	int i;
-# 	struct event *event;
+end # class MidifileParser
 
-  @num_tracks = 0;
-  @tracks = nil;
-end
-
-def handle_big_sysex ev
-#
-# 	unsigned int length;
-# 	ssize_t event_size;
-# 	int err;
-  sysex = ev.sysex
-  event_size = ev.length # required bufferspace
-  if event_size >= @seq.output_buffer_size
-    @seq.drain_output
-    @seq.output_buffer_size = event_size + 1
-  end
-  l = sysex.length
-  offset = 0
-  while l > MIDI_BYTES_PER_SEC
-    ev.sysex = sysex[0, MIDI_BYTES_PER_SEC]
-    @seq << ev
-    @seq.flush
-    @seq.sync_output_queue
-    sleep(1)  # AARGH
-    l -= MIDI_BYTES_PER_SEC
-    offset += MIDI_BYTES_PER_SEC
-    # l > 0
-  end
-  ev.sysex = sysex[offset, l]
-end
-
-def play_midi
+def play_midi chunk
 # 	snd_seq_event_t ev;
 # 	int i, max_tick, err;
 
 # 	/* calculate length of the entire file */
+  @queue.tempo = chunk.tempo
   max_tick = -1;
-  for i in (0...@num_tracks)
-    if (@tracks[i].end_tick > max_tick)
-      max_tick = @tracks[i].end_tick;
-    end
+  for track in chunk.tracks
+    max_tick = track.end_tick if track.end_tick > max_tick
+    track.rewind
   end
-
-#   	/* initialize current position in each track */
-  for i in (0...@num_tracks) do @tracks[i].rewind end
-# 	/* common settings for all our events */
-  ev = Driver::ev_malloc # non alsa
-  ev.clear
-#   puts "ev cleared-> #{ev.inspect}"
-  ev.queue = @queue
-  ev.source_port = @source_port
-  ev.flags = Driver::SND_SEQ_TIME_STAMP_TICK;
-#   puts "ev used for all-> #{ev.inspect}"
-
   @queue.start
-# 	/* The queue won't be started until the START_QUEUE event is
-# 	 * actually drained to the kernel, which is exactly what we want. */
+# The queue won't be started until the START_QUEUE event is
+# actually drained to the kernel, which is exactly what we want.
 
-  loop do
-    event = nil
-    event_track = nil
-    min_tick = max_tick + 1;
-
-# 		/* search next event */
-    for i in (0...@num_tracks)
-      track = @tracks[i];
-      e2 = track.current_event
-      if (e2 && e2.tick < min_tick)
-        min_tick = e2.tick;
-        event = e2;
-	event_track = track;
+  @noteons = {} # per portid, per channel, per note
+  begin
+    loop do
+      event = nil
+      event_track = nil
+      min_tick = max_tick + 1;
+  # search next event
+      for track in chunk.tracks
+        e2 = track.current_event
+        if e2 && e2.tick < min_tick
+          min_tick, event, event_track = e2.tick, e2, track
+        end
+      end
+      break unless event # end of song reached
+      event_track.next
+      case event
+      when NoteOnEvent
+        if event.velocity == 0 # it counts as a NoteOff then.
+          ((@noteons[event.dest.port] ||= {})[event.channel] ||= {})[event.note] = nil
+        else
+          ((@noteons[event.dest.port] ||= {})[event.channel] ||= {})[event.note] = event
+        end
+      when NoteOffEvent
+        ((@noteons[event.dest.port] ||= {})[event.channel] ||= {})[event.note] = nil
+      end
+      event.sender_queue = @queue
+      event.source = @source_port
+  #     print '>'
+      # this blocks when the output pool has been filled
+      @seq << event
+    end
+  ensure
+#     puts "ports=#{ports.keys.inspect}"
+    hangs = false
+    for k, ports in @noteons
+#       puts "channels=#{channels.keys.inspect}"
+      for channel, channels in ports
+        for note, event in channels
+          next unless event
+          puts "#{File.basename(__FILE__)}:#{__LINE__}:sending kill for note #{note} on port #{k} on ch #{event.channel}"
+          @seq << NoteOffEvent.new(channel, note, direct: true, dest: event.dest,
+                                   sender: @source_port)
+          hangs = true
+        end
       end
     end
-    break unless event # ; /* end of song reached */
-#     puts "read event from track, event=#{event.inspect}"
-    event_track.next
-
- # 		/* output the event */
-    ev.type = event.type;
-    ev.time_tick = event.tick;
-    ev.dest = @ports[event.port];
-#     puts "ev before typeswitch-> #{ev.inspect}"
-    case (ev.type)
-    when Driver::SND_SEQ_EVENT_NOTEON, Driver::SND_SEQ_EVENT_NOTEOFF
-      ev.set_fixed
-      ev.channel = event.d[0];
-      ev.note = event.d[1];
-      ev.velocity = event.d[2];
-#       puts "ev NOTEON/OFF:-> #{ev.inspect}"
-    when Driver::SND_SEQ_EVENT_KEYPRESS
-      next if @only_notes
-      ev.set_fixed
-      ev.channel = event.d[0];
-      ev.note = event.d[1];
-      ev.velocity = event.d[2];
-    when Driver::SND_SEQ_EVENT_CONTROLLER
-      next if @only_notes
-      ev.set_fixed
-      ev.channel = event.d[0];
-#       STDERR.puts("#{File.basename(__FILE__)}:#{__LINE__}:CONTROLLER, param = #{event.d[1]}")
-      ev.param = event.d[1]
-      ev.value = event.d[2]
-#       STDERR.puts("ev.param=#{ev.param}, ev.value=#{ev.value}")
-    when Driver::SND_SEQ_EVENT_PGMCHANGE, Driver::SND_SEQ_EVENT_CHANPRESS
-      next if @only_notes
-      ev.set_fixed
-      ev.channel = event.d[0];
-      ev.value = event.d[1];
-    when Driver::SND_SEQ_EVENT_PITCHBEND
-      next if @only_notes
-      ev.set_fixed
-      ev.channel = event.d[0];
-      ev.value = ((event.d[1]) | ((event.d[2]) << 7)) - 0x2000;
-    when Driver::SND_SEQ_EVENT_SYSEX
-      next if @no_sysex
-      ev.set_variable event.sysex
-      handle_big_sysex ev
-    when Driver::SND_SEQ_EVENT_TEMPO
-      ev.set_fixed
-      ev.dest = @seq.system_timer
-      ev.queue_queue = @queue;
-      ev.queue_value = event.tempo;
-    else
-      fatal("Invalid event type %d!", ev.type);
+    if hangs
+      @seq.flush # is direct so should not matter
+      @seq.sync_output_queue
+      sleep 2 # prevent seq from closing down before the deed is done....
     end
-  # 		/* this blocks when the output pool has been filled */
-    @seq << ev
-  end
-#  	/* schedule queue stop at end of song */
-  ev.set_fixed
-  ev.type = Driver::SND_SEQ_EVENT_STOP;
-  ev.time_tick = max_tick;
-  ev.dest = @seq.system_timer
-  ev.queue_queue = @queue;
-  @seq << ev
-# 	/* make sure that the sequencer sees all our events */
-  @seq.flush
+    #  schedule queue stop at end of song
+    event = StopEvent.new @queue, tick: max_tick, dest: @seq.system_timer, sender_queue: @queue,
+                        source: @source_port
+    @seq << event
+    # make sure that the sequencer sees all our events
+    puts "#{File.basename(__FILE__)}:#{__LINE__}:flush"
+    @seq.flush
 =begin
-      /*
-       * There are three possibilities how to wait until all events have
-       * been played:
-       * 1) send an event back to us (like pmidi does), and wait for it;
-       * 2) wait for the EVENT_STOP notification for our queue which is sent
-       *    by the system timer port (this would require a subscription);
-       * 3) wait until the output pool is empty.
-       * The last is the simplest.
-       */
+  There are three possibilities how to wait until all events have
+  been played:
+  1) send an event back to us (like pmidi does), and wait for it;
+  2) wait for the EVENT_STOP notification for our queue which is sent
+  by the system timer port (this would require a subscription);
+  3) wait until the output pool is empty.
+  The last is the simplest.
 =end
-  @seq.sync_output_queue
-#
-# 	/* give the last notes time to die away */
-  sleep(@end_delay) if @end_delay > 0
+    @seq.sync_output_queue
+    # give the last notes time to die away
+    sleep(@end_delay) if @end_delay > 0
+  end
 end
 
-def play_file
-# 	int ok;
-#
-  if (@file_name == "-")
-    @file = STDIN
-  else
-    @file = File::open(@file_name, "rb");
-  end
-  @file_offset = 0
-  ok = false
-  case (read_id())
-  when make_id('M', 'T', 'h', 'd')
-    ok = read_smf
-  when make_id('R', 'I', 'F', 'F')
-    ok = read_riff
-  else
-    errormsg("%s is not a Standard MIDI File", @file_name);
-  end
-  @file.close if @file != STDIN
-  require 'yaml'
-  File.open("./rplaymidi.yaml", "w") { |file| YAML.dump(@tracks, file) }
-  ok and play_midi
-  cleanup_file_data
+def play_file file_name
+  chunk = SoundChunk.new
+  MidifileParser.new file_name, chunk, @ports
+#   require 'yaml'
+#   File.open("./rplaymidi.yaml", "w") { |file| YAML.dump(chunk, file) }
+  play_midi chunk
 end
 
 SND_UTIL_VERSION_STR = '1.0'
 
 require 'optparse'
-@no_sysex = @only_notes = false
 opts = OptionParser.new
 opts.banner = "Usage: #$PROGRAM_NAME [options] inputfile ..."
 opts.on('-h', '--help', 'this help') { puts opts.to_s; exit 1; }
@@ -602,16 +496,21 @@ end
 
 opts.on('-p', '--port=VAL', 'comma separated list of ports') { |arg| parse_ports(arg) }
 opts.on('-d', '--delay=VAL', 'exit delay', Integer) { |d| @end_delay = d }
-opts.on('-S', '--no-sysex', 'do not play sysex') { @no_sysex = true }
-opts.on('-N', '--only-note', 'only_notes') { @no_sysex = @only_notes = true }
 
 def sigterm_exit
+  # this is what miniarp.c did.
+  # But it is not good enough. Some NoteOn events are already in the device.
+  # Also ruby takes about 5 seconds before we even get here.
+  # Presumably because the 'ensure' in Sequencer is done first, so we are too late anyway.
+  # We simply need an ensure on the midiplayer. And it must keep track of open NoteOn
+  # events sent.
   STDERR.print("Closing, please wait...");
   @queue.clear
-  sleep 2
-  @queue.stop
-  @queue.free
+#   sleep 2
+#   @queue.stop
+#   @queue.free
   STDERR.puts
+  # this will still handle all 'ensures' first
   exit 0
 end
 
@@ -620,32 +519,26 @@ require_relative 'sequencer'
   #   /* open sequencer */
 Sequencer.new('rplaymidi') do |seq|
   @seq = seq
-
   file_names = opts.parse ARGV
-
   if @ports.empty?
   # 			/* use env var for compatibility with pmidi */
     ports_str = ENV["ALSA_OUTPUT_PORTS"]
     parse_ports(ports_str) if ports_str && !ports_str.empty?
     if @ports.empty?
-      errormsg "Please specify at least one port with --port."
-      exit 1
+      raise RRTSError.new("Please specify at least one port with --port.")
     end
   end
   if file_names.empty?
-    errormsg "Please specify a file to play."
-    exit 1
+    raise RRTSError.new("Please specify a file to play.")
   end
   @source_port = MidiPort.new(seq, 'rplaymidi', port: 0, midi_generic: true, application: true)
   #       the first created port is 0 anyway, but let's make sure ...
   require_relative 'midiqueue'
   MidiQueue.new(@seq, 'rplaymidi') do |queue|
+    #   the queue is now locked, which is just fine
     @queue = queue
-    Signal.trap(:INT) { sigterm_exit } # strangely enough it does not respong immediately?
+    Signal.trap(:INT) { sigterm_exit } # strangely enough it does not respond immediately?
     Signal.trap(:TERM) { sigterm_exit }
-
-      #       /* the queue is now locked, which is just fine */
-
 =begin
       We send MIDI events with explicit destination addresses, so we don't
       need any connections to the playback ports.  But we connect to those
@@ -656,10 +549,8 @@ Sequencer.new('rplaymidi') do |seq|
     for port in @ports
       @source_port.connect_to port
     end
-
     for file_name in file_names
-      @file_name = file_name
-      play_file
+      play_file file_name
     end
   end # free queue
 end # seq.close

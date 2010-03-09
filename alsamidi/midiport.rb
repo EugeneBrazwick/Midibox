@@ -6,6 +6,23 @@ require 'forwardable'
 
 module RRTS
 
+# MidiPort
+# This class represents a queried or created port. A port is a connection
+# to another MIDI device, or a software application (but basically another sequencer).
+#
+# The following (readonly) methods delegate to AlsaPortInfo_i:
+#   * type
+#   * name
+#   * capability
+#   * timestamping?
+#   * timestamp_queue
+#   * timestamp_real?
+#   * midi_channels
+#   * midi_voices
+#   * synth_voices
+#   * port_specified?
+#
+# To retrieve port info use Sequencer#port
 class MidiPort
 include Comparable
 include Driver
@@ -42,52 +59,52 @@ extend Forwardable
 #   TypeBitsReverseMap = TypeBitsMap.invert
 
 private
-=begin
-   MidiPort.new sequencer, portinfo                   Reference a port (portinfo is dupped though)
-   MidiPort.new sequencer, name, params = nil  [ block ]       Open a new port.
+=begin :rdoc
+   new(sequencer, portinfo)                     Reference a port (portinfo is dupped though)
+   new(sequencer, name [, params] ) [ block ]   Open a new port.
 
 Parameters:
-  portinfo - internal reference. Please use Sequencer.ports
-  sequencer - owning Sequencer
-  name - name of the port to be
-  params - a hash with any one of the following symbols (use 'true' as value):
-        (Example: midi_generic: true, duplex: true )
-    read - true, to announce read capabilities
-    write - true, similar
-    duplex - true, read  + write
-    subs_read - true, to announce support of subscriptions for reading
-    subs_write - true, similar
-    subscription_read - same as subs_read, since I don't understand the name
-    subscription_write - similar
-    no_export - others may not subscribe to this port
-    specific - uses device specific messages
-    hardware_specific - better name for specific
-    midi_generic - announce generic (any) MIDI support
-    midi_gm - true, for general MIDI support
-    midi_gm2 - general MIDI 2 support
-    midi_gs - compatible with Roland GS standard
-    midi_xg - compatible with Yamaha XG standard
-    midi_mt32 - compatible with Roland MT32
-    direct_sample - instruments can be downloaded to this port, but not throug a queue
-    sample - instruments can be downloaded to this port, even through a queue
-    hardware - this port is implemented in hardware
-    software - it is not
-    synth - supports SAMPLE events (alsa(?) not MIDI)
-    synthesizer - generates waves
-    connects_to_device - this port connects to another device (SND_SEQ_PORT_TYPE_PORT)
+  [portinfo]  internal reference. Please use Sequencer.ports
+  [sequencer] owning Sequencer
+  [name]      name of the port to be
+  [params]    a hash with any one of the following symbols (use 'true' as value):
+             (Example: midi_generic: true, duplex: true )
+    * :read - true, to announce read capabilities
+    * :write - true, similar
+    * :duplex - true, read  + write
+    * :subs_read - true, to announce support of subscriptions for reading
+    * :subs_write - true, similar
+    * :subscription_read - same as subs_read, since I don't understand the name
+    * :subscription_write - similar
+    * :no_export - others may not subscribe to this port
+    * :specific - uses device specific messages
+    * :hardware_specific - better name for specific
+    * :midi_generic - announce generic (any) MIDI support
+    * :midi_gm - true, for general MIDI support
+    * :midi_gm2 - general MIDI 2 support
+    * :midi_gs - compatible with Roland GS standard
+    * :midi_xg - compatible with Yamaha XG standard
+    * :midi_mt32 - compatible with Roland MT32
+    * :direct_sample - instruments can be downloaded to this port, but not throug a queue
+    * :sample - instruments can be downloaded to this port, even through a queue
+    * :hardware - this port is implemented in hardware
+    * :software - it is not
+    * :synth - supports SAMPLE events (alsa(?) not MIDI)
+    * :synthesizer - generates waves
+    * :connects_to_device - this port connects to another device (SND_SEQ_PORT_TYPE_PORT)
                   Note that 'port' is the portnumber and this name is confusing anyway
-    application - if port belongs to an application like a sequencer
-    timestamping - put timestamps on events, provided there is also a queue
-    timestamp_queue - for timestamping, either an int or a MidiQueue
-    timestamp_real - for timestamping in realtime (nanoseconds), default is in ticks
+    * :application - if port belongs to an application like a sequencer
+    * :timestamping - put timestamps on events, provided there is also a queue
+    * :timestamp_queue - for timestamping, either an int or a MidiQueue
+    * :timestamp_real - for timestamping in realtime (nanoseconds), default is in ticks
                      where tick 0 is when the queue starts (though you can force absolute ticks -- somewhere?)
-    midi_channels - number of midi channels supported
-    midi_voices - number of midi voices supported, may leave this 0
-    synth_voices - number of midi voices supported, may leave this 0
-    port - portnumber to use, sets port_specified as well
-    port_specified - passed on as is, might be overwritten by setting port, so do not use this.
-    simple - should be true, make it a simple port without buffering or queueing
-    direct - same as simple
+    * :midi_channels - number of midi channels supported
+    * :midi_voices - number of midi voices supported, may leave this 0
+    * :synth_voices - number of midi voices supported, may leave this 0
+    * :port - portnumber to use, sets port_specified as well
+    * :port_specified - passed on as is, might be overwritten by setting port, so do not use this.
+    * :simple - true, make it a simple port without buffering or queueing
+    * :direct - same as simple
 =end
   AllowedParams = {:timestamping=>:timestamping=, :timestamp_queue=>:timestamp_queue=,
                    :timestamp_real=>:timestamp_real=, :midi_channels=>:midi_channels=,
@@ -112,7 +129,7 @@ protected
 
 public
 
-  # see new/initialize
+  # see #new
   def open sequencer, name, params = nil
     close
     @sequencer = sequencer
@@ -145,7 +162,7 @@ public
               typebits |= lu
             elsif lu = AllowedParams[k]
               raise RRTSError.new("Invalid parameter '#{k}' for simple MidiPort") if @simple
-              @handle ||= snd_seq_port_info_malloc
+              @handle ||= port_info_malloc
               @handle.send(lu, v)
             else
               raise RRTSError.new("Invalid parameter '#{k}' for MidiPort")
@@ -156,7 +173,7 @@ public
       if @simple
         @port = @seq_handle.create_simple_port(name, capsbits, typebits)
       else
-        @handle ||= snd_seq_port_info_malloc
+        @handle ||= port_info_malloc
         @handle.capability = capsbits
         @handle.type = typebits
         @handle.name = name
@@ -174,6 +191,8 @@ public
     self
   end
 
+  # close
+  # If a block is passed to the constructor the sequencer is automatically closed
   def close
     return unless @handle or @simple
     if @handle
@@ -188,13 +207,19 @@ public
     @simple = false
   end
 
+  # Returns true if the client is active (we are open)
   def open?
     @handle
   end
 
-# 'client' is reserved for MidiClient reference
-  attr :client_id, :port
+  # 'client' is reserved for MidiClient reference
 
+  # the clientid, given to us, chances are this is 128
+  attr :client_id
+  # the portid, either supplied or given by the system
+  attr :port
+
+  # Two port instances are the same if they have the same client- and portid
   def <=> other
     t = @client_id <=> other.client_id
     t == 0 ? (@port <=> other.port) : t
@@ -203,16 +228,20 @@ public
   def_delegators :@handle, :type, :name, :capability, :timestamping?, :timestamp_queue,
                  :timestamp_real?, :midi_channels, :midi_voices, :synth_voices, :port_specified?
 
+  # [clientid, portid] address
+  # returns the tuple client_id + port_id
   def address
     [@client_id, @port]
   end
 
+  # connect_to MidiPort
   # Create a simple connection that cannot be locked, and has no queue
   # The current port will be the sender (write)
   def connect_to port
     @seq_handle.connect_to self, port
   end
 
+  # connect_from MidiPort
   # Create a simple connection that cannot be locked, and has no queue
   # The current port will be the receiver (read)
   def connect_from port
@@ -222,7 +251,9 @@ public
   alias :>> :connect_to
   alias :<< :connect_from
 
-  # better way to query caps. Pass the symbols that must then be all set
+  # bool capability?(hash)
+  # better way to query caps. Pass the symbols to query
+  # returns true if *all* the symbols are set
   def capability?(*keys)
     bits = @handle.capability
     for k in keys
@@ -232,14 +263,16 @@ public
     true
   end
 
-  # full_name can be used to map ports
+  # string full_name
+  # can be used to map ports
   def full_name
     @sequencer.clients[@client_id].name + ':' + @handle.name
   end
 
   alias :fullname :full_name
 
-  # returns the hash as passed to the constructor (mapped on the type-flags that is)
+  # bool type?(hash)
+  # returns true if all symbols are set (so to speak)
   def type?(*keys)
     bits = @handle.type
     for k in keys
@@ -249,14 +282,20 @@ public
     true
   end
 
+  # bool input?
+  # same as type?(:read, :subscription_read)
   def input?
     type? :read, :subscription_read
   end
 
+  # bool output?
+  # same as type?(:write, :subscription_write)
   def output?
     type? :write, :subscription_write
   end
 
+  # bool system?
+  # true if the port is on the SYSTEM client (I believe 0)
   def system?
     @client_id == SND_SEQ_CLIENT_SYSTEM
   end
@@ -266,8 +305,9 @@ public
     @sequencer.clients[@client_id]
   end
 
-  # clientid[0] and portid[1]. This to enable using the result of parse_address
-  # as either AlsaMidiPort_i as well as MidiPort.
+  # int [](0 or 1)
+  # Returns clientid (for 0) and portid (otherwise)
+  # This to enable using the result of parse_address as either AlsaPortInfo_i as well as MidiPort.
   def []v
     v == 0 ? @client_id : @port
   end

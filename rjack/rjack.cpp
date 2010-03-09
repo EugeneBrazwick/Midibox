@@ -5,7 +5,7 @@
 static VALUE rJackClientClass, rJackPortClass;
 
 static VALUE
-wrap_jack_client_close(VALUE v_mod, VALUE v_client)
+wrap_jack_client_close(VALUE v_mod, VALUE v_client) /* :no-doc: */
 {
   jack_client_t * client;
   Data_Get_Struct(v_client, jack_client_t, client);
@@ -14,7 +14,7 @@ wrap_jack_client_close(VALUE v_mod, VALUE v_client)
 }
 
 static VALUE
-wrap_jack_client_open(VALUE v_mod, VALUE v_name, VALUE v_options, VALUE v_servername)
+wrap_jack_client_open(VALUE v_mod, VALUE v_name, VALUE v_options, VALUE v_servername) /* :no-doc: */
 {
   const char *const servername = StringValueCStr(v_servername);
   const bool hasServername = servername[0];
@@ -29,7 +29,7 @@ wrap_jack_client_open(VALUE v_mod, VALUE v_name, VALUE v_options, VALUE v_server
 }
 
 static VALUE
-wrap_jack_get_ports(VALUE v_mod, VALUE v_client, VALUE v_nampat, VALUE v_tppat, VALUE v_flags)
+wrap_jack_get_ports(VALUE v_mod, VALUE v_client, VALUE v_nampat, VALUE v_tppat, VALUE v_flags) /* :no-doc: */
 {
 //fprintf(stderr, "wrap_jack_get_ports, arg1.inspect="); // SEGV !! rb_apply(v_mod, rb_intern("inspect"), Qnil);
   jack_client_t *client;
@@ -44,7 +44,7 @@ wrap_jack_get_ports(VALUE v_mod, VALUE v_client, VALUE v_nampat, VALUE v_tppat, 
 }
 
 static VALUE
-wrap_jack_port_register(VALUE v_mod, VALUE v_client, VALUE v_portname, VALUE v_type, VALUE v_flags, VALUE v_bufsz)
+wrap_jack_port_register(VALUE v_mod, VALUE v_client, VALUE v_portname, VALUE v_type, VALUE v_flags, VALUE v_bufsz) /* :no-doc: */
 {
   jack_client_t *client;
   Data_Get_Struct(v_client, jack_client_t, client);
@@ -57,7 +57,7 @@ wrap_jack_port_register(VALUE v_mod, VALUE v_client, VALUE v_portname, VALUE v_t
 }
 
 static VALUE
-wrap_jack_port_unregister(VALUE v_mod, VALUE v_client, VALUE v_port)
+wrap_jack_port_unregister(VALUE v_mod, VALUE v_client, VALUE v_port) /* :no-doc: */
 {
   jack_client_t *client;
   Data_Get_Struct(v_client, jack_client_t, client);
@@ -143,7 +143,7 @@ process_callback(jack_nframes_t nframes, Context *context)
 extern "C" void
 Init_rjack()
 {
-  VALUE rJackModule = rb_define_module("RJack");
+  VALUE rJackModule = rb_define_module("RJack"); /* :no-doc: */
 #define WRAP_CONSTANT(s) rb_define_const(rJackModule, #s, INT2NUM(s))
 #define WRAP_STRING_CONSTANT(s) rb_define_const(rJackModule, #s, rb_str_new2(s))
   WRAP_CONSTANT(JackNoStartServer);
@@ -166,8 +166,8 @@ Init_rjack()
   WRAP_CONSTANT(JackPortIsTerminal);  // meaning: an 'endpoint'. a final destination, but also a source (when output)
   WRAP_STRING_CONSTANT(JACK_DEFAULT_AUDIO_TYPE);
   WRAP_STRING_CONSTANT(JACK_DEFAULT_MIDI_TYPE);
-  rJackClientClass = rb_define_class_under(rJackModule, "RJackClient", rb_cObject);
-  rJackPortClass = rb_define_class_under(rJackModule, "RJackPort", rb_cObject);
+  rJackClientClass = rb_define_class_under(rJackModule, "RJackClient", rb_cObject); /* :no-doc: */
+  rJackPortClass = rb_define_class_under(rJackModule, "RJackPort", rb_cObject); /* :no-doc: */
   rb_define_module_function(rJackModule, "jack_client_open", RUBY_METHOD_FUNC(wrap_jack_client_open), 3);
   rb_define_module_function(rJackModule, "jack_client_close", RUBY_METHOD_FUNC(wrap_jack_client_close), 1);
   rb_define_module_function(rJackModule, "jack_get_ports", RUBY_METHOD_FUNC(wrap_jack_get_ports), 4);

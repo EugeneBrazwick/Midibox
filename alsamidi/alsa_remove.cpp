@@ -283,8 +283,6 @@ wrap_snd_seq_remove_events_set_tag(VALUE v_rmp, VALUE v_tag)
 void
 alsa_remove_init()
 {
-  alsaRemoveEventsClass = rb_define_class_under(alsaDriver, "AlsaRemoveEvents_i", rb_cObject);
-
   //arg1 for snd_seq_ev_is....type
   WRAP_CONSTANT(SND_SEQ_REMOVE_INPUT);
   WRAP_CONSTANT(SND_SEQ_REMOVE_OUTPUT);

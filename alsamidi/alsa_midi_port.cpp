@@ -8,29 +8,29 @@
 
 VALUE alsaPortInfoClass;
 
-/*
- PortInfo#client= clientid
+/* client=(client)
 
-Set the client id of a port_info container.
+Set the client of a port_info container.
 Parameters:
-client  client id
+   [client] clientid or MidiClient
 */
 static VALUE
 wrap_snd_seq_port_info_set_client(VALUE v_port_info, VALUE v_clientid)
 {
   snd_seq_port_info_t *port_info;
   Data_Get_Struct(v_port_info, snd_seq_port_info_t, port_info);
+  RRTS_DEREF_DIRTY(v_clientid, @client);
   snd_seq_port_info_set_client(port_info, NUM2INT(v_clientid));
   return Qnil;
 }
 
-/* PortInfo#port = portid
+/* port=(portid)
 Set the port id of a port_info container.
 Parameters:
-port    port id, can be nil to unset the port
+port    portid, can be nil to unset the port
 
-Setting it will set port_specified to 1, and also setting it to nil
-will set port_specified to 0.
+Setting it will set port_specified to 1 (true), and also setting it to nil
+will set port_specified to 0 (false).
 */
 static VALUE
 wrap_snd_seq_port_info_set_port(VALUE v_port_info, VALUE v_portnr)
@@ -47,12 +47,12 @@ wrap_snd_seq_port_info_set_port(VALUE v_port_info, VALUE v_portnr)
   return Qnil;
 }
 
-/* PortInfo#port_specified = bool
-
-Set the port-specified mode of a port_info container.
+/* port_specified=(bool)
+Set the port-specified mode of a port_info container. This method is not
+required since setting the port will automatically set it. See #port=
 
 Parameters:
-val     true if specifying the port id at creation
+  [val] true if specifying the port id at creation
 */
 static VALUE
 wrap_snd_seq_port_info_set_port_specified(VALUE v_port_info, VALUE v_bool)
@@ -63,7 +63,9 @@ wrap_snd_seq_port_info_set_port_specified(VALUE v_port_info, VALUE v_bool)
   return Qnil;
 }
 
-// int PortInfo#client
+/* int client
+Returns the clientid
+*/
 static VALUE
 wrap_snd_seq_port_info_get_client(VALUE v_port_info)
 {
@@ -72,7 +74,9 @@ wrap_snd_seq_port_info_get_client(VALUE v_port_info)
   return INT2NUM(snd_seq_port_info_get_client(port_info));
 }
 
-// int PortInfo#port
+/* int port
+Returns the portid
+*/
 static VALUE
 wrap_snd_seq_port_info_get_port(VALUE v_port_info)
 {
@@ -81,7 +85,9 @@ wrap_snd_seq_port_info_get_port(VALUE v_port_info)
   return INT2NUM(snd_seq_port_info_get_port(port_info));
 }
 
-// client, port PortInfo#addr
+/* [client, port] addr
+Returns the address as a tuple of two integers
+*/
 static VALUE
 wrap_snd_seq_port_info_get_addr(VALUE v_port_info)
 {
@@ -91,7 +97,9 @@ wrap_snd_seq_port_info_get_addr(VALUE v_port_info)
   return rb_ary_new3(2, INT2NUM(adr->client), INT2NUM(adr->port));
 }
 
-// string PortInfo#name
+/* string name
+Returns the name of the port
+*/
 static VALUE
 wrap_snd_seq_port_info_get_name(VALUE v_port_info)
 {
@@ -100,7 +108,9 @@ wrap_snd_seq_port_info_get_name(VALUE v_port_info)
   return rb_str_new2(snd_seq_port_info_get_name(port_info));
 }
 
-// int PortInfo#capability
+/* int capability
+Returns the capabilities as a bitmap. Use the SND_SEQ_PORT_CAP constants for grogging this
+*/
 static VALUE
 wrap_snd_seq_port_info_get_capability(VALUE v_port_info)
 {
@@ -109,7 +119,9 @@ wrap_snd_seq_port_info_get_capability(VALUE v_port_info)
   return INT2NUM(snd_seq_port_info_get_capability(port_info));
 }
 
-// int PortInfo#midi_channels
+/* int midi_channels
+Returns the number of channels supported by this port. Most ports will return 16
+*/
 static VALUE
 wrap_snd_seq_port_info_get_midi_channels(VALUE v_port_info)
 {
@@ -118,7 +130,9 @@ wrap_snd_seq_port_info_get_midi_channels(VALUE v_port_info)
   return INT2NUM(snd_seq_port_info_get_midi_channels(port_info));
 }
 
-// int PortInfo#midi_voices
+/* int midi_voices
+Returns the number of voices present on the port. But many ports return 0 here
+*/
 static VALUE
 wrap_snd_seq_port_info_get_midi_voices(VALUE v_port_info)
 {
@@ -127,7 +141,10 @@ wrap_snd_seq_port_info_get_midi_voices(VALUE v_port_info)
   return INT2NUM(snd_seq_port_info_get_midi_voices(port_info));
 }
 
-// bool PortInfo#port_specified?
+/* bool port_specified?
+Returns true if a portnumber was explicitely set by the user when the
+port was created
+*/
 static VALUE
 wrap_snd_seq_port_info_get_port_specified(VALUE v_port_info)
 {
@@ -136,7 +153,9 @@ wrap_snd_seq_port_info_get_port_specified(VALUE v_port_info)
   return INT2BOOL(snd_seq_port_info_get_port_specified(port_info));
 }
 
-// int (?) PortInfo#read_use
+/* int read_use
+Returns the number of read-subscriptions on the port
+*/
 static VALUE
 wrap_snd_seq_port_info_get_read_use(VALUE v_port_info)
 {
@@ -145,52 +164,9 @@ wrap_snd_seq_port_info_get_read_use(VALUE v_port_info)
   return INT2NUM(snd_seq_port_info_get_read_use(port_info));
 }
 
-// int PortInfo#synth_voices
-static VALUE
-wrap_snd_seq_port_info_get_synth_voices(VALUE v_port_info)
-{
-  snd_seq_port_info_t *port_info;
-  Data_Get_Struct(v_port_info, snd_seq_port_info_t, port_info);
-  return INT2NUM(snd_seq_port_info_get_synth_voices(port_info));
-}
-
-// int PortInfo#timestamp_queue
-static VALUE
-wrap_snd_seq_port_info_get_timestamp_queue(VALUE v_port_info)
-{
-  snd_seq_port_info_t *port_info;
-  Data_Get_Struct(v_port_info, snd_seq_port_info_t, port_info);
-  return INT2NUM(snd_seq_port_info_get_timestamp_queue(port_info));
-}
-
-// bool PortInfo#timestamp_real?
-static VALUE
-wrap_snd_seq_port_info_get_timestamp_real(VALUE v_port_info)
-{
-  snd_seq_port_info_t *port_info;
-  Data_Get_Struct(v_port_info, snd_seq_port_info_t, port_info);
-  return INT2BOOL(snd_seq_port_info_get_timestamp_real(port_info));
-}
-
-// bool PortInfo#timestamping?
-static VALUE
-wrap_snd_seq_port_info_get_timestamping(VALUE v_port_info)
-{
-  snd_seq_port_info_t *port_info;
-  Data_Get_Struct(v_port_info, snd_seq_port_info_t, port_info);
-  return INT2BOOL(snd_seq_port_info_get_timestamping(port_info));
-}
-
-// int PortInfo#type
-static VALUE
-wrap_snd_seq_port_info_get_type(VALUE v_port_info)
-{
-  snd_seq_port_info_t *port_info;
-  Data_Get_Struct(v_port_info, snd_seq_port_info_t, port_info);
-  return INT2NUM(snd_seq_port_info_get_type(port_info));
-}
-
-// int PortInfo#write_use
+/* int write_use
+Returns the number of write-subscriptions on the port
+*/
 static VALUE
 wrap_snd_seq_port_info_get_write_use(VALUE v_port_info)
 {
@@ -199,7 +175,66 @@ wrap_snd_seq_port_info_get_write_use(VALUE v_port_info)
   return INT2NUM(snd_seq_port_info_get_write_use(port_info));
 }
 
-// PortInfo#timestamping= bool
+/* int synth_voices
+Returns the number of non-MIDI(?) voices
+*/
+static VALUE
+wrap_snd_seq_port_info_get_synth_voices(VALUE v_port_info)
+{
+  snd_seq_port_info_t *port_info;
+  Data_Get_Struct(v_port_info, snd_seq_port_info_t, port_info);
+  return INT2NUM(snd_seq_port_info_get_synth_voices(port_info));
+}
+
+/* int timestamp_queue
+Returns the queueid of the timestamp queue associated with the port.
+*/
+static VALUE
+wrap_snd_seq_port_info_get_timestamp_queue(VALUE v_port_info)
+{
+  snd_seq_port_info_t *port_info;
+  Data_Get_Struct(v_port_info, snd_seq_port_info_t, port_info);
+  return INT2NUM(snd_seq_port_info_get_timestamp_queue(port_info));
+}
+
+/* bool timestamp_real?
+Returns true if timestamps are given in realtime
+*/
+static VALUE
+wrap_snd_seq_port_info_get_timestamp_real(VALUE v_port_info)
+{
+  snd_seq_port_info_t *port_info;
+  Data_Get_Struct(v_port_info, snd_seq_port_info_t, port_info);
+  return INT2BOOL(snd_seq_port_info_get_timestamp_real(port_info));
+}
+
+/* bool timestamping?
+Returns true if the port will timestamp events automatically on arrival
+*/
+static VALUE
+wrap_snd_seq_port_info_get_timestamping(VALUE v_port_info)
+{
+  snd_seq_port_info_t *port_info;
+  Data_Get_Struct(v_port_info, snd_seq_port_info_t, port_info);
+  return INT2BOOL(snd_seq_port_info_get_timestamping(port_info));
+}
+
+/* int type
+Returns the type bitset. Use the SND_SEQ_PORT_TYPE... constants to
+interpret the result
+*/
+static VALUE
+wrap_snd_seq_port_info_get_type(VALUE v_port_info)
+{
+  snd_seq_port_info_t *port_info;
+  Data_Get_Struct(v_port_info, snd_seq_port_info_t, port_info);
+  return INT2NUM(snd_seq_port_info_get_type(port_info));
+}
+
+/* timestamping=(bool)
+Switch auto-timestamping on or off.  Note that the port needs a timestamp-queue
+as well to actually activate it.
+*/
 static VALUE
 wrap_snd_seq_port_info_set_timestamping(VALUE v_port_info, VALUE v_bool)
 {
@@ -209,7 +244,9 @@ wrap_snd_seq_port_info_set_timestamping(VALUE v_port_info, VALUE v_bool)
   return Qnil;
 }
 
-// PortInfo#midi_voices= count
+/* midi_voices=(count)
+Set the number of MIDI voices this port supports.
+*/
 static VALUE
 wrap_snd_seq_port_info_set_midi_voices(VALUE v_port_info, VALUE v_count)
 {
@@ -219,7 +256,9 @@ wrap_snd_seq_port_info_set_midi_voices(VALUE v_port_info, VALUE v_count)
   return Qnil;
 }
 
-// PortInfo#synth_voices= count
+/* synth_voices=(count)
+Sets the number of synth voices the port supports
+*/
 static VALUE
 wrap_snd_seq_port_info_set_synth_voices(VALUE v_port_info, VALUE v_count)
 {
@@ -229,7 +268,9 @@ wrap_snd_seq_port_info_set_synth_voices(VALUE v_port_info, VALUE v_count)
   return Qnil;
 }
 
-// PortInfo#midi_channels= count
+/* midi_channels=(count)
+Sets the number of MIDI channels the port supports
+*/
 static VALUE
 wrap_snd_seq_port_info_set_midi_channels(VALUE v_port_info, VALUE v_count)
 {
@@ -239,7 +280,9 @@ wrap_snd_seq_port_info_set_midi_channels(VALUE v_port_info, VALUE v_count)
   return Qnil;
 }
 
-// PortInfo#type= bits
+/* type=(bits)
+Set a combination of SND_SEQ_PORT_TYPE flags to indicate what kind of port this will be
+*/
 static VALUE
 wrap_snd_seq_port_info_set_type(VALUE v_port_info, VALUE v_bits)
 {
@@ -249,7 +292,9 @@ wrap_snd_seq_port_info_set_type(VALUE v_port_info, VALUE v_bits)
   return Qnil;
 }
 
-// PortInfo#capability= bits
+/* capability=(bits)
+Set a combination of SND_SEQ_PORT_CAP flags to indicate what this port can do
+*/
 static VALUE
 wrap_snd_seq_port_info_set_capability(VALUE v_port_info, VALUE v_bits)
 {
@@ -259,7 +304,9 @@ wrap_snd_seq_port_info_set_capability(VALUE v_port_info, VALUE v_bits)
   return Qnil;
 }
 
-// PortInfo#name= string
+/* name=(string)
+Sets the port name. Note: must be called prior to creating a port
+*/
 static VALUE
 wrap_snd_seq_port_info_set_name(VALUE v_port_info, VALUE v_name)
 {
@@ -269,7 +316,10 @@ wrap_snd_seq_port_info_set_name(VALUE v_port_info, VALUE v_name)
   return Qnil;
 }
 
-// PortInfo#timestamp_real= bool
+/* timestamp_real=(bool)
+Set the timestamping mode to realtime. You need to activate timestamping, and you
+need a timestamp-queue to truly activate this.
+*/
 static VALUE
 wrap_snd_seq_port_info_set_timestamp_real(VALUE v_port_info, VALUE v_bool)
 {
@@ -279,18 +329,22 @@ wrap_snd_seq_port_info_set_timestamp_real(VALUE v_port_info, VALUE v_bool)
   return Qnil;
 }
 
-// PortInfo#timestamp_queue= queueid
+/* timestamp_queue=(queue)
+Set the timestamp-queue
+*/
 static VALUE
 wrap_snd_seq_port_info_set_timestamp_queue(VALUE v_port_info, VALUE v_qid)
 {
   snd_seq_port_info_t *port_info;
   Data_Get_Struct(v_port_info, snd_seq_port_info_t, port_info);
-  RRTS_DEREF(v_qid, id);
+  RRTS_DEREF_DIRTY(v_qid, @id);
   snd_seq_port_info_set_timestamp_queue(port_info, NUM2INT(v_qid));
   return Qnil;
 }
 
-// self PortInfo.copy_to portinfo
+/* self copy_to([other])
+Make a copy of this record. Without an argument it returns a copy.
+*/
 static VALUE
 wrap_snd_seq_port_info_copy_to(int argc, VALUE *argv, VALUE v_port_info)
 {
@@ -299,18 +353,23 @@ wrap_snd_seq_port_info_copy_to(int argc, VALUE *argv, VALUE v_port_info)
   snd_seq_port_info_t *port_info, *dst;
   VALUE retval = v_port_info;
   if (NIL_P(v_dst))
-  {
-    const int r = snd_seq_port_info_malloc(&dst);
-    if (r < 0) RAISE_MIDI_ERROR("allocating port_info", r);
-    v_dst = Data_Wrap_Struct(alsaPortInfoClass, 0/*mark*/, snd_seq_port_info_free/*free*/, dst);
-    retval = v_dst;
-  }
+    {
+      const int r = snd_seq_port_info_malloc(&dst);
+      if (r < 0) RAISE_MIDI_ERROR("allocating port_info", r);
+      v_dst = Data_Wrap_Struct(alsaPortInfoClass, 0/*mark*/, snd_seq_port_info_free/*free*/, dst);
+      retval = v_dst;
+    }
   Data_Get_Struct(v_port_info, snd_seq_port_info_t, port_info);
   Data_Get_Struct(v_dst, snd_seq_port_info_t, dst);
   snd_seq_port_info_copy(dst, port_info);
   return retval;
 }
 
+/* AlsaMidiPort_i
+
+This class represents a snd_seq_port_info_t structure. It can be used to create a port with,
+or it can be used to queury a port's attributes
+*/
 void
 alsa_midi_port_init()
 {

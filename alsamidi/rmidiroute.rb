@@ -23,7 +23,7 @@ def midi_route(seq, out_ports, split_point)
       seq.event_output_direct ev
     else
       ev.source out_ports[0]
-      ev.snd_seq_event_output_direct ev
+      seq.event_output_direct ev
       ev.source = out_ports[1]
       seq.event_output_direct ev
     end

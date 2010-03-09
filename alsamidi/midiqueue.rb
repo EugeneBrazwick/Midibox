@@ -6,6 +6,7 @@ require 'forwardable'
 
 module RRTS
 
+  # MidiQueue is required for scheduling events
   class MidiQueue
     include Comparable
     include Driver
@@ -13,20 +14,13 @@ module RRTS
 
     private
 
-=begin
-    MidiQueue.new sequencer, name [, params] [, block]
-    MidiQueue.new sequencer, id
-
-    Parameters:
-        sequencer - owner
-        name - the name
-        block - if passed the queue is auto-freed
-        id - this returns a wrapper for the qid.
-        params - allowed options:
-           tempo - quarters per minute (int)
-           tempo - or a Tempo
-
-=end
+#  This will allocate a 'named' queue
+#  Parameters:
+#  * [sequencer] owner
+#  * [name] the name
+#  * [block] if passed the queue is auto-freed
+#  * [params] allowed options:
+#       * [tempo] - quarters per minute (int) or a Tempo
     def initialize sequencer, name, params = nil
       @sequencer = sequencer
       @seq_handle = sequencer.instance_variable_get(:@handle)
@@ -56,12 +50,13 @@ module RRTS
       end
     end
 
-    public
-
+    protected
     # DO NOT USE
     attr :id
 
-    # free
+    public
+
+    # free the queue.
     def free
       return unless @id
       t, @seq_handle = @seq_handle, nil
@@ -69,28 +64,27 @@ module RRTS
       @id = @seq_handle = @sequencer = nil
     end
 
-    # tempo = Tempo
+    # Parameters:
+    # * [tmpo] Tempo instance
     def tempo= tmpo
       @seq_handle.set_queue_tempo @id, tmpo
     end
 
-    # status
+    # returns a AlsaQueueStatus_i instance
     def status
       @seq_handle.queue_status @id
     end
 
-    # info
+    # returns a AlsaQueueInfo_i instance
     def info
       @seq_handle.queue_info @id
     end
 
-    # self start
     def start
       @seq_handle.start_queue @id
       self
     end
 
-    # self stop
     def stop
       @seq_handle.stop_queue @id
       self
@@ -99,30 +93,28 @@ module RRTS
 #     ConditionMap = {:input=>SND_SEQ_REMOVE_INPUT, :output=>SND_SEQ_REMOVE_OUTPUT,
 #                     :dest=>SND_SEQ_R
 
-=begin
-    Remove elements according to specification
-    With no arguments it removes all output events except NoteOffs.
-    Otherwise pass a bitset as expected by snd_seq_remove_events_set_condition
-    Or a hash with the following options:
-      - input: true
-      - output: true
-      - tag: string,  must match this tag
-      - time_before: time
-      - time_after: time
-      - time_ticks or ticks:  int. With exactly this 'tick' value
-      - dest_channel or channel: on this channel
-      - dest: on this destination port
-      - ignore_off: do NOT remove any NoteOffs.
-
-    A mix of options requires each one to be set. There is no constraint on options
-    that are not set. To remove all events pass 0 or {}.
-
-    Experimentation must confirm that NoteOn with velocity 0 is taken as a NoteOff.
-=end
+#     Remove elements according to specification
+#     With no arguments it removes all output events except NoteOffs.
+#     Otherwise pass a bitset as expected by remove_events_set_condition
+#     Or a hash with the following options:
+#     - input: true
+#     - output: true
+#     - tag: string,  must match this tag
+#     - time_before: time
+#     - time_after: time
+#     - time_ticks or ticks:  int. With exactly this 'tick' value
+#     - dest_channel or channel: on this channel
+#     - dest: on this destination port
+#     - ignore_off: do NOT remove any NoteOffs.
+#
+#     A mix of options requires each one to be set. There is no constraint on options
+#     that are not set. To remove all events pass 0 or {}.
+#
+#     Experimentation must confirm that NoteOn with velocity 0 is taken as a NoteOff.
     def clear events_to_remove = nil
       return unless @seq_handle
       cond = 0
-      remove_ev = snd_seq_remove_events_malloc
+      remove_ev = remove_events_malloc
       if Hash === events_to_remove
         for k, v in events_to_remove
           case k
@@ -154,7 +146,6 @@ module RRTS
       else
         cond = events_to_remove || (SND_SEQ_REMOVE_IGNORE_OFF | SND_SEQ_REMOVE_OUTPUT)
       end
-      #   snd_seq_remove_events_t *remove_ev;
       remove_ev.queue = @id
       remove_ev.condition = cond
       @seq_handle.remove_events remove_ev
@@ -164,22 +155,34 @@ module RRTS
     attr :sequencer
   end # MidiQueue
 
+  # Contains information about the speed
+  # The following methods delegate:
+  # * AlsaQueueTempo_i#skew
+  # * AlsaQueueTempo_i#skew=
+  # * AlsaQueueTempo_i#ppq
+  # * AlsaQueueTempo_i#ppq=
+  # * AlsaQueueTempo_i#skew_base
+  # * AlsaQueueTempo_i#skew_base=
+  # * AlsaQueueTempo_i#tempo
+  # * AlsaQueueTempo_i#queue,  but this method is called queue_id here!!
   class Tempo
     extend Forwardable
     include Driver
     private
 
-=begin
-     Tempo.new beats [,params]
-     Tempo.new frames, smpte_timing: true [,params]
-     Parameters:
-         beats - quarters per minute, defaults to 120
-         smpte_timing - using frames, not beats (quarters)
-         ticks - overrides default of 384 for beats, or 40 for frames
-=end
+    Frames2TempoPPQ = { 24=>[500_000, 12], 25=>[400_000, 10], 29=>[100_000_000, 2997], 30=>[500_000, 15] }
 
-     Frames2TempoPPQ = { 24=>[500_000, 12], 25=>[400_000, 10], 29=>[100_000_000, 2997], 30=>[500_000, 15] }
-
+#  Parameters:
+#  * [beats] quarters per minute, defaults to 120. But with smpte_timing it is the framecount!
+#  * [params] any of
+#       * [:smpte_timing] using frames, not beats (quarters). Must be first!
+#                         This is specifically for movie soundtracks as the tempo is
+#                         tied to the number of frames (images) per second.
+#                         If set, the +beats+ parameter is in fact the framecount.
+#       * [:ticks] overrides the default of 384 for beats, or 40 for frames
+#
+# Example:
+#     Tempo.new 25, smpte_timing: true
      def initialize beats = 120, params = nil
        frames = nil
        @smpte_timing, ticks = false, 384
@@ -211,7 +214,7 @@ module RRTS
          tempo = 60_000_000 / beats
          ppq = ticks
        end
-       @handle = snd_seq_queue_tempo_malloc
+       @handle = queue_tempo_malloc
        @handle.ppq = ppq
        @handle.tempo = tempo
      end
@@ -230,13 +233,11 @@ module RRTS
 
      public
 
-#      attr :ppq, :tempo, :beats, :frames  Can be done, but must make sure they stay in sync.
-     # do we need it??
-
      def_delegators :@handle, :tempo=, :ppq=, :skew=, :skew_base=,
                               :tempo, :skew, :skew_base, :ppq
      def_delegator :@handle, :queue, :queue_id
 
+     # returns true is smptr_timing is set.
      def smpte_timing?
        @smpte_timing
      end

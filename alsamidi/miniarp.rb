@@ -51,10 +51,7 @@ def parse_sequence
 end
 
 def set_tempo
-
-#   snd_seq_queue_tempo_t *queue_tempo;
-
-  queue_tempo = snd_seq_queue_tempo_malloc
+  queue_tempo = queue_tempo_malloc
   tempo = 60_000_000 / (@bpm * TICKS_PER_QUARTER) * TICKS_PER_QUARTER
   queue_tempo.tempo = tempo
   queue_tempo.ppq = TICKS_PER_QUARTER
@@ -62,11 +59,6 @@ def set_tempo
 end
 
 def arpeggio
-
-#   snd_seq_event_t ev;
-# int l1;
-# double dt;
-
   for l1 in (0...@seq_len)
     dt = (l1 % 2 == 0) ? @swing.to_f / 16384.0 : @swing.to_f / 16384.0
     ev = ev_malloc
@@ -91,15 +83,13 @@ def get_tick
 end
 
 def clear_queue
-#   snd_seq_remove_events_t *remove_ev;
-  remove_ev = snd_seq_remove_events_malloc
+  remove_ev = remove_events_malloc
   remove_ev.queue = @queue
   remove_ev.condition = SND_SEQ_REMOVE_OUTPUT | SND_SEQ_REMOVE_IGNORE_OFF
   @sequencer.remove_events(remove_ev) if @sequencer   # racecondition?? Who makes it nil anyway?
 end
 
 def midi_action
-#   snd_seq_event_t *ev;
   loop do
     (ev, remains = @sequencer.event_input) or break
     case ev

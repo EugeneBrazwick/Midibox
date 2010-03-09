@@ -5,33 +5,73 @@ require 'forwardable'
 
 module RRTS
 
+  # This class is the main client for the Alsa MIDI system.
+  # It is possible to use more than one Sequencer within an application
+  # Delegates to:
+  # *  AlsaSequencer_i#poll_descriptors
+  # *  AlsaSequencer_i#poll_descriptors_count
+  # *  AlsaSequencer_i#poll_descriptors_revents
+  # *  AlsaSequencer_i#drain_output,  with alias +flush+
+  # *  AlsaSequencer_i#start_queue
+  # *  AlsaSequencer_i#nonblock
+  # *  AlsaSequencer_i#alloc_named_queue,  but please use MidiQueue#new
+  # *  AlsaSequencer_i#set_queue_tempo
+  # *  AlsaSequencer_i#output_buffer_size
+  # *  AlsaSequencer_i#output_buffer_size=
+  # *  AlsaSequencer_i#input_buffer_size
+  # *  AlsaSequencer_i#input_buffer_size=
+  # *  AlsaSequencer_i#sync_output_queue
+  # *  AlsaSequencer_i#create_port, please use MidiPort.new
+  # *  AlsaSequencer_i#event_output
+  # *  AlsaSequencer_i#event_output_buffer
+  # *  AlsaSequencer_i#event_output_direct
+  # *  AlsaSequencer_i#queue_status
+  # *  AlsaSequencer_i#client_name
+  # *  AlsaSequencer_i#remove_events
+  # *  AlsaSequencer_i#client_pool
+  # *  AlsaSequencer_i#client_pool=
+  # *  AlsaSequencer_i#client_pool_output=
+  # *  AlsaSequencer_i#client_pool_output_room=
+  # *  AlsaSequencer_i#client_pool_input=
+  # *  AlsaSequencer_i#reset_pool_input
+  # *  AlsaSequencer_i#reset_pool_output
+  # *  AlsaSequencer_i#system_infp
+  # *  AlsaSequencer_i#dump_notes=
+  # *  AlsaClientInfo_i#broadcast_filter?
+  # *  AlsaClientInfo_i#error_bounce?
+  # *  AlsaClientInfo_i#event_lost
+  # *  AlsaClientInfo_i#events_lost
+  # *  AlsaClientInfo_i#num_ports
+  # *  AlsaClientInfo_i#num_open_ports
+  # *  AlsaClientInfo_i#type
 class Sequencer
 include Driver # open up namespace
 extend Forwardable
-  # for 'new':
+  # for #new
   Duplex = SND_SEQ_OPEN_DUPLEX
+  # for #new
   InputOnly = SND_SEQ_OPEN_INPUT
+  # for #new
   OutputOnly = SND_SEQ_OPEN_OUTPUT
+  # for #new
   Blocking = false
+  # for #new
   NonBlocking = true
+  # for the poll methods
   PollIn = POLLIN
+  # for the poll methods
   PollOut = POLLOUT
 private
-=begin
-   Sequencer.new name, [params] [ block]
-  parameters:
-    client_name - name of the instantiated client, if nil no client will be instantiated
-    params - hash of optional parameters:
-      name - default 'default'
-      openmode - default Duplex
-      clientname - unset
-      map_ports - default true if clientname yields true
-      blockingmode - default Blocking
-      dump_notes - if true dump snd_seq_event_t dumps to stderr and do NOT play them!!
-    block - encapsulation for automatic close. Works like IO::open. But notice that he ensures
-    the sequencer is closed.  This means also that it will not respond to ^C immediately, since
-    it will flush its buffers first.  To avoid this install a proper signal handler.
-=end
+#   parameters:
+#     [client_name] name of the instantiated client, if nil no client will be instantiated
+#     [params]     hash of optional parameters:
+#        [:name]         default 'default'
+#        [:openmode]     default Duplex
+#        [:map_ports]    default true if clientname yields true
+#        [:blockingmode] default Blocking
+#        [:dump_notes]   if true dump to stderr and do NOT play them!! Only works with HACKED cpp
+#                        backend
+#     [block] encapsulation for automatic close. Works like IO::open.
   def initialize client_name = nil, params = nil, &block
     @client = @handle = nil
     @client_id = @ports = @ports_index = @clients = nil  # not guaranteed open does this
@@ -50,21 +90,10 @@ protected
 
 public
 
-=begin
-Sequencer open name, [params] [ block]
-parameters:
-  client_name - name of the instantiated client, if nil no client will be instantiated
-  params - hash of optional parameters:
-  name - default 'default'
-  openmode - default Duplex
-  clientname - unset
-  map_ports - default true if clientname yields true
-  blockingmode - default Blocking
-  block - encapsulation for automatic close. Works like IO::open.
 
-Only call this after a close, if you want to reopen it.
-Just use 'new'.
-=end
+# See #new
+# Only call this after a close, if you want to reopen it.
+# Just use 'new'.
   def open client_name = nil, params = nil
     close
     name = 'default'
@@ -85,7 +114,7 @@ Just use 'new'.
         end
       end
     end
-    @handle = snd_seq_open name, openmode, blockingmode
+    @handle = seq_open name, openmode, blockingmode
     begin
       @handle.dump_notes = true if dump_notes
       @handle.client_name = client_name if client_name
@@ -106,7 +135,6 @@ Just use 'new'.
     end
   end
 
-  # close
   # closes the sequencer. Must be called to free resources, unless a block is passed to 'new'
   def close
     return unless @handle
@@ -116,23 +144,16 @@ Just use 'new'.
     @client = @client_id = @ports = @ports_index = @clients = nil
   end
 
-  # MidiClient client. us.
+  # us. a MidiClient
   attr :client
-  # int client_id. Same as client.client
+  # us, an integer client_id. Same as client.client
   attr :client_id
 
   # client_name = newname
   def client_name= arg
     @client.name = @handle.client_name = arg
   end
-=begin  hmm... would have been nice but cannot possibly work
-  Klassmap = { :clock=>ClockEvent, :note=>NoteEvent, :keypress=>NoteEvent,
-               :noteon=>NoteOnEvent, :noteoff=>NoteOffEvent,
-               :controller=>ControllerEvent,
-               :pgmchange=>ProgramChangeEvent,
-               :sysex=>SystemExclusiveEvent
-             }
-=end
+
   Klassmap = { SND_SEQ_EVENT_CLOCK=>ClockEvent, SND_SEQ_EVENT_NOTE=>NoteEvent,
                SND_SEQ_EVENT_KEYPRESS=>NoteEvent,
                SND_SEQ_EVENT_NOTEON=>NoteOnEvent, SND_SEQ_EVENT_NOTEOFF=>NoteOffEvent,
@@ -183,26 +204,20 @@ Just use 'new'.
                SND_SEQ_EVENT_USR_VAR4=>VarUserEvent
              }
 
-=begin
-  MidiEvent, more event_input
-
-  retrieve an event from sequencer
-
-Returns:
-
-  Obtains a MidiEvent from sequencer.
-  This function firstly receives the event byte-stream data from sequencer as much as possible at once.
-  Then it retrieves the first event record.
-  By calling this function sequentially, events are extracted from the input buffer.
-  If there is no input from sequencer, function falls into sleep in blocking mode until an event is received,
-  or returns nil in non-blocking mode. Occasionally, it may raise ENOSPC error. This means that the input
-  FIFO of sequencer overran, and some events are lost. Once this error is returned, the input FIFO is cleared automatically.
-
-  Function returns the event plus a boolean indicating more bytes remain in the input buffer
-  Application can determine from the returned value whether to call input once more or not,
-      if there's more data it will probably(!) not block, even in blocking mode.
-
-=end
+# Returns a tuple event + boolean, or nil
+#
+#   Obtains a MidiEvent from sequencer.
+#   This function firstly receives the event byte-stream data from sequencer as much as possible at once.
+#   Then it retrieves the first event record.
+#   By calling this function sequentially, events are extracted from the input buffer.
+#   If there is no input from sequencer, function falls into sleep in blocking mode until an event is received,
+#   or returns nil in non-blocking mode. Occasionally, it may raise ENOSPC error. This means that the input
+#   FIFO of sequencer overran, and some events are lost. Once this error is returned, the input FIFO is cleared automatically.
+#
+#   Function returns the event plus a boolean indicating more bytes remain in the input buffer
+#   Application can determine from the returned value whether to call input once more or not,
+#       if there's more data it will probably(!) not block, even in blocking mode.
+#
   def event_input
     (ev, more = @handle.event_input) or return nil
 #     typeid = ev.typeid
@@ -226,13 +241,13 @@ Returns:
                  # do not use alloc_named_queue, but say 'MidiQueue.new'
                  :alloc_named_queue,
                  :set_queue_tempo,
-                 :set_output_buffer_size, :output_buffer_size,
-                 :set_input_buffer_size, :input_buffer_size, :sync_output_queue,
+                 :output_buffer_size=, :output_buffer_size,
+                 :input_buffer_size=, :input_buffer_size, :sync_output_queue,
                  :create_port, :event_output, :queue_status,
                  :event_output_buffer, :event_output_direct, :client_name,
                  :remove_events, :client_pool, :client_pool=, :client_pool_output=,
                  :client_pool_output_room=, :client_pool_input=, :reset_pool_output,
-                 :reset_pool_input
+                 :reset_pool_input, :system_info, :dump_notes=
 
   # the following two are here for completeness sake. Please use the MidiPort methods instead!
   def_delegators :@handle, :connect_from, :connect_to
@@ -311,12 +326,12 @@ Returns:
     @handle
   end
 
-  # MidiClient[clientid] clients
+  # returns a hash of MidiClient instances, index by clientid
   # The result is cached, use clients! or ports! to reload
   def clients
     @clients and return @clients
     @clients = {}
-    cinfo = snd_seq_client_info_malloc
+    cinfo = client_info_malloc
     cinfo.client = -1
     require_relative 'midiclient'
     @clients[cinfo.client] = MidiClient.new(cinfo) while @handle.next_client(cinfo)
@@ -324,14 +339,13 @@ Returns:
     @clients
   end
 
-  # MidiClient[clientid] clients!
-  # Refresh the cache and also @client
+  # See #clients, this version always loads the clients anew
   def clients!
     @clients = nil
     clients
   end
 
-  # MidiPort[portname (?!)] ports
+  # return a has of MidiPorts, indexed by portname
   # The result is cached, used ports! to force a reload (also of clients)
   def ports
     return @ports if @ports
@@ -339,7 +353,7 @@ Returns:
     @ports_index = {}
     require_relative 'midiport'
     for clientid in clients.keys
-      pinfo = snd_seq_port_info_malloc
+      pinfo = port_info_malloc
       pinfo.client = clientid
       pinfo.port = -1
       while @handle.next_port(pinfo)
@@ -353,7 +367,7 @@ Returns:
     @ports
   end
 
-  # MidiPort[portname] ports!
+  # See #ports.
   # Refreshes @ports, @clients and @client
   def ports!
     @clients = @ports = nil

@@ -40,7 +40,7 @@ BUFFER_SIZE = 4088
 SND_UTIL_VERSION_STR = '1.0'
 
 # linked list of buffers, stores data as in the .mid file
-class Buffer    # buffer
+class Buffer    # :no-doc: buffer
 private
   def initialize
     @buf = ''
@@ -51,7 +51,7 @@ public
   attr :buf; # string
 end
 
-class Smf_track # smf_track
+class Smf_track # :no-doc: smf_track
 private
   def initialize
     @first_buf = Buffer.new
@@ -91,7 +91,8 @@ TRACKS_PER_PORT = 17
 @ts_div = 4 # time signature: denominator, default is quarters
 @ts_dd = 2 # time signature: denominator as a power of two, wholes is 0, halves =1 ,quarters=2,eights=3,sixteenths=4
 
-class Metronome
+# :no-doc:
+class Metronome #:no-doc:
 #  Metronome implementation. Context: pattern
   private
   # metronome default settings

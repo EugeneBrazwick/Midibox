@@ -75,7 +75,9 @@ dump_event(snd_seq_event_t *ev, const char *file, int line)
   return result;
 }
 
-// string AlsaMidiEvent_i#inspect
+/* string inspect
+for debugging purposes
+*/
 static VALUE
 alsaMidiEventClass_inspect(VALUE v_ev)
 {
@@ -87,7 +89,7 @@ alsaMidiEventClass_inspect(VALUE v_ev)
   return r;
 }
 
-/* self AlsaMidiEvent_i#clear
+/* self clear
 Initialize the event with all zeroes
 */
 static VALUE
@@ -102,8 +104,50 @@ wrap_snd_seq_ev_clear(VALUE v_ev)
   return v_ev;
 }
 
-// self AlsaMidiEvent_i#set_note ch, key, vel, dur
-static VALUE  // ch key vel dur
+/* self set_noteon(channel, key, velocity)
+Make the event a NOTEON event. Note that NOTEON events with velocity == 0 yield
+as NOTEOFF events. Channels must be in range 0..15, keys and velocity in 0..127.
+*/
+static VALUE
+wrap_snd_seq_ev_set_noteon(VALUE v_ev, VALUE v_ch, VALUE v_key, VALUE v_vel)
+{
+  snd_seq_event_t *ev;
+  Data_Get_Struct(v_ev, snd_seq_event_t, ev);
+#if defined(DUMP_API)
+  fprintf(DUMP_STREAM, "snd_seq_ev_set_noteon(%p, %d, %d, %d)\n", ev, NUM2INT(v_ch), NUM2INT(v_key), NUM2INT(v_vel));
+#endif
+  snd_seq_ev_set_noteon(ev, NUM2UINT(v_ch), NUM2UINT(v_key), NUM2UINT(v_vel));
+  return v_ev;
+}
+
+/* self set_noteoff(channel, key [, off_velocity])
+See #set_noteon.
+*/
+static VALUE
+wrap_snd_seq_ev_set_noteoff(int argc, VALUE *argv, VALUE v_ev)
+{
+  VALUE v_ch, v_key, v_vel;
+  snd_seq_event_t *ev;
+  Data_Get_Struct(v_ev, snd_seq_event_t, ev);
+  rb_scan_args(argc, argv, "21", &v_ch, &v_key, &v_vel);
+  const uint vel = NIL_P(v_vel) ? 0 : NUM2UINT(v_vel);
+#if defined(DUMP_API)
+  fprintf(DUMP_STREAM, "snd_seq_ev_set_noteoff(%p, %d, %d, %d)\n", ev, NUM2INT(v_ch), NUM2INT(v_key), vel);
+#endif
+  snd_seq_ev_set_noteoff(ev, NUM2UINT(v_ch), NUM2UINT(v_key), vel);
+  return v_ev;
+}
+
+/* self set_note(channel, key, velocity, duration)
+Make it a note-event and set the 4 four parameters for such events. Note that NOTE
+is not NOTEON.
+See #set_noteon. Duration is given in ticks or milliseconds, depending on scheduling mode.
+See also #schedule_real and #schedule_tick.
+
+Note the NOTE events are not MIDI at all. Supposedly Alsa interprets these events when
+put in a queue, and internally schedules the NOTEON and NOTEOFF events.
+*/
+static VALUE
 wrap_snd_seq_ev_set_note(VALUE v_ev, VALUE v_ch, VALUE v_key, VALUE v_vel, VALUE v_dur)
 {
   snd_seq_event_t *ev;
@@ -115,7 +159,25 @@ wrap_snd_seq_ev_set_note(VALUE v_ev, VALUE v_ch, VALUE v_key, VALUE v_vel, VALUE
   return v_ev;
 }
 
-// self AlsaMidiEvent_i#set_pgmchange ch, val
+/* self set_keypress(channel, key, velocity)
+Make this event an AFTERTOUCH event (aka KEYPRESS). See #noteon for valid ranges.
+*/
+static VALUE
+wrap_snd_seq_ev_set_keypress(VALUE v_ev, VALUE v_ch, VALUE v_key, VALUE v_vel)
+{
+  snd_seq_event_t *ev;
+  Data_Get_Struct(v_ev, snd_seq_event_t, ev);
+ #if defined(DUMP_API)
+  fprintf(DUMP_STREAM, "snd_seq_ev_set_keypress(%p, %d, %d, %d)\n", ev, NUM2INT(v_ch), NUM2INT(v_key), NUM2INT(v_vel));
+#endif
+  snd_seq_ev_set_keypress(ev, NUM2UINT(v_ch), NUM2UINT(v_key), NUM2UINT(v_vel));
+  return v_ev;
+}
+
+/* self set_pgmchange(channel, value)
+Make the event a PGMCHANGE event with gaven voice number. This event is normally preceded by
+a bank select event. Value should be in range 0..127.
+*/
 static VALUE
 wrap_snd_seq_ev_set_pgmchange(VALUE v_ev, VALUE v_ch, VALUE v_val)
 {
@@ -128,7 +190,10 @@ wrap_snd_seq_ev_set_pgmchange(VALUE v_ev, VALUE v_ch, VALUE v_val)
   return v_ev;
 }
 
-// self AlsaMidiEvent_i#set_pitchbend ch, val
+/* self set_pitchbend(channel, value)
+Make the event a PITCHBEND event, value should be in the range -0x2000..+0x1FFF
+(-8192..8191).
+*/
 static VALUE
 wrap_snd_seq_ev_set_pitchbend(VALUE v_ev, VALUE v_ch, VALUE v_val)
 {
@@ -141,7 +206,9 @@ wrap_snd_seq_ev_set_pitchbend(VALUE v_ev, VALUE v_ch, VALUE v_val)
   return v_ev;
 }
 
-// self AlsaMidiEvent_i#set_chanpress ch, val
+/* self set_chanpress(channel, value)
+Make the event a CHANPRESS (aftertouch on all playing notes). Value is in range 0..127
+*/
 static VALUE
 wrap_snd_seq_ev_set_chanpress(VALUE v_ev, VALUE v_ch, VALUE v_val)
 {
@@ -154,15 +221,10 @@ wrap_snd_seq_ev_set_chanpress(VALUE v_ev, VALUE v_ch, VALUE v_val)
   return v_ev;
 }
 
-/* AlsaMidiEvent_i#sysex = data
-IMPORTANT! the alsa docs (if you can call it that) say nothing about dynamic allocation
-of the buffer (is it copied somewhere?). Does the caller need to make sure it stays
-alive until the event is dispatched?
-
-Assigning a ruby string may will cause a SEGV as ruby will free the string at some time, which
-would invalidate the buffer!!
-
-TODO: look this up in the alsa source files.
+/* sysex=(data)
+Make the event a sysex. The buffer given is copied internally somewhere. It should be
+investigated how solid this is.
+This is probably the same as #set_variable
 */
 static VALUE
 wrap_snd_seq_ev_set_sysex(VALUE v_ev, VALUE v_data)
@@ -177,46 +239,11 @@ wrap_snd_seq_ev_set_sysex(VALUE v_ev, VALUE v_data)
   return Qnil;
 }
 
-// self AlsaMidiEvent_i#set_noteon ch, key, vel
-static VALUE
-wrap_snd_seq_ev_set_noteon(VALUE v_ev, VALUE v_ch, VALUE v_key, VALUE v_vel)
-{
-  snd_seq_event_t *ev;
-  Data_Get_Struct(v_ev, snd_seq_event_t, ev);
-#if defined(DUMP_API)
-  fprintf(DUMP_STREAM, "snd_seq_ev_set_noteon(%p, %d, %d, %d)\n", ev, NUM2INT(v_ch), NUM2INT(v_key), NUM2INT(v_vel));
-#endif
-  snd_seq_ev_set_noteon(ev, NUM2UINT(v_ch), NUM2UINT(v_key), NUM2UINT(v_vel));
-  return v_ev;
-}
-
-// self AlsaMidiEvent_i#set_noteoff ch, key, vel
-static VALUE
-wrap_snd_seq_ev_set_noteoff(VALUE v_ev, VALUE v_ch, VALUE v_key, VALUE v_vel)
-{
-  snd_seq_event_t *ev;
-  Data_Get_Struct(v_ev, snd_seq_event_t, ev);
-#if defined(DUMP_API)
-  fprintf(DUMP_STREAM, "snd_seq_ev_set_noteoff(%p, %d, %d, %d)\n", ev, NUM2INT(v_ch), NUM2INT(v_key), NUM2INT(v_vel));
-#endif
-  snd_seq_ev_set_noteoff(ev, NUM2UINT(v_ch), NUM2UINT(v_key), NUM2UINT(v_vel));
-  return v_ev;
-}
-
-// self AlsaMidiEvent_i#set_keypress ch, key, vel
-static VALUE
-wrap_snd_seq_ev_set_keypress(VALUE v_ev, VALUE v_ch, VALUE v_key, VALUE v_vel)
-{
-  snd_seq_event_t *ev;
-  Data_Get_Struct(v_ev, snd_seq_event_t, ev);
-#if defined(DUMP_API)
-  fprintf(DUMP_STREAM, "snd_seq_ev_set_keypress(%p, %d, %d, %d)\n", ev, NUM2INT(v_ch), NUM2INT(v_key), NUM2INT(v_vel));
-#endif
-  snd_seq_ev_set_keypress(ev, NUM2UINT(v_ch), NUM2UINT(v_key), NUM2UINT(v_vel));
-  return v_ev;
-}
-
-// self AlsaMidiEvent_i#set_controller ch, cc, val
+/* self set_controller(channel, param, value)
+Make it a CONTROLLER event. param and value are in range 0..127
+Note that some controller events have a MSB and LSB counterpart so that the effective
+range becomes 0..16383.
+*/
 static VALUE
 wrap_snd_seq_ev_set_controller(VALUE v_ev, VALUE v_ch, VALUE v_cc, VALUE v_val)
 {
@@ -229,9 +256,11 @@ wrap_snd_seq_ev_set_controller(VALUE v_ev, VALUE v_ch, VALUE v_cc, VALUE v_val)
   return v_ev;
 }
 
-/* self AlsaMidiEvent_i#set_subs
+/* self set_subs
 sets the destination to 'SUBSCRIBERS:UNKNOWN', a special client+port
-This causes the event to be broadcast to all subscribers of the connection
+This causes the event to be broadcast to all subscribers of the connection.
+For MidiEvent you can also say event.dest = sequencer.subscribers_unknown_port
+which makes it more understandable
 */
 static VALUE
 wrap_snd_seq_ev_set_subs(VALUE v_ev)
@@ -245,18 +274,15 @@ wrap_snd_seq_ev_set_subs(VALUE v_ev)
   return v_ev;
 }
 
-/*
-self AlsaMidiEvent_i schedule_tick qid, relative, tick
-self AlsaMidiEvent_i schedule_tick MidiQueue, relative, tick
-
-Set the queue and the specified eventtime
+/* self schedule_tick(queue, relative, tick)
+Sets the queue and the specified eventtime in the event. Queue can be an integer or MidiQueue
 */
 static VALUE
 wrap_snd_seq_ev_schedule_tick(VALUE v_ev, VALUE v_qid, VALUE v_relative, VALUE v_tick)
 {
   snd_seq_event_t *ev;
   Data_Get_Struct(v_ev, snd_seq_event_t, ev);
-  RRTS_DEREF(v_qid, id);
+  RRTS_DEREF_DIRTY(v_qid, @id);
 #if defined(DUMP_API)
   fprintf(DUMP_STREAM, "snd_seq_ev_schedule_tick(%p, %d, %s, %ud)\n", ev, NUM2INT(v_qid), BOOL2INT(v_relative) ? "true" : "false", NUM2UINT(v_tick));
 #endif
@@ -264,8 +290,8 @@ wrap_snd_seq_ev_schedule_tick(VALUE v_ev, VALUE v_qid, VALUE v_relative, VALUE v
   return v_ev;
 }
 
-/* self AlsaMidiEvent_i schedule_real qid, relative, timetuple
-Sets the queue and time for the event. The subscription must support this.
+/* self schedule_real qid, relative, timetuple
+Sets the queue and realtime for the event. The subscription must support this.
 */
 static VALUE
 wrap_snd_seq_ev_schedule_real(VALUE v_ev, VALUE v_qid, VALUE v_relative, VALUE v_timetuple)
@@ -283,6 +309,22 @@ wrap_snd_seq_ev_schedule_real(VALUE v_ev, VALUE v_qid, VALUE v_relative, VALUE v
   return v_ev;
 }
 
+/* :rdoc:
+the following type checking methods exist:
+  bool note_type?
+  bool result_type?
+  bool control_type?
+  bool channel_type?
+  bool message_type?
+  bool subscribe_type?
+  bool sample_type?
+  bool user_type?
+  bool instr_type?
+  bool fixed_type?
+  bool variable_type?
+  bool varusr_type?
+See alsa documentation, but that won't help you.
+*/
 #define IS_TYPE_EXPANSIONS \
 IS_TYPE_EXPANSION(result) \
 IS_TYPE_EXPANSION(note) \
@@ -391,6 +433,20 @@ return INT2BOOL(snd_seq_ev_is_##nam##_type(ev)); \
 IS_TYPE_EXPANSIONS
 #undef IS_TYPE_EXPANSION
 
+/* :rdoc:
+
+The following methods exist:
+   bool abstime?   , is the time absolute
+   bool reltime?   , or relative
+   bool direct?    , bypass buffers when sending
+   bool reserved?  , stay off
+   bool prior?     , is it a high-priority event
+   bool fixed?     , message has fixed size
+   bool variable?  , or variable
+   bool tick?      , times are set in ticks (1 bar = 384 ticks)
+   bool real?      , times are set in nanoseconds
+*/
+
 #define EV_IS_EXPANSIONS \
 EV_IS_EXPANSION(abstime) \
 EV_IS_EXPANSION(reltime) \
@@ -414,7 +470,9 @@ return INT2BOOL(snd_seq_ev_is_##nam(ev)); \
 EV_IS_EXPANSIONS
 #undef EV_IS_EXPANSION
 
-/* bool AlsaMidiEvent_i#type_check flags
+/* bool type_check(to_check)
++to_check+ must be one off SND_SEQ_EVFLG_RESULT..SND_SEQ_EVFLG_VARUSR.
+Flags cannot be combined using '|'.
 */
 static VALUE
 wrap_snd_seq_type_check(VALUE v_ev, VALUE v_x)
@@ -426,16 +484,14 @@ wrap_snd_seq_type_check(VALUE v_ev, VALUE v_x)
   return INT2BOOL(snd_seq_type_check(ev, x));
 }
 
-/*
-int AlsaMidiEvent_i#length
+/* int length
 calculates the (encoded) byte-stream size of the event
-
-Parameters:
-ev      the event
 
 Returns:
 the size of decoded bytes, ie. the number of bytes (including message formatting)
-required to send the event.
+required in the buffer to send the event.
+
+This is not the same as #len.
 */
 static VALUE
 wrap_snd_seq_event_length(VALUE v_ev)
@@ -446,7 +502,9 @@ wrap_snd_seq_event_length(VALUE v_ev)
   return INT2NUM(snd_seq_event_length(ev));
 }
 
-/* int AlsaMidiEvent_i#note
+/* int note
+
+Returns the note. If this is not a note-message it returns nil instead.
 */
 static VALUE
 alsaMidiEventClass_note(VALUE v_ev)
@@ -457,7 +515,10 @@ alsaMidiEventClass_note(VALUE v_ev)
   return UINT2NUM(ev->data.note.note);
 }
 
-// AlsaMidiEvent_i#note= value
+/* note=(value)
+
+Alter the note value. Consider using set_note/on/off instead.
+*/
 static VALUE
 alsaMidiEventClass_set_note(VALUE v_ev, VALUE v_val)
 {
@@ -467,7 +528,9 @@ alsaMidiEventClass_set_note(VALUE v_ev, VALUE v_val)
   return Qnil;
 }
 
-// AlsaMidiEvent_i#velocity= value
+/* velocity=(value)
+Alter the velocity value. Consider using set_note/on/off instead.
+*/
 static VALUE
 alsaMidiEventClass_set_velocity(VALUE v_ev, VALUE v_val)
 {
@@ -477,7 +540,9 @@ alsaMidiEventClass_set_velocity(VALUE v_ev, VALUE v_val)
   return Qnil;
 }
 
-// AlsaMidiEvent_i#off_velocity= value
+/* off_velocity=(value)
+Specific for NoteOff and Note events
+*/
 static VALUE
 alsaMidiEventClass_set_off_velocity(VALUE v_ev, VALUE v_val)
 {
@@ -487,7 +552,9 @@ alsaMidiEventClass_set_off_velocity(VALUE v_ev, VALUE v_val)
   return Qnil;
 }
 
-// AlsaMidiEvent_i#duration= value
+/* duration=(value)
+Set the duration in ticks or milliseconds, depending on the scheduling mode
+*/
 static VALUE
 alsaMidiEventClass_set_duration(VALUE v_ev, VALUE v_val)
 {
@@ -497,7 +564,7 @@ alsaMidiEventClass_set_duration(VALUE v_ev, VALUE v_val)
   return Qnil;
 }
 
-/* int AlsaMidiEvent_i#channel
+/* int channel
 Valid for both note- and controlmessages
 */
 static VALUE
@@ -513,7 +580,7 @@ alsaMidiEventClass_channel(VALUE v_ev)
   return Qnil;
 }
 
-/* AlsaMidiEvent_i#channel= ch
+/* channel=(channel)
 Valid for both note- and controlmessages, provided the type is set properly first!
 */
 static VALUE
@@ -530,7 +597,9 @@ alsaMidiEventClass_set_channel(VALUE v_ev, VALUE v_ch)
   return Qnil;
 }
 
-// int AlsaMidiEvent_i#queue
+/* int queue
+Returns the queue id, as set.
+*/
 static VALUE
 alsaMidiEventClass_queue(VALUE v_ev)
 {
@@ -539,7 +608,9 @@ alsaMidiEventClass_queue(VALUE v_ev)
   return INT2NUM(ev->queue);
 }
 
-// AlsaMidiEvent_i#queue=
+/* queue=(queue)
++queue+ can be an integer or a MidiQueue instance
+*/
 static VALUE
 alsaMidiEventClass_set_queue(VALUE v_ev, VALUE v_queue)
 {
@@ -550,7 +621,9 @@ alsaMidiEventClass_set_queue(VALUE v_ev, VALUE v_queue)
   return Qnil;
 }
 
-// int AlsaMidiEvent_i#queue
+/* int queue_queue
+Returns the queueid for a queue-event (not the senderqueue)
+*/
 static VALUE
 alsaMidiEventClass_queue_queue(VALUE v_ev)
 {
@@ -559,7 +632,10 @@ alsaMidiEventClass_queue_queue(VALUE v_ev)
   return UINT2NUM(ev->data.queue.queue);
 }
 
-// AlsaMidiEvent_i#queue_queue=
+/* queue_queue=(queue)
++queue+ can be an integer or a MidiQueue. This sets the subject of a queue-event,
+not the senderqueue.
+*/
 static VALUE
 alsaMidiEventClass_set_queue_queue(VALUE v_ev, VALUE v_queue)
 {
@@ -570,7 +646,9 @@ alsaMidiEventClass_set_queue_queue(VALUE v_ev, VALUE v_queue)
   return Qnil;
 }
 
-// int AlsaMidiEvent_i#flags
+/* int flags
+Returns the flags set.
+*/
 static VALUE
 alsaMidiEventClass_flags(VALUE v_ev)
 {
@@ -579,7 +657,9 @@ alsaMidiEventClass_flags(VALUE v_ev)
   return UINT2NUM(ev->flags);
 }
 
-// AlsaMidiEvent_i#flags=
+/* flags=(int)
+Alter the Alsa flags for the event
+*/
 static VALUE
 alsaMidiEventClass_set_flags(VALUE v_ev, VALUE v_flags)
 {
@@ -589,7 +669,9 @@ alsaMidiEventClass_set_flags(VALUE v_ev, VALUE v_flags)
   return Qnil;
 }
 
-// int AlsaMidiEvent_i#param
+/* int param
+Returns the controller param, or nil if this is not a controller event
+*/
 static VALUE
 alsaMidiEventClass_param(VALUE v_ev)
 {
@@ -599,7 +681,9 @@ alsaMidiEventClass_param(VALUE v_ev)
   return UINT2NUM(ev->data.control.param);
 }
 
-// AlsaMidiEvent_i#param= value
+/* param=(value)
+Changed the controller param
+*/
 static VALUE
 alsaMidiEventClass_set_param(VALUE v_ev, VALUE v_val)
 {
@@ -609,22 +693,21 @@ alsaMidiEventClass_set_param(VALUE v_ev, VALUE v_val)
   return Qnil;
 }
 
-// int AlsaMidiEvent_i#value
+/* int value
+Returns the controller value, or nil, if this is not a controller event
+*/
 static VALUE
 alsaMidiEventClass_value(VALUE v_ev)
 {
   snd_seq_event_t *ev;
   Data_Get_Struct(v_ev, snd_seq_event_t, ev);
-  /*  if (snd_seq_ev_is_variable_type(ev))
-  {
-    const uint len = ev->data.ext.len;
-    return rb_str_new((const char *)ev->data.ext.ptr, len);
-}*/
   if (!snd_seq_ev_is_control_type(ev)) return Qnil;
   return INT2NUM(ev->data.control.value);
 }
 
-// AlsaMidiEvent_i#value= val
+/* value=(value)
+Alters the controller value
+*/
 static VALUE
 alsaMidiEventClass_set_value(VALUE v_ev, VALUE v_val)
 {
@@ -634,7 +717,11 @@ alsaMidiEventClass_set_value(VALUE v_ev, VALUE v_val)
   return Qnil;
 }
 
-// string AlsaMidiEvent_i#sysex
+/* string sysex
+Returns the sysex value as a bytesstring (encoding ascii-8bits).
+Returns nil if the event is not of the _variable_ type, which hopefully
+is the same a 'sysex'.
+*/
 static VALUE
 alsaMidiEventClass_sysex(VALUE v_ev)
 {
@@ -645,7 +732,9 @@ alsaMidiEventClass_sysex(VALUE v_ev)
   return rb_str_new((const char *)ev->data.ext.ptr, len);
 }
 
-// int AlsaMidiEvent_i#velocity
+/* int velocity
+Returns the velocity, or nil if this is not a note type event
+*/
 static VALUE
 alsaMidiEventClass_velocity(VALUE v_ev)
 {
@@ -655,7 +744,9 @@ alsaMidiEventClass_velocity(VALUE v_ev)
   return INT2NUM(ev->data.note.velocity);
 }
 
-// int AlsaMidiEvent_i#type
+/* int type
+Returns the alsa type of the event. Will be one of the SND_SEQ_EVENT_... constants
+*/
 static VALUE
 alsaMidiEventClass_type(VALUE v_ev)
 {
@@ -664,7 +755,9 @@ alsaMidiEventClass_type(VALUE v_ev)
   return INT2NUM(ev->type);
 }
 
-// AlsaMidiEvent_i#type=
+/* type=(value)
+Alters the type of the event
+*/
 static VALUE
 alsaMidiEventClass_set_type(VALUE v_ev, VALUE v_tp)
 {
@@ -674,8 +767,11 @@ alsaMidiEventClass_set_type(VALUE v_ev, VALUE v_tp)
   return Qnil;
 }
 
-/* int AlsaMidiEvent_i#len. Better use sysex.length
-   Also do not confuse with length.
+/* int len
+
+Better use sysex.length.
+Also do not confuse with length.
+Returns nil if this is not a _variable_ type event.
 */
 static VALUE
 alsaMidiEventClass_len(VALUE v_ev)
@@ -686,7 +782,9 @@ alsaMidiEventClass_len(VALUE v_ev)
   return UINT2NUM(ev->data.ext.len);
 }
 
-// int AlsaMidiEvent_i#off_velocity
+/* int off_velocity
+Returns the off_velocity for NOTE and NOTEOFF. Returns nil if not a note-event
+*/
 static VALUE
 alsaMidiEventClass_off_velocity(VALUE v_ev)
 {
@@ -696,7 +794,9 @@ alsaMidiEventClass_off_velocity(VALUE v_ev)
   return INT2NUM(ev->data.note.off_velocity);
 }
 
-// int AlsaMidiEvent_i#duration
+/* int duration
+For none note-events returns nil.
+*/
 static VALUE
 alsaMidiEventClass_duration(VALUE v_ev)
 {
@@ -706,7 +806,9 @@ alsaMidiEventClass_duration(VALUE v_ev)
   return INT2NUM(ev->data.note.duration);
 }
 
-// client, port AlsaMidiEvent_i#dest
+/* client, port dest
+Returns a tuple of two integers
+*/
 static VALUE
 alsaMidiEventClass_dest(VALUE v_ev)
 {
@@ -715,7 +817,9 @@ alsaMidiEventClass_dest(VALUE v_ev)
   return rb_ary_new3(2, INT2NUM(ev->dest.client), INT2NUM(ev->dest.port));
 }
 
-// int AlsaMidiEvent_i#dest_port
+/* int dest_port
+Returns the destination portid
+*/
 static VALUE
 alsaMidiEventClass_dest_port(VALUE v_ev)
 {
@@ -724,7 +828,9 @@ alsaMidiEventClass_dest_port(VALUE v_ev)
   return INT2NUM(ev->dest.port);
 }
 
-// int AlsaMidiEvent_i#dest_client
+/* int dest_client
+Returns the destinations clientid
+*/
 static VALUE
 alsaMidiEventClass_dest_client(VALUE v_ev)
 {
@@ -733,7 +839,9 @@ alsaMidiEventClass_dest_client(VALUE v_ev)
   return INT2NUM(ev->dest.client);
 }
 
-// client, port AlsaMidiEvent_i#source
+/* client, port source
+Returns the source as a tuple clientid + portid
+*/
 static VALUE
 alsaMidiEventClass_source(VALUE v_ev)
 {
@@ -742,7 +850,9 @@ alsaMidiEventClass_source(VALUE v_ev)
   return rb_ary_new3(2, INT2NUM(ev->source.client), INT2NUM(ev->source.port));
 }
 
-// int AlsaMidiEvent_i#source_port
+/* int source_port
+See also #source
+*/
 static VALUE
 alsaMidiEventClass_source_port(VALUE v_ev)
 {
@@ -751,7 +861,9 @@ alsaMidiEventClass_source_port(VALUE v_ev)
   return INT2NUM(ev->source.port);
 }
 
-// int AlsaMidiEvent_i#source_client
+/* int source_client
+See also #source
+*/
 static VALUE
 alsaMidiEventClass_source_client(VALUE v_ev)
 {
@@ -760,10 +872,15 @@ alsaMidiEventClass_source_client(VALUE v_ev)
   return INT2NUM(ev->source.client);
 }
 
-/* AlsaMidiEvent_i#source= addr
-   AlsaMidiEvent_i#source= client, port
+/* source=(address_specification)
 
  IMPORTANT: this differs from the alsa API which suffers from a naming inconsistency.
+ You must pass a tuple clientid, portid or a MidiClient, portid tuple, or a single MidiPort instance.
+ Examples:
+     event.source = 20, 1
+     event.source = [20, 1]
+     event.source = myclient, 1
+     event.source = source_port
 */
 static VALUE
 alsaMidiEventClass_set_source(int argc, VALUE *argv, VALUE v_ev)
@@ -776,7 +893,9 @@ alsaMidiEventClass_set_source(int argc, VALUE *argv, VALUE v_ev)
   return Qnil;
 }
 
-// AlsaMidiEvent_i#source_client =
+/* source_client=(client)
+The +client+ can be an integer (clientid) or a MidiClient instance
+*/
 static VALUE
 alsaMidiEventClass_set_source_client(VALUE v_ev, VALUE v_clientid)
 {
@@ -786,7 +905,9 @@ alsaMidiEventClass_set_source_client(VALUE v_ev, VALUE v_clientid)
   return Qnil;
 }
 
-// AlsaMidiEvent_i#source_port =
+/* source_port=(port)
+This sets the port part of the source. This would be weird.
+*/
 static VALUE
 alsaMidiEventClass_set_source_port(VALUE v_ev, VALUE v_portid)
 {
@@ -797,7 +918,10 @@ alsaMidiEventClass_set_source_port(VALUE v_ev, VALUE v_portid)
   return Qnil;
 }
 
-// skewvalue, base AlsaMidiEvent_i#queue_skew
+/* skewvalue, base queue_skew
+Returns the queue skew as a tuple value + base
+I have no idea what a queue skew is at this point. See Alsa docs (but they won't tell you)
+*/
 static VALUE
 alsaMidiEventClass_queue_skew(VALUE v_ev)
 {
@@ -806,8 +930,8 @@ alsaMidiEventClass_queue_skew(VALUE v_ev)
   return rb_ary_new3(2, UINT2NUM(ev->data.queue.param.skew.value), UINT2NUM(ev->data.queue.param.skew.base));
 }
 
-/* AlsaMidiEvent_i#queue_skew= [value, base]
-AlsaMidiEvent_i#queue_skew= value, base
+/* queue_skew=(value, base)
+You can also pass a tuple, as returned by #queue_skew for instance.
 */
 static VALUE
 alsaMidiEventClass_set_queue_skew(int argc, VALUE *argv, VALUE v_ev)
@@ -828,9 +952,11 @@ alsaMidiEventClass_set_queue_skew(int argc, VALUE *argv, VALUE v_ev)
   return Qnil;
 }
 
-/* AlsaMidiEvent_i#time= ticks
-AlsaMidiEvent_i#time= sec, nsec
-AlsaMidiEvent_i#time= [sec, nsec]
+/* time=(time_specification)
+If time is given as a single integer, it is ticks. Otherwise it must be two arguments
+or a tuple, namely the seconds, and then the nanoseconds.
+
+This does not change the scheduling mode. It just fills the time data structure.
 */
 static VALUE
 alsaMidiEventClass_set_time(int argc, VALUE *argv, VALUE v_ev)
@@ -856,6 +982,9 @@ alsaMidiEventClass_set_time(int argc, VALUE *argv, VALUE v_ev)
   return Qnil;
 }
 
+/* sec, nsec time_real
+Returns a realtime tuple: seconds + nanoseconds
+*/
 static VALUE
 alsaMidiEventClass_time_real(VALUE v_ev)
 {
@@ -864,9 +993,8 @@ alsaMidiEventClass_time_real(VALUE v_ev)
   return rb_ary_new3(2, UINT2NUM(ev->time.time.tv_sec), UINT2NUM(ev->time.time.tv_nsec));
 }
 
-/*
-AlsaMidiEvent_i#time_real= sec, nsec
-AlsaMidiEvent_i#time_real= [sec, nsec]
+/* time_real=(sec, nsec)
+See #time=
 */
 static VALUE
 alsaMidiEventClass_set_time_real(int argc, VALUE *argv, VALUE v_ev)
@@ -887,9 +1015,9 @@ alsaMidiEventClass_set_time_real(int argc, VALUE *argv, VALUE v_ev)
   return Qnil;
 }
 
-/* AlsaMidiEvent_i#queue_time= ticks
-AlsaMidiEvent_i#queue_time= sec, nsec
-AlsaMidiEvent_i#queue_time= [sec, nsec]
+/* queue_time=(time_specification)
+See also #time=, this works the same but for the timespecification within the queue-control
+event
 */
 static VALUE
 alsaMidiEventClass_set_queue_time(int argc, VALUE *argv, VALUE v_ev)
@@ -915,7 +1043,9 @@ alsaMidiEventClass_set_queue_time(int argc, VALUE *argv, VALUE v_ev)
   return Qnil;
 }
 
-// sec, nsec AlsaMidiEvent_i#time_real
+/* sec, nsec queue_time_real
+Returns the set realtime for a queue-control event
+*/
 static VALUE
 alsaMidiEventClass_queue_time_real(VALUE v_ev)
 {
@@ -925,9 +1055,9 @@ alsaMidiEventClass_queue_time_real(VALUE v_ev)
                         UINT2NUM(ev->data.queue.param.time.time.tv_nsec));
 }
 
-/*
-AlsaMidiEvent_i#queue_time_real= sec, nsec
-AlsaMidiEvent_i#queue_time_real= [sec, nsec]
+/* queue_time_real=(sec, nsec)
+
+Works in the same way as #time_real=, see also #queue_time=
 */
 static VALUE
 alsaMidiEventClass_set_queue_time_real(int argc, VALUE *argv, VALUE v_ev)
@@ -948,6 +1078,9 @@ alsaMidiEventClass_set_queue_time_real(int argc, VALUE *argv, VALUE v_ev)
   return Qnil;
 }
 
+/* dest=(address)
+Sets the destination in the same way as #source= does
+*/
 static VALUE
 alsaMidiEventClass_set_dest(int argc, VALUE *argv, VALUE v_ev)
 {
@@ -959,7 +1092,9 @@ alsaMidiEventClass_set_dest(int argc, VALUE *argv, VALUE v_ev)
   return Qnil;
 }
 
-// AlsaMidiEvent_i#dest_client =
+/* dest_client=(client)
+See #dest=
+*/
 static VALUE
 alsaMidiEventClass_set_dest_client(VALUE v_ev, VALUE v_clientid)
 {
@@ -969,7 +1104,9 @@ alsaMidiEventClass_set_dest_client(VALUE v_ev, VALUE v_clientid)
   return Qnil;
 }
 
-// AlsaMidiEvent_i#dest_port =
+/* dest_port=(port)
+See #dest=
+*/
 static VALUE
 alsaMidiEventClass_set_dest_port(VALUE v_ev, VALUE v_portid)
 {
@@ -979,17 +1116,8 @@ alsaMidiEventClass_set_dest_port(VALUE v_ev, VALUE v_portid)
   return Qnil;
 }
 
-/*
-secs, nsect AlsaMidiEvent_i#time
-ticks AlsaMidiEvent_i#time
-
-Note: there is NO data associated with a CLOCK event
-24 CLOCKS = 1/4 note.
-So in 4/4 there are 96 CLOCKS in a bar,
-and for 3/4 that would be 72.
-1/8 12 clocks
-1/16 6 clocks
-1/32 3 clocks
+/* timespec time
+Returns either the realtime (as a tuple [sec,nsec], or the ticks)
 */
 static VALUE
 alsaMidiEventClass_time(VALUE v_ev)
@@ -1000,15 +1128,16 @@ alsaMidiEventClass_time(VALUE v_ev)
   snd_seq_timestamp_t t = ev->time;
   const bool real = snd_seq_ev_is_real(ev);
   if (real)
-  {
-    VALUE v_secs = UINT2NUM(t.time.tv_sec);
-    VALUE v_nsecs = UINT2NUM(t.time.tv_nsec);
-    return rb_ary_new3(2, v_secs, v_nsecs);
-  }
+    {
+      VALUE v_secs = UINT2NUM(t.time.tv_sec);
+      VALUE v_nsecs = UINT2NUM(t.time.tv_nsec);
+      return rb_ary_new3(2, v_secs, v_nsecs);
+    }
   return UINT2NUM(t.tick);
 }
 
-/* int AlsaMidiEvent_i#time_tick
+/* int time_tick
+See also #time. If the event is a realtime event it will return nil.
 */
 static VALUE
 alsaMidiEventClass_time_tick(VALUE v_ev)
@@ -1019,7 +1148,8 @@ alsaMidiEventClass_time_tick(VALUE v_ev)
   return UINT2NUM(ev->time.tick);
 }
 
-/* AlsaMidiEvent_i#time_tick= value
+/* time_tick=(value)
+Sets the time in ticks, but does not change the timemode of the event
 */
 static VALUE
 alsaMidiEventClass_set_time_tick(VALUE v_ev, VALUE v_val)
@@ -1030,7 +1160,10 @@ alsaMidiEventClass_set_time_tick(VALUE v_ev, VALUE v_val)
   return Qnil;
 }
 
-// int AlsaMidiEvent_i#queue_value
+/* int queue_value
+Note that #value only works for CONTROLLER events. This method returns the
+value of a queue parameter of a queue-control-event
+*/
 static VALUE
 alsaMidiEventClass_queue_value(VALUE v_ev)
 {
@@ -1039,7 +1172,9 @@ alsaMidiEventClass_queue_value(VALUE v_ev)
   return INT2NUM(ev->data.queue.param.value);
 }
 
-// AlsaMidiEvent_i#queue_value= value
+/* queue_value=(value)
+Sets the value of a queue-control parameter
+*/
 static VALUE
 alsaMidiEventClass_set_queue_value(VALUE v_ev, VALUE v_val)
 {
@@ -1049,8 +1184,10 @@ alsaMidiEventClass_set_queue_value(VALUE v_ev, VALUE v_val)
   return Qnil;
 }
 
-// int AlsaMidiEvent_i#queue_time.  This may be wrong so snd_seq_ev_is_real is used.
-// Assuming hence, that time and queue.time have the same format.
+/* timespecification queue_time
+snd_seq_ev_is_real is used to decide whether ticks are returned or
+a realtime (as a tuple [sec,nsec])
+*/
 static VALUE
 alsaMidiEventClass_queue_time(VALUE v_ev)
 {
@@ -1059,15 +1196,17 @@ alsaMidiEventClass_queue_time(VALUE v_ev)
   const snd_seq_timestamp_t &t = ev->data.queue.param.time;
   const bool real = snd_seq_ev_is_real(ev);
   if (real)
-  {
-    VALUE v_secs = UINT2NUM(t.time.tv_sec);
-    VALUE v_nsecs = UINT2NUM(t.time.tv_nsec);
-    return rb_ary_new3(2, v_secs, v_nsecs);
-  }
+    {
+      VALUE v_secs = UINT2NUM(t.time.tv_sec);
+      VALUE v_nsecs = UINT2NUM(t.time.tv_nsec);
+      return rb_ary_new3(2, v_secs, v_nsecs);
+    }
   return UINT2NUM(t.tick);
 }
 
-/* int AlsaMidiEvent_i#queue_time_tick
+/* int queue_time_tick
+Returns the queue time in ticks for a queue-control-message.
+If the event was realtime it returns nil instead
 */
 static VALUE
 alsaMidiEventClass_queue_time_tick(VALUE v_ev)
@@ -1078,7 +1217,8 @@ alsaMidiEventClass_queue_time_tick(VALUE v_ev)
   return UINT2NUM(ev->data.queue.param.time.tick);
 }
 
-/* AlsaMidiEvent_i#queue_time_tick= value
+/* queue_time_tick=(value)
+See #queue_time=
 */
 static VALUE
 alsaMidiEventClass_set_queue_time_tick(VALUE v_ev, VALUE v_val)
@@ -1089,7 +1229,9 @@ alsaMidiEventClass_set_queue_time_tick(VALUE v_ev, VALUE v_val)
   return Qnil;
 }
 
-// int AlsaMidiEvent_i#queue_position
+/* int queue_position
+Returns the position parameter for a queue-control message
+*/
 static VALUE
 alsaMidiEventClass_queue_position(VALUE v_ev)
 {
@@ -1098,7 +1240,10 @@ alsaMidiEventClass_queue_position(VALUE v_ev)
   return UINT2NUM(ev->data.queue.param.position);
 }
 
-// AlsaMidiEvent_i#queue_position= value
+/* queue_position=(value)
+Alter the position. Do not confuse with queue_pos.
+What is this anyway?
+*/
 static VALUE
 alsaMidiEventClass_set_queue_position(VALUE v_ev, VALUE v_val)
 {
@@ -1108,7 +1253,10 @@ alsaMidiEventClass_set_queue_position(VALUE v_ev, VALUE v_val)
   return Qnil;
 }
 
-// ALSA internal ???? What's a tag???
+/* tag=(value)
+Tag can be in range of 0..255. I believe this can be used by the user to mark
+specific events, so they can be removed using the tagvalue.
+*/
 static VALUE
 wrap_snd_seq_ev_set_tag(VALUE v_ev, VALUE v_tag)
 {
@@ -1118,17 +1266,20 @@ wrap_snd_seq_ev_set_tag(VALUE v_ev, VALUE v_tag)
   return Qnil;
 }
 
-// Specify that the event must be broadcast to ALL clients on the system
+/* self set_broadcast
+Specify that the event must be broadcast to ALL clients on the system
+*/
 static VALUE
 wrap_snd_seq_ev_set_broadcast(VALUE v_ev)
 {
   snd_seq_event_t *ev;
   Data_Get_Struct(v_ev, snd_seq_event_t, ev);
   snd_seq_ev_set_broadcast(ev);
-  return Qnil;
+  return v_ev;
 }
 
-/* Specify that the event does not use a queue and is send immediately.
+/* self set_direct
+Specify that the event does not use a queue and is send immediately.
 If neither a schedule is perfomed, and 'direct' is not set, then the event
 is still buffered and will only be send on a flush
 */
@@ -1138,10 +1289,12 @@ wrap_snd_seq_ev_set_direct(VALUE v_ev)
   snd_seq_event_t *ev;
   Data_Get_Struct(v_ev, snd_seq_event_t, ev);
   snd_seq_ev_set_direct(ev);
-  return Qnil;
+  return v_ev;
 }
 
-// specify that the event has a high priority
+/* priority=(bool)
+specify that the event has a high priority (true) or normal (false)
+*/
 static VALUE
 wrap_snd_seq_ev_set_priority(VALUE v_ev, VALUE v_prio)
 {
@@ -1151,17 +1304,21 @@ wrap_snd_seq_ev_set_priority(VALUE v_ev, VALUE v_prio)
   return Qnil;
 }
 
-// specify that the event has a fixed length.
+/* self set_fixed
+specify that the event has a fixed length
+*/
 static VALUE
 wrap_snd_seq_ev_set_fixed(VALUE v_ev)
 {
   snd_seq_event_t *ev;
   Data_Get_Struct(v_ev, snd_seq_event_t, ev);
   snd_seq_ev_set_fixed(ev);
-  return Qnil;
+  return v_ev;
 }
 
-// Set variable data, makes it a sysex
+/* self set_variable(data)
+Set variable data, making it a sysex. Probably the same as #sysex=
+*/
 static VALUE
 wrap_snd_seq_ev_set_variable(VALUE v_ev, VALUE v_data)
 {
@@ -1169,10 +1326,12 @@ wrap_snd_seq_ev_set_variable(VALUE v_ev, VALUE v_data)
   Data_Get_Struct(v_ev, snd_seq_event_t, ev);
   Check_Type(v_data, T_STRING);
   snd_seq_ev_set_variable(ev, RSTRING_LEN(v_data), RSTRING_PTR(v_data));
-  return Qnil;
+  return v_ev;
 }
 
-// set a varusr event's data
+/* self set_varusr(data)
+set a varusr event's data, making it a VARUSR event
+*/
 static VALUE
 wrap_snd_seq_ev_set_varusr(VALUE v_ev, VALUE v_data)
 {
@@ -1180,60 +1339,79 @@ wrap_snd_seq_ev_set_varusr(VALUE v_ev, VALUE v_data)
   Data_Get_Struct(v_ev, snd_seq_event_t, ev);
   Check_Type(v_data, T_STRING);
   snd_seq_ev_set_varusr(ev, RSTRING_LEN(v_data), RSTRING_PTR(v_data));
-  return Qnil;
+  return v_ev;
 }
 
-// Utility 'macro' for the other queue_control macro's
+/* self set_queue_control(type, queue, value)
+Utility 'macro' for the other queue_control macro's
+*/
 static VALUE
 wrap_snd_seq_ev_set_queue_control(VALUE v_ev, VALUE v_tp, VALUE v_q, VALUE v_val)
 {
   snd_seq_event_t *ev;
   Data_Get_Struct(v_ev, snd_seq_event_t, ev);
   snd_seq_ev_set_queue_control(ev, NUM2INT(v_tp), NUM2UINT(v_q), NUM2INT(v_val));
-  return Qnil;
+  return v_ev;
 }
 
-// make it a start queue event
+/* self set_queue_start(queue)
+make it a start queue event
+*/
 static VALUE
 wrap_snd_seq_ev_set_queue_start(VALUE v_ev, VALUE v_q)
 {
   snd_seq_event_t *ev;
   Data_Get_Struct(v_ev, snd_seq_event_t, ev);
+  RRTS_DEREF_DIRTY(v_q, @id);
   snd_seq_ev_set_queue_start(ev, NUM2UINT(v_q));
-  return Qnil;
+  return v_ev;
 }
 
-// make it a stop queue event
+/* self set_queue_stop(queue)
+make it a stop queue event
+*/
 static VALUE
 wrap_snd_seq_ev_set_queue_stop(VALUE v_ev, VALUE v_q)
 {
   snd_seq_event_t *ev;
   Data_Get_Struct(v_ev, snd_seq_event_t, ev);
+  RRTS_DEREF_DIRTY(v_q, @id);
   snd_seq_ev_set_queue_stop(ev, NUM2UINT(v_q));
-  return Qnil;
+  return v_ev;
 }
 
-// make it a queue continue event
+/* self set_queue_continue(queue)
+make it a queue continue event
+*/
 static VALUE
 wrap_snd_seq_ev_set_queue_continue(VALUE v_ev, VALUE v_q)
 {
   snd_seq_event_t *ev;
   Data_Get_Struct(v_ev, snd_seq_event_t, ev);
+  RRTS_DEREF_DIRTY(v_q, @id);
   snd_seq_ev_set_queue_continue(ev, NUM2UINT(v_q));
-  return Qnil;
+  return v_ev;
 }
 
-// make it a set queue tempo event
+/* self set_queue_tempo(queue, tempo)
+make it a set-queue-tempo event.
+For the tempo parameter see Alsa docs (but there isn't any)
+Use google to find meaningfull example.
+*/
 static VALUE
 wrap_snd_seq_ev_set_queue_tempo(VALUE v_ev, VALUE v_q, VALUE v_tempo)
 {
   snd_seq_event_t *ev;
   Data_Get_Struct(v_ev, snd_seq_event_t, ev);
+  RRTS_DEREF_DIRTY(v_q, @id);
   snd_seq_ev_set_queue_tempo(ev, NUM2UINT(v_q), NUM2UINT(v_tempo));
-  return Qnil;
+  return v_ev;
 }
 
-// perform a realtime seek, changes current position in queue
+/* self set_queue_pos_real(queue, [sec, nsec])
+Make it a a realtime seek event, for changing the current position in queue.
+Events are hence skipped or resend
+*/
 static VALUE
 wrap_snd_seq_ev_set_queue_pos_real(VALUE v_ev, VALUE v_q, VALUE v_timetuple)
 {
@@ -1243,21 +1421,29 @@ wrap_snd_seq_ev_set_queue_pos_real(VALUE v_ev, VALUE v_q, VALUE v_timetuple)
   if (!RTEST(v_timetuple)) RAISE_MIDI_ERROR_FMT0("bad realtime for queuepos_real");
   VALUE secs = rb_ary_entry(v_timetuple, 0), nsecs = rb_ary_entry(v_timetuple, 1);
   const snd_seq_real_time tm = { NUM2UINT(secs), NUM2UINT(nsecs) };
+  RRTS_DEREF_DIRTY(v_q, @id);
   snd_seq_ev_set_queue_pos_real(ev, NUM2UINT(v_q), &tm);
-  return Qnil;
+  return v_ev;
 }
 
-// perform a seek in the queue, altering the current position
-// events are skipped or resend
+/* self set_queue_pos_tick(queue, ticks)
+See #set_queue_pos_real
+*/
 static VALUE
 wrap_snd_seq_ev_set_queue_pos_tick(VALUE v_ev, VALUE v_q, VALUE v_ticks)
 {
   snd_seq_event_t *ev;
   Data_Get_Struct(v_ev, snd_seq_event_t, ev);
+  RRTS_DEREF_DIRTY(v_q, @id);
   snd_seq_ev_set_queue_pos_tick(ev, NUM2UINT(v_q), NUM2UINT(v_ticks));
-  return Qnil;
+  return v_ev;
 }
 
+/* AlsaMidiEvent_i is the class wrapper for snd_seq_event_t.
+
+Use this for one on one ports only as the ruby implementation has a lot
+of overhead over the original one. Use MidiEvent if possible.
+*/
 void
 alsa_midi_event_init()
 {
@@ -1532,7 +1718,7 @@ alsa_midi_event_init()
 
 
   rb_define_method(alsaMidiEventClass, "set_noteon", RUBY_METHOD_FUNC(wrap_snd_seq_ev_set_noteon), 3);
-  rb_define_method(alsaMidiEventClass, "set_noteoff", RUBY_METHOD_FUNC(wrap_snd_seq_ev_set_noteoff), 3);
+  rb_define_method(alsaMidiEventClass, "set_noteoff", RUBY_METHOD_FUNC(wrap_snd_seq_ev_set_noteoff), -1);
   rb_define_method(alsaMidiEventClass, "set_keypress", RUBY_METHOD_FUNC(wrap_snd_seq_ev_set_keypress), 3);
   rb_define_method(alsaMidiEventClass, "set_controller", RUBY_METHOD_FUNC(wrap_snd_seq_ev_set_controller), 3);
 

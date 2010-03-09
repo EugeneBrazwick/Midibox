@@ -11,9 +11,10 @@ VALUE alsaPortSubscriptionClass;
 
 // External doc: http://www.alsa-project.org/~tiwai/alsa-subs.html
 
-/* client, port PortSubscription#dest
+/* [client, port] dest
 
-Get destination address of a port_subscribe container.
+Get destination address of a port_subscribe container as a tuple of two integers:
+clientid plus portid
 */
 static VALUE
 wrap_snd_seq_port_subscribe_get_dest(VALUE v_port_subs)
@@ -24,7 +25,9 @@ wrap_snd_seq_port_subscribe_get_dest(VALUE v_port_subs)
   return rb_ary_new3(2, INT2NUM(adr->client), INT2NUM(adr->port));
 }
 
-// clientid PortSubscription#dest_client
+/* clientid dest_client
+See #dest
+*/
 static VALUE
 wrap_snd_seq_port_subscribe_get_dest_client(VALUE v_port_subs)
 {
@@ -34,7 +37,9 @@ wrap_snd_seq_port_subscribe_get_dest_client(VALUE v_port_subs)
   return INT2NUM(adr->client);
 }
 
-// portid PortSubscription#dest_port
+/* portid dest_port
+See #dest
+*/
 static VALUE
 wrap_snd_seq_port_subscribe_get_dest_port(VALUE v_port_subs)
 {
@@ -44,10 +49,9 @@ wrap_snd_seq_port_subscribe_get_dest_port(VALUE v_port_subs)
   return INT2NUM(adr->port);
 }
 
-/* bool PortSubscription#exclusive?
-Get the exclusive mode of a port_subscribe container.
-Returns:
-   true if exclusive mode
+/* bool exclusive?
+Get the exclusive mode of a port_subscribe container. If a port is exclusive
+no one can subscribe it, and there can only be one subscriber.
 */
 static VALUE
 wrap_snd_seq_port_subscribe_get_exclusive(VALUE v_port_subs)
@@ -57,10 +61,8 @@ wrap_snd_seq_port_subscribe_get_exclusive(VALUE v_port_subs)
   return INT2BOOL(snd_seq_port_subscribe_get_exclusive(port_subs));
 }
 
-/* int PortSubscription#queue
+/* int queue
 Get the queue id of a port_subscribe container.
-Reurns:
-  queue id
 */
 static VALUE
 wrap_snd_seq_port_subscribe_get_queue(VALUE v_port_subs)
@@ -70,8 +72,9 @@ wrap_snd_seq_port_subscribe_get_queue(VALUE v_port_subs)
   return INT2NUM(snd_seq_port_subscribe_get_queue(port_subs));
 }
 
-/* client, port PortSubscription#sender
+/* [client, port] sender
 Get sender address of a port_subscribe container.
+See #dest
 */
 static VALUE
 wrap_snd_seq_port_subscribe_get_sender(VALUE v_port_subs)
@@ -82,7 +85,9 @@ wrap_snd_seq_port_subscribe_get_sender(VALUE v_port_subs)
   return rb_ary_new3(2, INT2NUM(adr->client), INT2NUM(adr->port));
 }
 
-// client PortSubscription#sender_client
+/* clientid sender_client
+See #sender
+*/
 static VALUE
 wrap_snd_seq_port_subscribe_get_sender_client(VALUE v_port_subs)
 {
@@ -92,7 +97,9 @@ wrap_snd_seq_port_subscribe_get_sender_client(VALUE v_port_subs)
   return INT2NUM(adr->client);
 }
 
-// port PortSubscription#sender_port
+/* portid sender_port
+See #sender
+*/
 static VALUE
 wrap_snd_seq_port_subscribe_get_sender_port(VALUE v_port_subs)
 {
@@ -102,10 +109,8 @@ wrap_snd_seq_port_subscribe_get_sender_port(VALUE v_port_subs)
   return INT2NUM(adr->port);
 }
 
-/* bool PortSubscription#time_real?
+/* bool time_real?
 Get the real-time update mode of a port_subscribe container.
-Returns:
- true if real-time update mode
 */
 static VALUE
 wrap_snd_seq_port_subscribe_get_time_real(VALUE v_port_subs)
@@ -115,10 +120,8 @@ wrap_snd_seq_port_subscribe_get_time_real(VALUE v_port_subs)
   return INT2BOOL(snd_seq_port_subscribe_get_time_real(port_subs));
 }
 
-/* bool PortSubscription#time_update?
-Get the time-update mode of a port_subscribe container.
-Returns:
-  true if update timestamp
+/* bool time_update?
+Get the timestamping mode of a port_subscribe container.
 */
 static VALUE
 wrap_snd_seq_port_subscribe_get_time_update(VALUE v_port_subs)
@@ -132,17 +135,17 @@ wrap_snd_seq_port_subscribe_get_time_update(VALUE v_port_subs)
 VALUE v_clientid, v_portid; \
 rb_scan_args(argc, argv, "11", &v_clientid, &v_portid); \
 solve_address(v_clientid, v_portid)
-/*
-PortSubscription.set_dest client, port
-PortSubscription.set_dest addr
-PortSubscription.dest= addr
+
+/* dest=(address)
 
 Set destination address of a port_subscribe container.
 
 Parameters:
-  client - clientid
-  port - portid
-  addr - destination address
+  [addr] destination address. A combination of MidiClient, MidiPort or integer ids.
+Example:
+  dest = 20, 1
+  dest = [20, 1]
+  dest = myPort
 */
 static VALUE
 wrap_snd_seq_port_subscribe_set_dest(int argc, VALUE *argv, VALUE v_port_subs)
@@ -158,10 +161,8 @@ wrap_snd_seq_port_subscribe_set_dest(int argc, VALUE *argv, VALUE v_port_subs)
   return Qnil;
 }
 
-/* PortSubscription#exclusive = bool
-Set the exclusive mode of a port_subscribe container.
-Parameters:
-val     true to enable
+/* exclusive=(bool)
+Set the exclusive mode of a port_subscribe container. Should be set before construction
 */
 static VALUE
 wrap_snd_seq_port_subscribe_set_exclusive(VALUE v_port_subs, VALUE v_val)
@@ -172,10 +173,10 @@ wrap_snd_seq_port_subscribe_set_exclusive(VALUE v_port_subs, VALUE v_val)
   return Qnil;
 }
 
-/* PortSubscription#queue= qid
+/* queue=(queue)
 Set the queue id of a port_subscribe container.
 Parameters:
-qid       queue id
+  [qid] queueid or MidiQueue
 */
 static VALUE
 wrap_snd_seq_port_subscribe_set_queue(VALUE v_port_subs, VALUE v_queue_id)
@@ -183,19 +184,17 @@ wrap_snd_seq_port_subscribe_set_queue(VALUE v_port_subs, VALUE v_queue_id)
   snd_seq_port_subscribe_t *port_subs;
   Data_Get_Struct(v_port_subs, snd_seq_port_subscribe_t, port_subs);
   //fprintf(stderr, __FILE__ ":%d:snd_seq_port_subscribe_set_queue(%d)\n", __LINE__, NUM2INT(v_queue_id));
-  #if defined(DUMP_API)
+#if defined(DUMP_API)
   fprintf(DUMP_STREAM, "snd_seq_port_subscribe_set_queue(%p, %d)\n", port_subs, NUM2INT(v_queue_id));
-  #endif
+#endif
+  RRTS_DEREF_DIRTY(v_queue_id, @id);
   snd_seq_port_subscribe_set_queue(port_subs, NUM2INT(v_queue_id));
   return Qnil;
 }
 
-/* PortSubscription#set_sender client, port
-   PortSubscription#set_sender addr
-   PortSubscription#sender= addr
-Set sender address of a port_subscribe container.
-Parameters:
-  addr    sender address
+/* sender=(address)
+
+Set sender address of a port_subscribe container. See also #dest=
 */
 static VALUE
 wrap_snd_seq_port_subscribe_set_sender(int argc, VALUE *argv, VALUE v_port_subs)
@@ -204,17 +203,15 @@ wrap_snd_seq_port_subscribe_set_sender(int argc, VALUE *argv, VALUE v_port_subs)
   snd_seq_port_subscribe_t *port_subs;
   Data_Get_Struct(v_port_subs, snd_seq_port_subscribe_t, port_subs);
   snd_seq_addr_t addr = { NUM2INT(v_clientid), NUM2INT(v_portid) };
-  #if defined(DUMP_API)
+#if defined(DUMP_API)
   fprintf(DUMP_STREAM, "snd_seq_port_subscribe_set_sender(%p, {%d, %d})\n", port_subs, NUM2INT(v_clientid), NUM2INT(v_portid));
-  #endif
+#endif
   snd_seq_port_subscribe_set_sender(port_subs, &addr);
   return Qnil;
 }
 
-/* PortSubscription#real_time= bool
+/* real_time=(bool)
 Set the real-time mode of a port_subscribe container.
-Parameters:
-  val     true to enable
 */
 static VALUE
 wrap_snd_seq_port_subscribe_set_time_real(VALUE v_port_subs, VALUE v_val)
@@ -229,10 +226,8 @@ wrap_snd_seq_port_subscribe_set_time_real(VALUE v_port_subs, VALUE v_val)
   return Qnil;
 }
 
-/*  PortSubscription#time_update= bool
-Set the time-update mode of a port_subscribe container.
-Parameters:
-val     true to enable
+/*  time_update=(bool)
+Set the timestamp-update mode of a port_subscribe container.
 */
 static VALUE
 wrap_snd_seq_port_subscribe_set_time_update(VALUE v_port_subs, VALUE v_val)
@@ -247,11 +242,15 @@ wrap_snd_seq_port_subscribe_set_time_update(VALUE v_port_subs, VALUE v_val)
   return Qnil;
 }
 
+/* AlsaPortSubscription_i
+
+This class can be used to connect two ports and to associate a queue with this
+subscription.  Then events can be send and their sender + destination + queue
+field is properly set automatically. FIXME: not implemented yet
+*/
 void
 port_subscription_init()
 {
-  alsaPortSubscriptionClass = rb_define_class_under(alsaDriver, "AlsaPortSubscription_i", rb_cObject);
-
   rb_define_method(alsaPortSubscriptionClass, "dest", RUBY_METHOD_FUNC(wrap_snd_seq_port_subscribe_get_dest), 0);
   rb_define_method(alsaPortSubscriptionClass, "dest_client", RUBY_METHOD_FUNC(wrap_snd_seq_port_subscribe_get_dest_client), 0);
   rb_define_method(alsaPortSubscriptionClass, "dest_port", RUBY_METHOD_FUNC(wrap_snd_seq_port_subscribe_get_dest_port), 0);

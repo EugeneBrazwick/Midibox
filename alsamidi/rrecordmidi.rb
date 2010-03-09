@@ -39,7 +39,7 @@ BUFFER_SIZE = 4088
 SND_UTIL_VERSION_STR = '1.0'
 
 # linked list of buffers, stores data as in the .mid file
-class Buffer    # buffer
+class Buffer    # :no-doc: buffer
 private
   def initialize
     @buf = ''
@@ -50,7 +50,7 @@ public
   attr :buf; # string
 end
 
-class Smf_track # smf_track
+class Smf_track # :no-doc: smf_track
 private
   def initialize
     @first_buf = Buffer.new
@@ -105,7 +105,7 @@ METRONOME_PROGRAM = 0
 
 def init_seq
   #       open sequencer
-  @seq = snd_seq_open
+  @seq = seq_open
   #   puts "seq=#@seq"
   # find out our client's id
   @client = @seq.client_id
@@ -125,7 +125,7 @@ def metronome_note note, tick
 end
 
 def metronome_echo tick  # unsigned int tick
-  ev = ev_malloc # snd_seq_event_t ev;
+  ev = ev_malloc # AlsaMidiEvent_i
   ev.clear
   ev.type = SND_SEQ_EVENT_USR0
   ev.schedule_tick @queue, 0, tick
@@ -156,7 +156,7 @@ end
 
 def create_queue
   @queue = @seq.alloc_named_queue 'rrecordmidi'
-  tempo = snd_seq_queue_tempo_malloc
+  tempo = queue_tempo_malloc
   if !@smpte_timing
     tempo.tempo = 60_000_000 / @beats
     tempo.ppq = @ticks
@@ -177,7 +177,6 @@ def create_queue
     when 30
       tempo.tempo = 500_000
       tempo.ppq = 15 * @ticks
-      snd_seq_queue_tempo_set_tempo(tempo, 500000);
     else
       fail
     end
@@ -186,7 +185,7 @@ def create_queue
 end
 
 def create_ports
-  pinfo =  snd_seq_port_info_malloc
+  pinfo =  port_info_malloc
 #         common information for all our ports
   pinfo.capability = SND_SEQ_PORT_CAP_WRITE | SND_SEQ_PORT_CAP_SUBS_WRITE
   pinfo.type = SND_SEQ_PORT_TYPE_MIDI_GENERIC | SND_SEQ_PORT_TYPE_APPLICATION
@@ -442,8 +441,8 @@ opts.banner = "Usage: #{$PROGRAM_NAME} [options] outputfile"
 opts.on('-h', '--help', 'this help') { puts opts.to_s; exit 1 }
 opts.on('-V', '--version', 'show version') { STDERR.puts("rrecordmidi version #{SND_UTIL_VERSION_STR}\n"); exit }
 opts.on('-l', '--list', 'list input ports') do
-  cinfo = snd_seq_client_info_malloc
-  pinfo = snd_seq_port_info_malloc
+  cinfo = client_info_malloc
+  pinfo = port_info_malloc
   puts(" Port    Client name                      Port name")
   cinfo.client = -1
   while @seq.next_client(cinfo)

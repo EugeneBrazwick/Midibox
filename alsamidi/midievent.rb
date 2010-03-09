@@ -5,15 +5,9 @@ require 'forwardable'
 
 module RRTS
 
-=begin
-
-To make sure we are as fast as possible we instantiate all properties as
-ivars. So no forwarding.
-All possible properties are supported but will be nil.
-At least, today...
-
-To create an event use Sequencer.input_event
-=end
+# MidiEvent can be used to read, write and manipulate MIDI events.
+#
+# To create an event use Sequencer#event_input
   class MidiEvent
     include Driver, Comparable
 
@@ -224,31 +218,41 @@ To create an event use Sequencer.input_event
 
     public
 
-    # :nodoc: the typeid, a symbol equal to the suffix of the event name in lower case
+=begin :no-doc:
+    # the typeid, a symbol equal to the suffix of the event name in lower case
     # Examples: :start, :sensing, :pgmchange, :noteon
     # DO NOT USE. It is redundant!!
-    attr :type
+=end
+    attr :type # :no-doc:
 
     # timestamp of event, either in ticks (int) or realtime [secs, nanosecs]
     attr_accessor :time
     alias :tick :time
     alias :tick= :time=
-    # this should be kept simple. These are MidiPorts
-    attr_accessor :source, :dest
+    # The source MidiPort
+    attr_accessor :source
+    # The destination MidiPort
+    attr_accessor :dest
     alias :sender :source
     alias :sender= :source=
 
     # hash of bools.
-    attr_accessor :flags, :sender_queue
+    attr_accessor :flags
+    # the MidiQueue used for sending, if both queue and time are unset we use +direct+ events
+    attr_accessor :sender_queue
     # receiver queue. id or MidiQueue
     attr :receiver_queue
     # notes and control events have a channel. We use the range 1..16
     # The channel can be set to an enumerable. This will make the
     # messages be sent to all the given channels
     attr :channel
-    # notes have these:
-    attr :velocity, :off_velocity, :duration
-    # can be 'event' for result messages, normally used for controls
+    # notes have this
+    attr :velocity
+    # for NoteEvent specific
+    attr :off_velocity
+    # for NoteEvent specific
+    attr :duration
+    # can be 'event' for result messages, but normally used for controls
     attr :param
     # value is a note or a control-value, a result-value, or a queue-value, also a sysex binary string
     # normally integer
@@ -262,14 +266,9 @@ To create an event use Sequencer.input_event
     # these are MidiPorts for connection events
     attr :connnect_sender, :connect_dest
 
-    def schedule_tick
-      not_implemented
-    end
-
-    def schedule_real
-      not_implemented
-    end
-
+    # two events are 'the same' if the time is the same. In other words
+    # if you sort them this will be on time.
+    # FIXME: we need a kind of priority as well.
     def <=> other
       case @time
       when Array
@@ -281,26 +280,6 @@ To create an event use Sequencer.input_event
     end
 
   end  # MidiEvent
-
-=begin  queue events ?
-  class ClockEvent < MidiEvent
-    private
-    def initialize arg0, params = {}
-      case params when AlsaMidiEvent_i then super
-      else super :clock, params
-      end
-    end
-  end
-
-  class TickEvent < MidiEvent
-    private
-    def initialize arg0, params = {}
-      case params when AlsaMidiEvent_i then super
-      else super :tick, params
-      end
-    end
-  end
-=end
 
   # a VoiceEvent has a channel (arg0), and also a value (arg1) (could be 'note')
   class VoiceEvent < MidiEvent
@@ -317,17 +296,19 @@ To create an event use Sequencer.input_event
     end
   end
 
+  # A NOTEON event
   class NoteOnEvent < VoiceEvent
 
     private
-    # new sequencer, event
-    # new channel, note, velocity [,...]
+    # new(sequencer, event)
+    # new(channel, note, velocity [,...])
+
     # It is allowed to use strings like 'C4' or 'd5' or 'Eb6' for 'note' (arg1)
-    def initialize arg0, arg1 = nil, velocity = nil, params = {}
-      case arg1 when AlsaMidiEvent_i then super(arg0, arg1)
+    def initialize channel, note = nil, velocity = nil, params = {}
+      case note when AlsaMidiEvent_i then super(channel, note)
       else
         params[:velocity] = velocity
-        super :noteon, arg0, arg1, params
+        super :noteon, channel, note, params
       end
     end
 
@@ -336,16 +317,17 @@ To create an event use Sequencer.input_event
     alias :note :value
   end
 
-  class KeypressEvent < VoiceEvent  # aka 'aftertouch'
+  # Keypress or aftertouch event
+  class KeypressEvent < VoiceEvent
     private
     # new sequencer, event
     # new channel, note, pressure[,...]
     # It is allowed to use strings like 'C4' or 'd5' or 'Eb6' for 'note' (arg1)
-    def initialize arg0, arg1 = nil, velocity = nil, params = {}
-      case arg1 when AlsaMidiEvent_i then super(arg0, arg1)
+    def initialize channel, note = nil, velocity = nil, params = {}
+      case note when AlsaMidiEvent_i then super(channel, note)
       else
         params[:velocity] = velocity
-        super :keypress, arg0, arg1, params
+        super :keypress, channel, note, params
       end
     end
 
@@ -355,15 +337,17 @@ To create an event use Sequencer.input_event
     alias :pressure :velocity
   end
 
+  # noteoff event
   class NoteOffEvent < VoiceEvent
     private
-    # new sequencer, event
-    # new channel, note [,...]
+    # new(sequencer, event)
+    # new(channel, note [,...])
+
     # It is allowed to use strings like 'C4' or 'd5' or 'Eb6' for 'note' (arg1)
-    def initialize arg0, arg1 = nil, params = {}
-      case arg1 when AlsaMidiEvent_i then super(arg0, arg1)
+    def initialize channel, note = nil, params = {}
+      case note when AlsaMidiEvent_i then super(channel, note)
       else
-        super :noteoff, arg0, arg1, params
+        super :noteoff, channel, note, params
       end
     end
 
@@ -371,9 +355,10 @@ To create an event use Sequencer.input_event
     alias :note :value
   end
 
+  # an Alsa hack.
   class NoteEvent < VoiceEvent
     private
-    # NoteEvent.new channel, note, velocity [, ...]
+    # new(channel, note, velocity [, ...])
     # It is allowed to use strings like 'C4' or 'd5' or 'Eb6' for 'note' (arg1)
     def initialize arg0, arg1 = nil, velocity = nil, params = {}
       case arg1 when AlsaMidiEvent_i then super(arg0, arg1)
@@ -386,63 +371,62 @@ To create an event use Sequencer.input_event
     alias :note :value
   end
 
+  # a controller event is basicly a large group of more specific events
   class ControllerEvent < VoiceEvent
+
     private
     # IMPORTANT: if you use a controller-parameter that requires an on/off value
     # then 0 is off and 64 is on. You can use the constants below as well.
     # Or you pass 'false' or 'true' for value.
     ON = 0x40
     OFF = 0x0
-=begin
-    IMPORTANT: all events must support this way of construction
-    arg0 is a Sequencer, arg1 is a LOW LEVEL AlsaMidiEvent_i.
-    new sequencer, event
-    new channel, param, value [, params ]
-    new channel, param [, params ]
 
-    'param' can be a symbol from:
+#     *IMPORTANT*: all events must support this way of construction
+#     arg0 is a Sequencer, arg1 is a LOW LEVEL AlsaMidiEvent_i.
+#     new sequencer, event
 
-   IMPORTANT: the value you pass here must be a 14 bits int, or else 2 7 bit ints.
-   Two events will actually be sent (always).
-   Pass coarse: false to use the value as a single 7 bits int, while passing 0 as lsb.
-   Even in this case two events are sent.
-    :bank_select (14 bits), or better 7+7
-    :modulation_wheel (14)
-    :breath_controller (14)
-    :foot_pedal (14)
-    :portamento_time (14)
-    :data_entry (14)
-    :volume (14)
-    :balance (14)
-    :pan_position(14)
-    :expression(14)
-
-    :hold_pedal (1), portamento (1), sustenuto(10, soft(1), legato(1)
-    :hold_2_pedal (1).  Note that value 64 (bit 7) is used for this.
-    IMPORTANT: passing '1' here does therefore not activate the control!
-
-    These are 7 bits:
-    :timbre, :release, :attack, :brightness,
-    :effects_level, :tremulo_level/:tremulo, :chorus_level/:chorus,
-    :celest_level/:celeste/:detune
-    :phaser
-
-    These are 0 bits:
-    :all_controllers_off (single channel)
-    :all_notes_off (nonlocal, except pedal)
-    :all_sound_off/:panic (nonlocal)
-    :omni_off, :omni_on, :mono, :poly
-
-    It is also possible to pass a tuple as 'value'.
-    ControllerEvent.new channel, :bank_select, [1, 23]
-    This would select bank 1*128+23.
-=end
-    def initialize arg0, arg1 = nil, value = 0, params = {}
-      case arg1 when AlsaMidiEvent_i then super(arg0, arg1)
+# *IMPORTANT*: the value you pass here must be a 14 bits int, or else 2 7 bit ints.
+# Two events will actually be sent (always).
+# Pass coarse: false to use the value as a single 7 bits int, while passing 0 as lsb.
+# Even in this case two events are sent.
+#
+#   'param' can be a symbol from:
+#     :bank_select (14 bits), or better 7+7
+#     :modulation_wheel (14)
+#     :breath_controller (14)
+#     :foot_pedal (14)
+#     :portamento_time (14)
+#     :data_entry (14)
+#     :volume (14)
+#     :balance (14)
+#     :pan_position(14)
+#     :expression(14)
+#
+#     :hold_pedal (1), portamento (1), sustenuto(10, soft(1), legato(1)
+#     :hold_2_pedal (1).  Note that value 64 (bit 7) is used for this.
+#         IMPORTANT: passing '1' here does therefore not activate the control!
+#
+#     These are 7 bits:
+#     :timbre, :release, :attack, :brightness,
+#     :effects_level, :tremulo_level/:tremulo, :chorus_level/:chorus,
+#     :celest_level/:celeste/:detune
+#     :phaser
+#
+#     These are 0 bits:
+#     :all_controllers_off (single channel)
+#     :all_notes_off (nonlocal, except pedal)
+#     :all_sound_off/:panic (nonlocal)
+#     :omni_off, :omni_on, :mono, :poly
+#
+#     It is also possible to pass a tuple as 'value'.
+#     ControllerEvent.new channel, :bank_select, [1, 23]
+#     This would select bank 1*128+23.
+    def initialize channel, param = nil, value = 0, params = {}
+      case param when AlsaMidiEvent_i then super(channel, parama)
       else
         params, value = value, 0 if Hash === value
-        params[:param] = Driver::param2sym(arg1)
-        super :controller, arg0, value, params
+        params[:param] = Driver::param2sym(param)
+        super :controller, channel, value, params
       end
     end
 
@@ -456,31 +440,33 @@ To create an event use Sequencer.input_event
     IMPORTANT: all events must support this way of construction
     arg0 is a Sequencer, arg1 is a LOW LEVEL AlsaMidiEvent_i.
     new sequencer, event
-    new channel, param, value, params
 =end
-    def initialize arg0, arg1 = nil, value = nil, params = {}
-      case arg1 when AlsaMidiEvent_i then super(arg0, arg1)
+    # new(channel, param, value [, ...])
+    def initialize channel, param = nil, value = nil, params = {}
+      case param when AlsaMidiEvent_i then super(channel, param)
       else
-        params[:param] = arg1
-        super :control14, arg0, value, params
+        params[:param] = param
+        super :control14, channel, value, params
       end
     end
   end
 
+  # PRGCHANGE events
   class ProgramChangeEvent < VoiceEvent
     private
 =begin
     IMPORTANT: all events must support this way of construction
     arg0 is a Sequencer, arg1 is a LOW LEVEL AlsaMidiEvent_i.
     new sequencer, event
-    new channel, program [, params ]
-    new channel, [bank_msb, program] [, params]
-    new channel , [bank_msb, bank_lsb, program] ...
 =end
-    def initialize arg0, arg1 = nil, params = {}
-      case arg1 when AlsaMidiEvent_i then super(arg0, arg1)
+    # program can be a single value in range 0..127.
+    # Or it may be a tuple [bank_msb, progno]
+    # Or even [bank_msb, bank_lsb, progno]
+    # The last one will of course send 3 events when send.
+    def initialize channel, program = nil, params = {}
+      case program when AlsaMidiEvent_i then super(channel, program)
       else
-        super :pgmchange, arg0, arg1, params
+        super :pgmchange, channel, program, params
       end
     end
 
@@ -488,26 +474,26 @@ To create an event use Sequencer.input_event
     alias :program :value
   end
 
+  # to bend the pitch (and who does not want to do that)
   class PitchbendEvent < VoiceEvent
     private
-=begin
-    new sequencer, event
-    new channel, value [, params ]
-    Note that value is a 14 bits signed integer
-    in the range -0x2000 to 0x2000
-=end
-    def initialize arg0, arg1 = nil, params = {}
-      case arg1 when AlsaMidiEvent_i then super(arg0, arg1)
+#       Note that value is a 14 bits signed integer
+#       in the range -0x2000 to 0x2000
+    def initialize channel, value = nil, params = {}
+      case value when AlsaMidiEvent_i then super(channel, value)
       else
-        super :pitchbend, arg0, arg1, params
+        super :pitchbend, channel, value, params
       end
     end
   end
 
+  # channel pressure == poor man's aftertouch
   class ChannelPressureEvent < VoiceEvent
     private
     # new Sequencer, event
-    # new channel, pressure [,...]
+
+    # new(channel, pressure [,...])
+    # Pressure should be in the range 0..127
     def initialize arg0, arg1 = nil, params = {}
       case arg1 when AlsaMidiEvent_i then super(arg0, arg1)
       else
@@ -541,11 +527,12 @@ To create an event use Sequencer.input_event
   class SystemExclusiveEvent < MidiEvent
     private
     # new Sequencer, event
-    # new data [,...].  NOTE: see low level API, where does the memory stay??????
-    def initialize arg0, arg1 = nil, params = {}
-      case arg1 when AlsaMidiEvent_i then super(arg0, arg1)
+
+    # new(data [,...])
+    def initialize data, params = {}
+      case params when AlsaMidiEvent_i then super(data, params)
       else
-        params[:value] = arg0
+        params[:value] = data
         super :sysex, params
       end
     end
@@ -572,10 +559,9 @@ To create an event use Sequencer.input_event
 
   class StartEvent < QueueEvent
     private
-    # new Sequencer, event
-    # new queue, [,...]
-    def initialize arg0, arg1 = {}
-      case arg1 when AlsaMidiEvent_i then super(arg0, arg1)
+    # create a new StartEvent
+    def initialize queue, params = {}
+      case params when AlsaMidiEvent_i then super(queue, params)
       else
         super :start, arg0, arg1
       end
@@ -584,36 +570,30 @@ To create an event use Sequencer.input_event
 
   class StopEvent < QueueEvent
     private
-    # new Sequencer, event
-    # new queue, [,...]
-    def initialize arg0, arg1 = {}
-      case arg1 when AlsaMidiEvent_i then super(arg0, arg1)
+    def initialize queue, params = {}
+      case params when AlsaMidiEvent_i then super(queue, params)
       else
-        super :stop, arg0, arg1
+        super :stop, queue, params
       end
     end
   end
 
   class ContinueEvent < QueueEvent
     private
-    # new Sequencer, event
-    # new queue, [,...]
-    def initialize arg0, arg1 = {}
-      case arg1 when AlsaMidiEvent_i then super(arg0, arg1)
+    def initialize queue, params = {}
+      case params when AlsaMidiEvent_i then super(queue, params)
       else
-        super :continue, arg0, arg1
+        super :continue, queue, params
       end
     end
   end
 
   class ClockEvent < QueueEvent
     private
-    # new Sequencer, event
-    # new queue, [,...]
-    def initialize arg0, arg1 = {}
-      case arg1 when AlsaMidiEvent_i then super
+    def initialize queue, params = {}
+      case params when AlsaMidiEvent_i then super
       else
-        super :clock, arg0, params
+        super :clock, queue, params
       end
     end
   end
@@ -622,10 +602,10 @@ To create an event use Sequencer.input_event
     private
     # new Sequencer, event
     # new queue, [,...]
-    def initialize arg0, arg1 = {}
-      case arg1 when AlsaMidiEvent_i then super
+    def initialize queue, params = {}
+      case params when AlsaMidiEvent_i then super
       else
-        super :tick, arg0, params
+        super :tick, queue, params
       end
     end
   end
@@ -676,8 +656,8 @@ To create an event use Sequencer.input_event
     IMPORTANT: all events must support this way of construction
     arg0 is a Sequencer, arg1 is a LOW LEVEL AlsaMidiEvent_i.
     new sequencer, event
-    new queue, value[, params]
 =end
+    # new(queue, value[, params])
     def initialize arg0, arg1 = nil, params = {}
       case arg1 when AlsaMidiEvent_i then super(arg0, arg1)
       else
@@ -691,14 +671,16 @@ To create an event use Sequencer.input_event
   end
 
    # There is also a META Tempo bit in a MIDI file.
+
+   # TempoEvent.
   class TempoEvent < QueueEvent
     private
 =begin
     IMPORTANT: all events must support this way of construction
     arg0 is a Sequencer, arg1 is a LOW LEVEL AlsaMidiEvent_i.
     new sequencer, event
-    new queue, tempo[, params]
 =end
+    # new(queue, tempo[, params])
     def initialize arg0, arg1 = nil, params = {}
       case arg1 when AlsaMidiEvent_i then super(arg0, arg1)
       else
@@ -745,9 +727,9 @@ To create an event use Sequencer.input_event
   # TODO: these classes can be made on the fly.
   class ResetEvent < MidiEvent
     private
-    def initialize arg0 = {}, arg1 = nil
+    def initialize params = {}, arg1 = nil
       case arg1 when AlsaMidiEvent_i then super
-      else super :reset, arg0
+      else super :reset, params
       end
     end
   end # ResetEvent
@@ -763,9 +745,9 @@ To create an event use Sequencer.input_event
 
   class EchoEvent < MidiEvent
     private
-    def initialize arg0 = {}, arg1 = nil
+    def initialize params = {}, arg1 = nil
       case arg1 when AlsaMidiEvent_i then super
-      else super :echo, arg0
+      else super :echo, params
       end
     end
   end # EchoEvent

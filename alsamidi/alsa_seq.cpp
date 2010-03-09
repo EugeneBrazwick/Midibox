@@ -18,16 +18,25 @@
 #include "alsa_midi_client.h"
 #include "alsa_midi_port.h"
 #include "alsa_client_pool.h"
+#include "alsa_system_info.h"
 #include <ruby/dl.h>
 #include <alsa/asoundlib.h>
 
 VALUE alsaSequencerClass;
 static VALUE alsaPollFdsClass;
 
+/*
+* 31.25 kbaud, one start bit, eight data bits, two stop bits.
+* (The MIDI spec says one stop bit, but every transmitter uses two, just to be
+* sure, so we better not exceed that to avoid overflowing the output buffer.)
+*/
 static size_t MIDI_BYTES_PER_SEC = 31250 / (1 + 8 + 2);
 
 #if defined (DEBUG)
 static bool AlsaSequencer_dump_notes = false;
+
+/* dump_notes=(bool)
+*/
 static VALUE
 AlsaSequencer_set_dump_notes(VALUE v_seq, VALUE v_on)
 {
@@ -37,8 +46,7 @@ AlsaSequencer_set_dump_notes(VALUE v_seq, VALUE v_on)
 #endif
 
 
-/*
-int AlsaSequencer_i#close
+/* int close
 
 Close the sequencer.
 
@@ -46,11 +54,10 @@ Returns:
 nil on success otherwise a negative error code
 
 Closes the sequencer client and releases its resources. After a client is closed, an event with
-SND_SEQ_EVENT_CLIENT_EXIT is broadcast to announce port. The connection between other clients are disconnected.
+SND_SEQ_EVENT_CLIENT_EXIT is broadcast to announce port.
+The connection between other clients are disconnected.
 Call this just before exiting your program.
 */
-
-
 static VALUE
 wrap_snd_seq_close(VALUE v_seq)
 {
@@ -63,16 +70,14 @@ wrap_snd_seq_close(VALUE v_seq)
   return r ? INT2NUM(r) : Qnil;
 }
 
-/*
-string AlsaSequencer_i#name
-get identifier of sequencer handle
+/* string name
+get the name of the sequencer handle. This should really be 'default'.
 
-Returns:
-ASCII identifier of sequencer handle
+Returns the ASCII identifier of the given sequencer handle. It's the same identifier
+specified in Driver#seq_open
 
-Returns the ASCII identifier of the given sequencer handle. It's the same identifier specified in snd_seq_open().
+Do not confuse it with #client_name
 */
-
 static VALUE
 wrap_snd_seq_name(VALUE v_seq)
 {
@@ -81,17 +86,11 @@ wrap_snd_seq_name(VALUE v_seq)
   return rb_str_new2(snd_seq_name(seq));
 }
 
-/* int AlsaSequencer_i#client_id
-Get the client id.
-
-Returns:
-the client id
-
+/* int client_id
 Returns the id of the specified client. If an error occurs, function raises AlsaMidiError
-A client id is necessary to inquiry or to set the client information. A user client is assigned from 128 to 191.
+A client id is necessary to inquiry or to set the client information.
+A user client is assigned from 128 to 191.
 */
-
-
 static VALUE
 wrap_snd_seq_client_id(VALUE v_seq)
 {
@@ -105,17 +104,20 @@ wrap_snd_seq_client_id(VALUE v_seq)
   return INT2NUM(r);
 }
 
-/* AlsaSequencer_i#nonblock=(nonblock = true)
+/* nonblock([nonblock])
 Set nonblock mode.
 
 Parameters:
-nonblock        false = block, true = nonblock mode
+  [nonblock] false = block, true (the default) = nonblock mode
 
-Returns:
 May raise AlsaMidiError
 
-Change the blocking mode of the given client. In block mode, the client falls into sleep when it fills the output memory
-pool with full events. The client will be woken up after a certain amount of free space becomes available.
+Change the blocking mode of the given client. In block mode, the client falls into
+sleep when it fills the output memory
+pool with full events. The client will be woken up after a certain amount of free
+space becomes available.
+
+The default mode on creation is +blocking+.
 */
 static VALUE
 wrap_snd_seq_nonblock(int argc, VALUE *v_params, VALUE v_seq)
@@ -129,14 +131,11 @@ wrap_snd_seq_nonblock(int argc, VALUE *v_params, VALUE v_seq)
   return Qnil;
 }
 
-/* self AlsaSequencer_i#set_client_name(name)
+/* client_name=(name)
 set client name
 
-Parameters:
-name    name string
-
+This should update the connections as others see it.
 */
-
 static VALUE
 wrap_snd_seq_set_client_name(VALUE v_seq, VALUE v_name)
 {
@@ -151,24 +150,23 @@ wrap_snd_seq_set_client_name(VALUE v_seq, VALUE v_name)
   return v_seq;
 }
 
-/*
-port_info AlsaSequencer_i#create_port(port_info))
+/* AlsaMidiPort_i create_port(port_info)
 
-                                        create a sequencer port on the current client
+create a sequencer port on the current client
 
-                                        Parameters:
-                                        port_info    port information for the new port
+Parameters:
+  [port_info]    port construction information for the new port. Also returned.
 
-       Returns: port_info
+Creates a sequencer port on the current client. The attributes of created port is
+specified in info argument.
 
-        Creates a sequencer port on the current client. The attributes of created port is specified in info argument.
+The client field in info argument is overwritten with the current client id.
+The port id to be created can be specified via AlsaMidiPort_i#port_specified=.
+You can get the created port id by reading the port pointer via AlsaMidiPort_i#port.
 
-        The client field in info argument is overwritten with the current client id. The port id to be created can be
-        specified via snd_seq_port_info_set_port_specified. You can get the created port id by reading the port pointer via
-        snd_seq_port_info_get_port.
-
-        Each port has the capability bit-masks to specify the access capability of the port from other clients.
-        The capability bit flags are defined as follows:
+Each port has the capability bit-masks to specify the access capability of the port
+from other clients.
+The capability bit flags are defined as follows:
 
         * SND_SEQ_PORT_CAP_READ Readable from this port
         * SND_SEQ_PORT_CAP_WRITE Writable to this port.
@@ -179,7 +177,7 @@ port_info AlsaSequencer_i#create_port(port_info))
         * SND_SEQ_PORT_CAP_SUBS_WRITE Write subscription is allowed
         * SND_SEQ_PORT_CAP_NO_EXPORT Subscription management from 3rd client is disallowed
 
-        Each port has also the type bitmasks defined as follows:
+Each port has also the type bitmasks defined as follows:
 
         * SND_SEQ_PORT_TYPE_SPECIFIC Hardware specific port
         * SND_SEQ_PORT_TYPE_MIDI_GENERIC Generic MIDI device
@@ -194,7 +192,8 @@ port_info AlsaSequencer_i#create_port(port_info))
         * SND_SEQ_PORT_TYPE_PORT Connects to other device(s)
         * SND_SEQ_PORT_TYPE_APPLICATION Application (sequencer/editor)
 
-        A port may contain specific midi channels, midi voices and synth voices. These values could be zero as default.
+A port may contain specific midi channels, midi voices and synth voices.
+These values could be zero as default.
 */
 static VALUE
 wrap_snd_seq_create_port(VALUE v_seq, VALUE v_portinfo)
@@ -211,47 +210,19 @@ wrap_snd_seq_create_port(VALUE v_seq, VALUE v_portinfo)
   return v_portinfo;
 }
 
-/*
-int AlsaSequencer_i#create_simple_port(name, caps, type)
+/* int create_simple_port(name, capsbits, typebits)
 
 create a port - simple version, buffering and queueing is not supported
 
 Parameters:
-seq     sequencer handle
-name    the name of the port
-caps    capability bits
-type    type bits
-Returns:
-the created port number.
+  [name] the name of the port
+  [caps] capability bits
+  [type] type bits
+
+Returns the created port number.
 Creates a port with the given capability and type bits.
-Each port has the capability bit-masks to specify the access capability of the port from other clients. The capability bit flags are defined as follows:
-
-* SND_SEQ_PORT_CAP_READ Readable from this port
-* SND_SEQ_PORT_CAP_WRITE Writable to this port.
-* SND_SEQ_PORT_CAP_SYNC_READ For synchronization (not implemented)
-* SND_SEQ_PORT_CAP_SYNC_WRITE For synchronization (not implemented)
-* SND_SEQ_PORT_CAP_DUPLEX Read/write duplex access is supported
-* SND_SEQ_PORT_CAP_SUBS_READ Read subscription is allowed
-* SND_SEQ_PORT_CAP_SUBS_WRITE Write subscription is allowed
-* SND_SEQ_PORT_CAP_NO_EXPORT Subscription management from 3rd client is disallowed
-
-Each port has also the type bitmasks defined as follows:
-
-* SND_SEQ_PORT_TYPE_SPECIFIC Hardware specific port
-* SND_SEQ_PORT_TYPE_MIDI_GENERIC Generic MIDI device
-* SND_SEQ_PORT_TYPE_MIDI_GM General MIDI compatible device
-* SND_SEQ_PORT_TYPE_MIDI_GM2 General MIDI 2 compatible device
-* SND_SEQ_PORT_TYPE_MIDI_GS GS compatible device
-* SND_SEQ_PORT_TYPE_MIDI_XG XG compatible device
-* SND_SEQ_PORT_TYPE_MIDI_MT32 MT-32 compatible device
-* SND_SEQ_PORT_TYPE_HARDWARE Implemented in hardware
-* SND_SEQ_PORT_TYPE_SOFTWARE Implemented in software
-* SND_SEQ_PORT_TYPE_SYNTHESIZER Generates sound
-* SND_SEQ_PORT_TYPE_PORT Connects to other device(s)
-* SND_SEQ_PORT_TYPE_APPLICATION Application (sequencer/editor)
-
+See #create_port.
 */
-
 static VALUE
 wrap_snd_seq_create_simple_port(VALUE v_seq, VALUE v_name, VALUE v_caps, VALUE v_type)
 {
@@ -268,19 +239,20 @@ wrap_snd_seq_create_simple_port(VALUE v_seq, VALUE v_name, VALUE v_caps, VALUE v
   return INT2NUM(r);
 }
 
-/*
-int AlsaSequencer_i#delete_simple_port(port)
+/* int delete_simple_port(port)
 delete the port
+
 Parameters:
-port    port id
-Returns:
-nil on success or negative error code
+  [port] portid or MidiPort
+
+Returns nil on success or negative error code
 */
 static VALUE
 wrap_snd_seq_delete_simple_port(VALUE v_seq, VALUE v_portid)
 {
   snd_seq_t *seq;
   Data_Get_Struct(v_seq, snd_seq_t, seq);
+  RRTS_DEREF_DIRTY(v_portid, @port);
 #if defined(DUMP_API)
   fprintf(DUMP_STREAM, "snd_seq_delete_simple_port(%p, %d)\n", seq, NUM2INT(v_portid));
 #endif
@@ -288,21 +260,21 @@ wrap_snd_seq_delete_simple_port(VALUE v_seq, VALUE v_portid)
   return r ? INT2NUM(r) : Qnil;
 }
 
-/*
-int AlsaSequencer_i#delete_port  port
+/* int delete_port  port
 
 delete a sequencer port on the current client
 
 Parameters:
-  port    port to be deleted
+  [port]    portid or MidiPort to be deleted
 
-Returns: 0 on success, a negative errorcode otherwise
+Returns: nil on success, a negative errorcode otherwise
 */
 static VALUE
 wrap_snd_seq_delete_port(VALUE v_seq, VALUE v_portid)
 {
   snd_seq_t *seq;
   Data_Get_Struct(v_seq, snd_seq_t, seq);
+  RRTS_DEREF_DIRTY(v_portid, @port);
 #if defined(DUMP_API)
   fprintf(DUMP_STREAM, "snd_seq_delete_port(%p, %d)\n", seq, NUM2INT(v_portid));
 #endif
@@ -310,22 +282,27 @@ wrap_snd_seq_delete_port(VALUE v_seq, VALUE v_portid)
   return r ? INT2NUM(r) : Qnil; // C++ rule, do not raise exceptions on destructors
 }
 
-/* event, more event_input
+/* [AlsaMidiEvent_i, more] event_input
 retrieve an event from sequencer
 
-Returns:
+Obtains an input event from sequencer.
+This function firstly receives the event byte-stream data from sequencer as much as
+possible at once. Then it retrieves the first event record and store the pointer on ev.
+By calling this function sequentially, events are extracted from the input buffer.
+If there is no input from sequencer, function falls into sleep in blocking mode until
+an event is received, or returns nil in non-blocking mode. Occasionally, it may raise
+the ENOSPC SystemError. This means that the input FIFO of sequencer overran,
+and some events are lost. Once this error is returned, the input FIFO is cleared automatically.
 
-Obtains an input event from sequencer. The event is created via snd_seq_create_event(), and its pointer is stored on ev argument.
-This function firstly receives the event byte-stream data from sequencer as much as possible at once. Then it retrieves
-the first event record and store the pointer on ev. By calling this function sequentially, events are extracted from
-the input buffer.
-If there is no input from sequencer, function falls into sleep in blocking mode until an event is received,
-or returns nil in non-blocking mode. Occasionally, it may raise ENOSPC error. This means that the input
-FIFO of sequencer overran, and some events are lost. Once this error is returned, the input FIFO is cleared automatically.
-
-Function returns the event plus a boolean indicating more bytes remain in the input buffer
-Application can determine from the returned value whether to call input once more or not,
+Function returns the event plus a boolean indicating more bytes remain in the input buffer.
+It may also return nil in nonblocking mode.
+An application can determine from the returned value whether to call input once more or not,
 if there's more data it will probably(!) not block, even in blocking mode.
+
+===== Multithreading
+The caller should make note that ruby will block if a C-call blocks.  It would be wise
+to create a separate thread for reading notes if blocking mode is active.
+TODO: actually do this for Sequencer.  It is all still a bit experimental.
 */
 static VALUE
 wrap_snd_seq_event_input(VALUE v_seq)
@@ -337,7 +314,8 @@ wrap_snd_seq_event_input(VALUE v_seq)
   fprintf(DUMP_STREAM, "snd_seq_event_input(%p, null)\n", seq);
 #endif
   int r = snd_seq_event_input(seq, &ev);
-  // according to mailing lists, these need NOT be freed. And it can't even since event_free is deprecated
+  // according to mailing lists, these must NOT be freed.
+  // And it can't even since event_free is deprecated
   if (r < 0)
     {
       VALUE cls = alsaMidiError;
@@ -353,7 +331,8 @@ wrap_snd_seq_event_input(VALUE v_seq)
       ev = 0;
     }
 //   fprintf(stderr, __FILE__":%d:event_input -> %p\n", __LINE__, ev);
-  return rb_ary_new3(2, Data_Wrap_Struct(alsaMidiEventClass, 0/*mark*/, 0/*free*/, ev), INT2BOOL(r > 0));
+  return rb_ary_new3(2, Data_Wrap_Struct(alsaMidiEventClass, 0/*mark*/, 0/*free*/, ev),
+                     INT2BOOL(r > 0));
 }
 
 static void
@@ -369,9 +348,16 @@ DUMP_EVENT(snd_seq_event_t *ev, int line)
 }
 
 typedef int (output_method)(snd_seq_t *, snd_seq_event_t *);
+enum EOutput { Normal, Direct, Buffer, NrofMethods };
+
+static const output_method *dispatch[NrofMethods] = {
+  &snd_seq_event_output,
+  &snd_seq_event_output_direct,
+  &snd_seq_event_output_buffer
+};
 
 // returns remaining nr of events (>=0)
-static inline VALUE do_event_output(snd_seq_t *seq, snd_seq_event_t *ev, output_method *func)
+static inline VALUE do_event_output(snd_seq_t *seq, snd_seq_event_t *ev, VALUE v_func)
 {
 //   fprintf(stderr, "***do_event_output tp=%d, ch=%d, source.client=%d,flags=%d\n", ev->type, snd_seq_ev_is_note_type(ev) ? ev->data.note.channel : snd_seq_ev_is_control_type(ev) ? ev->data.control.channel : -1, ev->source.client, ev->flags);
 #if defined(DEBUG)
@@ -381,7 +367,12 @@ static inline VALUE do_event_output(snd_seq_t *seq, snd_seq_event_t *ev, output_
       return INT2NUM(0);
     }
 #endif
-  const int r = (*func)(seq, ev);
+#if defined(DUMP_API)
+  fprintf(DUMP_STREAM, "snd_seq_event_output*(%p, %p)\n", seq, ev);
+#endif
+  fprintf(stderr, "block when queue is full? %ld\n", time(0));
+  const int r = (*dispatch[NUM2INT(v_func)])(seq, ev);
+  fprintf(stderr, "-> %d, %ld\n", r, time(0));
   if (r < 0)
     {
       if (r == -EINVAL)
@@ -408,31 +399,30 @@ WRITE_CHANNEL_IN_EVENT(snd_seq_event_t &ev, VALUE v_channel)
     ev.data.control.channel = (NUM2INT(v_channel) - 1) & 0xf;
 }
 
-static output_method *SENDCALLBACK_OUTPUTMETHOD_HACKFUNC = 0;
-
-static VALUE  // callback for rb_iterate, val3 = seq+ev+retval
-send_callback(VALUE v_channel, VALUE v_val3)
+static VALUE  // callback for rb_iterate, val4 = seq+ev+retval+EOutput
+send_callback(VALUE v_channel, VALUE v_val4)
 {
 //   fprintf(stderr, "%s:%d: in send_callback\n", __FILE__, __LINE__);
-  rb_check_type(v_val3, T_ARRAY);
-  VALUE v_seq = rb_ary_entry(v_val3, 0);
-  VALUE v_ev = rb_ary_entry(v_val3, 1);
+  // rb_check_type(v_val4, T_ARRAY); We control this
+  VALUE v_seq = rb_ary_entry(v_val4, 0);
+  VALUE v_ev = rb_ary_entry(v_val4, 1);
+  VALUE v_outfunc  = rb_ary_entry(v_val4, 3);
   snd_seq_event_t *ev;
   Data_Get_Struct(v_ev, snd_seq_event_t, ev);
   snd_seq_t *seq;
   Data_Get_Struct(v_seq, snd_seq_t, seq);
 //   fprintf(stderr, "%s:%d: in send_callback\n", __FILE__, __LINE__);
   WRITE_CHANNEL_IN_EVENT(*ev, v_channel);
-  VALUE v_retval = do_event_output(seq, ev, SENDCALLBACK_OUTPUTMETHOD_HACKFUNC);
+  VALUE v_retval = do_event_output(seq, ev, NUM2INT(v_outfunc));
 //   fprintf(stderr, "%s:%d: in send_callback\n", __FILE__, __LINE__);
-  rb_ary_store(v_val3, 2, v_retval);
+  rb_ary_store(v_val4, 2, v_retval);
   return Qnil;
 }
 
 // v_ev is a MidiEvent!
 static VALUE
 do_event_output(bool ch_ref, snd_seq_t *seq, VALUE v_seq, VALUE v_ev, snd_seq_event_t &ev,
-                output_method func)
+                VALUE v_func)
 {
   if (ch_ref) // but no longer used. Bit of heuristics instead
     {
@@ -442,19 +432,16 @@ do_event_output(bool ch_ref, snd_seq_t *seq, VALUE v_seq, VALUE v_ev, snd_seq_ev
 //           fprintf(stderr, "@channel.respond_to?(:each)!!!\n");
           VALUE vev = Data_Wrap_Struct(alsaMidiEventClass, 0/*mark*/, 0/*free*/, &ev);
           VALUE retval = Qnil;
-          VALUE val3 = rb_ary_new3(3, v_seq, vev, retval);
+          VALUE val4 = rb_ary_new3(4, v_seq, vev, retval, v_func);
           // I hope this cast is valid?
 //           fprintf(stderr, "callng rb_iterate on v_channel\n");
-// FIXME: Not thread safe....
-          SENDCALLBACK_OUTPUTMETHOD_HACKFUNC = func;
-          rb_iterate(rb_each, v_channel, (VALUE (*)(...))send_callback, val3);
-          SENDCALLBACK_OUTPUTMETHOD_HACKFUNC = 0;
+          rb_iterate(rb_each, v_channel, (VALUE (*)(...))send_callback, val4);
           // return r; This is the enum!! (so v_channel)
-          return rb_ary_entry(val3, 2);
+          return rb_ary_entry(val4, 2);
         }
       WRITE_CHANNEL_IN_EVENT(ev, v_channel);
     }
-  VALUE r = do_event_output(seq, &ev, func);
+  VALUE r = do_event_output(seq, &ev, v_func);
 //   fprintf(stderr, "did do_event_output\n");
   return r;
 }
@@ -543,27 +530,12 @@ static uint decode_a_note(const char *pat)
   return (pat[i] - '0') * 12 + base;
 }
 
-/*
-int AlsaSequencer_i#event_output(ev)
-
-output an event
-
-Parameters:
-              ev      AlsaMidiEvent_i or MidiEvent to be output
-
-Returns:
-  the number of remaining events
-
-An event is once expanded on the output buffer. The output buffer will be drained automatically if it becomes full.
-
-If events remain unprocessed on output buffer before drained, the size of total byte data on output buffer is
-returned. If the output buffer is empty, this returns zero.
-*/
 static VALUE
-wrap_snd_seq_event_output_func(VALUE v_seq, VALUE v_ev, output_method func)
+wrap_snd_seq_event_output_func(VALUE v_seq, VALUE v_ev, EOutput func)
 {
   snd_seq_t *seq;
   Data_Get_Struct(v_seq, snd_seq_t, seq);
+  VALUE v_func = INT2NUM(func);
   // Now it's gonna be hairy. v_ev might be a MidiEvent descendant and not 'Data'.
   const ID id_MidiEvent = rb_intern("MidiEvent");
   if (rb_const_defined(rb_mKernel, id_MidiEvent))
@@ -696,7 +668,7 @@ wrap_snd_seq_event_output_func(VALUE v_seq, VALUE v_ev, output_method func)
                           }
                       }
                     ev.data.control.value = msb;
-                    do_event_output(ch_ref, seq, v_seq, v_ev, ev, func);
+                    do_event_output(ch_ref, seq, v_seq, v_ev, ev, v_func);
 //             fprintf(stderr, "%s:%d: CONTROLLER(param=%u,value=%d)\n", __FILE__,__LINE__, lsb_version, lsb);
                     ev.data.control.param = lsb_version;
                     value = lsb;
@@ -728,10 +700,10 @@ wrap_snd_seq_event_output_func(VALUE v_seq, VALUE v_ev, output_method func)
                         ev_bank.type = SND_SEQ_EVENT_CONTROLLER;
                         ev_bank.data.control.param = MIDI_CTL_MSB_BANK;
                         ev_bank.data.control.value = msb;
-                        do_event_output(ch_ref, seq, v_seq, v_ev, ev_bank, func);
+                        do_event_output(ch_ref, seq, v_seq, v_ev, ev_bank, v_func);
                         ev_bank.data.control.param = MIDI_CTL_LSB_BANK;
                         ev_bank.data.control.value = lsb;
-                        do_event_output(ch_ref, seq, v_seq, v_ev, ev_bank, func);
+                        do_event_output(ch_ref, seq, v_seq, v_ev, ev_bank, v_func);
                       }
                   }
                 ev.data.control.value = value;
@@ -804,41 +776,64 @@ wrap_snd_seq_event_output_func(VALUE v_seq, VALUE v_ev, output_method func)
               RAISE_MIDI_ERROR_FMT1("invalid/unsupported type %d", ev.type);
               break;
             }
-          return do_event_output(ch_ref, seq, v_seq, v_ev, ev, func);
+          return do_event_output(ch_ref, seq, v_seq, v_ev, ev, v_func);
         }
     }
   snd_seq_event_t *ev;
   Data_Get_Struct(v_ev, snd_seq_event_t, ev);
-#if defined(DUMP_API)
-  fprintf(DUMP_STREAM, "snd_seq_event_output(%p, %p)\n", seq, ev);
-#endif
-  return do_event_output(seq, ev, func);
+  return do_event_output(seq, ev, v_func);
 }
 
+/* int event_output(event)
+
+output an event
+
+Parameters:
+[event] AlsaMidiEvent_i or MidiEvent to be output
+
+Returns the number of remaining events.
+
+An event is once expanded on the output buffer. The output buffer will be
+drained (flushed) automatically if it becomes full.  However, this may still block the
+process (and ruby) if the other side does not read fast enough. For this problem, see
+also #event_input.
+
+If events remain unprocessed on the output buffer before drained, the size of total
+byte data on output buffer is returned. If the output buffer is empty, this returns zero.
+
+You can assume that the event can be freed after calling this method, even if it contains
+dynamic data (sysex/variable).
+*/
 static VALUE
 wrap_snd_seq_event_output(VALUE v_seq, VALUE v_ev)
 {
-  return wrap_snd_seq_event_output_func(v_seq, v_ev, snd_seq_event_output);
+  return wrap_snd_seq_event_output_func(v_seq, v_ev, Normal);
 }
 
+/* int event_output_buffer(event)
+See #event_output. The same, but the buffer is not flushed when becoming full.
+*/
 static VALUE
 wrap_snd_seq_event_output_buffer(VALUE v_seq, VALUE v_ev)
 {
-  return wrap_snd_seq_event_output_func(v_seq, v_ev, snd_seq_event_output_buffer);
+  return wrap_snd_seq_event_output_func(v_seq, v_ev, Buffer);
 }
 
+/* int event_output_direct(event)
+See #event_output. The same, except no buffer is used and timestamping is impossible.
+*/
 static VALUE
 wrap_snd_seq_event_output_direct(VALUE v_seq, VALUE v_ev)
 {
-  return wrap_snd_seq_event_output_func(v_seq, v_ev, snd_seq_event_output_direct);
+  return wrap_snd_seq_event_output_func(v_seq, v_ev, Direct);
 }
 
-/*
-bool AlsaSequencer_i#query_next_client(info)
-query the next client
+/* bool query_next_client(clientinfo)
 Parameters:
-info    query pattern and result
-Queries the next client. The search begins at the client with an id one greater than client field in info.
+  [clientinfo] query pattern and result
+
+Queries the next client. The search begins at the client with an id one greater
+than client field in info.
 If a client is found, its attributes are stored in info, and true is returned.
 If not found (-ENOENT I hope) false is returned.
 Otherwise an AlsaMidiError is raised
@@ -859,15 +854,15 @@ wrap_snd_seq_query_next_client(VALUE v_seq, VALUE v_client_info)
   return Qtrue;
 }
 
-/*
-bool AlsaSequencer_i#query_next_port info
-query the next matching port
+/* bool query_next_port(portinfo)
 Parameters:
-info    query pattern and result
-Queries the next matching port on the client specified in info argument. The search begins at the next port specified in
-port field of info argument. For finding the first port at a certain client, give -1.
-If a matching port is found, its attributes are stored on info and function returns true. Otherwise,
-false.
+  [portinfo]  query pattern and result
+
+Queries the next matching port on the client specified in info argument. The search
+begins at the next port specified in port field of info argument.
+For finding the first port at a certain client, give -1.
+If a matching port is found, its attributes are stored on info and function returns true
+and false otherwise.
 */
 static VALUE
 wrap_snd_seq_query_next_port(VALUE v_seq, VALUE v_port_info)
@@ -882,17 +877,15 @@ wrap_snd_seq_query_next_port(VALUE v_seq, VALUE v_port_info)
   return Qtrue;
 }
 
-/*
-int AlsaSequencer_i#alloc_named_queue   name
+/* int alloc_named_queue(name)
 
 allocate a queue with the specified name.
 According to aplaymidi.c this queue is locked (which is just fine)
 
- Parameters:
-   name    the name of the new queue
+Parameters:
+   [name] the name of the new queue
 
- Returns:
-   the queue id (zero or positive) on success
+Returns the queue id (zero or positive) on success, throws AlsaMidiError otherwise
 */
 static VALUE
 wrap_snd_seq_alloc_named_queue(VALUE v_seq, VALUE v_name)
@@ -904,12 +897,12 @@ wrap_snd_seq_alloc_named_queue(VALUE v_seq, VALUE v_name)
   return INT2NUM(r);
 }
 
-/*
-sub AlsaSequencer_i#subscribe_port sub
-subscribe a port connection
+/* subinfo subscribe_port(subinfo)
 Parameters:
-sub     subscription information
-Subscribes a connection between two ports. The subscription information is stored in sub argument.
+  [subinfo] subscription information
+
+Subscribes a connection between two ports. The subscription information is stored in
+the subinfo argument (returned as well)
 */
 static VALUE
 wrap_snd_seq_subscribe_port(VALUE v_seq, VALUE v_port_subs)
@@ -926,7 +919,8 @@ wrap_snd_seq_subscribe_port(VALUE v_seq, VALUE v_port_subs)
   return v_port_subs;
 }
 
-/* int AlsaSequencer_i#unsubscribe_port(port_sub)
+/* int unsubscribe_port(port_sub)
+Returns nil if OK, otherwise negative errorcode. Reverse of subscribing.
 */
 static VALUE
 wrap_snd_seq_unsubscribe_port(VALUE v_seq, VALUE v_port_subs)
@@ -946,40 +940,15 @@ wrap_snd_seq_unsubscribe_port(VALUE v_seq, VALUE v_port_subs)
 VALUE v_myportid, v_##prefix##_clientid, v_##prefix##_portid; \
 rb_scan_args(argc, v_params, "21", &v_myportid, &v_##prefix##_clientid, &v_##prefix##_portid); \
 solve_address(v_##prefix##_clientid, v_##prefix##_portid); \
-RRTS_DEREF(v_myportid, port)
+RRTS_DEREF_DIRTY(v_myportid, @port)
 
-/*
-AlsaSequencer_i#connect_from(myport, src_client, src_port)
-AlsaSequencer_i#connect_from(myport, [src_client, src_port])
+/* self connect_to(myport, dest_address)
 simple subscription (w/o exclusive & time conversion)
-Parameters:
-myport  the port id as receiver, or the MidiPort (something with a 'port' method)
-src_client      sender client id
-src_port        sender port id
-Connect from the given sender client:port to the given destination port in the current client.
-*/
-// where destclient = current client, and myportid = dstportid
-static VALUE
-wrap_snd_seq_connect_from(int argc, VALUE *v_params, VALUE v_seq)
-{
-//   fprintf(stderr, "connect_from(argc=%d)\n", argc);
-  FETCH_CONNECTION_ADDRESSES(src);
-  snd_seq_t *seq;
-  Data_Get_Struct(v_seq, snd_seq_t, seq);
-  const int src_cid = NUM2INT(v_src_clientid), src_pid = NUM2INT(v_src_portid);
-  const int r = snd_seq_connect_from(seq, NUM2INT(v_myportid), src_cid, src_pid);
-  if (r) RAISE_MIDI_ERROR_FMT3("cannot connect from port %d:%d - %s", src_cid, src_pid, snd_strerror(r));
-  return Qnil;
-}
 
-/*
-AlsaSequencer_i#connect_to(myport, dest_client, dest_port)
-AlsaSequencer_i#connect_to(myport, [dest_client, dest_port])
-simple subscription (w/o exclusive & time conversion)
 Parameters:
-myport  the port id as sender, but it may also respond to :port
-dest_client     destination client id
-dest_port       destination port id
+  [myport]       the portid or MidiPort as sender
+  [dest_address] a tuple, or two single arguments as client + port, or a MidiPort
+
 Connect from the given receiver port in the current client to the given destination client:port.
 */
 static VALUE
@@ -991,12 +960,29 @@ wrap_snd_seq_connect_to(int argc, VALUE *v_params, VALUE v_seq)
   const int dest_cid = NUM2INT(v_dest_clientid), dest_pid = NUM2INT(v_dest_portid);
   const int r = snd_seq_connect_to(seq, NUM2INT(v_myportid), dest_cid, dest_pid);
   if (r) RAISE_MIDI_ERROR_FMT3("cannot connect to port %d:%d - %s", dest_cid, dest_pid, snd_strerror(r));
-  return Qnil;
+  return v_seq;
 }
 
-/*
-AlsaSequencer_i#disconnect_from(myport, src_client, src_port)
-AlsaSequencer_i#disconnect_from(myport, [src_client, src_port])
+/* connect_from(myport, source_address)
+Connect from the given sender client:port to the given destination port in the current client.
+See #connect_to
+*/
+static VALUE
+wrap_snd_seq_connect_from(int argc, VALUE *v_params, VALUE v_seq)
+{
+  //   fprintf(stderr, "connect_from(argc=%d)\n", argc);
+  FETCH_CONNECTION_ADDRESSES(src);
+  snd_seq_t *seq;
+  Data_Get_Struct(v_seq, snd_seq_t, seq);
+  const int src_cid = NUM2INT(v_src_clientid), src_pid = NUM2INT(v_src_portid);
+  const int r = snd_seq_connect_from(seq, NUM2INT(v_myportid), src_cid, src_pid);
+  if (r) RAISE_MIDI_ERROR_FMT3("cannot connect from port %d:%d - %s", src_cid, src_pid, snd_strerror(r));
+  return v_seq;
+}
+
+/* int disconnect_from(myport, source_address)
+See #connect_to
+Returns nil if OK, otherwise negative errorcode
 */
 static VALUE
 wrap_snd_seq_disconnect_from(int argc, VALUE *v_params, VALUE v_seq)
@@ -1008,9 +994,8 @@ wrap_snd_seq_disconnect_from(int argc, VALUE *v_params, VALUE v_seq)
   return r ? INT2NUM(r) : Qnil;
 }
 
-/*
-AlsaSequencer_i#disconnect_to(myport, dest_client, dest_port)
-AlsaSequencer_i#disconnect_to(myport, [dest_client, dest_port])
+/* int disconnect_to(myport, dest_address)
+See also #disconnect_from
 */
 static VALUE
 wrap_snd_seq_disconnect_to(int argc, VALUE *v_params, VALUE v_seq)
@@ -1022,19 +1007,21 @@ wrap_snd_seq_disconnect_to(int argc, VALUE *v_params, VALUE v_seq)
   return r ? INT2NUM(r) : Qnil;
 }
 
-/*
-clientid, portid AlsaSequencer_i::parse_address(addr, arg)
+/* [clientid, portid] parse_address(arg)
 parse the given string and get the sequencer address
+
 Parameters:
-addr    the address pointer to be returned
-arg     the string to be parsed
-Returns:
-clientid + portid on success or it raises a AlsaMidiError
+  [arg] the string to be parsed
+
+Returns clientid + portid on success or it raises a AlsaMidiError.
+
 This function parses the sequencer client and port numbers from the given string.
-The client and port tokes are separated by either colon or period, e.g. 128:1. When seq is not NULL,
-the function accepts also a client name not only digit numbers.
+The client and port tokes are separated by either colon or period, e.g. 128:1.
+The function accepts also a client name not only digit numbers.
 
 The arguments could be '20:2' or 'MIDI2:0' etc.  Portnames are not understood!
+
+See Driver#parse_address
 */
 static VALUE
 wrap_snd_seq_parse_address(VALUE v_seq, VALUE v_arg)
@@ -1048,10 +1035,10 @@ wrap_snd_seq_parse_address(VALUE v_seq, VALUE v_arg)
   return rb_ary_new3(2, INT2NUM(ret.client), INT2NUM(ret.port));
 }
 
-/*
-AlsaSequencer_i#sync_output_queue
+/* self sync_output_queue
 wait until all events are processed
-This function waits until all events of this client are processed.
+This function waits (blocks) until all events of this client are processed.
+See the note on blocking ruby at #event_output
 */
 static VALUE
 wrap_snd_seq_sync_output_queue(VALUE v_seq)
@@ -1062,17 +1049,17 @@ wrap_snd_seq_sync_output_queue(VALUE v_seq)
   // According to the CRAPPY docs this should return 0 or negative errorcode.
   // However it apparently can also return 1. I hope it's OK.
   if (r < 0) RAISE_MIDI_ERROR("syncing output queue", r);
-  return Qnil;
+  return v_seq;
 }
 
-/*
-int AlsaSequencer_i#drain_output
+/* int drain_output
 drain output buffer to sequencer
-Returns:
-0 when all events are drained and sent to sequencer. When events
-still remain on the buffer, the byte size of remaining events are returned. On error a AlsaMidiError is raised.
-This function drains all pending events on the output buffer. The function returns immediately after
-the events are sent to the queues regardless whether the events are processed or not. To get synchronization with the
+Returns 0 when all events are drained and sent to sequencer. When events
+still remain on the buffer, the byte size of remaining events are returned.
+On error a AlsaMidiError is raised.
+This function drains all pending events on the output buffer.
+The function returns immediately after the events are sent to the queues regardless
+whether the events are processed or not. To get synchronization with the
 all event processes, use sync_output_queue after calling this function.
 */
 static VALUE
@@ -1085,18 +1072,20 @@ wrap_snd_seq_drain_output(VALUE v_seq)
   return INT2NUM(r);
 }
 
-/*
-int AlsaSequencer_i#input_pending(fetch_sequencer_fifo = true)
+/* int input_pending(fetch_sequencer_fifo = true)
 
  check events in input buffer
 
- Returns:
-  the byte size of remaining input events on input buffer.
+ Returns the byte size of remaining input events on input buffer.
 
- If events remain on the input buffer of user-space, function returns the total byte size of events on it.
- If fetch_sequencer_fifo argument is true, this function checks the presence of events on sequencer FIFO
- When events exist, they are transferred to the input buffer, and the number of received events are returned.
- If fetch_sequencer argument is zero and no events remain on the input buffer, function simply returns zero.
+ If events remain on the input buffer of user-space, function returns the
+ total byte size of events on it.
+ If fetch_sequencer_fifo argument is true, this function checks the presence of
+ events on sequencer FIFO.
+ When events exist, they are transferred to the input buffer, and the number of
+ received events are returned.
+ If fetch_sequencer argument is zero and no events remain on the input buffer,
+ the function simply returns zero.
 */
 static VALUE
 wrap_snd_seq_event_input_pending(int argc, VALUE *v_params, VALUE v_seq)
@@ -1108,10 +1097,8 @@ wrap_snd_seq_event_input_pending(int argc, VALUE *v_params, VALUE v_seq)
   return INT2NUM(snd_seq_event_input_pending(seq, NIL_P(v_fetchseq) ? 1 : NUM2INT(v_fetchseq)));
 }
 
-/*
-AlsaSequencer_i#drop_input
-clear input buffer and and remove events in sequencer queue
-
+/* self drop_input
+clear the input buffer and and remove all events in the sequencer queue
 */
 static VALUE
 wrap_snd_seq_drop_input(VALUE v_seq)
@@ -1119,14 +1106,12 @@ wrap_snd_seq_drop_input(VALUE v_seq)
   snd_seq_t *seq;
   Data_Get_Struct(v_seq, snd_seq_t, seq);
   snd_seq_drop_input(seq);
-  return Qnil;
+  return v_seq;
 }
 
-/*
-nil AlsaSequencer_i#drop_input_buffer
+/* self drop_input_buffer
 
 remove all events on user-space input FIFO
-
 */
 static VALUE
 wrap_snd_seq_drop_input_buffer(VALUE v_seq)
@@ -1134,17 +1119,16 @@ wrap_snd_seq_drop_input_buffer(VALUE v_seq)
   snd_seq_t *seq;
   Data_Get_Struct(v_seq, snd_seq_t, seq);
   snd_seq_drop_input_buffer(seq);
-  return Qnil;
+  return v_seq;
 }
 
-/*
-self AlsaSequencer_i#set_queue_info(qid, info)
+/* self set_queue_info(queue, info)
 
 change the queue attributes
 
-                                        Parameters:
-                                        qid       queue id to change
-                                        info    information changed
+Parameters:
+  queue   queueid or MidiQueue to change
+  info    information changed
 */
 static VALUE
 wrap_snd_seq_set_queue_info(VALUE v_seq, VALUE v_qid, VALUE v_qi)
@@ -1153,6 +1137,7 @@ wrap_snd_seq_set_queue_info(VALUE v_seq, VALUE v_qid, VALUE v_qi)
   Data_Get_Struct(v_seq, snd_seq_t, seq);
   snd_seq_queue_info_t *qi;
   Data_Get_Struct(v_qi, snd_seq_queue_info_t, qi);
+  RRTS_DEREF_DIRTY(v_qid, @id);
 #if defined(DUMP_API)
   fprintf(DUMP_STREAM, "snd_seq_set_queue_info(%p, %d, %p)\n", seq, NUM2INT(v_qid), qi);
 #endif
@@ -1161,15 +1146,13 @@ wrap_snd_seq_set_queue_info(VALUE v_seq, VALUE v_qid, VALUE v_qi)
   return v_seq;
 }
 
-/*
-self AlsaSequencer_i#set_queue_tempo(q, tempo)
+/* self set_queue_tempo(queue, tempo)
 
 set the tempo of the queue
 
-                                        Parameters:
-                                        q       queue id to change the tempo
-                                        tempo   tempo information
-
+Parameters:
+  [queue] queueid or MidiQueue to change the tempo
+  [tempo] AlsaQueueTempo_i or Tempo instance
 */
 static VALUE
 wrap_snd_seq_set_queue_tempo(VALUE v_seq, VALUE v_qid, VALUE v_tempo)
@@ -1190,16 +1173,15 @@ wrap_snd_seq_set_queue_tempo(VALUE v_seq, VALUE v_qid, VALUE v_tempo)
   return v_seq;
 }
 
-/*
-info AlsaSequencer_i#queue_info q [, info]
+/* AlsaQueueInfo_i queue_info q [, info]
 
 obtain queue attributes
 
 Parameters:
-  q       queue id to query
-  info    room for information returned
+  [q]     queueid or MidiQueue to query
+  [info] room for information returned, if omitted it is allocated
 
-Returns: info
+Returns info
 */
 static VALUE
 wrap_snd_seq_get_queue_info(int argc, VALUE *v_params, VALUE v_seq)
@@ -1217,20 +1199,21 @@ wrap_snd_seq_get_queue_info(int argc, VALUE *v_params, VALUE v_seq)
     }
   else
       Data_Get_Struct(v_qi, snd_seq_queue_info_t, qi);
+  RRTS_DEREF_DIRTY(v_qid, @id);
   const int r = snd_seq_get_queue_info(seq, NUM2INT(v_qid), qi);
   if (r < 0) RAISE_MIDI_ERROR("retrieving queue info", r);
   return v_qi;
 }
 
-/* self AlsaSequencer_i#remove_events  remove_event_descriptor
+/* self remove_events([remove_event_descriptor])
 
 remove events on input/output buffers and pools
 
 Parameters:
-  rmp     remove event container. If nil is passed all output events except OFFS are erased.
+  [remove_events_descriptor] remove event container.
+                             If omitted all output events except OFFS are erased.
 
 Removes matching events with the given condition from input/output buffers and pools.
-The removal condition is specified in rmp argument.
 This can be used to erase events that are currently underway, parked in qeueus etc.
 Use it to cleanly exit a process
 */
@@ -1257,16 +1240,15 @@ wrap_snd_seq_remove_events(int argc, VALUE *argv, VALUE v_seq)
   return v_seq;
 }
 
-/*
-int AlsaSequencer_i#create_queue info
+/* int create_queue(queueinfo)
 
 create a queue
 
 Parameters:
-         info    queue information to initialize
+   [queueinfo]  AlsaQueueInfo_i instance used to initialize
 
-Returns:
-  the queue id (zero or positive) on success
+Returns the queue id (zero or positive) on success or raise AlsaMidiError.
+The queue should be freed using #free_queue.
 */
 static VALUE
 wrap_snd_seq_create_queue(VALUE v_seq, VALUE v_qi)
@@ -1283,12 +1265,14 @@ wrap_snd_seq_create_queue(VALUE v_seq, VALUE v_qi)
   return INT2NUM(r);
 }
 
-// int free_queue(qid)
+/* int free_queue(queue)
+*/
 static VALUE
 wrap_snd_seq_free_queue(VALUE v_seq, VALUE v_qid)
 {
   snd_seq_t *seq;
   Data_Get_Struct(v_seq, snd_seq_t, seq);
+  RRTS_DEREF_DIRTY(v_qid, @id);
 #if defined(DUMP_API)
   fprintf(DUMP_STREAM, "snd_seq_free_queue(%p, %d)\n", seq, NUM2INT(v_qid));
 #endif
@@ -1296,17 +1280,11 @@ wrap_snd_seq_free_queue(VALUE v_seq, VALUE v_qid)
   return r < 0 ? INT2NUM(r) : Qnil;
 }
 
-/*
-int AlsaSequencer_i#query_named_queue   name
+/* int query_named_queue(name)
+  Parameters:
+    [name]    the queuename to locate
 
-                                        query the matching queue with the specified name
-
-                                        Parameters:
-                                        name    the name string to query
-
-                                        Returns:
-                                        the queue id if found or nil if not found.  (FIXME!!!)
-                                        Searches the matching queue with the specified name string.
+  Returns the queueid of the queue with given name or else nil.
 */
 static VALUE
 wrap_snd_seq_query_named_queue(VALUE v_seq, VALUE v_name)
@@ -1314,20 +1292,19 @@ wrap_snd_seq_query_named_queue(VALUE v_seq, VALUE v_name)
   snd_seq_t *seq;
   Data_Get_Struct(v_seq, snd_seq_t, seq);
   const int r = snd_seq_query_named_queue(seq, RSTRING_PTR(v_name));
-  if (r == -ENOENT) /* ?????????????????????? FIXME */ return Qnil;
+  if (r == -EINVAL) return Qnil;
   if (r < 0) RAISE_MIDI_ERROR("queue query", r);
   return INT2NUM(r);
 }
 
-/*
-self AlsaSequencer_i#start_queue q
-== snd_seq_control_queue(seq, q, SND_SEQ_EVENT_START, 0[, ev = NULL])
-
+/* self start_queue(queue)
 start the specified queue
 
 Parameters:
-q       queue id to start or the MidiQueue
-ev      optional event record (see snd_seq_control_queue)   CURRENTLY NOT SUPPORTED!
+  [queue] queueid or MidiQueue to start
+  [ev]    optional event record (see snd_seq_control_queue)   CURRENTLY NOT SUPPORTED!
+
+See also MidiQueue#start
 */
 static VALUE
 wrap_snd_seq_start_queue(VALUE v_seq, VALUE v_qid)
@@ -1342,7 +1319,10 @@ wrap_snd_seq_start_queue(VALUE v_seq, VALUE v_qid)
   return v_seq;
 }
 
-// AlsaSequencer_i#stop_queue qid
+/* self stop_queue(q)
+
+See #start_queue
+*/
 static VALUE
 wrap_snd_seq_stop_queue(VALUE v_seq, VALUE v_qid)
 {
@@ -1352,18 +1332,17 @@ wrap_snd_seq_stop_queue(VALUE v_seq, VALUE v_qid)
   return Qnil;
 }
 
-
-
-/*
-status AlsaSequencer_i#queue_status    q [, status ]
+/* AlsaQueueStatus_i queue_status(q [, status ])
 
 obtain the running state of the queue
 
 Parameters:
-  q       queue id to query
-  status  pointer to store the current status
+  [q]      queueid or MidiQueue to query
+  [status] pointer to store the current status
 
 Returns: status
+
+If the +status+ parameter is omitted a new one is allocated
 */
 static VALUE
 wrap_snd_seq_get_queue_status(int argc, VALUE *v_params, VALUE v_seq)
@@ -1386,21 +1365,15 @@ wrap_snd_seq_get_queue_status(int argc, VALUE *v_params, VALUE v_seq)
   return v_status;
 }
 
-/*
-int AlsaSequencer_i#poll_descriptors_count  events
-
-Returns the number of poll descriptors.
+/* int poll_descriptors_count(eventmask)
 
 Parameters:
-  events  the poll events to be checked (POLLIN and POLLOUT)
+  [eventmask] the poll events to be checked (POLLIN or POLLOUT or combination)
 
-Returns:
-  the number of poll descriptors.
-
- Get the number of poll descriptors. The polling events to be checked can be specified by the second argument.
- When both input and output are checked, pass POLLIN|POLLOUT
+ Get the number of poll descriptors. The polling events to be checked can be
+ specified by the second argument.
+ When both input and output are to be checked, pass POLLIN|POLLOUT
 */
-
 static VALUE
 wrap_snd_seq_poll_descriptors_count(VALUE v_seq, VALUE v_pollflags)
 {
@@ -1409,29 +1382,24 @@ wrap_snd_seq_poll_descriptors_count(VALUE v_seq, VALUE v_pollflags)
   return INT2NUM(snd_seq_poll_descriptors_count(seq, NUM2INT(v_pollflags)));
 }
 
-/*
-pollfds AlsaSequencer_i#poll_descriptors(space, events)
-pollfds AlsaSequencer_i#poll_descriptors(events)
-Get poll descriptors. The second form uses snd_seq_poll_descriptors_count first.
+/* AlsaPollFds_i poll_descriptors([space, ]eventmask)
+
+Get poll descriptors. If space is omitted snd_seq_poll_descriptors_count is used for that.
 
  Parameters:
-    space   space in the poll descriptor array
-    events  polling events to be checked (POLLIN and POLLOUT)
-
-Returns:
-  descriptors
+    [space]      space in the poll descriptor array
+    [eventmask]  polling events to be checked (POLLIN or POLLOUT or combination)
 
 Get poll descriptors assigned to the sequencer handle. Since a sequencer handle can duplex streams,
 you need to set which direction(s) is/are polled in events argument. When POLLIN bit is specified,
 the incoming events to the ports are checked.
 
-To check the returned poll-events, call snd_seq_poll_descriptors_revents()
+To check the returned poll-events, call #poll_descriptors_revents
 instead of reading the pollfd structs directly.
 
 Alsa examples call fds.poll(timeout_msec) since revents has a fixed and/or unknown timeout.
 Whatever.
 */
-
 static VALUE
 wrap_snd_seq_poll_descriptors(int argc, VALUE *argv, VALUE v_seq)
 {
@@ -1457,20 +1425,18 @@ wrap_snd_seq_poll_descriptors(int argc, VALUE *argv, VALUE v_seq)
   return Data_Wrap_Struct(alsaPollFdsClass, 0/*mark*/, free/*free*/, fds);
 }
 
-/*
-intarray AlsaSequencer_i#poll_descriptors_revents pollfds
+/* boolarray poll_descriptors_revents(pollfds)
 
 get returned events from poll descriptors
 
-                                                Parameters:
-                                                pollfds    array of poll descriptors
+ Parameters:
+   pollfds    AlsaPollFds_i, the poll descriptors
 
-Returns:
-  revents array or nil if there are no events.
-  The revents array holds an entry per fd, in the same order, holding true if
-  there was an event at that index.
+Returns boolean array or nil if there are no events.
+The resulintg array holds an entry per filedescriptor, in the same order, holding true if
+there was an event at that index. At least one of them must hold true.
 
-  However, you cannot specify a poll timeout, and the alsa examples use poll!!
+However, you cannot specify a poll timeout, and the alsa examples all use poll instead!!
 */
 static VALUE
 wrap_snd_seq_poll_descriptors_revents(VALUE v_seq, VALUE v_fds)
@@ -1483,7 +1449,7 @@ wrap_snd_seq_poll_descriptors_revents(VALUE v_seq, VALUE v_fds)
   unsigned short revents[nfds];
   const int r = snd_seq_poll_descriptors_revents(seq, (struct pollfd *)(((size_t *)fds) + 1), nfds, revents);
   if (r < 0)
-      RAISE_MIDI_ERROR("polling descriptors", r);
+    RAISE_MIDI_ERROR("polling descriptors", r);
   bool located = false;
   for (size_t i = 0; i < nfds && !located; i++)
     located = revents[i];
@@ -1497,7 +1463,7 @@ wrap_snd_seq_poll_descriptors_revents(VALUE v_seq, VALUE v_fds)
   return v_revents;
 }
 
-/* revents Pollfds.poll(timeout_msec)
+/* boolarray poll(timeout_msec)
 
 Wrapper around poll (not ppoll -- currently)
 Returns nil if no events where present
@@ -1522,21 +1488,11 @@ wrapPoll(VALUE v_descriptors, VALUE v_timeout_msec)
   return v_revents;
 }
 
-/*
-int AlsaSequencer_i#output_buffer_size
+/* int output_buffer_size
 
-Return the size of output buffer.
-
-Parameters:
-seq     sequencer handle
-
-Returns:
-the size of output buffer in bytes
-
-Obtains the size of output buffer. This buffer is used to store decoded
+Obtains the size in bytes of output buffer. This buffer is used to store decoded
 byte-stream of output events before transferring to sequencer.
 */
-
 static VALUE
 wrap_snd_seq_get_output_buffer_size(VALUE v_seq)
 {
@@ -1545,15 +1501,10 @@ wrap_snd_seq_get_output_buffer_size(VALUE v_seq)
   return UINT2NUM(snd_seq_get_output_buffer_size(seq));
 }
 
-/*
-int AlsaSequencer_i#input_buffer_size
+/* int input_buffer_size
 
-Return the size of input buffer.
-
-Returns:
-the size of input buffer in bytes
-
-Obtains the size of input buffer. This buffer is used to read byte-stream of input events from sequencer.
+Obtains the size of input buffer in bytes. This buffer is used to read byte-stream
+of input events from the sequencer.
 */
 static VALUE
 wrap_snd_seq_get_input_buffer_size(VALUE v_seq)
@@ -1563,14 +1514,12 @@ wrap_snd_seq_get_input_buffer_size(VALUE v_seq)
   return UINT2NUM(snd_seq_get_input_buffer_size(seq));
 }
 
-/*
- AlsaSequencer_i#input_buffer_size= size
+/* input_buffer_size=(size)
 
 Resize the input buffer.
 
 Parameters:
-  size    the size of input buffer to be changed in bytes
-
+  [size] the size of input buffer to be changed in bytes
 */
 static VALUE
 wrap_snd_seq_set_input_buffer_size(VALUE v_seq, VALUE v_sz)
@@ -1582,13 +1531,12 @@ wrap_snd_seq_set_input_buffer_size(VALUE v_seq, VALUE v_sz)
   return Qnil;
 }
 
-/*
-AlsaSequencer_i#output_buffer_size= size
+/* output_buffer_size=(size)
 
 Resize the output buffer.
 
 Parameters:
-size    the size of output buffer to be changed in bytes
+  [size] the size of output buffer to be changed in bytes
 */
 static VALUE
 wrap_snd_seq_set_output_buffer_size(VALUE v_seq, VALUE v_sz)
@@ -1600,16 +1548,14 @@ wrap_snd_seq_set_output_buffer_size(VALUE v_seq, VALUE v_sz)
   return Qnil;
 }
 
-/*
-AlsaPortInfo_i AlsaSequencer_i#port_info  port
-
+/* AlsaPortInfo_i port_info(portid)
 obtain the information of a port on the current client
 
 Parameters:
-  port    port id to get
+  [portid] portid to get
 
 Returns:
-  port instance
+  AlsaPortInfo_i instance
 */
 static VALUE
 wrap_snd_seq_get_port_info(VALUE v_seq, VALUE v_portid)
@@ -1624,6 +1570,9 @@ wrap_snd_seq_get_port_info(VALUE v_seq, VALUE v_portid)
   return Data_Wrap_Struct(alsaPortInfoClass, 0/*mark*/, snd_seq_port_info_free/*free*/, info);
 }
 
+/* AlsaPortInfo_i any_port_info(clientid, portid)
+Return information about ports on any client
+*/
 static VALUE
 wrap_snd_seq_get_any_port_info(VALUE v_seq, VALUE v_clientid, VALUE v_portid)
 {
@@ -1637,14 +1586,13 @@ wrap_snd_seq_get_any_port_info(VALUE v_seq, VALUE v_clientid, VALUE v_portid)
   return Data_Wrap_Struct(alsaPortInfoClass, 0/*mark*/, snd_seq_port_info_free/*free*/, info);
 }
 
-/*
-self AlsaSequencer_i#set_port_info  portno, port_info
+/* self set_port_info(portid, port_info)
 
 set the information of a port on the current client
 
 Parameters:
-  port    port to be set
-  info    port information to be set
+  [portid]     port to be set
+  [port_info]  AlsaPortInfo_i instance to be set
 
 Returns:
   self
@@ -1661,9 +1609,8 @@ wrap_snd_seq_set_port_info(VALUE v_seq, VALUE v_portid, VALUE v_portinfo)
   return v_seq;
 }
 
-/*
-int     snd_seq_get_client_pool (snd_seq_t *handle, snd_seq_client_pool_t *info)
-obtain the pool information of the current client
+/* AlsaClientPool_i client_pool([poolinfo])
+obtain the pool information of the current client, allocates space if required
 */
 static VALUE
 wrap_snd_seq_get_client_pool(int argc, VALUE *argv, VALUE v_seq)
@@ -1686,8 +1633,7 @@ wrap_snd_seq_get_client_pool(int argc, VALUE *argv, VALUE v_seq)
   return v_pool;
 }
 
-/*
-int     snd_seq_set_client_pool (snd_seq_t *handle, snd_seq_client_pool_t *info)
+/* client_pool=(poolinfo)
 set the pool information
 */
 static VALUE
@@ -1699,12 +1645,11 @@ wrap_snd_seq_set_client_pool(VALUE v_seq, VALUE v_pool)
   Data_Get_Struct(v_pool, snd_seq_client_pool_t, info);
   const int r = snd_seq_set_client_pool(seq, info);
   if (r < 0) RAISE_MIDI_ERROR("setting client_pool", r);
-  return v_seq;
+  return Qnil;
 }
 
-/*
-t       snd_seq_set_client_pool_output (snd_seq_t *seq, size_t size)
-change the output pool size of the given client
+/* client_pool_output=(size)
+change the output pool size of the current client
 */
 static VALUE
 wrap_snd_seq_set_client_pool_output(VALUE v_seq, VALUE v_sz)
@@ -1716,9 +1661,8 @@ wrap_snd_seq_set_client_pool_output(VALUE v_seq, VALUE v_sz)
   return Qnil;
 }
 
-/*
-int     snd_seq_set_client_pool_output_room (snd_seq_t *seq, size_t size)
-change the output room size of the given client
+/* int client_pool_output_room=(size)
+change the output room size of the current client
 */
 static VALUE
 wrap_snd_seq_set_client_pool_output_room(VALUE v_seq, VALUE v_sz)
@@ -1730,9 +1674,8 @@ wrap_snd_seq_set_client_pool_output_room(VALUE v_seq, VALUE v_sz)
   return Qnil;
 }
 
-/*
-int     snd_seq_set_client_pool_input (snd_seq_t *seq, size_t size)
-change the input pool size of the given client
+/* client_pool_input=(size)
+change the input pool size of the current client
 */
 static VALUE
 wrap_snd_seq_set_client_pool_input(VALUE v_seq, VALUE v_sz)
@@ -1744,9 +1687,7 @@ wrap_snd_seq_set_client_pool_input(VALUE v_seq, VALUE v_sz)
   return Qnil;
 }
 
-/*
-self snd_seq_reset_pool_output (snd_seq_t *seq)
-reset client output pool
+/* self reset_pool_output
 */
 static VALUE
 wrap_snd_seq_reset_pool_output(VALUE v_seq)
@@ -1758,9 +1699,7 @@ wrap_snd_seq_reset_pool_output(VALUE v_seq)
   return v_seq;
 }
 
-/*
-self snd_seq_reset_pool_input (snd_seq_t *seq)
-reset client input pool
+/* self reset_pool_input
 */
 static VALUE
 wrap_snd_seq_reset_pool_input(VALUE v_seq)
@@ -1772,10 +1711,40 @@ wrap_snd_seq_reset_pool_input(VALUE v_seq)
   return v_seq;
 }
 
+/* AlsaSystemInfo_i seq_system_info([info])
+obtain the sequencer system information, if no buffer is passed, it is allocated
+*/
+static VALUE
+wrap_snd_seq_system_info(int argc, VALUE *argv, VALUE v_seq)
+{
+  snd_seq_t *seq;
+  Data_Get_Struct(v_seq, snd_seq_t, seq);
+  VALUE v_info;
+  rb_scan_args(argc, argv, "01", &v_info);
+  snd_seq_system_info_t *info;
+  if (NIL_P(v_info))
+    {
+      const int r = snd_seq_system_info_malloc(&info);
+      if (r < 0) RAISE_MIDI_ERROR("allocating syteminfo", r);
+      v_info = Data_Wrap_Struct(alsaSystemInfoClass, 0/*mark*/, snd_seq_system_info_free/*free*/,
+                                info);
+    }
+  else
+      Data_Get_Struct(v_info, snd_seq_system_info_t, info);
+  const int r = snd_seq_system_info(seq, info);
+  if (r < 0) RAISE_MIDI_ERROR("retrieving system info", r);
+  return v_info;
+}
+
+/*
+Wrapper around snd_seq_t. A sequencer is basically a client.
+Create one using Driver#seq_open
+*/
 void alsa_seq_init()
 {
   WRAP_CONSTANT(POLLIN);
   WRAP_CONSTANT(POLLOUT);
+  WRAP_CONSTANT(MIDI_BYTES_PER_SEC);
   // W RAP_CONSTANT(SND_SEQ_DLSYM_VERSION)  UNDEFINED!!
   WRAP_CONSTANT(SND_SEQ_ADDRESS_UNKNOWN);
   WRAP_CONSTANT(SND_SEQ_ADDRESS_SUBSCRIBERS);
@@ -1848,6 +1817,7 @@ void alsa_seq_init()
   rb_define_method(alsaSequencerClass, "client_pool_input=", RUBY_METHOD_FUNC(wrap_snd_seq_set_client_pool_input), 1);
   rb_define_method(alsaSequencerClass, "reset_pool_output", RUBY_METHOD_FUNC(wrap_snd_seq_reset_pool_output), 0);
   rb_define_method(alsaSequencerClass, "reset_pool_input", RUBY_METHOD_FUNC(wrap_snd_seq_reset_pool_input), 0);
+  rb_define_method(alsaSequencerClass, "system_info", RUBY_METHOD_FUNC(wrap_snd_seq_system_info), -1);
 #if defined(DEBUG)
   rb_define_method(alsaSequencerClass, "dump_notes=", RUBY_METHOD_FUNC(AlsaSequencer_set_dump_notes), 1);
 #endif

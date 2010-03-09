@@ -54,15 +54,12 @@ require_relative 'rrts'
  * sure, so we better not exceed that to avoid overflowing the output buffer.)
 =end
 
-MIDI_BYTES_PER_SEC = 31_250 / (1 + 8 + 2)
-
 include RRTS::Driver
 
 =begin
  * A MIDI event after being parsed/loaded from the file.
- * There could be made a case for using snd_seq_event_t instead.
 =end
-class Event
+class Event # :no-doc:
 
   attr_accessor :type, :port, :tick, :d, :tempo, :length, :sysex
 
@@ -79,7 +76,7 @@ class Event
 # 	unsigned char sysex[0];
 end # event
 
-class Track
+class Track # :no-doc:
 # 	struct event *first_event;	/* list of all events in this track */
 # 	int end_tick;			/* length of this track */
 #
@@ -107,18 +104,7 @@ public
   end
 end # class Track
 
-# static snd_seq_t *seq;
-# static int client;
-# static int port_count;
-# static snd_seq_addr_t *ports;
-# static int queue;
 @end_delay = 2
-# static const char *file_name;
-# static FILE *file;
-# static int file_offset;		/* current offset in input file */
-# static int num_tracks;
-# static struct track *tracks;
-# static int smpte_timing;
 
 # /* prints an error message to stderr */
 def errormsg msg, *args
@@ -137,12 +123,12 @@ end
 # static void check_snd(const char *operation, int err)
 # {
 # 	if (err < 0)
-# 		fatal("Cannot %s - %s", operation, snd_strerror(err));
+# 		fatal("Cannot %s - %s", operation, Driver::strerror(err));
 # }
 
 def init_seq
 #   /* open sequencer */
-  @seq = snd_seq_open
+  @seq = Driver::seq_open
 #   	/* set our name (otherwise it's "Client-xxx") */
   @seq.client_name = "aplaymidi"
   #@seq.dump_notes = true  # requires DEBUG to be set. This disables output!!!
@@ -167,10 +153,7 @@ def parse_ports arg
 end
 
 def create_source_port
-# 	snd_seq_port_info_t *pinfo;
-# 	int err;
-
-  pinfo = snd_seq_port_info_malloc
+  pinfo = port_info_malloc
 
 # 	/* the first created port is 0 anyway, but let's make sure ... */
   pinfo.port = 0
@@ -404,9 +387,6 @@ end
 
 # /* reads an entire MIDI file */
 def read_smf
-# 	int header_len, type, time_division, i, err;
-# 	snd_seq_queue_tempo_t *queue_tempo;
-
 # 	/* the curren position is immediately after the "MThd" id */
   header_len = read_int(4);
   invalid_format if (header_len < 6)
@@ -427,7 +407,7 @@ def read_smf
   time_division = read_int(2);
 #   puts "time_division=#{time_division}"
 # 	/* interpret and set tempo */
-  queue_tempo = snd_seq_queue_tempo_malloc
+  queue_tempo = queue_tempo_malloc
   @smpte_timing = (time_division & 0x8000) != 0
   if (!@smpte_timing)
 # 		/* time_division is ticks per quarter */
@@ -533,10 +513,7 @@ def handle_big_sysex ev
 end
 
 def play_midi
-# 	snd_seq_event_t ev;
-# 	int i, max_tick, err;
-
-# 	/* calculate length of the entire file */
+#calculate length of the entire file
   max_tick = -1;
   for i in (0...@num_tracks)
     if (@tracks[i].end_tick > max_tick)
@@ -683,11 +660,8 @@ def play_file
 end
 
 def list_ports
-# 	snd_seq_client_info_t *cinfo;
-# 	snd_seq_port_info_t *pinfo;
-
-  cinfo = snd_seq_client_info_malloc
-  pinfo = snd_seq_port_info_malloc
+  cinfo = client_info_malloc
+  pinfo = port_info_malloc
   puts " Port    Client name                      Port name"
   cinfo.client = -1
   while @seq.query_next_client(cinfo)

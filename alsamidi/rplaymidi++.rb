@@ -32,20 +32,13 @@ This too is an issue with aplaymidi to begin with.
 
 require_relative 'rrts'
 
-=begin
- * 31.25 kbaud, one start bit, eight data bits, two stop bits.
- * (The MIDI spec says one stop bit, but every transmitter uses two, just to be
- * sure, so we better not exceed that to avoid overflowing the output buffer.)
-=end
-MIDI_BYTES_PER_SEC = 31_250 / (1 + 8 + 2)
-
 include RRTS
 
 =begin
  * A MIDI event after being parsed/loaded from the file.
  * There could be made a case for using snd_seq_event_t instead.
 =end
-class Track
+class Track # :no-doc:
 # 	struct event *first_event;	/* list of all events in this track */
 # 	int end_tick;			/* length of this track */
 #
@@ -84,7 +77,7 @@ def parse_ports arg
   @ports = arg.split(',').map { |name| @seq.parse_address(name)  }
 end
 
-class SoundChunk
+class SoundChunk #:no-doc:
   private
   def initialize
     @tracks = []
@@ -97,7 +90,7 @@ end
 
 # The Parser will be a class that is basically used in the chunk constructor.
 # It builds a single chunk from an inputfile
-class MidifileParser
+class MidifileParser #:no-doc:
   private
   def initialize file_name, chunk, destination_ports
     @file = file_name == "-" ? STDIN : File::open(file_name, "rb")
@@ -305,11 +298,8 @@ class MidifileParser
     raise RRTSError.new("%s: invalid file format", @file_name)
   end
 
-  # /* reads an entire MIDI file */
+  # reads an entire MIDI file
   def read_smf
-    #       int header_len, type, time_division, i, err;
-    #       snd_seq_queue_tempo_t *queue_tempo;
-
     # the curren position is immediately after the "MThd" id
     header_len = read_int(4);
     invalid_format if (header_len < 6)
@@ -376,10 +366,7 @@ class MidifileParser
 end # class MidifileParser
 
 def play_midi chunk
-# 	snd_seq_event_t ev;
-# 	int i, max_tick, err;
-
-# 	/* calculate length of the entire file */
+# calculate length of the entire file
   @queue.tempo = chunk.tempo
   max_tick = -1;
   for track in chunk.tracks
@@ -419,6 +406,7 @@ def play_midi chunk
       event.source = @source_port
   #     print '>'
       # this blocks when the output pool has been filled
+      # in ruby C-calls also block signals...
       @seq << event
     end
   ensure

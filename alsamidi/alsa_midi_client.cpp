@@ -143,7 +143,6 @@ wrap_snd_seq_client_info_get_event_lost(VALUE v_client_info)
 void
 alsa_midi_client_init()
 {
-  alsaClientInfoClass = rb_define_class_under(alsaDriver, "AlsaClientInfo_i", rb_cObject);
   // possible values for 'type':
   WRAP_CONSTANT(SND_SEQ_USER_CLIENT);
   WRAP_CONSTANT(SND_SEQ_KERNEL_CLIENT);

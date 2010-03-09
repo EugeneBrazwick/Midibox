@@ -6,10 +6,10 @@ require 'rjack'
 
 include RJack;
 
-class JackError < RuntimeError
+class JackError < RuntimeError # :no-doc:
 end
 
-class JackClient
+class JackClient # :no-doc:
 private
   def handleJackResult res, msg
   raise JackError.new("%s: %s%s%s%s%s" "%s%s%s%s%s" "%s\n" % [msg,
@@ -67,7 +67,7 @@ public
   def registerPort port; @registered_ports << port; end
 end # class JackClient
 
-class JackPort
+class JackPort # :no-doc:
 private
   def initialize client, name, flags, type = JACK_DEFAULT_MIDI_TYPE, bufsz = 0
     @data = jack_port_register client.data, name, type, flags, bufsz

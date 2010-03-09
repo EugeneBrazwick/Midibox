@@ -145,7 +145,6 @@ wrap_snd_seq_client_pool_set_output_room(VALUE v_pool, VALUE v_sz)
 void
 alsa_client_pool_init()
 {
-  alsaClientPoolClass = rb_define_class_under(alsaDriver, "AlsaClientPool_i", rb_cObject);
   rb_define_method(alsaClientPoolClass, "copy_to", RUBY_METHOD_FUNC(wrap_snd_seq_client_pool_copy_to), -1);
   rb_define_method(alsaClientPoolClass, "client", RUBY_METHOD_FUNC(wrap_snd_seq_client_pool_get_client), 0);
   rb_define_method(alsaClientPoolClass, "output_pool", RUBY_METHOD_FUNC(wrap_snd_seq_client_pool_get_output_pool), 0);

@@ -13,7 +13,10 @@
 
 VALUE alsaQueueInfoClass, alsaQueueTempoClass, alsaQueueStatusClass;
 
-// self QueueTempo#copy_to tempo
+/* self copy_to([other])
+Makes a copy of the current tempo. If +other+ is not specified it
+returns a copy.
+*/
 static VALUE
 wrap_snd_seq_queue_tempo_copy_to(VALUE v_queue_tempo, VALUE v_dst)
 {
@@ -24,7 +27,10 @@ wrap_snd_seq_queue_tempo_copy_to(VALUE v_queue_tempo, VALUE v_dst)
   return v_queue_tempo;
 }
 
-// self QueueStatus#copy_to status
+/* self copy_to([other])
+Makes a copy of the current queuestatus. If +other+ is not specified it
+returns a copy
+*/
 static VALUE
 wrap_snd_seq_queue_status_copy_to(VALUE v_queue_status, VALUE v_dst)
 {
@@ -35,7 +41,10 @@ wrap_snd_seq_queue_status_copy_to(VALUE v_queue_status, VALUE v_dst)
   return v_queue_status;
 }
 
-// self QueueInfo#copy_to info
+/* self copy_to([other])
+Returns a copy of the queue info structure. If +other+ is given it will be used
+as a buffer, otherwise a new buffer is allocated
+*/
 static VALUE
 wrap_snd_seq_queue_info_copy_to(VALUE v_queue_info, VALUE v_dst)
 {
@@ -46,7 +55,10 @@ wrap_snd_seq_queue_info_copy_to(VALUE v_queue_info, VALUE v_dst)
   return v_queue_info;
 }
 
-// QueueInfo#flags= flags
+/* flags=(flags)
+Alter the flags for this queue. Must be used before creating a queue.
+God knows what these flags are. See the Alsa docs (but they won't tell you).
+*/
 static VALUE
 wrap_snd_seq_queue_info_set_flags(VALUE v_qi, VALUE v_flags)
 {
@@ -56,7 +68,10 @@ wrap_snd_seq_queue_info_set_flags(VALUE v_qi, VALUE v_flags)
   return Qnil;
 }
 
-// QueueInfo#locked= bool
+/* locked=(bool)
+I believe that queues are created locked, but you may lock or unlock them
+with this method. But what does it do?? The Alsa documentation says nothing...
+*/
 static VALUE
 wrap_snd_seq_queue_info_set_locked(VALUE v_qi, VALUE v_locked)
 {
@@ -66,7 +81,9 @@ wrap_snd_seq_queue_info_set_locked(VALUE v_qi, VALUE v_locked)
   return Qnil;
 }
 
-// QueueInfo#name=
+/* name=(string)
+Change the name of the queue to be (must be called before creating a queue)
+*/
 static VALUE
 wrap_snd_seq_queue_info_set_name(VALUE v_qi, VALUE v_name)
 {
@@ -79,7 +96,9 @@ wrap_snd_seq_queue_info_set_name(VALUE v_qi, VALUE v_name)
   return Qnil;
 }
 
-// int QueueInfo#queue
+/* int queue
+Gives the queueid of the queue
+*/
 static VALUE
 wrap_snd_seq_queue_info_get_queue(VALUE v_qi)
 {
@@ -88,7 +107,9 @@ wrap_snd_seq_queue_info_get_queue(VALUE v_qi)
   return INT2NUM(snd_seq_queue_info_get_queue(qi));
 }
 
-// int QueueInfo#flags
+/* int flags
+Returns some flags, but these are undocumented
+*/
 static VALUE
 wrap_snd_seq_queue_info_get_flags(VALUE v_qi)
 {
@@ -97,7 +118,8 @@ wrap_snd_seq_queue_info_get_flags(VALUE v_qi)
   return UINT2NUM(snd_seq_queue_info_get_flags(qi));
 }
 
-// string QueueInfo#name
+/* string name
+*/
 static VALUE
 wrap_snd_seq_queue_info_get_name(VALUE v_qi)
 {
@@ -106,8 +128,8 @@ wrap_snd_seq_queue_info_get_name(VALUE v_qi)
   return rb_str_new2(snd_seq_queue_info_get_name(qi));
 }
 
-/* int QueueInfo#owner
- returns the client (id)
+/* int owner
+returns the clientid of the owner. Normally this would be yourself
 */
 static VALUE
 wrap_snd_seq_queue_info_get_owner(VALUE v_qi)
@@ -117,7 +139,8 @@ wrap_snd_seq_queue_info_get_owner(VALUE v_qi)
   return INT2NUM(snd_seq_queue_info_get_owner(qi));
 }
 
-/* bool QueueInfo#locked?
+/* bool locked?
+Returns true if the queue is locked. But locked how or what?
 */
 static VALUE
 wrap_snd_seq_queue_info_get_locked(VALUE v_qi)
@@ -127,32 +150,29 @@ wrap_snd_seq_queue_info_get_locked(VALUE v_qi)
   return INT2BOOL(snd_seq_queue_info_get_locked(qi));
 }
 
-/* QueueInfo.owner= ownerid
+/* owner=(client)
 
 Set the owner client id of a queue_info container.
 
 Parameters:
-owner   client id
+   owner   clientid or MidiClient
 */
 static VALUE
 wrap_snd_seq_queue_info_set_owner(VALUE v_qi, VALUE v_owner_clientid)
 {
   snd_seq_queue_info_t *qi;
   Data_Get_Struct(v_qi, snd_seq_queue_info_t, qi);
-  #if defined(DUMP_API)
+#if defined(DUMP_API)
   fprintf(DUMP_STREAM, "snd_seq_queue_info_set_owner(%p, %d)\n", qi, NUM2INT(v_owner_clientid));
-  #endif
+#endif
+  RRTS_DEREF_DIRTY(v_owner_clientid, @client);
   snd_seq_queue_info_set_owner(qi, NUM2INT(v_owner_clientid));
   return Qnil;
 }
 
-/*
-int QueueTempo#ppq
+/* int ppq
 
-Get the ppq of a queue_status container.
-
-Returns:
-  ppq value
+Get the ppq (ticks per beat) of a queue_tempo container.
 */
 static VALUE
 wrap_snd_seq_queue_tempo_get_ppq(VALUE v_tempo)
@@ -162,14 +182,10 @@ wrap_snd_seq_queue_tempo_get_ppq(VALUE v_tempo)
   return INT2NUM(snd_seq_queue_tempo_get_ppq(tempo));
 }
 
-/* int QueueTempo#queue
+/* int queue
 
 Get the queue id of a queue_status container.
-
-Returns:
-  queue id
 */
-
 static VALUE
 wrap_snd_seq_queue_tempo_get_queue(VALUE v_tempo)
 {
@@ -178,12 +194,10 @@ wrap_snd_seq_queue_tempo_get_queue(VALUE v_tempo)
   return INT2NUM(snd_seq_queue_tempo_get_queue(tempo));
 }
 
-/* int QueueTempo#skew
+/* int skew
 
-Get the timer skew value of a queue_status container.
-
-Returns:
-  timer skew value
+Get the timer skew value of a queue_tempo container, whatever it is.
+See #skew_base
 */
 static VALUE
 wrap_snd_seq_queue_tempo_get_skew(VALUE v_tempo)
@@ -193,13 +207,10 @@ wrap_snd_seq_queue_tempo_get_skew(VALUE v_tempo)
   return UINT2NUM(snd_seq_queue_tempo_get_skew(tempo));
 }
 
-/*
- int QueueTempo#skew_base
+/* int skew_base
 
 Get the timer skew base value of a queue_status container.
-
-Returns:
-  timer skew base value
+See #skew.
 */
 static VALUE
 wrap_snd_seq_queue_tempo_get_skew_base(VALUE v_tempo)
@@ -209,13 +220,9 @@ wrap_snd_seq_queue_tempo_get_skew_base(VALUE v_tempo)
   return UINT2NUM(snd_seq_queue_tempo_get_skew_base(tempo));
 }
 
-/*
- int QueueTempo#tempo
-
-Get the tempo of a queue_status container.
-
-Returns:
-  tempo value
+/* int tempo
+Get the tempo of a queue_tempo container. But WTF is this???
+Please tell me!!!
 */
 static VALUE
 wrap_snd_seq_queue_tempo_get_tempo(VALUE v_tempo)
@@ -225,13 +232,8 @@ wrap_snd_seq_queue_tempo_get_tempo(VALUE v_tempo)
   return UINT2NUM(snd_seq_queue_tempo_get_tempo(tempo));
 }
 
-/*
- QueueTempo.ppq= ppq
-
-Set the ppq of a queue_status container.
-
-Parameters:
-ppq     ppq value
+/* ppq=(ppq)
+Set the ppq of a queue_tempo container.
 */
 static VALUE
 wrap_snd_seq_queue_tempo_set_ppq(VALUE v_tempo, VALUE v_ppq)
@@ -242,7 +244,8 @@ wrap_snd_seq_queue_tempo_set_ppq(VALUE v_tempo, VALUE v_ppq)
   return Qnil;
 }
 
-// QueueTempo#skew= skew
+/* skew=(skew)
+*/
 static VALUE
 wrap_snd_seq_queue_tempo_set_skew(VALUE v_tempo, VALUE v_skew)
 {
@@ -252,7 +255,8 @@ wrap_snd_seq_queue_tempo_set_skew(VALUE v_tempo, VALUE v_skew)
   return Qnil;
 }
 
-// QueueTempo#skew_base = skew_base
+/* skew_base=(skew_base)
+*/
 static VALUE
 wrap_snd_seq_queue_tempo_set_skew_base(VALUE v_tempo, VALUE v_skew)
 {
@@ -262,7 +266,8 @@ wrap_snd_seq_queue_tempo_set_skew_base(VALUE v_tempo, VALUE v_skew)
   return Qnil;
 }
 
-// QueueTempo#tempo=
+/* tempo=(something)
+*/
 static VALUE
 wrap_snd_seq_queue_tempo_set_tempo(VALUE v_tempo, VALUE v_val)
 {
@@ -272,7 +277,9 @@ wrap_snd_seq_queue_tempo_set_tempo(VALUE v_tempo, VALUE v_val)
   return Qnil;
 }
 
-// int QueueStatus.queue
+/* int queue
+Returns the queueid
+*/
 static VALUE
 wrap_snd_seq_queue_status_get_queue(VALUE v_status)
 {
@@ -281,8 +288,8 @@ wrap_snd_seq_queue_status_get_queue(VALUE v_status)
   return INT2NUM(snd_seq_queue_status_get_queue(status));
 }
 
-/* int QueueStatus#events
- nr of events remaining in queue
+/* int events
+Returns the nr of events remaining in the queue
 */
 static VALUE
 wrap_snd_seq_queue_status_get_events(VALUE v_status)
@@ -292,7 +299,9 @@ wrap_snd_seq_queue_status_get_events(VALUE v_status)
   return INT2NUM(snd_seq_queue_status_get_events(status));
 }
 
-// int QueueStatus#tick_time
+/* int tick_time
+Returns the current time/position in the queue (in ticks)
+*/
 static VALUE
 wrap_snd_seq_queue_status_get_tick_time(VALUE v_status)
 {
@@ -301,7 +310,9 @@ wrap_snd_seq_queue_status_get_tick_time(VALUE v_status)
   return UINT2NUM(snd_seq_queue_status_get_tick_time(status));
 }
 
-// secs, nsec QueueStatus#real_time
+/* [secs, nsec] real_time
+Returns the current time/position in the queue in nanoseconds
+*/
 static VALUE
 wrap_snd_seq_queue_status_get_real_time(VALUE v_status)
 {
@@ -311,7 +322,9 @@ wrap_snd_seq_queue_status_get_real_time(VALUE v_status)
   return rb_ary_new3(2, UINT2NUM(t->tv_sec), UINT2NUM(t->tv_nsec));
 }
 
-// int QueueStatus#status
+/* int status
+Returns something. 'status bits' says the Alsa doc. But which?
+*/
 static VALUE
 wrap_snd_seq_queue_status_get_status(VALUE v_status)
 {
@@ -320,6 +333,10 @@ wrap_snd_seq_queue_status_get_status(VALUE v_status)
   return UINT2NUM(snd_seq_queue_status_get_status(status));
 }
 
+/* AlsaMidiQueue_i
+
+This wrapper is used for creating queues, and also for querying existing ones
+*/
 void
 alsa_midi_queue_init()
 {

@@ -251,6 +251,12 @@ field is properly set automatically. FIXME: not implemented yet
 void
 port_subscription_init()
 {
+  if (0)  // this is to make rdoc document it.
+  {
+    VALUE rrtsModule = rb_define_module("RRTS");
+    alsaDriver = rb_define_module_under(rrtsModule, "Driver");
+  }
+  alsaPortSubscriptionClass = rb_define_class_under(alsaDriver, "AlsaPortSubscription_i", rb_cObject);
   rb_define_method(alsaPortSubscriptionClass, "dest", RUBY_METHOD_FUNC(wrap_snd_seq_port_subscribe_get_dest), 0);
   rb_define_method(alsaPortSubscriptionClass, "dest_client", RUBY_METHOD_FUNC(wrap_snd_seq_port_subscribe_get_dest_client), 0);
   rb_define_method(alsaPortSubscriptionClass, "dest_port", RUBY_METHOD_FUNC(wrap_snd_seq_port_subscribe_get_dest_port), 0);

@@ -30,7 +30,7 @@ is pressed (or whatever other killing signal).
 This too is an issue with aplaymidi to begin with.
 =end
 
-require_relative 'rrts'
+require 'rrts/rrts'
 
 include RRTS
 
@@ -502,7 +502,7 @@ def sigterm_exit
   exit 0
 end
 
-require_relative 'sequencer'
+require 'rrts/sequencer'
 
   #   /* open sequencer */
 Sequencer.new('rplaymidi') do |seq|
@@ -521,7 +521,7 @@ Sequencer.new('rplaymidi') do |seq|
   end
   @source_port = MidiPort.new(seq, 'rplaymidi', port: 0, midi_generic: true, application: true)
   #       the first created port is 0 anyway, but let's make sure ...
-  require_relative 'midiqueue'
+  require 'rrts/midiqueue'
   MidiQueue.new(@seq, 'rplaymidi') do |queue|
     #   the queue is now locked, which is just fine
     @queue = queue

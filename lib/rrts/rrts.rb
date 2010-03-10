@@ -1,5 +1,5 @@
 
-require_relative './alsa_midi.so'
+require_relative 'driver/alsa_midi.so'
 
 module RRTS
   RRTSError = RuntimeError

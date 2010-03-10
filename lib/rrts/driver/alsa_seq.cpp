@@ -370,9 +370,9 @@ static inline VALUE do_event_output(snd_seq_t *seq, snd_seq_event_t *ev, VALUE v
 #if defined(DUMP_API)
   fprintf(DUMP_STREAM, "snd_seq_event_output*(%p, %p)\n", seq, ev);
 #endif
-  fprintf(stderr, "block when queue is full? %ld\n", time(0));
+  fprintf(stderr, "block when queue is full? time=%ld\n", time(0));
   const int r = (*dispatch[NUM2INT(v_func)])(seq, ev);
-  fprintf(stderr, "-> %d, %ld\n", r, time(0));
+  fprintf(stderr, "-> %d, time=%ld\n", r, time(0));
   if (r < 0)
     {
       if (r == -EINVAL)
@@ -1726,8 +1726,9 @@ wrap_snd_seq_system_info(int argc, VALUE *argv, VALUE v_seq)
     {
       const int r = snd_seq_system_info_malloc(&info);
       if (r < 0) RAISE_MIDI_ERROR("allocating syteminfo", r);
-      v_info = Data_Wrap_Struct(alsaSystemInfoClass, 0/*mark*/, snd_seq_system_info_free/*free*/,
-                                info);
+      v_info = Data_Wrap_Struct(alsaSystemInfoClass, 0 //mark
+                                , snd_seq_system_info_free//free
+                                , info);
     }
   else
       Data_Get_Struct(v_info, snd_seq_system_info_t, info);

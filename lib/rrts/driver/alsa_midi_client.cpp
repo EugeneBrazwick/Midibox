@@ -12,8 +12,12 @@
 
 VALUE alsaClientInfoClass;
 
-/* self ClientInfo#copy_to dst
- dst ClientInfo#copy_to
+/* call-seq:
+     client_info.copy_to other -> client_info
+     client_info.copy_to       -> client_info
+
+Make a duplicate. Used internally by AlsaClientInfo_i#initialize_copy.
+The second form creates an actual clone
 */
 static VALUE
 wrap_snd_seq_client_info_copy_to(int argc, VALUE *argv, VALUE v_client_info)
@@ -35,7 +39,8 @@ wrap_snd_seq_client_info_copy_to(int argc, VALUE *argv, VALUE v_client_info)
   return retval;
 }
 
-/* ClientInfo.client= clientid
+/* call-seq:
+   ClientInfo.client= clientid
 
 Set the client id of a client_info container.
 
@@ -51,14 +56,10 @@ wrap_snd_seq_client_info_set_client(VALUE v_client_info, VALUE v_clientid)
   return Qnil;
 }
 
-/*
-int ClientInfo#client
+/* call-seq:
+  ClientInfo#client -> int
 
-Get client id of a client_info container.
-
-
-Returns:
-  client id
+Get the clientid of a client_info container.
 */
 static VALUE
 wrap_snd_seq_client_info_get_client(VALUE v_client_info)
@@ -140,12 +141,21 @@ wrap_snd_seq_client_info_get_event_lost(VALUE v_client_info)
   return INT2NUM(snd_seq_client_info_get_event_lost(client_info));
 }
 
+/* AlsaMidiClient_i is used to external clients or the sequencer client itself.
+*/
 void
 alsa_midi_client_init()
 {
   // possible values for 'type':
   WRAP_CONSTANT(SND_SEQ_USER_CLIENT);
   WRAP_CONSTANT(SND_SEQ_KERNEL_CLIENT);
+  // must be in this file, or rdoc will not document it
+  if (0)  // this is to make rdoc document it.
+    {
+       VALUE rrtsModule = rb_define_module("RRTS");
+       alsaDriver = rb_define_module_under(rrtsModule, "Driver");
+    }
+  alsaClientInfoClass = rb_define_class_under(alsaDriver, "AlsaClientInfo_i", rb_cObject);
   rb_define_method(alsaClientInfoClass, "client=", RUBY_METHOD_FUNC(wrap_snd_seq_client_info_set_client), 1);
   rb_define_method(alsaClientInfoClass, "client", RUBY_METHOD_FUNC(wrap_snd_seq_client_info_get_client), 0);
   rb_define_method(alsaClientInfoClass, "name", RUBY_METHOD_FUNC(wrap_snd_seq_client_info_get_name), 0);

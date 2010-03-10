@@ -192,6 +192,12 @@ wrap_snd_seq_remove_events_set_time(int argc, VALUE *argv, VALUE v_rmp)
   return Qnil;
 }
 
+/* call-seq:
+     AlsaRemoveEvents_i.time_real= sec, nsec
+     AlsaRemoveEvents_i.time_real= [sec, nsec]
+
+For removing events based on this specified realtime
+*/
 static VALUE
 ARE_set_time_real(int argc, VALUE *argv, VALUE v_rmp)
 {
@@ -213,6 +219,8 @@ ARE_set_time_real(int argc, VALUE *argv, VALUE v_rmp)
   return Qnil;
 }
 
+/* For removing events based on a tick time
+*/
 static VALUE
 ARE_set_time_tick(VALUE v_rmp, VALUE v_ticks)
 {
@@ -280,6 +288,9 @@ wrap_snd_seq_remove_events_set_tag(VALUE v_rmp, VALUE v_tag)
   return Qnil;
 }
 
+/* AlsaRemoveClass_i
+Class to remove (already sent) events from queues.
+*/
 void
 alsa_remove_init()
 {
@@ -295,6 +306,7 @@ alsa_remove_init()
   WRAP_CONSTANT(SND_SEQ_REMOVE_TAG_MATCH);
   WRAP_CONSTANT(SND_SEQ_REMOVE_IGNORE_OFF);
 
+  alsaRemoveEventsClass = rb_define_class_under(alsaDriver, "AlsaRemoveEvents_i", rb_cObject);
   rb_define_method(alsaRemoveEventsClass, "copy_to", RUBY_METHOD_FUNC(wrap_snd_seq_remove_events_copy_to), -1);
   rb_define_method(alsaRemoveEventsClass, "condition",
                    RUBY_METHOD_FUNC(wrap_snd_seq_remove_events_get_condition), 0);

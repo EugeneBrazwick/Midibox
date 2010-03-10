@@ -8,42 +8,42 @@ module RRTS
   # This class is the main client for the Alsa MIDI system.
   # It is possible to use more than one Sequencer within an application
   # Delegates to:
-  # *  AlsaSequencer_i#poll_descriptors
-  # *  AlsaSequencer_i#poll_descriptors_count
-  # *  AlsaSequencer_i#poll_descriptors_revents
-  # *  AlsaSequencer_i#drain_output,  with alias +flush+
-  # *  AlsaSequencer_i#start_queue
-  # *  AlsaSequencer_i#nonblock
-  # *  AlsaSequencer_i#alloc_named_queue,  but please use MidiQueue#new
-  # *  AlsaSequencer_i#set_queue_tempo
-  # *  AlsaSequencer_i#output_buffer_size
-  # *  AlsaSequencer_i#output_buffer_size=
-  # *  AlsaSequencer_i#input_buffer_size
-  # *  AlsaSequencer_i#input_buffer_size=
-  # *  AlsaSequencer_i#sync_output_queue
-  # *  AlsaSequencer_i#create_port, please use MidiPort.new
-  # *  AlsaSequencer_i#event_output
-  # *  AlsaSequencer_i#event_output_buffer
-  # *  AlsaSequencer_i#event_output_direct
-  # *  AlsaSequencer_i#queue_status
-  # *  AlsaSequencer_i#client_name
-  # *  AlsaSequencer_i#remove_events
-  # *  AlsaSequencer_i#client_pool
-  # *  AlsaSequencer_i#client_pool=
-  # *  AlsaSequencer_i#client_pool_output=
-  # *  AlsaSequencer_i#client_pool_output_room=
-  # *  AlsaSequencer_i#client_pool_input=
-  # *  AlsaSequencer_i#reset_pool_input
-  # *  AlsaSequencer_i#reset_pool_output
-  # *  AlsaSequencer_i#system_infp
-  # *  AlsaSequencer_i#dump_notes=
-  # *  AlsaClientInfo_i#broadcast_filter?
-  # *  AlsaClientInfo_i#error_bounce?
-  # *  AlsaClientInfo_i#event_lost
-  # *  AlsaClientInfo_i#events_lost
-  # *  AlsaClientInfo_i#num_ports
-  # *  AlsaClientInfo_i#num_open_ports
-  # *  AlsaClientInfo_i#type
+  # *  Driver::AlsaSequencer_i#poll_descriptors
+  # *  Driver::AlsaSequencer_i#poll_descriptors_count
+  # *  Driver::AlsaSequencer_i#poll_descriptors_revents
+  # *  Driver::AlsaSequencer_i#drain_output,  with alias +flush+
+  # *  Driver::AlsaSequencer_i#start_queue
+  # *  Driver::AlsaSequencer_i#nonblock
+  # *  Driver::AlsaSequencer_i#alloc_named_queue,  but please use MidiQueue#new
+  # *  Driver::AlsaSequencer_i#set_queue_tempo
+  # *  Driver::AlsaSequencer_i#output_buffer_size
+  # *  Driver::AlsaSequencer_i#output_buffer_size=
+  # *  Driver::AlsaSequencer_i#input_buffer_size
+  # *  Driver::AlsaSequencer_i#input_buffer_size=
+  # *  Driver::AlsaSequencer_i#sync_output_queue
+  # *  Driver::AlsaSequencer_i#create_port, please use MidiPort.new
+  # *  Driver::AlsaSequencer_i#event_output
+  # *  Driver::AlsaSequencer_i#event_output_buffer
+  # *  Driver::AlsaSequencer_i#event_output_direct
+  # *  Driver::AlsaSequencer_i#queue_status
+  # *  Driver::AlsaSequencer_i#client_name
+  # *  Driver::AlsaSequencer_i#remove_events
+  # *  Driver::AlsaSequencer_i#client_pool
+  # *  Driver::AlsaSequencer_i#client_pool=
+  # *  Driver::AlsaSequencer_i#client_pool_output=
+  # *  Driver::AlsaSequencer_i#client_pool_output_room=
+  # *  Driver::AlsaSequencer_i#client_pool_input=
+  # *  Driver::AlsaSequencer_i#reset_pool_input
+  # *  Driver::AlsaSequencer_i#reset_pool_output
+  # *  Driver::AlsaSequencer_i#system_infp
+  # *  Driver::AlsaSequencer_i#dump_notes=
+  # *  Driver::AlsaClientInfo_i#broadcast_filter?
+  # *  Driver::AlsaClientInfo_i#error_bounce?
+  # *  Driver::AlsaClientInfo_i#event_lost
+  # *  Driver::AlsaClientInfo_i#events_lost
+  # *  Driver::AlsaClientInfo_i#num_ports
+  # *  Driver::AlsaClientInfo_i#num_open_ports
+  # *  Driver::AlsaClientInfo_i#type
 class Sequencer
 include Driver # open up namespace
 extend Forwardable

@@ -1,8 +1,6 @@
 #if !defined(_RRTS_ALSA_MIDI_H)
 #define _RRTS_ALSA_MIDI_H
 
-/* $Id: alsa_midi.h,v 1.8 2010/02/23 22:56:55 ara Exp ara $ */
-
 #include <ruby.h>
 #pragma interface
 

@@ -26,32 +26,35 @@
 
 VALUE alsaDriver, alsaMidiError;
 
-/* AlsaSequencer_i Driver#seq_open [name = 'default [, streams = SND_SEQ_OPEN_DUPLEX [, mode = 0]]]
+/* call-seq:
+  Driver.seq_open -> AlsaSequencer_i
+  Driver.seq_open name -> AlsaSequencer_i
+  Driver.seq_open name, streams -> AlsaSequencer_i
+  Driver.seq_open name, streams, mode -> AlsaSequencer_i
 
 Open the ALSA sequencer.
 
-Parameters:
-      [name]    The sequencer's "name". This is not a name you make up for your own purposes;
-                it has special significance to the ALSA library.
-                Usually you need to pass "default" here.
-      [streams] The read/write mode of the sequencer. Can be one of three values:
+Parameters
+[name]    The sequencer's "name". This is not a name you make up for your own purposes;
+          it has special significance to the ALSA library.
+          Usually you need to pass "default" here. This is also the default.
 
+[streams] The read/write mode of the sequencer. Can be one of three values:
           * SND_SEQ_OPEN_OUTPUT - open the sequencer for output only
           * SND_SEQ_OPEN_INPUT - open the sequencer for input only
-          * SND_SEQ_OPEN_DUPLEX - open the sequencer for output and input
+          * SND_SEQ_OPEN_DUPLEX - open the sequencer for output and input, the default
 
-          Note:
+          _Note_:
           Internally, these are translated to O_WRONLY, O_RDONLY and O_RDWR respectively and used
           as the second argument to the C library open() call.
 
-       [mode] Optional modifier. Can be either 0, or else SND_SEQ_NONBLOCK, which will make
-              read/write operations non-blocking. This can also be set later using
-              AlsaSequencer_i#nonblock.
-              The default is blocking mode.
+[mode] Optional modifier. Can be either 0 (default), or else SND_SEQ_NONBLOCK, which will make
+       read/write operations non-blocking. This can also be set later using
+       AlsaSequencer_i#nonblock.
+       The default is blocking mode.
 
-Returns:
-  A AlsaSequencer_i instance. This instance must be kept and passed to most of
-  the other sequencer functions.
+Returns an AlsaSequencer_i instance. This instance must be kept and passed to most of
+the other sequencer functions.
 
 Creates a new handle and opens a connection to the kernel sequencer interface.
 After a client is created successfully, an event with SND_SEQ_EVENT_CLIENT_START
@@ -334,77 +337,57 @@ This is the main namespace. Ruby RealTime Sequencer. But how RT can it be?
 Currently it contains the Alsa (Advanced Linux Sound Architecture) MIDI Driver
 plus supporter classes, in particular Sequencer.
 
-The following rules were used:
-
-  - This is a literal implementation of the almost full alsa snd_seq API
-
-  - functions have been made methods by using arg0 as self.
-
-  - the snd_seq_ prefix was removed for methods, but not for constants.
-
-  - special case seq_open for snd_seq_open, since just 'open' would conflict with
-    Kernel#open
-
-  - the support classes have methods that do not require the Alsa constants anymore
-
-  - obvious defaults value for parameters are applied, whereas the original API is C,
-    which has no defaults
-
-  - where values are often used as pairs (or even a c-struct) as in client+port=address
-   I allow passing the address as a tuple (array with elements at 0 and 1).
-
-  - similarly, instances of the Driver classes can be used, or even the higher level
+The following rules were used
+* This is a literal implementation of the almost full alsa snd_seq API
+* functions have been made methods by using arg0 as self.
+* the snd_seq_ prefix was removed for methods, but not for constants.
+* special case seq_open for snd_seq_open, since just 'open' would conflict with
+  Kernel#open
+* the support classes have methods that do not require the Alsa constants anymore
+* obvious defaults value for parameters are applied, whereas the original API is C,
+  which has no defaults
+* where values are often used as pairs (or even a c-struct) as in client+port=address
+  I allow passing the address as a tuple (array with elements at 0 and 1).
+* similarly, instances of the Driver classes can be used, or even the higher level
   classes (not always) where the original API expects the id or handle to be passed.
   This is always the case for queueids, where AlsaMidiQueue_i can be used, or for portids
   where AlsaMidiPort_i can be used.
-
-  - methods starting with set (snd_seq_..._set), and with a single (required) argument have been
-    replaced by the equivalent setter in ruby (as 'port=')
-
-  - set methods with 0 or 2 or more arguments still remain
-
-  - for methods starting with get_ this prefix has been removed as well.
-
-  - getters that return a boolean are suffixed with '?'.
-
-  - errors became exceptions, in particular AlsaMidiError and ENOSPC somewhere.
-   Exceptions on this rule are methods used in finalizers, since exceptions in finalizers
-   are really not funny. So close/free/clear or whatever return their original value.
-   Currently now errormessage is printed, but I may change this in the future. This depends
-   on the failchance of given methods.
-
-  - integers that could be (or should be) interpreted as booleans have been replaced by booleans
-
-  - methods with a return argumentaddress in C have this method now return this parameter.
+* methods starting with set (snd_seq_..._set), and with a single (required) argument have been
+  replaced by the equivalent setter in ruby (as 'port=')
+* set methods with 0 or 2 or more arguments still remain
+* for methods starting with get_ this prefix has been removed as well.
+* getters that return a boolean are suffixed with '?'.
+* errors became exceptions, in particular AlsaMidiError and ENOSPC somewhere.
+  Exceptions on this rule are methods used in finalizers, since exceptions in finalizers
+  are really not funny. So close/free/clear or whatever return their original value.
+  Currently now errormessage is printed, but I may change this in the future. This depends
+  on the failchance of given methods.
+* integers that could be (or should be) interpreted as booleans have been replaced by booleans
+* methods with a return argumentaddress in C have this method now return this parameter.
   In some cases this lead to returning a tuple.
-
-  - methods that would always return nil (though the original may not) now return self
-
-  - in some cases, some parameters became meaningless.
-
-  - normally in C, you would operate on the event object direct, using the structure definition.
-   This is no longer possible, and where names where unique within the union the fieldname became
-   a setter, getter. For ambiguous situations, the same approach is chosen, but the backend uses
-   the type as set in the event.
-   So:
+* methods that would always return nil (though the original may not) now return self
+* in some cases, some parameters became meaningless.
+* normally in C, you would operate on the event object direct, using the structure definition.
+  This is no longer possible, and where names where unique within the union the fieldname became
+  a setter, getter. For ambiguous situations, the same approach is chosen, but the backend uses
+  the type as set in the event.
+  So:
      ev = ev_malloc
      ev.channel = 7
-   is wrong as the type is not yet set and we must choose between ev.data.note.channel or
-   ev.data.control.channel.
-   But:
+  is wrong as the type is not yet set and we must choose between ev.data.note.channel or
+  ev.data.control.channel.
+  But:
      ev = ev_malloc
      ev.note = 63
-   is perfectly OK, since the +note+ selector is unambiguous (ev.data.note.note).
-
-  - in some cases, alsa uses ambigues names. Example the macro snd_seq_ev_set_source only sets
-   the port, and not the client. ev.source.port = p.
-   This has been renamed to source_port, similarly source_client source, and the three setters are
-   included. However for 'queue' this would not work, so
-   ev.queue refers to the queue on which the event was send or received while
-   ev.queue_queue refers to the queue as a subject of a queue control event
-
-  - all other queue params have a queue_ prefix, including value.  ev.value is the control value.
-   Example: ev.data.queue.param.value  should be replaced with ev.queue_value.
+  is perfectly OK, since the +note+ selector is unambiguous (ev.data.note.note).
+* in some cases, alsa uses ambigues names. Example the macro snd_seq_ev_set_source only sets
+  the port, and not the client. ev.source.port = p.
+  This has been renamed to source_port, similarly source_client source, and the three setters are
+  included. However for 'queue' this would not work, so
+  ev.queue refers to the queue on which the event was send or received while
+  ev.queue_queue refers to the queue as a subject of a queue control event
+* all other queue params have a queue_ prefix, including value.  ev.value is the control value.
+  Example: ev.data.queue.param.value  should be replaced with ev.queue_value.
 
 *IMPORTANT*: using this API as is, will not be the most efficient way to deal with
 alsa_midi.so.  Please use the ruby classes and additional methods in this library.
@@ -456,10 +439,6 @@ Init_alsa_midi()
   rb_define_module_function(alsaDriver, "strerror", RUBY_METHOD_FUNC(wrap_snd_strerror), 1);
   rb_define_module_function(alsaDriver, "parse_address", RUBY_METHOD_FUNC(wrap_snd_seq_parse_address), 1);
 
-  alsaPortSubscriptionClass = rb_define_class_under(alsaDriver, "AlsaPortSubscription_i", rb_cObject);
-  alsaClientInfoClass = rb_define_class_under(alsaDriver, "AlsaClientInfo_i", rb_cObject);
-  alsaClientPoolClass = rb_define_class_under(alsaDriver, "AlsaClientPool_i", rb_cObject);
-  alsaRemoveEventsClass = rb_define_class_under(alsaDriver, "AlsaRemoveEvents_i", rb_cObject);
 
   alsa_seq_init();
   alsa_midi_queue_init();

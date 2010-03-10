@@ -1,6 +1,6 @@
 #!/usr/bin/ruby1.9.1 -w
 
-require_relative 'alsa_midi.so'
+require_relative 'driver/alsa_midi.so'
 require 'forwardable'
 
 module RRTS

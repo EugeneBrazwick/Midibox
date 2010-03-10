@@ -3,6 +3,7 @@
 #pragma interface
 
 extern VALUE alsaClientInfoClass;
+
 extern void alsa_midi_client_init();
 
 /* portid can be unset, and both can be an instance of client or port resp.

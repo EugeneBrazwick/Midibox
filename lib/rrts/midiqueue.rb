@@ -1,4 +1,4 @@
-#!/usr/bin/ruby1.9.1 -w
+#!/usr/bin/ruby -w
 # encoding: utf-8
 
 require_relative 'driver/alsa_midi.so'
@@ -21,6 +21,8 @@ module RRTS
 #  * [block] if passed the queue is auto-freed
 #  * [params] allowed options:
 #       * [tempo] - quarters per minute (int) or a Tempo
+#                   or a hash suitable for #tempo=
+#       * any option for the Tempo constructor
     def initialize sequencer, name, params = nil
       @sequencer = sequencer
       @seq_handle = sequencer.instance_variable_get(:@handle)
@@ -32,6 +34,9 @@ module RRTS
             case k
             when :tempo
               tempo = case v when Integer then Tempo.new(v) else v end
+            when :beats, :frames, :ticks, :smpte_timing, :ticks_per_beat,
+                 :ticks_per_frame, :ticks_per_quarter
+              (tempo ||= {})[k] = v
             else raise RRTSError.new("illegal parameter '#{k}' for MidiQueue")
             end
           end
@@ -64,9 +69,15 @@ module RRTS
       @id = @seq_handle = @sequencer = nil
     end
 
-    # Parameters:
-    # * [tmpo] Tempo instance
+    # Assign a Tempo, or a hash containing :beats or :frames and :ticks
+    # * [tmpo] Tempo instance, or a hash
     def tempo= tmpo
+      if Hash === tmpo
+        beats = tmpo[:beats] || tmpo[:frames]
+        tmpo[:smpte_timing] = tmpo[:frames]
+        tmpo[:beats] = tmpo[:frames] = nil
+        tmpo = Tempo.new beats, tmpo
+      end
       @seq_handle.set_queue_tempo @id, tmpo
     end
 

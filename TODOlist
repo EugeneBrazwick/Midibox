@@ -16,3 +16,7 @@
           I noticed the following: the INT-handler truly gets first. So we flush the queue.
           After that NoteOff's for hanging notes are sent, but to no avail
           Finally we get in the ensure of the Sequencer constructor.
+0007 do mrt 11 21:39:48 CET 2010 BUG using alsa mallocs causes a critical condition since it uses
+          malloc (probably) and not the ruby wrappers.  ALLOC or ALLOC_N.
+          Also a failure should raise NoMemError. The least I can do is make sure these all go
+          trough one container.

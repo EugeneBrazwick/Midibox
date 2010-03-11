@@ -94,6 +94,7 @@ previous results save.
 17) Crescendo. Replaces a specific note with a specific parameter change. So can use a specific
 key to add crescendo's to the music.
 18) notemapping. Inverting or shifting and modulating.
+19) echoes... almost forgot this one.
 
 * Important concept:  original recording remain intact.  All operations following are merely
 logical, though it should be possible to _realize_ parts.

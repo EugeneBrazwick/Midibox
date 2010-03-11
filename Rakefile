@@ -5,7 +5,7 @@ require 'rake/rdoctask'
 ALSALIB='lib/rrts/driver/alsa_midi.so'
 MIDI_IN_PORT = '20:0'
 MIDI_OUT_PORT = '20:1'
-
+RUBY = 'ruby -w -I lib'
 CLEAN.include('*.o', '*.so')
 CLOBBER.include('*.log')
 
@@ -31,6 +31,10 @@ file ALSALIB => FileList['lib/rrts/driver/*.cpp'] do
   end
 end
 
+file 'extsrc/miniArp'=>['extsrc/miniArp.c'] do
+  sh 'cc /usr/lib/libasound.so extsrc/miniArp.c -o extsrc/miniArp -g -O0'
+end
+
 desc 'build the alsamidi shared library'
 task :build_alsamidi => [ALSALIB] do
 end
@@ -41,5 +45,24 @@ end
 
 desc 'play a track using rplaymidi++'
 task :playtest do
-  sh "ruby -w -I lib bin/rplaymidi++ --port=#{MIDI_OUT_PORT} fixtures/eurodance.midi"
+  sh "#{RUBY} bin/rplaymidi++ --port=#{MIDI_OUT_PORT} fixtures/eurodance.midi"
+end
+
+desc 'play original miniarp'
+task :play_original_miniarp => ['extsrc/miniArp'] do
+  sh %q{echo 'Please use [k]aconnect to connect miniArp to year keyboard...'}
+  sh %q{echo 'Press Ctrl-C to quit'}
+  sh 'extsrc/miniArp 120 fixtures/miniarp.dat'
+end
+
+desc 'play rminiarp'
+task :play_rminiarp do
+  sh %q{echo 'Please use [k]aconnect to connect miniarp to year keyboard...'}
+  sh %q{echo 'Press Ctrl-C to quit'}
+  sh "#{RUBY} bin/miniarp 120 fixtures/miniarp.dat"
+end
+
+desc 'panic'
+task :panic do
+  sh "#{RUBY} bin/panic 20:1"
 end

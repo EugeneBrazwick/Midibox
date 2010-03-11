@@ -67,4 +67,20 @@ public:
 
 extern VALUE param2sym(uint param);
 
+#if defined(TRACE)
+#define trace(arg) fprintf(stderr, arg "\n");
+#define trace1(arg, a) fprintf(stderr, arg "\n", a);
+#define trace2(arg, a, b) fprintf(stderr, arg "\n", a, b);
+#define trace3(arg, a, b, c) fprintf(stderr, arg "\n", a, b, c);
+#define trace4(arg, a, b, c, d) fprintf(stderr, arg "\n", a, b, c, d);
+#else
+#define trace(arg)
+#define trace1(arg, a)
+#define trace2(arg, a, b)
+#define trace3(arg, a, b, c)
+#define trace4(arg, a, b, c, d)
+#endif
+
+#define INSPECT(x) RSTRING_PTR(rb_inspect(x))
+
 #endif // _RRTS_ALSA_MIDI_H

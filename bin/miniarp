@@ -6,7 +6,7 @@
 TICKS_PER_QUARTER = 128
 MAX_SEQ_LEN = 64
 
-require_relative 'rrts'
+require 'rrts/rrts'
 
 include RRTS
 include Driver
@@ -21,7 +21,10 @@ def parse_sequence
 #   FILE *f;
 # char c;
   sequence = []
-  sequence[0] = sequence[1] = sequence[2] = []
+#   sequence[0] = sequence[1] = sequence[2] = []  #BEGINNER MISTAKE
+  for i in (0..2)
+    sequence[i] = []
+  end
   File::open(@seq_filename, "r") do |file|
     @seq_len = 0
     chars = file.chars
@@ -47,6 +50,7 @@ def parse_sequence
 #       puts "seq_len now is #@seq_len"
     end
   end
+  puts "sequence is now #{sequence.inspect}"
   @sequence = sequence
 end
 
@@ -64,7 +68,11 @@ def arpeggio
     ev = ev_malloc
     ev.clear
 #     puts "sequence=#{@sequence.inspect}"
-    ev.set_note(0, @sequence[2][l1] + @transpose, 127, @sequence[1][l1])
+    # we use note and note noteon here!
+    note = @sequence[2][l1] + @transpose
+    duration = @sequence[1][l1]
+    puts "note #{note}, duration #{duration}, l1=#{l1}, transpose=#@transpose"
+    ev.set_note 0, note, 127, duration
     ev.schedule_tick @queue, 0, @tick
     ev.source = @port_out
     ev.set_subs
@@ -134,12 +142,12 @@ end
 @swing = @transpose = @tick = 0
 @seq_filename = ARGV[1]
 sequence = parse_sequence
-require_relative 'sequencer'
+require 'rrts/sequencer'
 Sequencer.new 'miniArp' do |seq|
   @sequencer = seq
   @port_out = MidiPort.new(seq, "miniArp O", read: true, subs_read: true, application: true)
   @port_in = MidiPort.new(seq, 'miniArp I', write: true, subs_write: true, application: true)
-  require_relative 'midiqueue'
+  require 'rrts/midiqueue'
   @queue = MidiQueue.new seq, 'miniArp'
   seq.client_pool_output = (@seq_len << 1) + 4
   set_tempo

@@ -15,7 +15,7 @@
 #    the default queuespace == 16384 == 2**14
 #    you MUST use a queue, or at least start q 0?
 #    The ALSA API proves ones more to be crappy.  There is nothing invalid about the parameters....
-require_relative 'sequencer'
+require 'rrts/sequencer'
 include RRTS
 Sequencer.new('rplaymidi') do |sequencer|
   if ARGV[0]
@@ -26,7 +26,7 @@ Sequencer.new('rplaymidi') do |sequencer|
   end
   src_port = MidiPort.new sequencer, 'panic', midi_generic:true, application:true
   src_port.connect_to out_port
-  require_relative 'midiqueue'
+  require 'rrts/midiqueue'
   queue = MidiQueue.new(sequencer, "panic")
 #   queue = nil   # and you get EINVAL on drain_output
   # NOTE: the API looks ugly.

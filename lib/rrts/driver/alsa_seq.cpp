@@ -3,6 +3,7 @@
 // To create Makefile:    ruby ./extruby.rb
 
 // #define DUMP_API
+// #define TRACE
 #define DEBUG
 
 #pragma implementation
@@ -359,7 +360,7 @@ static const output_method *dispatch[NrofMethods] = {
 // returns remaining nr of events (>=0)
 static inline VALUE do_event_output(snd_seq_t *seq, snd_seq_event_t *ev, VALUE v_func)
 {
-//   fprintf(stderr, "***do_event_output tp=%d, ch=%d, source.client=%d,flags=%d\n", ev->type, snd_seq_ev_is_note_type(ev) ? ev->data.note.channel : snd_seq_ev_is_control_type(ev) ? ev->data.control.channel : -1, ev->source.client, ev->flags);
+  trace4("***do_event_output tp=%d, ch=%d, source.client=%d,flags=%d", ev->type, snd_seq_ev_is_note_type(ev) ? ev->data.note.channel : snd_seq_ev_is_control_type(ev) ? ev->data.control.channel : -1, ev->source.client, ev->flags)
 #if defined(DEBUG)
   if (AlsaSequencer_dump_notes)
     {
@@ -370,9 +371,9 @@ static inline VALUE do_event_output(snd_seq_t *seq, snd_seq_event_t *ev, VALUE v
 #if defined(DUMP_API)
   fprintf(DUMP_STREAM, "snd_seq_event_output*(%p, %p)\n", seq, ev);
 #endif
-  fprintf(stderr, "block when queue is full? time=%ld\n", time(0));
+  trace2("block when queue is full? time=%ld, v_func=%s", time(0), INSPECT(v_func))
   const int r = (*dispatch[NUM2INT(v_func)])(seq, ev);
-  fprintf(stderr, "-> %d, time=%ld\n", r, time(0));
+  trace2("-> %d, time=%ld", r, time(0))
   if (r < 0)
     {
       if (r == -EINVAL)
@@ -393,6 +394,7 @@ static inline VALUE do_event_output(snd_seq_t *seq, snd_seq_event_t *ev, VALUE v
 static inline void
 WRITE_CHANNEL_IN_EVENT(snd_seq_event_t &ev, VALUE v_channel)
 {
+  trace("WRITE_CHANNEL_IN_EVENT")
   if (snd_seq_ev_is_note_type(&ev))
     ev.data.note.channel = (NUM2INT(v_channel) - 1) & 0xf;
   else
@@ -402,6 +404,7 @@ WRITE_CHANNEL_IN_EVENT(snd_seq_event_t &ev, VALUE v_channel)
 static VALUE  // callback for rb_iterate, val4 = seq+ev+retval+EOutput
 send_callback(VALUE v_channel, VALUE v_val4)
 {
+  trace2("send_callback, channel=%s, val4=%s", INSPECT(v_channel), INSPECT(v_val4))
 //   fprintf(stderr, "%s:%d: in send_callback\n", __FILE__, __LINE__);
   // rb_check_type(v_val4, T_ARRAY); We control this
   VALUE v_seq = rb_ary_entry(v_val4, 0);
@@ -411,11 +414,12 @@ send_callback(VALUE v_channel, VALUE v_val4)
   Data_Get_Struct(v_ev, snd_seq_event_t, ev);
   snd_seq_t *seq;
   Data_Get_Struct(v_seq, snd_seq_t, seq);
-//   fprintf(stderr, "%s:%d: in send_callback\n", __FILE__, __LINE__);
+  trace3("%s:%d: in send_callback, outfunc=%s", __FILE__, __LINE__, INSPECT(v_outfunc))
   WRITE_CHANNEL_IN_EVENT(*ev, v_channel);
-  VALUE v_retval = do_event_output(seq, ev, NUM2INT(v_outfunc));
+  VALUE v_retval = do_event_output(seq, ev, v_outfunc);
 //   fprintf(stderr, "%s:%d: in send_callback\n", __FILE__, __LINE__);
   rb_ary_store(v_val4, 2, v_retval);
+  trace1(":%d:done", __LINE__)
   return Qnil;
 }
 
@@ -424,17 +428,18 @@ static VALUE
 do_event_output(bool ch_ref, snd_seq_t *seq, VALUE v_seq, VALUE v_ev, snd_seq_event_t &ev,
                 VALUE v_func)
 {
+  trace2("do_event_output, ch_ref=%d, v_func=%s", ch_ref, INSPECT(v_func))
   if (ch_ref) // but no longer used. Bit of heuristics instead
     {
       VALUE v_channel = rb_iv_get(v_ev, "@channel"); // can be Enumerable! (or int in 1..16)
       if (rb_respond_to(v_channel, rb_intern("each")))
         {
-//           fprintf(stderr, "@channel.respond_to?(:each)!!!\n");
+          trace("@channel.respond_to?(:each)!!!")
           VALUE vev = Data_Wrap_Struct(alsaMidiEventClass, 0/*mark*/, 0/*free*/, &ev);
           VALUE retval = Qnil;
           VALUE val4 = rb_ary_new3(4, v_seq, vev, retval, v_func);
           // I hope this cast is valid?
-//           fprintf(stderr, "callng rb_iterate on v_channel\n");
+          trace1("calling rb_iterate on v_channel, v_channel=%s", INSPECT(v_channel))
           rb_iterate(rb_each, v_channel, (VALUE (*)(...))send_callback, val4);
           // return r; This is the enum!! (so v_channel)
           return rb_ary_entry(val4, 2);
@@ -450,6 +455,7 @@ do_event_output(bool ch_ref, snd_seq_t *seq, VALUE v_seq, VALUE v_ev, snd_seq_ev
 static inline uint
 PARAM_IS_MSB_LSB_PAIR(uint param)
 {
+  trace("PARAM_IS_MSB_LSB_PAIR")
   if (param >= MIDI_CTL_MSB_BANK && param <= MIDI_CTL_MSB_GENERAL_PURPOSE4)
     return param + (MIDI_CTL_LSB_BANK - MIDI_CTL_MSB_BANK);
   switch (param)
@@ -463,7 +469,7 @@ PARAM_IS_MSB_LSB_PAIR(uint param)
 static inline void
 WRITE_TIME_IN_CHANNEL_i(VALUE v_time, snd_seq_event_t &ev, bool have_sender_queue)
 {
-//   fprintf(stderr, "WRITE_TIME_IN_CHANNEL_i, have_sender_queue=%d\n", have_sender_queue);
+  trace1("WRITE_TIME_IN_CHANNEL_i, have_sender_queue=%d", have_sender_queue)
   if (!RTEST(v_time))
     {
       if (!have_sender_queue)
@@ -533,6 +539,7 @@ static uint decode_a_note(const char *pat)
 static VALUE
 wrap_snd_seq_event_output_func(VALUE v_seq, VALUE v_ev, EOutput func)
 {
+  trace("snd_seq_event_output_func")
   snd_seq_t *seq;
   Data_Get_Struct(v_seq, snd_seq_t, seq);
   VALUE v_func = INT2NUM(func);

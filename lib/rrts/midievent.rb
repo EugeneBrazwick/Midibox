@@ -422,7 +422,7 @@ module RRTS
 #     ControllerEvent.new channel, :bank_select, [1, 23]
 #     This would select bank 1*128+23.
     def initialize channel, param = nil, value = 0, params = {}
-      case param when AlsaMidiEvent_i then super(channel, parama)
+      case param when AlsaMidiEvent_i then super(channel, param)
       else
         params, value = value, 0 if Hash === value
         params[:param] = Driver::param2sym(param)

@@ -75,6 +75,7 @@ private
   def initialize client_name = nil, params = nil, &block
     @client = @handle = nil
     @client_id = @ports = @ports_index = @clients = nil  # not guaranteed open does this
+    @queues = nil
     open client_name, params, &block
   end
 
@@ -138,10 +139,18 @@ public
   # closes the sequencer. Must be called to free resources, unless a block is passed to 'new'
   def close
     return unless @handle
+    if @queues
+      t = @queues
+      @queues = nil
+      for k, queue in t
+        queue.free
+      end
+    end
     t = @handle
     @handle = nil
     t.close
     @client = @client_id = @ports = @ports_index = @clients = nil
+    @queues = nil
   end
 
   # us. a MidiClient
@@ -373,6 +382,22 @@ public
     @clients = @ports = nil
     ports
   end
+
+  # Create a queue with given name, plus options
+  # See MidiQueue#new
+  # Important, a queue created using this method is automatically freed
+  # the queuename should be unique however.
+  def create_queue queuename, options = nil
+    require_relative 'midiqueue'
+    (@queues ||= {})[queuename] = MidiQueue.new self, queuename, options
+  end
+
+  # return the named queue. Bit boring since most apps only have 1 queue
+  def queue name
+    @queues && @queues[name]
+  end
+
+  attr :queues
 end # Sequencer
 
 end # RRTS

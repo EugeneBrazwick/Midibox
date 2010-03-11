@@ -267,6 +267,14 @@ wrap_snd_seq_queue_tempo_set_skew_base(VALUE v_tempo, VALUE v_skew)
 }
 
 /* tempo=(something)
+I quote here the Alsa documentation:
+"Set the tempo of a queue_status container."
+So there it is...
+
+It should be the beatlength in microseconds.
+So it is 60_000_000 / bpm
+bpm is aka qpm
+The number of ticks per beat cannot be changed while the queue runs, but the tempo can be.
 */
 static VALUE
 wrap_snd_seq_queue_tempo_set_tempo(VALUE v_tempo, VALUE v_val)

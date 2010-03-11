@@ -1339,6 +1339,49 @@ wrap_snd_seq_stop_queue(VALUE v_seq, VALUE v_qid)
   return Qnil;
 }
 
+/* call-seq:
+      AlsaQueueInfo_i#queue_usage queue -> bool
+
+Parameters:
+  q       queue id or MidiQueue
+
+Returns:
+  true = client is allowed to access the queue, false = not allowed,
+  otherwise it raise AlsaMidiError
+*/
+static VALUE
+wrap_snd_seq_get_queue_usage(VALUE v_seq, VALUE v_qid)
+{
+  snd_seq_t *seq;
+  Data_Get_Struct(v_seq, snd_seq_t, seq);
+  RRTS_DEREF_DIRTY(v_qid, @id);
+#if defined(DUMP_API)
+  fprintf(DUMP_STREAM, "snd_seq_get_queue_usage(%p, %d)\n", seq, NUM2INT(v_qid));
+#endif
+  const int r = snd_seq_get_queue_usage(seq, NUM2INT(v_qid));
+  if (r < 0) RAISE_MIDI_ERROR("fetching usage", r);
+  return INT2BOOL(r);
+}
+
+/* call-seq:
+    set_queue_usage queue, bool -> self
+
+Allow or disallow the use of this queue. But to whom? And why?
+*/
+static VALUE
+wrap_snd_seq_set_queue_usage(VALUE v_seq, VALUE v_qid, VALUE v_bool)
+{
+  snd_seq_t *seq;
+  Data_Get_Struct(v_seq, snd_seq_t, seq);
+  RRTS_DEREF_DIRTY(v_qid, @id);
+#if defined(DUMP_API)
+  fprintf(DUMP_STREAM, "snd_seq_set_queue_usage(%p, %d, %d)\n", seq, NUM2INT(v_qid), BOOL2INT(v_bool));
+#endif
+  const int r = snd_seq_set_queue_usage(seq, NUM2INT(v_qid), BOOL2INT(v_bool));
+  if (r < 0) RAISE_MIDI_ERROR("fetching usage", r);
+  return v_seq;
+}
+
 /* AlsaQueueStatus_i queue_status(q [, status ])
 
 obtain the running state of the queue
@@ -1801,6 +1844,8 @@ void alsa_seq_init()
   rb_define_method(alsaSequencerClass, "start_queue", RUBY_METHOD_FUNC(wrap_snd_seq_start_queue), 1);
   rb_define_method(alsaSequencerClass, "stop_queue", RUBY_METHOD_FUNC(wrap_snd_seq_stop_queue), 1);
   rb_define_method(alsaSequencerClass, "query_named_queue", RUBY_METHOD_FUNC(wrap_snd_seq_query_named_queue), 1);
+  rb_define_method(alsaSequencerClass, "queue_usage?", RUBY_METHOD_FUNC(wrap_snd_seq_get_queue_usage), 1);
+  rb_define_method(alsaSequencerClass, "queue_usage=", RUBY_METHOD_FUNC(wrap_snd_seq_set_queue_usage), 2);
   rb_define_method(alsaSequencerClass, "next_client", RUBY_METHOD_FUNC(wrap_snd_seq_query_next_client), 1);
   rb_define_method(alsaSequencerClass, "next_port", RUBY_METHOD_FUNC(wrap_snd_seq_query_next_port), 1);
   rb_define_method(alsaSequencerClass, "query_next_client", RUBY_METHOD_FUNC(wrap_snd_seq_query_next_client), 1);

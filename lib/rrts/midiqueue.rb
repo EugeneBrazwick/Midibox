@@ -34,7 +34,7 @@ module RRTS
             case k
             when :tempo
               tempo = case v when Integer then Tempo.new(v) else v end
-            when :beats, :frames, :ticks, :smpte_timing, :ticks_per_beat,
+            when :beats, :bpm, :qpm, :frames, :ticks, :ppq, :smpte_timing, :ticks_per_beat,
                  :ticks_per_frame, :ticks_per_quarter
               (tempo ||= {})[k] = v
             else raise RRTSError.new("illegal parameter '#{k}' for MidiQueue")
@@ -61,21 +61,23 @@ module RRTS
 
     public
 
-    # free the queue.
+    # free the queue. If it is still running it is stopped first
     def free
       return unless @id
+      stop if running?
       t, @seq_handle = @seq_handle, nil
       t.free_queue @id
       @id = @seq_handle = @sequencer = nil
     end
 
-    # Assign a Tempo, or a hash containing :beats or :frames and :ticks
+    # Assign a Tempo, or a hash containing :beats, :bpm, :qpm or :frames plus :ticks (optionally)
     # * [tmpo] Tempo instance, or a hash
     def tempo= tmpo
       if Hash === tmpo
-        beats = tmpo[:beats] || tmpo[:frames]
+        beats = tmpo[:beats] || tmpo[:bpm] || tmpo[:qpm] || tmpo[:frames]
         tmpo[:smpte_timing] = tmpo[:frames]
-        tmpo[:beats] = tmpo[:frames] = nil
+        tmpo.delete_if{|k,v| [:beats, :bpm, :qpm, :frames].include?(k) }
+#         puts "beats=#{beats}, hash is now #{tmpo.inspect}"
         tmpo = Tempo.new beats, tmpo
       end
       @seq_handle.set_queue_tempo @id, tmpo
@@ -91,14 +93,39 @@ module RRTS
       @seq_handle.queue_info @id
     end
 
+    # start the queue. Returns self
     def start
+#       puts "#{File.basename(__FILE__)}:#{__LINE__}:running? -> #{running?}"
       @seq_handle.start_queue @id
+#       puts "#{File.basename(__FILE__)}:#{__LINE__}:Started. running? -> #{running?}"
       self
     end
 
+    # stop the queue, returns self
     def stop
+#       puts "#{File.basename(__FILE__)}:#{__LINE__}:running? -> #{running?}"
       @seq_handle.stop_queue @id
+#       puts "#{File.basename(__FILE__)}:#{__LINE__}:Stopped, running? -> #{running?}"
       self
+    end
+
+    # is the client allowed to use it?
+    def usage?
+      @seq_handle.queue_usage? @id
+    end
+
+    # (dis)allow usage
+    def usage= bool
+      @seq_handle.queue_usage = bool
+    end
+
+    # returns true if the queue has been started
+    # *Important*: there is a delay. Presumably because events are send out and
+    # only on receiving these the state is actually changed.
+    # So this method is slightly unreliable
+    def running?
+#       puts "#{File.basename(__FILE__)}:#{__LINE__}:status.status=#{status.status}"
+      @id && status.status != 0
     end
 
 #     ConditionMap = {:input=>SND_SEQ_REMOVE_INPUT, :output=>SND_SEQ_REMOVE_OUTPUT,
@@ -204,7 +231,7 @@ module RRTS
              @smpte_timing, ticks = true, 40 if v
            when :ticks
              ticks = v
-           when :ticks_per_quarter, :ticks_per_beat
+           when :ticks_per_quarter, :ticks_per_beat, :ppq
              raise RRTSError.new("illegal parameter '#{k}' for Tempo") if @smpte_timing
              ticks = v
            when :ticks_per_frame

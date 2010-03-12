@@ -2,6 +2,7 @@
 
 require_relative 'driver/alsa_midi.so'
 require 'forwardable'
+require_relative 'rrts'
 
 module RRTS
 
@@ -117,7 +118,7 @@ module RRTS
              # can be a range or maybe even an array of channels!!
             # or an array of ranges...
             @channel = v
-#             puts "#{File.basename(__FILE__)}:#{__LINE__}:channel:=#@channel"
+#             tag "channel:=#@channel"
           when :duration then @duration = v
           when :velocity then @velocity = v
           when :off_velocity then @off_velocity = v
@@ -156,6 +157,7 @@ module RRTS
     # coarse_b should be true if we need to send a single event.
     # otherwise an MSB + LSB should both be send
     def debunkparam_i
+#       tag "param = #{@param.inspect}"
       if Symbol === @param
         p = Symbol2Param[@param] or raise RRTSError.new("Bad paramname '#@param'")
         return p, @flags[:coarse]
@@ -345,6 +347,7 @@ module RRTS
 
     # It is allowed to use strings like 'C4' or 'd5' or 'Eb6' for 'note' (arg1)
     def initialize channel, note = nil, params = {}
+      @off_velocity = 0
       case note when AlsaMidiEvent_i then super(channel, note)
       else
         super :noteoff, channel, note, params
@@ -361,6 +364,7 @@ module RRTS
     # new(channel, note, velocity [, ...])
     # It is allowed to use strings like 'C4' or 'd5' or 'Eb6' for 'note' (arg1)
     def initialize arg0, arg1 = nil, velocity = nil, params = {}
+      @off_velocity = 0
       case arg1 when AlsaMidiEvent_i then super(arg0, arg1)
       else
         params[:velocity] = velocity

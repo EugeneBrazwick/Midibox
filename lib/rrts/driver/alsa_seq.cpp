@@ -484,6 +484,7 @@ WRITE_TIME_IN_CHANNEL_i(VALUE v_time, snd_seq_event_t &ev, bool have_sender_queu
   // if (ev.flags & SND_SEQ_TIME_STAMP_TICK)  flags is 0!!!!!
   if (!(ev.flags & SND_SEQ_TIME_STAMP_REAL))
     {
+       // this is basicly what snd_seq_ev_schedule_tick does!
 //       fprintf(stderr, "using time\n");
       ev.time.tick = NUM2UINT(v_time);
     }
@@ -827,7 +828,8 @@ wrap_snd_seq_event_output_buffer(VALUE v_seq, VALUE v_ev)
 }
 
 /* int event_output_direct(event)
-See #event_output. The same, except no buffer is used and timestamping is impossible.
+See #event_output. The same, except no buffer is used but timestamping is still possible,
+if there is a queue.
 */
 static VALUE
 wrap_snd_seq_event_output_direct(VALUE v_seq, VALUE v_ev)

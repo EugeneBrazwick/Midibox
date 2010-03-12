@@ -1,0 +1,218 @@
+#!/usr/bin/ruby -w
+
+#  miniArp.c by Matthias Nagorni
+# See http://www.suse.de/~mana/miniArp.c
+
+TICKS_PER_QUARTER = 128
+CHANNEL = 1
+VELOCITY = 127
+
+require 'rrts/rrts'
+
+include RRTS
+
+# Germans call b h
+Map1 = {'c'=>0, 'd'=>2, 'e'=>4, 'f'=>5, 'g'=>7, 'a'=>9, 'b'=>11, 'h'=>11,
+        'C'=>0, 'D'=>2, 'E'=>4, 'F'=>5, 'G'=>7, 'A'=>9, 'B'=>11, 'H'=>11
+        }
+
+class ArpeggioNote
+  private
+  def initialize note, duration, delta
+    @note, @duration, @delta = note, duration, delta
+  end
+  public
+
+  attr :note, :duration, :delta
+end
+
+def parse_sequence filename
+
+#   FILE *f;
+# char c;
+  sequence = []
+#   sequence[0] = sequence[1] = sequence[2] = []  #BEGINNER MISTAKE
+  File::open(filename, "r") do |file|
+    chars = file.chars
+    loop do
+      c = chars.next
+#       puts "#{File.basename(__FILE__)}:#{__LINE__}:read '#{c}'"
+      break if c == "\n"
+      note = Map1[c] or fail("Bad note '#{c}'")
+      c =  chars.next
+      if c == '#'
+        note += 1
+        c = chars.next
+      end
+      note += 12 * c.to_i
+      duration = TICKS_PER_QUARTER / chars.next.to_i
+      delta = TICKS_PER_QUARTER / chars.next.to_i
+      sequence << ArpeggioNote.new(note, duration, delta)
+    end
+  end
+  sequence
+end
+
+def arpeggio
+  for arpnote, l1 in @sequence.each_with_index
+    note = arpnote.note + @transpose
+    duration = arpnote.duration
+    ev = NoteEvent.new CHANNEL, note, VELOCITY, duration: duration,
+        sender_queue: @queue, tick: @tick, source: @port_out,
+        dest: @sequencer.any_subscribers
+    @sequencer.event_output_direct ev
+    dt = (l1 % 2 == 0) ? @swing.to_f / 16384.0 : @swing.to_f / 16384.0
+    @tick += (arpnote.delta.to_f * (1.0 + dt)).to_i
+  end
+#
+#   ev = ev_malloc
+#   ev.clear
+#   ev.type = SND_SEQ_EVENT_ECHO
+#   ev.schedule_tick @queue,  0, @tick
+#   ev.dest = @port_in
+  @sequencer.event_output_direct EchoEvent.new(sender_queue: @queue,
+      tick: @tick, dest: @port_in)
+end
+
+# also called when modwheel is used.
+def set_tempo bpm
+#   queue_tempo = queue_tempo_malloc
+#   tempo = 60_000_000 / (@bpm * TICKS_PER_QUARTER) * TICKS_PER_QUARTER
+#   queue_tempo.tempo = tempo
+#   queue_tempo.ppq = TICKS_PER_QUARTER
+  @queue.tempo = { bpm: bpm, ticks_per_quarter: TICKS_PER_QUARTER }
+end
+
+def midi_action
+  loop do
+    (ev, remains = @sequencer.event_input) or break
+    case ev
+    when EchoEvent then arpeggio
+    when NoteOnEvent
+      @queue.clear
+      @transpose = ev.note - 60
+      @tick = @queue.tick_time
+      arpeggio
+    when ControllerEvent
+#       tag "ev.param=#{ev.param.inspect}"
+      if ev.param == :modwheel
+        set_tempo((@options.bpm.to_f * (1.0 + ev.value.to_f / 127.0)).to_i)
+      end
+    when PitchbendEvent
+      @swing = ev.value.to_f
+    end
+    return if remains == 0 # @sequencer.event_input_pending(false) == 0
+  end
+end
+
+def sigterm_exit
+  STDERR.print("Closing, please wait...");
+  @queue.clear
+  sleep 1
+  STDERR.puts
+  # note that this calls the ensure in Sequencer, so everything is properly cleared.
+  exit
+end
+
+# int main(int argc, char *argv[]) {
+
+#   int npfd, l1;
+# struct pollfd *pfd;
+
+class Options
+  private
+  def initialize sequencer
+    @bpm = 120
+    @wrap_port_in = @wrap_port_out = nil
+    require 'optparse'
+    opts = OptionParser.new
+    opts.banner = "Usage: #$PROGRAM_NAME [options] inputfile ..."
+    opts.on('-h', '--help', 'this help') { puts opts.to_s; exit 1; }
+    opts.on('-V', '--version', 'show version') do
+      puts "#$PROGRAM_NAME version 1.0"
+      exit 0
+    end
+    opts.on('-o', '--list-output', 'list output ports') do
+      list_ports sequencer, :write, :subscription_write
+    end
+    opts.on('-i', '--list-input', 'list input ports') do
+      list_ports sequencer, :read, :subscription_read
+    end
+    opts.on('-b', '--bpm=BPM', '--beats-per-minute=BPM', 'set tempo', Integer) do |bpm|
+      raise RRTSError.new("invalid tempo") unless (10..1000) === bpm
+      @bpm = bpm
+    end
+    opts.on('-w', '--wrap=PORTSSPEC', 'single client, or comma separated porttuple (i,o)') do |portsspec|
+      if portsspec =~ /([-,]*),([-,])*/
+        @wrap_port_in, @wrap_port_out = sequencer.port($1), sequencer.port($2)
+      else
+        client = sequencer.client(portsspec)
+#         tag "client=#{client.inspect}"
+        # filter the input and output ports. Should be r + w
+        ports = client.ports
+        raise RRTSError.new("client does not identify exactly two ports") if ports.length != 2
+        if !ports[0].capability?(:read, :subscription_read) ||
+           !ports[0].type?(:midi_generic) ||
+           !ports[1].capability?(:write, :subscription_write) ||
+           !ports[1].type?(:midi_generic)
+          raise RRTSError.new("Port 0 must be read+MIDI, port 1 must be write+MIDI. This is not the case.")
+        end
+        @wrap_port_in, @wrap_port_out = ports
+      end
+    end
+    filenames = opts.parse ARGV
+    if filenames.length != 1
+      puts opts.to_s
+      exit 1
+    end
+    @filename = filenames[0]
+  end
+
+  def list_ports sequencer, *caps
+    puts " Port    Client name                      Port name"
+    for portname, port in sequencer.ports
+      # port must understand MIDI messages
+      if port.type?(:midi_generic) && port.capability?(*caps)
+        printf "%3d:%-3d  %-32.32s %s\n", port.client_id, port.port, port.client.name, portname
+      end
+    end
+    exit
+  end
+
+  public
+  attr :filename
+  attr :bpm
+  attr :wrap_port_in, :wrap_port_out
+end # Options
+
+@swing = @transpose = @tick = 0
+require 'rrts/sequencer'
+Sequencer.new 'rminiarp' do |seq|
+  @sequencer = seq
+  @options = Options.new @sequencer
+  @sequence = parse_sequence @options.filename
+  @port_out = MidiPort.new(seq, "miniArp O", read: true, subs_read: true, application: true)
+  @port_in = MidiPort.new(seq, 'miniArp I', write: true, subs_write: true, application: true)
+  if @options.wrap_port_in
+#     tag "connect #{@options.wrap_port_in} to #@port_in"
+#     tag "connect #@port_out to #{@options.wrap_port_out}"
+    @port_in.connect_from @options.wrap_port_in
+    @port_out.connect_to @options.wrap_port_out
+  end
+  @queue = @sequencer.create_queue 'miniArp'
+  @sequencer.client_pool_output = (@sequence.length << 1) + 4
+  set_tempo @options.bpm
+#   arpeggio
+  @queue.start
+  @sequencer.flush # or it plays a single note ever.... since queue.start is not send
+      # but it does start properly after receiving a note.
+  descriptors = seq.poll_descriptors(Sequencer::PollIn)
+  @transpose = @swing = @tick = 0
+  Signal.trap(:INT) {  sigterm_exit }
+  Signal.trap(:TERM) { sigterm_exit }
+  arpeggio
+#   @sequencer.flush
+  loop do
+    midi_action if descriptors.poll(100_000)
+  end
+end

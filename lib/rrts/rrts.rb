@@ -21,4 +21,8 @@ module RRTS
     end
   end
 
+  def tag msg = ''
+    STDERR.puts "#{caller[0]} #{msg}"
+  end
+
 end

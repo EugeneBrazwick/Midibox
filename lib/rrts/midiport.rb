@@ -234,9 +234,23 @@ public
     [@client_id, @port]
   end
 
-  # connect_to MidiPort
-  # Create a simple connection that cannot be locked, and has no queue
-  # The current port will be the sender (write)
+  def to_s
+    "#@client_id:#@port(#{@handle.name})"
+  end
+
+=begin rdoc
+  connect_to MidiPort
+  Create a simple connection that cannot be locked, and has no queue
+  The current port will be the sender (write)
+
+  *IMPORTANT*:
+      a.connect_to b
+  is not the same as:
+      b.connect_from a
+
+  Normally you use the lefthand side as local ports, while the righthand
+  side is the external port.
+=end
   def connect_to port
     @seq_handle.connect_to self, port
   end
@@ -251,7 +265,7 @@ public
   alias :>> :connect_to
   alias :<< :connect_from
 
-  # bool capability?(hash)
+  # bool capability?(symbolarray)
   # better way to query caps. Pass the symbols to query
   # returns true if *all* the symbols are set
   def capability?(*keys)

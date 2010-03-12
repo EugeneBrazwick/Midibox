@@ -126,7 +126,7 @@ public
         begin
           yield self
         ensure
-          puts "#{File.basename(__FILE__)}:#{__LINE__}:ensure close"
+#           tag "ensure close"
           close
         end
       end
@@ -152,11 +152,6 @@ public
     @client = @client_id = @ports = @ports_index = @clients = nil
     @queues = nil
   end
-
-  # us. a MidiClient
-  attr :client
-  # us, an integer client_id. Same as client.client
-  attr :client_id
 
   # client_name = newname
   def client_name= arg
@@ -213,19 +208,31 @@ public
                SND_SEQ_EVENT_USR_VAR4=>VarUserEvent
              }
 
-# Returns a tuple event + boolean, or nil
+# Returns a tuple MidiEvent + boolean, or nil
 #
-#   Obtains a MidiEvent from sequencer.
+#   Obtains a MidiEvent from the sequencer.
 #   This function firstly receives the event byte-stream data from sequencer as much as possible at once.
 #   Then it retrieves the first event record.
 #   By calling this function sequentially, events are extracted from the input buffer.
-#   If there is no input from sequencer, function falls into sleep in blocking mode until an event is received,
-#   or returns nil in non-blocking mode. Occasionally, it may raise ENOSPC error. This means that the input
-#   FIFO of sequencer overran, and some events are lost. Once this error is returned, the input FIFO is cleared automatically.
+#   If there is no input from sequencer, function falls into sleep in blocking mode until
+#   an event is received,
+#   or returns nil in non-blocking mode. Occasionally, it may raise ENOSPC error. This means
+#   that the input
+#   FIFO of sequencer overran, and some events are lost.
+#   Once this error is returned, the input FIFO is cleared automatically.
 #
 #   Function returns the event plus a boolean indicating more bytes remain in the input buffer
 #   Application can determine from the returned value whether to call input once more or not,
 #       if there's more data it will probably(!) not block, even in blocking mode.
+#
+#Example:
+#   remains = 1
+#   while remains > 0
+#     (ev, remains = @sequencer.event_input) or break
+#     case ev
+#     ..
+#     end
+#   end
 #
   def event_input
     (ev, more = @handle.event_input) or return nil
@@ -256,7 +263,8 @@ public
                  :event_output_buffer, :event_output_direct, :client_name,
                  :remove_events, :client_pool, :client_pool=, :client_pool_output=,
                  :client_pool_output_room=, :client_pool_input=, :reset_pool_output,
-                 :reset_pool_input, :system_info, :dump_notes=
+                 :reset_pool_input, :system_info, :dump_notes=,
+                 :next_client, :next_port
 
   # the following two are here for completeness sake. Please use the MidiPort methods instead!
   def_delegators :@handle, :connect_from, :connect_to
@@ -269,7 +277,7 @@ public
   def_delegators :@client, :broadcast_filter?, :error_bounce?, :event_lost, :events_lost,
                            :num_ports, :num_open_ports, :type
 
-  # self << MidiEvent
+  # Same as event_output, except for returnvalue (self).
   def << event
 #     puts "#{File.basename(__FILE__)}:#{__LINE__}: << event(#{event.inspect})"
     @handle.event_output event
@@ -285,11 +293,13 @@ public
     port(@handle.parse_address(portspec))
   end
 
-  # MidiPort port clientid, portid
-  # MidiPort port portspecstring
-  # MidiPort port clientstring, portid
-  # MidiPort port :specialportsymbol ,  supported are :system_timer and :subscribers_unknown
-  # MidiPort port [clientid, portid]
+  # call-seq:
+  #  port(clientid, portid) -> MidiPort
+  #  port(portspecstring) -> MidiPort
+  #  port(clientstring, portid) -> MidiPort
+  #  port(:specialportsymbol) -> MidiPort, supported are :system_timer and :subscribers_unknown
+  #  MidiPort([clientid, portid]) -> MidiPort
+  #
   # The port must exist
   def port clientid, portid = nil
     case clientid
@@ -329,8 +339,10 @@ public
   end
 
   alias :subscribers_unknown :subscribers_unknown_port
+  alias :any_subscribers :subscribers_unknown_port
   alias :system_timer :system_timer_port
 
+  # returns true if the sequencer is currently open (which it normally is)
   def open?
     @handle
   end
@@ -343,7 +355,7 @@ public
     cinfo = client_info_malloc
     cinfo.client = -1
     require_relative 'midiclient'
-    @clients[cinfo.client] = MidiClient.new(cinfo) while @handle.next_client(cinfo)
+    @clients[cinfo.client] = MidiClient.new(self, cinfo) while @handle.next_client(cinfo)
     @client = @clients[@client_id]
     @clients
   end
@@ -397,6 +409,17 @@ public
     @queues && @queues[name]
   end
 
+  # without argument return MidiClient which is us, otherwise locate client with that name
+  def client name = nil
+    return @client if name.nil?
+    r = clients.find{|id,c| c.name == name } and return r[1]
+    r = clients!.find{|id,c| c.name == name } and return r[1]
+    raise RRTSError.new("client '#{name}' not located")
+  end
+
+  # us, an integer client_id. Same as client.client
+  attr :client_id
+  # returns a hash, indexed by queuename
   attr :queues
 end # Sequencer
 

@@ -57,9 +57,10 @@ end
 
 desc 'play rminiarp'
 task :play_rminiarp do
-  sh %q{echo 'Please use [k]aconnect to connect miniarp to year keyboard...'}
-  sh %q{echo 'Press Ctrl-C to quit'}
-  sh "#{RUBY} bin/miniarp 120 fixtures/miniarp.dat"
+#  sh %q{echo 'Please use [k]aconnect to connect rminiarp to year keyboard...'}
+  sh %q{echo 'Press Ctrl -C to quit'}
+# sorry but this only works if you have UM-2 which is questionable.
+  sh "#{RUBY} bin/rminiarp --bpm=120 --wrap=UM-2 fixtures/miniarp.dat"
 end
 
 desc 'panic'

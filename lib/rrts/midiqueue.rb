@@ -191,6 +191,16 @@ module RRTS
 
     alias :remove_events :clear
     attr :sequencer
+
+    # short for status.tick_time
+    def tick_time
+      status.tick_time
+    end
+
+    # short for status.real_time
+    def real_time
+      status.real_time
+    end
   end # MidiQueue
 
   # Contains information about the speed

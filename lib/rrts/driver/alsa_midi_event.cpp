@@ -274,7 +274,9 @@ wrap_snd_seq_ev_set_subs(VALUE v_ev)
   return v_ev;
 }
 
-/* self schedule_tick(queue, relative, tick)
+/*  call-seq:
+      schedule_tick(queue, relative?, tick) -> self
+
 Sets the queue and the specified eventtime in the event. Queue can be an integer or MidiQueue
 */
 static VALUE

@@ -23,7 +23,8 @@ include Comparable
 extend Forwardable;
 private
   # normally never used
-  def initialize cinfo
+  def initialize sequencer, cinfo
+    @sequencer = sequencer
     @handle = cinfo.copy_to
     @client = cinfo.client  # naming it 'client' is confusing but required so 'respond_to :client' works!
     # name is slightly dangerous as the name can be changed  ???? It should not matter
@@ -50,6 +51,20 @@ public
   attr :client
   def_delegators :@handle, :name, :broadcast_filter?, :error_bounce?, :event_lost, :events_lost,
                            :num_ports, :num_open_ports, :type
+
+  # the result is an arrray with references into sequencer#@ports
+  # if you require a hash, why not use sequencer.ports or port ?
+  def ports
+    r = []
+    pinfo = port_info_malloc
+    pinfo.client = @client
+    pinfo.port = -1
+    while @sequencer.next_port(pinfo)
+      r << @sequencer.port(@client, pinfo.port)
+    end
+    r
+  end
+
 end
 
 end # RRTS

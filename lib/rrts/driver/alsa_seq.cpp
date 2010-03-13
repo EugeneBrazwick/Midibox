@@ -451,7 +451,7 @@ do_event_output(bool ch_ref, snd_seq_t *seq, VALUE v_seq, VALUE v_ev, snd_seq_ev
   return r;
 }
 
-// return the LSB_ code if param is an MSB param
+// return the LSB_ code if param is an MSB param or else 0
 static inline uint
 PARAM_IS_MSB_LSB_PAIR(uint param)
 {
@@ -460,6 +460,10 @@ PARAM_IS_MSB_LSB_PAIR(uint param)
     return param + (MIDI_CTL_LSB_BANK - MIDI_CTL_MSB_BANK);
   switch (param)
     {
+    case MIDI_CTL_MSB_GENERAL_PURPOSE1: return MIDI_CTL_LSB_GENERAL_PURPOSE1;
+    case MIDI_CTL_MSB_GENERAL_PURPOSE2: return MIDI_CTL_LSB_GENERAL_PURPOSE2;
+    case MIDI_CTL_MSB_GENERAL_PURPOSE3: return MIDI_CTL_LSB_GENERAL_PURPOSE3;
+    case MIDI_CTL_MSB_GENERAL_PURPOSE4: return MIDI_CTL_LSB_GENERAL_PURPOSE4;
     case MIDI_CTL_NONREG_PARM_NUM_MSB: return MIDI_CTL_NONREG_PARM_NUM_LSB;
     case MIDI_CTL_REGIST_PARM_NUM_MSB: return MIDI_CTL_REGIST_PARM_NUM_LSB;
     }
@@ -650,39 +654,44 @@ wrap_snd_seq_event_output_func(VALUE v_seq, VALUE v_ev, EOutput func)
 //                 fprintf(stderr, "got param\n");
                 VALUE v_value = rb_iv_get(v_ev, "@value");
                 int value;
-                uint lsb_version = PARAM_IS_MSB_LSB_PAIR(param);
-                if (lsb_version)
+                if (coarse)
+                    value = NUM2INT(v_value) & 0x7f;
+                else
                   {
-                    int msb, lsb = 0;
-//                     fprintf(stderr, "%d: coarse=%d, value=%d,param=%u\n", __LINE__, coarse, value,ev.data.control.param);
-                    if (coarse)
-                      msb = NUM2INT(v_value);
-                    else if FIXNUM_P(v_value)
+                    uint lsb_version = PARAM_IS_MSB_LSB_PAIR(param);
+                    if (lsb_version)
                       {
-                        const int v = NUM2INT(v_value);
-                        msb = v << 7;
-                        lsb = v & 0x7f;
-                      }
-                    else
-                      {
-                        VALUE v_ar = rb_check_array_type(v_value);
-                        if (NIL_P(v_ar)) msb = 0;
+                        int msb, lsb = 0;
+    //                     fprintf(stderr, "%d: coarse=%d, value=%d,param=%u\n", __LINE__, coarse, value,ev.data.control.param);
+                        if (coarse)
+                          msb = NUM2INT(v_value);
+                        else if FIXNUM_P(v_value)
+                          {
+                            const int v = NUM2INT(v_value);
+                            msb = v << 7;
+                            lsb = v & 0x7f;
+                          }
                         else
                           {
-                            VALUE v0 = rb_ary_entry(v_ar, 0), v1 = rb_ary_entry(v_ar, 1);
-                            if (!RTEST(v0)) RAISE_MIDI_ERROR_FMT1("Bad args for param %d", param);
-                            msb = NUM2INT(v0);
-                            lsb = RTEST(v1) ? NUM2INT(v1) : 0;
+                            VALUE v_ar = rb_check_array_type(v_value);
+                            if (NIL_P(v_ar)) msb = 0;
+                            else
+                              {
+                                VALUE v0 = rb_ary_entry(v_ar, 0), v1 = rb_ary_entry(v_ar, 1);
+                                if (!RTEST(v0)) RAISE_MIDI_ERROR_FMT1("Bad args for param %d", param);
+                                msb = NUM2INT(v0);
+                                lsb = RTEST(v1) ? NUM2INT(v1) : 0;
+                              }
                           }
+                        ev.data.control.value = msb;
+                        do_event_output(ch_ref, seq, v_seq, v_ev, ev, v_func);
+    //             fprintf(stderr, "%s:%d: CONTROLLER(param=%u,value=%d)\n", __FILE__,__LINE__, lsb_version, lsb);
+                        ev.data.control.param = lsb_version;
+                        value = lsb;
                       }
-                    ev.data.control.value = msb;
-                    do_event_output(ch_ref, seq, v_seq, v_ev, ev, v_func);
-//             fprintf(stderr, "%s:%d: CONTROLLER(param=%u,value=%d)\n", __FILE__,__LINE__, lsb_version, lsb);
-                    ev.data.control.param = lsb_version;
-                    value = lsb;
+                    else
+                        value = NUM2INT(v_value) & 0x7f;
                   }
-                else
-                    value = NUM2INT(v_value) & 0x7f;
                 ev.data.control.value = value;
     // fprintf(stderr, "%s:%d: CONTROLLER(param=%u,value=%d)\n", __FILE__,__LINE__, param, value & 0x7f);
                 break;

@@ -195,6 +195,7 @@ class MidifileParser #:no-doc:
 
   #  reads one complete track from the file
   def read_track track, track_end
+    tag "read_track, track_end=#{track_end}"
     #
     tick = 0
     last_cmd = 0
@@ -223,11 +224,16 @@ class MidifileParser #:no-doc:
         off_vel = read_byte & 0x7f
         event = NoteOffEvent.new(channel, note, off_velocity: off_vel, destination: port, tick: tick)
         track << event
-      when 0x9, 0xb #* channel msg with 2 parameter bytes */
+      when 0x9, 0xa #* channel msg with 2 parameter bytes */
         note = read_byte & 0x7f
         vel =  read_byte & 0x7f
         event = (status == 0x9 ? NoteOnEvent : KeypressEvent).new(channel, note, vel,
                                                                   destination: port, tick: tick)
+        track << event
+      when 0xb # control msg with 2 parameter byte
+        param = read_byte & 0x7f
+        val =  read_byte & 0x7f
+        event = ControllerEvent).new(channel, param, val, destination: port, tick: tick)
         track << event
       when 0xe
         event = PitchbendEvent.new(cmd & 0x0f, read_fixed(2) - 0x2000, destination: port, tick: tick)

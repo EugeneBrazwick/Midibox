@@ -83,6 +83,9 @@ module RRTS
       :nonreg_parm_num_lsb=>MIDI_CTL_NONREG_PARM_NUM_LSB,
       :regist_parm_num_lsb=>MIDI_CTL_REGIST_PARM_NUM_LSB
       }
+
+    DEFAULT_FLAGS = { :time_mode_absolute=>true, :time_mode_ticks=>true } # cow!
+
 =begin
     IMPORTANT: all events must support this way of construction
     new Sequencer, AlsaMidiEvent_i
@@ -95,8 +98,9 @@ module RRTS
       else # result of user construction
         @type = arg0 or raise RRTSError.new("illegal type man!!")
         # Don't use flags, as it seems rather costly using a hash here.
-        @flags = { :time_mode_absolute=>true, :time_mode_ticks=>true }  # since this is SND_SEQ_TIME_MODE_ABS which is 0.
-        @channel = @velocity = @value = @param = @source = @track = nil
+        @flags = DEFAULT_FLAGS
+        @channel = nil # OK
+        @velocity = @value = @param = @source = @track = nil
         # @dest = @queue = nil  used???
         # @off_velocity = @duration = hardly ever used
         @time = nil
@@ -106,10 +110,9 @@ module RRTS
           when :value
             if arg1[:param]
               case v
-              when TrueClass, FalseClass then @value = v ? 64 : 0
+              when TrueClass, FalseClass then @value = v ? ON : OFF
               else @value = v
               end
-              @value <<= 7 if arg1[:coarse]
             else
               @value = v
             end
@@ -132,19 +135,17 @@ module RRTS
 #             puts "#{File.basename(__FILE__)}:#{__LINE__}:@tick:=#{v}"
           when :queue
             @queue = v
-          when :time_mode_tick then @flags[:time_mode_tick] = v; @flags[:time_mode_real] = !v
-          when :time_mode_real then @flags[:time_mode_tick] = !v; @flags[:time_mode_real] = v
+          when :time_mode_tick then set_flag(time_mode_tick: v, time_mode_real: !v)
+          when :time_mode_real then set_flag(time_mode_tick: !v, time_mode_real: v)
           when :time_mode_relative
-            @flags[:time_mode_relative] = v
-            @flags[:time_mode_absolute] = !v
+            set_flag(time_mode_relative: v, time_mode_absolute: !v)
           when :time_mode_absolute
-            @flags[:time_mode_relative] = !v
-            @flags[:time_mode_absolute] = v
+            set_flag(time_mode_relative: !v, time_mode_absolute: v)
           when :coarse
             if v && arg1[:value] > 0x7f
               raise RRTSError.new("overflowing coarse controller value[#{arg1[:param]}] #{arg1[:value]}")
             end
-            @flags[:coarse] = v
+            set_flag(coarse: v)
           when :param then @param = v
           when :track then @track = v
           when :direct then @sender_queue = @time = nil # bit of a hack...
@@ -236,13 +237,29 @@ module RRTS
     attr_accessor :source
     # The destination MidiPort
     attr_accessor :dest
-    # Track that was the source.
-    attr :track
+    # Track that stores this event (not neccesarily the source)
+    attr_accessor :track
     alias :sender :source
     alias :sender= :source=
 
     # hash of bools.
-    attr_accessor :flags
+#     attr_accessor :flags  ILLEGAL
+
+    def flag *keys
+      for k in keys
+        return false unless @flags[k]
+      end
+      true
+    end
+
+    def set_flag hash
+      @flags = @flags.dup if @flags.equal?(DEFAULT_FLAGS)
+      for k, v in hash
+        @flags[k] = v
+      end
+      self
+    end
+
     # the MidiQueue used for sending, if both queue and time are unset we use +direct+ events
     attr_accessor :sender_queue
     # receiver queue. id or MidiQueue
@@ -273,17 +290,37 @@ module RRTS
 
     # two events are 'the same' if the time is the same. In other words
     # if you sort them this will be on time.
-    # FIXME: we need a kind of priority as well.
     def <=> other
-      case @time
-      when Array
-        d = @time[0] - other.time[0]
-        d != 0 ? d : @time[1] - other.time[1]
+#       tag "<=>"
+      d = @time <=> other.time
+#       tag "compared times -> #{d}, time=#@time, other.time=#{other.time}"
+      return d if d != 0
+#       tag "prio=#{priority}, other.prio=#{other.priority}"
+      priority <=> other.priority
+    end
+
+    # returns the time difference (self - other)
+    # The events must have compatible timestamps
+    def time_diff other
+      if Array === @time
+        otime = other.time
+        d = 1_000_000_000 * (@time[0] - otime[0]) + @time[1] - otime[1]
+        [ d / 1_000_000_000, d % 1_000_000_000 ]
       else
         @time - other.time
       end
     end
 
+    # lower is more important, used for sorting events with equal time
+    def priority
+      0
+    end
+
+    # this ruins track... But we may be able to recover from it...
+    def to_yaml *args
+      @track = @track.key if @track.respond_to?(:key)
+      super
+    end
   end  # MidiEvent
 
   # a VoiceEvent has a channel (arg0), and also a value (arg1) (could be 'note')
@@ -319,7 +356,15 @@ module RRTS
 
     public
 
+    def to_s
+      "NoteOnEvent ch:#@channel, #@value, vel:#@velocity"
+    end
+
     alias :note :value
+
+    def priority
+      990
+    end
   end
 
   # Keypress or aftertouch event
@@ -338,7 +383,11 @@ module RRTS
 
   public
 
-    alias :note :value
+  def priority
+    995
+  end
+
+  alias :note :value
     alias :pressure :velocity
   end
 
@@ -358,7 +407,16 @@ module RRTS
     end
 
     public
+
+    def priority
+      999
+    end
+
     alias :note :value
+
+    def to_s
+      "NoteOffEvent ch:#@channel, #@value"
+    end
   end
 
   # an Alsa hack.
@@ -374,11 +432,22 @@ module RRTS
         super :note, arg0, arg1, params
       end
     end
+
     public
+    def priority
+      995
+    end
+
     alias :note :value
+
+    def to_s
+      "NoteEvent ch:#@channel, #@value, vel:#@velocity, duration:#@duration"
+    end
   end
 
   # a controller event is basicly a large group of more specific events
+  # All having a parameter denoting the kind of event, and value where appropriate
+  # Currently all values are unsigned, but I may still change this (probably even)
   class ControllerEvent < VoiceEvent
 
     private
@@ -392,10 +461,13 @@ module RRTS
 #     arg0 is a Sequencer, arg1 is a LOW LEVEL AlsaMidiEvent_i.
 #     new sequencer, event
 
-# *IMPORTANT*: the value you pass here must be a 14 bits int, or else 2 7 bit ints.
-# Two events will actually be sent (always).
-# Pass coarse: false to use the value as a single 7 bits int, while passing 0 as lsb.
-# Even in this case two events are sent.
+# *IMPORTANT*: the value you pass here may be a 14 bits int, or else 2 7 bit ints
+# as in [MSB,LSB]
+# this depends on the param.
+# Two events will actually be sent.
+# Pass coarse: false to use the value as a single 7 bits int
+# if one of the _lsb params is used the controller will have a 7 bits value
+# In both cases only one event is sent.
 #
 #   'param' can be a symbol from:
 #     :bank_select (14 bits), or better 7+7
@@ -405,15 +477,18 @@ module RRTS
 #     :portamento_time (14)
 #     :data_entry (14)
 #     :volume (14)
-#     :balance (14)
-#     :pan_position(14)
+#     :balance (14)                  as in MONO, this just makes L or R stronger
+#     :pan_position(14)  POSITIVE    as in STEREO, this places the source elsewhere (virtually)
 #     :expression(14)
 #
-#     :hold_pedal (1), portamento (1), sustenuto(10, soft(1), legato(1)
-#     :hold_2_pedal (1).  Note that value 64 (bit 7) is used for this.
-#         IMPORTANT: passing '1' here does therefore not activate the control!
+#   These are 1 bit:
+#     :hold_pedal, portamento, sustenuto, soft, legato
+#     :hold_2_pedal.
+#     Note that value 'ON' (bit 7) is used for this.
+#     IMPORTANT: passing '1' here does therefore not activate the control!
+#     But 'true' can be passed safely
 #
-#     These are 7 bits:
+#     These are unsigned 7 bits:
 #     :timbre, :release, :attack, :brightness,
 #     :effects_level, :tremulo_level/:tremulo, :chorus_level/:chorus,
 #     :celest_level/:celeste/:detune
@@ -439,6 +514,36 @@ module RRTS
 
     public
     alias :program :value
+
+    def to_s
+      "ControllerEvent ch:#@channel, param: #@param -> #@value"
+    end
+
+    LSB2MSB = { :bank_lsb=>:bank, :modwheel_lsb=>:modwheel, :breath_lsb=>:breath,
+                :foot_lsb=>:foot, :portamento_time_lsb=>:portamento_time,
+                :data_entry_lsb=>:data_entry, :volume_lsb=>:volume,
+                :balance_lsb=>:balance, :pan_lsb=>:pan, :expression_lsb=>:expression,
+                :general_purpose1_lsb=>:general_purpose1,
+                :general_purpose2_lsb=>:general_purpose2,
+                :general_purpose3_lsb=>:general_purpose3,
+                :general_purpose4_lsb=>:general_purpose4,
+                :nonreg_parm_num_lsb=>:nonreg_parm_num,
+                :regist_parm_num_lsb=>:regist_parm_num
+              }
+    MSB2LSB = LSB2MSB.invert
+
+    # returns msb param, if this is an lsb param
+    def lsb2msb
+      LSB2MSB[@param]
+    end
+
+    # returns lsb param, if this is an msb param
+    def msb2lsb
+      MSB2LSB[@param]
+    end
+
+    alias :lsb? :lsb2msb
+    alias :msb? :msb2lsb
   end
 
   class Control14Event < VoiceEvent
@@ -479,6 +584,15 @@ module RRTS
 
     public
     alias :program :value
+
+    def to_s
+      "ProgramChangeEvent ch:#@channel, program: #{program.inspect}"
+    end
+
+    def priority
+      1
+    end
+
   end
 
   # to bend the pitch (and who does not want to do that)
@@ -763,6 +877,7 @@ module RRTS
     end
   end # EchoEvent
 
+  # THESE ARE STILL BROKEN !!!
   class ClientEvent < MidiEvent
   end
 
@@ -804,4 +919,25 @@ module RRTS
 
   class VarUserEvent < MidiEvent
   end
+
+  class MetaEvent < MidiEvent
+    private
+    # can never be constructed through AlsaMidi since there is no such event
+    def initialize params = {}
+      super :meta, params
+    end
+
+    public
+
+    def priority
+      -1
+    end
+  end
+
+  class LastEvent < MetaEvent
+  end
+
+  # Need lyrics + marker + cuesomething meta events ...
+  # probably voicename as well
+
 end # RRTS

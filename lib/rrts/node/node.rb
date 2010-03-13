@@ -1,4 +1,18 @@
 
+module RRTS # namespace
+
+  module Node
+
+    Base = Object
+
+    class EventsNode < Base
+      include Enumerable
+      # even if still abstract
+    end
+
+  end # Node
+end # module RRTS namespace
+
 __END__
 
 A _node_ is a graphical notion.  Nodes are items that can be connected using

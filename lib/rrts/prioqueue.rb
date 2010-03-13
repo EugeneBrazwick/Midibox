@@ -23,6 +23,7 @@ module RRTS
       @array[@ptr]
     end
 
+    # therefore, it is a 'relative' first.
     alias :first :peek
 
     def <=> other
@@ -36,7 +37,7 @@ module RRTS
   This priority queue works on enumerators and it dequeues
   the first element of the first enumerator.
   Enqueued is the full enumerator, not a single entry.
-  Each is important that each enumerator is already sorted.
+  It is important that each enumerator is already sorted.
 
   enqueue [4,4, 8, 12]
   enqueue [5, 6,6 24]

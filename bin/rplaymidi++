@@ -90,6 +90,7 @@ end
 
 # The Parser will be a class that is basically used in the chunk constructor.
 # It builds a single chunk from an inputfile
+# DEPRECATED, should be replaced by parser in lib/rrts/node/midifilereader.rb
 class MidifileParser #:no-doc:
   private
   def initialize file_name, chunk, destination_ports

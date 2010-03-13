@@ -96,7 +96,7 @@ module RRTS
         @type = arg0 or raise RRTSError.new("illegal type man!!")
         # Don't use flags, as it seems rather costly using a hash here.
         @flags = { :time_mode_absolute=>true, :time_mode_ticks=>true }  # since this is SND_SEQ_TIME_MODE_ABS which is 0.
-        @channel = @velocity = @value = @param = @source = nil
+        @channel = @velocity = @value = @param = @source = @track = nil
         # @dest = @queue = nil  used???
         # @off_velocity = @duration = hardly ever used
         @time = nil
@@ -116,7 +116,7 @@ module RRTS
           when :channel
             #RTTSError.new("illegal channel #{v}") unless v.between?(1, 16)
              # can be a range or maybe even an array of channels!!
-            # or an array of ranges...
+            # or an array of ranges... ???
             @channel = v
 #             tag "channel:=#@channel"
           when :duration then @duration = v
@@ -146,6 +146,7 @@ module RRTS
             end
             @flags[:coarse] = v
           when :param then @param = v
+          when :track then @track = v
           when :direct then @sender_queue = @time = nil # bit of a hack...
           else raise RRTSError.new("illegal option '#{k}' for #{self.class}")
           end
@@ -235,6 +236,8 @@ module RRTS
     attr_accessor :source
     # The destination MidiPort
     attr_accessor :dest
+    # Track that was the source.
+    attr :track
     alias :sender :source
     alias :sender= :source=
 
@@ -684,12 +687,16 @@ module RRTS
     arg0 is a Sequencer, arg1 is a LOW LEVEL AlsaMidiEvent_i.
     new sequencer, event
 =end
-    # new(queue, tempo[, params])
-    def initialize arg0, arg1 = nil, params = {}
-      case arg1 when AlsaMidiEvent_i then super(arg0, arg1)
+    #  call-seq:
+    #     new(queue, tempo[, params])
+    # tempo is an integer indicating the nr of microseconds per beat
+    # queue can be a MidiQueue or a queueid.
+    def initialize queue, tempo = nil, params = {}
+      if AlsaMidiEvent_i === tempo
+        super(queue, tempo)
       else
-        params[:value] = arg1
-        super :tempo, arg0, params
+        params[:value] = tempo
+        super :tempo, queue, params
       end
     end
 

@@ -335,7 +335,7 @@ static int read_track(struct track *track, int track_end)
 	while (file_offset < track_end) {
 		unsigned char cmd;
 		struct event *event;
-		int delta_ticks, len, c;
+		int delta_timticks, len, c;
 
 		delta_ticks = read_var();
 		if (delta_ticks < 0)

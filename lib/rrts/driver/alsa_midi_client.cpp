@@ -19,25 +19,7 @@ VALUE alsaClientInfoClass;
 Make a duplicate. Used internally by AlsaClientInfo_i#initialize_copy.
 The second form creates an actual clone
 */
-static VALUE
-wrap_snd_seq_client_info_copy_to(int argc, VALUE *argv, VALUE v_client_info)
-{
-  VALUE v_dst;
-  rb_scan_args(argc, argv, "01", &v_dst);
-  VALUE retval = v_client_info;
-  snd_seq_client_info_t *client_info, *dst;
-  if (NIL_P(v_dst))
-    {
-      const int r = snd_seq_client_info_malloc(&dst);
-      if (r < 0) RAISE_MIDI_ERROR("allocation client info", r);
-      v_dst = Data_Wrap_Struct(alsaClientInfoClass, 0/*mark*/, snd_seq_client_info_free/*free*/, dst);
-      retval = v_dst;
-    }
-  Data_Get_Struct(v_client_info, snd_seq_client_info_t, client_info);
-  Data_Get_Struct(v_dst, snd_seq_client_info_t, dst);
-  snd_seq_client_info_copy(dst, client_info);
-  return retval;
-}
+ALSA_MIDI_COPY_TO_TEMPLATE(client_info, ClientInfo)
 
 /* call-seq:
    ClientInfo.client= clientid

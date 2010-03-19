@@ -83,4 +83,28 @@ extern VALUE param2sym(uint param);
 
 #define INSPECT(x) RSTRING_PTR(rb_inspect(x))
 
+// strct could be 'queue_timer' for example. Excludes _t suffix.
+// clss should then be QueueTimer
+// The argcount for the wrapper should be -1 (== variable)
+#define ALSA_MIDI_COPY_TO_TEMPLATE(strct, clss) \
+static VALUE \
+wrap_snd_seq_##strct##_copy_to(int argc, VALUE *argv, VALUE v_self) \
+{ \
+  VALUE v_dst; \
+  rb_scan_args(argc, argv, "01", &v_dst); \
+  VALUE retval = v_self; \
+  snd_seq_##strct##_t *self, *dst; \
+  if (NIL_P(v_dst)) \
+  { \
+    const int r = snd_seq_##strct##_malloc(&dst); \
+    if (r < 0) RAISE_MIDI_ERROR("allocating " #strct, r); \
+    v_dst = Data_Wrap_Struct(alsa##clss##Class, 0/*mark*/, snd_seq_##strct##_free/*free*/, dst); \
+    retval = v_dst; \
+  } \
+  Data_Get_Struct(v_self, snd_seq_##strct##_t, self); \
+  Data_Get_Struct(v_dst, snd_seq_##strct##_t, dst); \
+  snd_seq_##strct##_copy(dst, self); \
+  return retval; \
+}
+
 #endif // _RRTS_ALSA_MIDI_H

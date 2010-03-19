@@ -11,25 +11,7 @@ VALUE alsaClientPoolClass;
 void    snd_seq_client_pool_copy (snd_seq_client_pool_t *dst, const snd_seq_client_pool_t *src)
 copy one snd_seq_client_pool_t to another
 */
-static VALUE
-wrap_snd_seq_client_pool_copy_to(int argc, VALUE *argv, VALUE v_pool)
-{
-  VALUE v_dst;
-  rb_scan_args(argc, argv, "01", &v_dst);
-  VALUE retval = v_pool;
-  snd_seq_client_pool_t *pool, *dst;
-  if (NIL_P(v_dst))
-  {
-    const int r = snd_seq_client_pool_malloc(&dst);
-    if (r < 0) RAISE_MIDI_ERROR("allocating client_pool", r);
-    v_dst = Data_Wrap_Struct(alsaClientPoolClass, 0/*mark*/, snd_seq_client_pool_free/*free*/, dst);
-    retval = v_dst;
-  }
-  Data_Get_Struct(v_pool, snd_seq_client_pool_t, pool);
-  Data_Get_Struct(v_dst, snd_seq_client_pool_t, dst);
-  snd_seq_client_pool_copy(dst, pool);
-  return retval;
-}
+ALSA_MIDI_COPY_TO_TEMPLATE(client_pool, ClientPool)
 
 /*
 int     snd_seq_client_pool_get_client (const snd_seq_client_pool_t *info)

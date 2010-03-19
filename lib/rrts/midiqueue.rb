@@ -252,12 +252,14 @@ module RRTS
          end
        end
        if @smpte_timing
-         frames, beats = beats, nil
-         fail if frames > 255
+         @frames, beats = beats, nil
+         fail if @frames > 255
          # ALSA doesn't know about the SMPTE time divisions, so
          # we pretend to have a musical tempo with the equivalent
          # number of ticks/s.
-         (tempo, ppq = Frames2TempoPPQ[frames]) or fail
+         (tempo, mult = Frames2TempoPPQ[@frames]) or fail
+         @ticks_per_frame = ticks
+         ppq = mult * ticks # per frame
        else
          tempo = 60_000_000 / beats
          ppq = ticks
@@ -288,6 +290,15 @@ module RRTS
      # returns true is smptr_timing is set.
      def smpte_timing?
        @smpte_timing
+     end
+
+     # how tempo is stored in a midi file (two bytes)
+     def time_division
+       if @smpte_timing
+         @ticks_per_frame | ((0x100 - @frames) << 8)
+       else
+         @handle.ppq
+       end
      end
   end  # Tempo
 end # RRTS

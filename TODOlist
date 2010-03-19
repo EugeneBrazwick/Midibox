@@ -6,6 +6,7 @@
 0003 za feb 27 21:50:12 CET 2010 BUG rplaymidi reads a NoteOn without a NoteOff
          in fixtures/eurodance.midi.  Note 12, Rhythm track. I believe this was recorded
          with arecordmidi. So who's to blame? Is there an official midi file dumper somewhere?
+     di mrt 16 20:26:02 CET 2010 FIXED. At least in midifilereader.rb
 0004 do mrt  4 23:20:06 CET 2010 BUG rmidiroute.rb:14:in `block in midi_route': undefined method `set_subs'
 0005 do mrt  4 23:24:01 CET 2010 TODO writing ev: param := ':modwheel', reading same event -> param == 1.
                                       This is an inconsistency. Must be mapped back.
@@ -21,3 +22,7 @@
           Also a failure should raise NoMemError. The least I can do is make sure these all go
           trough one container.
 0008 do mrt 11 23:36:01 CET 2010 TODO: queue_timer interface is lacking...
+     ma mrt 15 19:00:52 CET 2010 DONE
+0009 ma mrt 15 19:01:17 CET 2010 BUG: merging events through pipes cannot work since notes will
+          be out of order.
+     ma mrt 15 20:13:17 CET 2010 FIXED

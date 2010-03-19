@@ -10,29 +10,37 @@ module RRTS
     # but this may be a CompoundTrack
     # A chunk is an enumerable of events, but more importantly, it
     # has actual storage for events.
-    class Chunk
+    class Chunk < EventsNode
       include Enumerable
       extend Forwardable
       MAJOR = true
       MINOR = false
       private
-      def initialize split_tracks = false
+      def initialize options = {}
+        @options = options
         require_relative '../midiqueue'
-        @split_tracks = split_tracks
         @tempo = Tempo.new
-        @time_signature = 4, 4
-        @key = :C, MAJOR
+        @time_signature = nil #  4, 4  do not set it! Otherwise saving/loading MIDI will have
+        @clocks_per_beat = nil
+            # differences.  Can be interpreted on other level if so required
+        @key = nil # :C, MAJOR no default here
         @track = nil
       end
       public
-      # the initial tempo (Tempo instance)
-      attr_accessor :tempo, :key, :time_signature
+
+      # the initial tempo (Tempo instance). Note this is an override from EventsNode
+      attr_accessor :tempo
+
+      attr_accessor :key, :time_signature, :clocks_per_beat
       # the internal track
       attr :track
 
       def ticks_per_beat= ppq
         @tempo.ppq = ppq
       end
+
+#       def clocks_per_beat= cpb
+#       end
 
       alias :ppq= :ticks_per_beat=
 
@@ -44,10 +52,10 @@ module RRTS
             if CompoundTrack === @track
               @track << event
             else
-              @track = CompoundTrack.new(@track, @split_tracks)
+              @track = CompoundTrack.new(@track, @options)
             end
-          elsif @split_tracks
-            @track = CompoundTrack.new(event, @split_tracks)
+          elsif @options[:split_tracks]
+            @track = CompoundTrack.new(event, @options)
           else
             @track = event
           end
@@ -57,7 +65,11 @@ module RRTS
         self
       end
 
-      def_delegators :@track, :each, :rewind, :next, :peek
+      def_delegators :@track, :each, :rewind, :next, :peek, :listing
+
+      def has_tracks?
+        true
+      end
     end # class Chunk
 
   end # Node

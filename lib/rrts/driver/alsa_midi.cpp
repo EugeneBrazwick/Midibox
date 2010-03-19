@@ -16,6 +16,7 @@
 #include "alsa_remove.h"
 #include "alsa_client_pool.h"
 #include "alsa_system_info.h"
+#include "alsa_timer.h"
 
 #if defined(DUMP_API)
 #define DUMP_STREAM stderr
@@ -449,5 +450,6 @@ Init_alsa_midi()
   alsa_remove_init();
   alsa_client_pool_init();
   alsa_system_info_init();
+  alsa_timer_init();
   alsa_midi_plusplus_init();
 }

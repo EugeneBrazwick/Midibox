@@ -28,6 +28,7 @@ module RRTS
       :foot_lsb=>MIDI_CTL_LSB_FOOT,
       :portamento_time=>MIDI_CTL_MSB_PORTAMENTO_TIME, #5
       :portamento_time_lsb=>MIDI_CTL_LSB_PORTAMENTO_TIME,
+      # data_entry applies to the last (un)registered parameter
       :data_entry=>MIDI_CTL_MSB_DATA_ENTRY, #6
       :data_entry_lsb=>MIDI_CTL_LSB_DATA_ENTRY,
       :volume=>MIDI_CTL_MSB_MAIN_VOLUME, :main_volume=>MIDI_CTL_MSB_MAIN_VOLUME, #7
@@ -56,6 +57,7 @@ module RRTS
       :chorus=>MIDI_CTL_E3_CHORUS_DEPTH,#93
       :detune=>MIDI_CTL_E4_DETUNE_DEPTH, :celeste=>MIDI_CTL_E4_DETUNE_DEPTH, #94
       :phaser=>MIDI_CTL_E5_PHASER_DEPTH,#95
+       # data_inc works on last (un)registered parameter that passed along
       :data_increment=>MIDI_CTL_DATA_INCREMENT,#96
       :data_decrement=>MIDI_CTL_DATA_DECREMENT,#97
       :reset_controllers=>MIDI_CTL_RESET_CONTROLLERS, #121
@@ -79,7 +81,18 @@ module RRTS
       :general_purpose8=>MIDI_CTL_GENERAL_PURPOSE8,
       :portamento_control=>MIDI_CTL_PORTAMENTO_CONTROL,
       :nonreg_parm_num=>MIDI_CTL_NONREG_PARM_NUM_MSB,
+      # AKA: RPN
       :regist_parm_num=>MIDI_CTL_REGIST_PARM_NUM_MSB,
+      # note that LSB is in fact send first here!!!! At least that's what arecordmidi.c does
+      # the following is a list of registered parameters
+      #  0 = pitchbend range  MSB == semitones,  LSB = cents
+      #  1 = master fine tuning   14 bit data in cents where 0x2000 is A440
+      #  2 = coarse tuning        14 bit semitones where 0x40 = a440
+      #  0x3fff = unset any 'current' RPN
+      # My MIDI reference says that MSB can be send before LSB. Even in this case.
+      # IMPORTANT: since these are controller event the value is in fact the RPN (and not param)
+      # they set the RPN and then following data_entry and data_increment and data_decrement
+      # messages will all effect this parameter.
       :nonreg_parm_num_lsb=>MIDI_CTL_NONREG_PARM_NUM_LSB,
       :regist_parm_num_lsb=>MIDI_CTL_REGIST_PARM_NUM_LSB
       }
@@ -145,7 +158,7 @@ module RRTS
             if v && arg1[:value] > 0x7f
               raise RRTSError.new("overflowing coarse controller value[#{arg1[:param]}] #{arg1[:value]}")
             end
-            set_flag(coarse: v)
+              set_flag(coarse: v)
           when :param then @param = v
           when :track then @track = v
           when :direct then @sender_queue = @time = nil # bit of a hack...
@@ -184,7 +197,7 @@ module RRTS
                     :note=>SND_SEQ_EVENT_NOTE, # 5
                     :keypress=>SND_SEQ_EVENT_KEYPRESS, # 8
                     :controller=>SND_SEQ_EVENT_CONTROLLER, #10
-                    :control14=>SND_SEQ_EVENT_CONTROL14,
+                    :control14=>SND_SEQ_EVENT_CONTROL14,  # ALSA?? 14 bit controller
                     :pgmchange=>SND_SEQ_EVENT_PGMCHANGE, #11
                     :pitchbend=>SND_SEQ_EVENT_PITCHBEND, #13
                     :chanpress=>SND_SEQ_EVENT_CHANPRESS, #12
@@ -300,14 +313,23 @@ module RRTS
     end
 
     # returns the time difference (self - other)
-    # The events must have compatible timestamps
+    # The events must have compatible timestamps. Other can also be a timestamp
     def time_diff other
+      otime = MidiEvent === other ? other.time : other
       if Array === @time
-        otime = other.time
         d = 1_000_000_000 * (@time[0] - otime[0]) + @time[1] - otime[1]
         [ d / 1_000_000_000, d % 1_000_000_000 ]
       else
-        @time - other.time
+        @time - otime
+      end
+    end
+
+    def time_plus delta
+      if Array === @time
+        d = 1_000_000_000 * (@time[0] - delta[0]) + @time[1] - delta[1]
+        [ d / 1_000_000_000, d % 1_000_000_000 ]
+      else
+        @time + delta
       end
     end
 
@@ -320,6 +342,33 @@ module RRTS
     def to_yaml *args
       @track = @track.key if @track.respond_to?(:key)
       super
+    end
+
+    class FlagHelper
+      private
+      def initialize event
+        @event = event
+      end
+      public
+      def [](*f)
+        @event.flag(*f)
+      end
+
+      def []=(f, val)
+        @event.set_flag(f=>val)
+      end
+    end
+
+    # flags[x]      :== flag(x)
+    # flags[x,y]    :== flag(x, y)
+    # flags[x] = v  :== set_flag(x=>v)
+    def flags
+      FlagHelper.new(self)
+    end
+
+    # midi status nibble
+    def status
+      0x0
     end
   end  # MidiEvent
 
@@ -365,6 +414,10 @@ module RRTS
     def priority
       990
     end
+
+    def status
+      0x9
+    end
   end
 
   # Keypress or aftertouch event
@@ -381,15 +434,22 @@ module RRTS
       end
     end
 
-  public
+    public
 
-  def priority
-    995
-  end
+    def priority
+      995
+    end
 
-  alias :note :value
+    alias :note :value
     alias :pressure :velocity
+
+    def status
+      0xa
+    end
   end
+
+  # alias for KeypressEvent
+  KeyPressEvent = KeypressEvent
 
   # noteoff event
   class NoteOffEvent < VoiceEvent
@@ -410,6 +470,10 @@ module RRTS
 
     def priority
       999
+    end
+
+    def status
+      0x8
     end
 
     alias :note :value
@@ -442,6 +506,10 @@ module RRTS
 
     def to_s
       "NoteEvent ch:#@channel, #@value, vel:#@velocity, duration:#@duration"
+    end
+
+    def off_time
+      time_plus(@duration)
     end
   end
 
@@ -502,7 +570,7 @@ module RRTS
 #
 #     It is also possible to pass a tuple as 'value'.
 #     ControllerEvent.new channel, :bank_select, [1, 23]
-#     This would select bank 1*128+23.
+#     This would select bank 1*128+23.    BROKEN???
     def initialize channel, param = nil, value = 0, params = {}
       case param when AlsaMidiEvent_i then super(channel, param)
       else
@@ -514,6 +582,10 @@ module RRTS
 
     public
     alias :program :value
+
+    def status
+      0xb
+    end
 
     def to_s
       "ControllerEvent ch:#@channel, param: #@param -> #@value"
@@ -544,24 +616,9 @@ module RRTS
 
     alias :lsb? :lsb2msb
     alias :msb? :msb2lsb
-  end
+  end # class ControllerEvent
 
-  class Control14Event < VoiceEvent
-    private
-=begin
-    IMPORTANT: all events must support this way of construction
-    arg0 is a Sequencer, arg1 is a LOW LEVEL AlsaMidiEvent_i.
-    new sequencer, event
-=end
-    # new(channel, param, value [, ...])
-    def initialize channel, param = nil, value = nil, params = {}
-      case param when AlsaMidiEvent_i then super(channel, param)
-      else
-        params[:param] = param
-        super :control14, channel, value, params
-      end
-    end
-  end
+  Control14Event = ControllerEvent
 
   # PRGCHANGE events
   class ProgramChangeEvent < VoiceEvent
@@ -585,6 +642,10 @@ module RRTS
     public
     alias :program :value
 
+    def status
+      0xc
+    end
+
     def to_s
       "ProgramChangeEvent ch:#@channel, program: #{program.inspect}"
     end
@@ -606,7 +667,16 @@ module RRTS
         super :pitchbend, channel, value, params
       end
     end
+
+    public
+
+    def status
+      0xe
+    end
   end
+
+  # another alias
+  PitchBendEvent = PitchbendEvent
 
   # channel pressure == poor man's aftertouch
   class ChannelPressureEvent < VoiceEvent
@@ -621,6 +691,13 @@ module RRTS
         super :chanpress, arg0, arg1, params
       end
     end
+
+    public
+
+    def status
+      0xd
+    end
+
   end
 
   # has a channel ????  FIXME ??
@@ -645,6 +722,16 @@ module RRTS
     end
   end
 
+=begin
+  a Universal SysEx:
+  0xF0  SysEx
+  0x7E  Non-Realtime
+  0x7F  The SysEx channel. Could be from 0x00 to 0x7F. Here we set it to "disregard channel".
+  0x09  Sub-ID -- GM System Enable/Disable
+  0xNN  Sub-ID2 -- NN=00 for disable, NN=01 for enable
+  0xF7  End of SysEx
+=end
+
   class SystemExclusiveEvent < MidiEvent
     private
     # new Sequencer, event
@@ -661,6 +748,10 @@ module RRTS
     public
 
     alias :data :value
+
+    def status
+      0xf
+    end
   end
 
   SysexEvent = SystemExclusiveEvent
@@ -816,6 +907,11 @@ module RRTS
 
     public
     alias :tempo :value
+
+    # technically it is a meta event
+    def status
+      0xf
+    end
   end
 
   class QueueSkewEvent < QueueEvent
@@ -932,12 +1028,38 @@ module RRTS
     def priority
       -1
     end
+
+    def status
+      0xf
+    end
   end
 
   class LastEvent < MetaEvent
   end
 
-  # Need lyrics + marker + cuesomething meta events ...
-  # probably voicename as well
+  class MetaTextEvent < MetaEvent
+    private
+    def initialize value, params = {}
+      params[:value] = value
+      super params
+    end
+  end
 
+  # see http://www.midi.org/techspecs/rp17.php
+  # Can be used for Karaoke
+  class LyricsEvent < MetaTextEvent; end
+  class ProgramNameEvent < MetaTextEvent; end
+  class CommentEvent < MetaTextEvent; end
+  class MarkerEvent < MetaTextEvent; end
+  class CuePointEvent < MetaTextEvent; end
+
+  class ProgramNameEvent < MetaTextEvent
+    private
+    def initialize(channel, value, params = {})
+      params[:channel] = channel
+      super(value, params)
+    end
+  end
+
+  class VoiceNameEvent < ProgramNameEvent; end
 end # RRTS

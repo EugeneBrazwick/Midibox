@@ -1,3 +1,4 @@
+#!/usr/bin/ruby -w
 
 module RRTS # namespace
 
@@ -6,9 +7,78 @@ module RRTS # namespace
     Base = Object
 
     class EventsNode < Base
-      include Enumerable
-      # even if still abstract
+      include Enumerable # even if still abstract
+
+      public
+      def has_tracks?
+        false
+      end
+
+      # returns a default tempo
+      def tempo
+        require_relative '../midiqueue'
+        Tempo.new
+      end
+
+      # we must assume the node has events so it behaves like a single eventsource.
+      # good enough for 'listing'
+      def listing
+        [self]
+      end
+
+      def sequencenr
+        0
+      end
     end
+
+    # Peekable improves Enumerator with a 'peek' method
+    class Peekable < Enumerator
+      private
+
+      alias :old_next :next
+
+      # any obj supporting _method_ can be passed
+      # the result is an Enumerable (and Enumerator) supporting peek
+      # as well as next.
+      # So if something support each, but not peek, we can use this
+      # class as a wrapper.
+      def initialize(obj, method = :each, *args, &block)
+#         tag "Peekable.initialize called"
+        super
+        begin
+          @lookahead = old_next
+        rescue StopIteration
+          @lookahead = nil
+        end
+      end
+
+      # override
+      public
+      def next
+#         tag "Peekable.next called"
+        raise StopIteration.new unless @lookahead
+        r = @lookahead
+        begin
+          @lookahead = super
+        rescue StopIteration
+          @lookahead = nil
+        end
+        r
+      end
+
+      def peek
+        @lookahead
+      end
+
+      def rewind
+        super
+        begin
+          @lookahead = self.next
+        rescue StopIteration
+          @lookahead = nil
+        end
+      end
+    end# class Peekable
 
   end # Node
 end # module RRTS namespace
@@ -122,3 +192,16 @@ A style has a its own directory with files containing the midirecordings. Each s
 named for example pat:C#7:M7:9:4.   kind:notename:chordname:level:nrofbars.
 Kind can be 'pat' or 'fill' or 'intro' or 'end'.  The notename can drop the octave, and
 normally you would only supply a single one. A bass inversion could be added to the chordname.
+
+Generic interface to nodes
+Do all nodes have an IO interace?  For example, should you be able to use a midifilereader
+as an output node.  This could be usefull to add a midifile to a song already being played.
+We could then easily chain together 5 midifilereaders, reading 5 midifiles simultaneously.
+
+Still there is a performance problem. It would mean that a midifilereader needs to juggle between
+reading from a file (or pipe) and between other events.
+
+Could use a separate MergerNode to do the merging. There is another problem looming up.
+For nodes to merge properly they need a 'peek' operation.
+This can be solved generically by using yet another layer that calls upon next, but has a
+single lookahead element.

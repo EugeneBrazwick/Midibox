@@ -1426,6 +1426,59 @@ wrap_snd_seq_get_queue_status(int argc, VALUE *v_params, VALUE v_seq)
   return v_status;
 }
 
+/* call-seq:
+timer -> AlsaQueueTimer_i
+timer(buffer) -> AlsaQueueTimer_i
+Obtain the queue timer information
+*/
+static VALUE
+wrap_snd_seq_get_queue_timer(int argc, VALUE *v_params, VALUE v_seq)
+{
+  VALUE v_qid, v_timer;
+  rb_scan_args(argc, v_params, "11", &v_qid, &v_timer);
+  snd_seq_queue_timer_t *timer;
+  if (NIL_P(v_timer))
+  {
+    const int r = snd_seq_queue_timer_malloc(&timer);
+    if (r < 0) RAISE_MIDI_ERROR("allocating queue_timer", r);
+    v_timer = Data_Wrap_Struct(alsaQueueStatusClass, 0/*mark*/, snd_seq_queue_timer_free/*free*/, timer);
+  }
+  else
+    Data_Get_Struct(v_timer, snd_seq_queue_timer_t, timer);
+  snd_seq_t *seq;
+  Data_Get_Struct(v_seq, snd_seq_t, seq);
+  const int r = snd_seq_get_queue_timer(seq, NUM2INT(v_qid), timer);
+  if (r < 0) RAISE_MIDI_ERROR("retrieving queue_timer", r);
+  return v_timer;
+}
+
+/* call-seq:
+    set_queue_timer(queue, timer) -> self
+
+set the timer of the queue
+
+Parameters:
+[queue] queueid or MidiQueue to change the timer
+[timer] AlsaQueueTimer_i
+*/
+static VALUE
+wrap_snd_seq_set_queue_timer(VALUE v_seq, VALUE v_qid, VALUE v_timer)
+{
+  snd_seq_t *seq;
+  Data_Get_Struct(v_seq, snd_seq_t, seq);
+  RRTS_DEREF_DIRTY(v_timer, @handle);
+  RRTS_DEREF_DIRTY(v_qid, @id);
+  snd_seq_queue_timer_t *timer;
+  Data_Get_Struct(v_timer, snd_seq_queue_timer_t, timer);
+#if defined(DUMP_API)
+  fprintf(DUMP_STREAM, "snd_seq_set_queue_timer(%p, %d, %p)\n", seq, NUM2INT(v_qid), timer);
+ #endif
+  const int r = snd_seq_set_queue_timer(seq, NUM2INT(v_qid), timer);
+  if (r < 0)
+    RAISE_MIDI_ERROR("Cannot set queue timer", r);
+  return v_seq;
+}
+
 /* int poll_descriptors_count(eventmask)
 
 Parameters:
@@ -1850,6 +1903,8 @@ void alsa_seq_init()
   rb_define_method(alsaSequencerClass, "set_queue_info", RUBY_METHOD_FUNC(wrap_snd_seq_set_queue_info), 2);
   rb_define_method(alsaSequencerClass, "queue_status", RUBY_METHOD_FUNC(wrap_snd_seq_get_queue_status), -1);
   rb_define_method(alsaSequencerClass, "set_queue_tempo", RUBY_METHOD_FUNC(wrap_snd_seq_set_queue_tempo), 2);
+  rb_define_method(alsaSequencerClass, "queue_timer", RUBY_METHOD_FUNC(wrap_snd_seq_get_queue_timer), -1);
+  rb_define_method(alsaSequencerClass, "set_queue_timer", RUBY_METHOD_FUNC(wrap_snd_seq_set_queue_timer), 2);
   rb_define_method(alsaSequencerClass, "create_queue", RUBY_METHOD_FUNC(wrap_snd_seq_create_queue), 1);
   rb_define_method(alsaSequencerClass, "free_queue", RUBY_METHOD_FUNC(wrap_snd_seq_free_queue), 1);
   rb_define_method(alsaSequencerClass, "start_queue", RUBY_METHOD_FUNC(wrap_snd_seq_start_queue), 1);

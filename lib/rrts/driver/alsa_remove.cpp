@@ -10,31 +10,12 @@ VALUE alsaRemoveEventsClass;
 
 /* void    snd_seq_remove_events_free (snd_seq_remove_events_t *ptr)
 frees a previously allocated snd_seq_remove_events_t
-AUTOM
 */
 
 /* copy AlsaRemoveEvents_i#copy_to dst
 copy one snd_seq_remove_events_t to another
 */
-static VALUE
-wrap_snd_seq_remove_events_copy_to(int argc, VALUE *argv, VALUE v_rmp)
-{
-  VALUE v_dst;
-  rb_scan_args(argc, argv, "01", &v_dst);
-  VALUE retval = v_rmp;
-  snd_seq_remove_events_t *rmp, *dst;
-  if (NIL_P(v_dst))
-  {
-    const int r = snd_seq_remove_events_malloc(&dst);
-    if (r < 0) RAISE_MIDI_ERROR("allocating remove_events", r);
-    v_dst = Data_Wrap_Struct(alsaRemoveEventsClass, 0/*mark*/, snd_seq_remove_events_free/*free*/, dst);
-    retval = v_dst;
-  }
-  Data_Get_Struct(v_rmp, snd_seq_remove_events_t, rmp);
-  Data_Get_Struct(v_dst, snd_seq_remove_events_t, dst);
-  snd_seq_remove_events_copy(dst, rmp);
-  return retval;
-}
+ALSA_MIDI_COPY_TO_TEMPLATE(remove_events, RemoveEvents)
 
 /* int    AlsaRemoveEvents_i#condition
 Get the removal condition bits.

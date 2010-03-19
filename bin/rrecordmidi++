@@ -217,8 +217,7 @@ end
 def delta_time track, ev
   diff = ev.time - track.last_tick
   diff = 0 if diff < 0
-  # Hier gaat het allemaal om!
-  STDERR.printf "ARA:%d:diff=%d, ev.time.tick=%d, last=%d\n", __LINE__, diff, ev.time, track.last_tick
+#   STDERR.printf "ARA:%d:diff=%d, ev.time.tick=%d, last=%d\n", __LINE__, diff, ev.time, track.last_tick
   var_value track, diff
   track.last_tick = ev.time
 end

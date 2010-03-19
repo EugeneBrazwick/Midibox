@@ -17,43 +17,19 @@ VALUE alsaQueueInfoClass, alsaQueueTempoClass, alsaQueueStatusClass;
 Makes a copy of the current tempo. If +other+ is not specified it
 returns a copy.
 */
-static VALUE
-wrap_snd_seq_queue_tempo_copy_to(VALUE v_queue_tempo, VALUE v_dst)
-{
-  snd_seq_queue_tempo_t *tempo, *dst;
-  Data_Get_Struct(v_queue_tempo, snd_seq_queue_tempo_t, tempo);
-  Data_Get_Struct(v_dst, snd_seq_queue_tempo_t, dst);
-  snd_seq_queue_tempo_copy(dst, tempo);
-  return v_queue_tempo;
-}
+ALSA_MIDI_COPY_TO_TEMPLATE(queue_tempo, QueueTempo)
 
 /* self copy_to([other])
 Makes a copy of the current queuestatus. If +other+ is not specified it
 returns a copy
 */
-static VALUE
-wrap_snd_seq_queue_status_copy_to(VALUE v_queue_status, VALUE v_dst)
-{
-  snd_seq_queue_status_t *status, *dst;
-  Data_Get_Struct(v_queue_status, snd_seq_queue_status_t, status);
-  Data_Get_Struct(v_dst, snd_seq_queue_status_t, dst);
-  snd_seq_queue_status_copy(dst, status);
-  return v_queue_status;
-}
+ALSA_MIDI_COPY_TO_TEMPLATE(queue_status, QueueStatus)
 
 /* self copy_to([other])
 Returns a copy of the queue info structure. If +other+ is given it will be used
 as a buffer, otherwise a new buffer is allocated
 */
-static VALUE
-wrap_snd_seq_queue_info_copy_to(VALUE v_queue_info, VALUE v_dst)
-{
-  snd_seq_queue_info_t *queue_info, *dst;
-  Data_Get_Struct(v_queue_info, snd_seq_queue_info_t, queue_info);
-  Data_Get_Struct(v_dst, snd_seq_queue_info_t, dst);
-  snd_seq_queue_info_copy(dst, queue_info);
-  return v_queue_info;
-}
+ALSA_MIDI_COPY_TO_TEMPLATE(queue_info, QueueInfo)
 
 /* flags=(flags)
 Alter the flags for this queue. Must be used before creating a queue.
@@ -354,7 +330,7 @@ alsa_midi_queue_init()
 
   rb_define_method(alsaQueueTempoClass, "tempo=", RUBY_METHOD_FUNC(wrap_snd_seq_queue_tempo_set_tempo), 1);
   rb_define_method(alsaQueueTempoClass, "ppq=", RUBY_METHOD_FUNC(wrap_snd_seq_queue_tempo_set_ppq), 1);
-  rb_define_method(alsaQueueTempoClass, "copy_to", RUBY_METHOD_FUNC(wrap_snd_seq_queue_tempo_copy_to), 1);
+  rb_define_method(alsaQueueTempoClass, "copy_to", RUBY_METHOD_FUNC(wrap_snd_seq_queue_tempo_copy_to), -1);
   rb_define_method(alsaQueueTempoClass, "skew=", RUBY_METHOD_FUNC(wrap_snd_seq_queue_tempo_set_skew), 1);
   rb_define_method(alsaQueueTempoClass, "skew_base=", RUBY_METHOD_FUNC(wrap_snd_seq_queue_tempo_set_skew_base), 1);
   rb_define_method(alsaQueueTempoClass, "skew_base", RUBY_METHOD_FUNC(wrap_snd_seq_queue_tempo_get_skew_base), 0);
@@ -372,12 +348,12 @@ alsa_midi_queue_init()
   rb_define_method(alsaQueueInfoClass, "owner", RUBY_METHOD_FUNC(wrap_snd_seq_queue_info_get_owner), 0);
   rb_define_method(alsaQueueInfoClass, "locked?", RUBY_METHOD_FUNC(wrap_snd_seq_queue_info_get_locked), 0);
   rb_define_method(alsaQueueInfoClass, "flags", RUBY_METHOD_FUNC(wrap_snd_seq_queue_info_get_flags), 0);
-  rb_define_method(alsaQueueInfoClass, "copy_to", RUBY_METHOD_FUNC(wrap_snd_seq_queue_info_copy_to), 1);
+  rb_define_method(alsaQueueInfoClass, "copy_to", RUBY_METHOD_FUNC(wrap_snd_seq_queue_info_copy_to), -1);
 
   rb_define_method(alsaQueueStatusClass, "queue", RUBY_METHOD_FUNC(wrap_snd_seq_queue_status_get_queue), 0);
   rb_define_method(alsaQueueStatusClass, "events", RUBY_METHOD_FUNC(wrap_snd_seq_queue_status_get_events), 0);
   rb_define_method(alsaQueueStatusClass, "tick_time", RUBY_METHOD_FUNC(wrap_snd_seq_queue_status_get_tick_time), 0);
   rb_define_method(alsaQueueStatusClass, "real_time", RUBY_METHOD_FUNC(wrap_snd_seq_queue_status_get_real_time), 0);
   rb_define_method(alsaQueueStatusClass, "status", RUBY_METHOD_FUNC(wrap_snd_seq_queue_status_get_status), 0);
-  rb_define_method(alsaQueueStatusClass, "copy_to", RUBY_METHOD_FUNC(wrap_snd_seq_queue_status_copy_to), 1);
+  rb_define_method(alsaQueueStatusClass, "copy_to", RUBY_METHOD_FUNC(wrap_snd_seq_queue_status_copy_to), -1);
 }

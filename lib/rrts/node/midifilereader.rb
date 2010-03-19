@@ -166,23 +166,24 @@ module RRTS #namespace
       def read_track track, track_end
         tick = 0 # keep track of timings
         last_cmd = 0 # for running status
-        tag "read_track, starting at pos #@pos, last_cmd := 0"
+#         tag "read_track, starting at pos #@pos, last_cmd := 0, track_end = #{track_end}"
         meta_channel = 0
         #  the current file position is after the track ID and length
         while @pos < track_end
+#           tag "pos = #@pos, track_end = #{track_end}"
           delta_ticks = read_var or break
-          tag "delta_ticks=#{delta_ticks}, pos of command is #@pos"
+#           tag "delta_ticks=#{delta_ticks}, pos of command is #@pos"
           tick += delta_ticks
           c = read_byte
           if (c & 0x80) != 0
             # have command
             cmd = c
             last_cmd = cmd if cmd < 0xf0
-            tag "read c #{c}, last_cmd = #{last_cmd}, pos=#@pos"
+#             tag "read c #{c}, last_cmd = #{last_cmd}, pos=#@pos"
           else # running status, should not have read 'c' then
             @io.ungetbyte c
             @pos -= 1 # !!
-            tag "got byte #{c}, not a status, using recorded last_cmd: #{last_cmd}"
+#             tag "got byte #{c}, not a status, using recorded last_cmd: #{last_cmd}"
             cmd = last_cmd
             read_error("running status was 0, last byte read was #{c}") if cmd == 0
           end
@@ -235,9 +236,9 @@ module RRTS #namespace
               event = SysexEvent.new(sysex, track: track, tick: tick)
             when 0xff # meta event
               c = read_byte
-              tag "read byte #{c} == meta event kind, pos = #@pos"
+#               tag "read byte #{c} == meta event kind, pos = #@pos"
               len = read_var or read_error('could not read metalength')
-              tag "read meta_event #{c}, len = #{len}, pos = #@pos"
+#               tag "read meta_event #{c}, len = #{len}, pos = #@pos"
               case c
               when 0x21 # port number
                 read_error('0 length portnumber') if len < 1
@@ -250,7 +251,7 @@ module RRTS #namespace
                 @builder.<<(event, &@block)
                 return
               when 0x51 # tempo
-                tag "got tempo, len = #{len}"
+#                 tag "got tempo, len = #{len}"
                 read_error('tempo too short') if len < 3
                 if @builder.tempo.smpte_timing?
                   #  SMPTE timing doesn't change
@@ -292,7 +293,7 @@ module RRTS #namespace
               when 0x20
                 meta_channel = read_byte
               when 0x58 # time signature
-                tag "read time signature (4 bytes), pos = #@pos, len = #{len}"
+#                 tag "read time signature (4 bytes), pos = #@pos, len = #{len}"
                 invalid_format('time signature must be 4 long') unless len == 4
                 numerator = read_byte
                 denominator = read_byte
@@ -300,7 +301,7 @@ module RRTS #namespace
                 skip 1  # last byte == ???? number of 32's in a MIDI beat (== 24 clocks)
                 @builder.time_signature = numerator, denominator
                 @builder.clocks_per_beat = clocks_per_beat # normally 24
-                tag "setup time_sig #{numerator}/#{denominator} tpb=#{clocks_per_beat}, pos is now #@pos"
+#                 tag "setup time_sig #{numerator}/#{denominator} tpb=#{clocks_per_beat}, pos is now #@pos"
               when 0x59 # key signature
                 invalid_format('key signature must be 2 long') unless len == 2
                 sf = read_byte # 0 == C, 1 == G, 2 == D (##)
@@ -343,6 +344,7 @@ module RRTS #namespace
         type = read_int 2
         # 0 == 16 channels in 1 track. Only 1 track present.
         # 1 == more than one track, each track 1 channel.
+        # 2 = more than one track, all tracks are separate pieces
         if type != 0 && type != 1
           raise RRTSError.new("#@io: type #{type} format is not supported")
         end

@@ -71,18 +71,19 @@ module RRTS #namespace
       POW2_14 = 1 << 14
       POW2_7 = 1 << 7
 
-      # write variable length integer using bit 8.
+      # write variable length integer using bit 8. Returns v for convience.
       def write_var v
         @io.putc(0x80 | ((v >> 28) & 0x03)) if v >= POW2_28
         @io.putc(0x80 | ((v >> 21) & 0x7f)) if v >= POW2_21
         @io.putc(0x80 | ((v >> 14) & 0x7f)) if v >= POW2_14
         @io.putc(0x80 | ((v >> 7) & 0x7f)) if v >= POW2_7
         @io.putc(v & 0x7f)
+        v
       end
 
       # write command. Can be skipped if equal to last_command
       def write_command command
-        tag "write_command pos=#{@io.pos}, #{command}, last_command = #@last_command"
+#         tag "write_command pos=#{@io.pos}, #{command}, last_command = #@last_command"
         @io.putc(command) if command != @last_command
         @last_command = command < 0xf0 ? command : 0
       end
@@ -99,8 +100,7 @@ module RRTS #namespace
           next if off_time > eventtm
           delta_ticks = off_time - @tick
           raise RRTSError.new("Really, an invalid timestamp....") if delta_ticks < 0
-          write_var delta_ticks
-          @tick += delta_ticks
+          @tick += write_var(delta_ticks)
           status = 0x8
           write_command((0x8 << 4) + note.channel - 1)
           @io.putc note.note
@@ -112,47 +112,48 @@ module RRTS #namespace
 
       def write_event track, event, notes_to_close
          # this only works if events are recorded in ticks!  FIXME
-        tag "write_event, at pos #{@io.pos}"
+#         tag "write_event, at pos #{@io.pos}"
         if (delta_ticks = event.time - @tick) < 0
           raise RRTSError.new("Invalid delta #{delta_ticks} in source, tick = #@tick, " +
                             "event.time=#{event.time.inspect}\nevent=#{event}")
         end
-        tag "writing delta #{delta_ticks} at pos #{@io.pos}, tick:=#{@tick + delta_ticks}"
-        write_var delta_ticks
-        @tick += delta_ticks
+#         tag "writing delta #{delta_ticks} at pos #{@io.pos}, tick:=#{@tick + delta_ticks}"
         status = event.status
         ch = event.channel ? event.channel - 1 : 0
         command = (status << 4) + ch
-        tag "status = #{status}, ch = #{ch}, event.class=#{event.class}, command=#{command}"
+#         tag "status = #{status}, ch = #{ch}, event.class=#{event.class}, command=#{command}"
         case event
         when NoteOnEvent, NoteOffEvent, KeyPressEvent
-          tag "NoteO[n|ff]Event, KeyPressEvent"
+#           tag "NoteO[n|ff]Event, KeyPressEvent"
+          @tick += write_var(delta_ticks)
           write_command(command)
           @io.putc event.note
           @io.putc event.velocity
         when NoteEvent
+          @tick += write_var(delta_ticks)
           write_command((0x9 << 4) + ch)
           @io.putc event.note
           @io.putc event.velocity
           notes_to_close << event.dup
           notes_to_close.sort!{|n, o| n.off_time <=> o.off_time }
         when ControllerEvent
+          @tick += write_var(delta_ticks)
           write_command(command)
-          tag "Controller event on channel #{ch}"
+#           tag "Controller event on channel #{ch}"
           param = event.param
           param = MidiEvent::Symbol2Param[param] if Symbol === param
-          tag "store param #{param} at pos #{@io.pos}"
+#           tag "store param #{param} at pos #{@io.pos}"
           @io.putc(param)
           if Array === event.value
             @io.putc(event.value[0])
             @io.putc(0) # delta
-            tag "running state at pos #{@io.pos}"
+#             tag "running state at pos #{@io.pos}"
             @io.putc(param)
             @io.putc(event.value[1])
           elsif lsb = event.msb2lsb && !event.flag(:coarse)
             @io.putc(event.value >> 7)
             @io.putc(0) # delta
-            tag "running state at pos #{@io.pos}"
+#             tag "running state at pos #{@io.pos}"
             @io.putc(param)
             @io.putc(event.value && 0x7f)
           else
@@ -161,10 +162,11 @@ module RRTS #namespace
             @io.putc(event.value)
           end
         when ProgramChangeEvent
-          tag "ProgramChangeEvent"
+          @tick += write_var(delta_ticks)
+          #           tag "ProgramChangeEvent"
           # could be prog or [bank14, prog] or [bankmsb,lsb,prog] or [bank7,prog] and flag(:coarse)
           if Array === event.value
-            tag "Emit ControllerEvent first!"
+#             tag "Emit ControllerEvent first!"
             write_command((0xb << 4) + ch)
             @io.putc(Driver::MIDI_CTL_MSB_BANK)
             if event.value.length == 3
@@ -180,7 +182,7 @@ module RRTS #namespace
             else
               @io.putc(event.value[0] >> 7) # MSB value
               @io.putc(0) # delta
-              tag "produce running state at pos #{@io.pos}, putc#{Driver::MIDI_CTL_LSB_BANK}, value[0]=#{event.value[0]}"
+#               tag "produce running state at pos #{@io.pos}, putc#{Driver::MIDI_CTL_LSB_BANK}, value[0]=#{event.value[0]}"
               @io.putc(Driver::MIDI_CTL_LSB_BANK)
               @io.putc(event.value[0] & 0x7f)
               program = event.value[1]
@@ -189,19 +191,22 @@ module RRTS #namespace
           else
             program = event.value
           end
-          tag "write progchange command at pos #{@io.pos}"
+#           tag "write progchange command at pos #{@io.pos}"
           write_command(command)
 #           tag "program=#{program.inspect}"
           @io.putc(program & 0x7f)
         when ChannelPressureEvent
+          @tick += write_var(delta_ticks)
           write_command(command)
           @io.putc(event.value & 0x7f)
         when PitchBendEvent
+          @tick += write_var(delta_ticks)
           write_command(command)
           value = event.value + 0x2000
           @io.putc(value & 0x7f)
           @io.putc((value >> 7) & 0x7f)
         when SysexEvent
+          @tick += write_var(delta_ticks)
           # note arecordmidi.c  IGNORES this if len is 0.
           # But I already sent the delta. Why would there be 0 length events anyway?
           sysex = event.value # should be ascii-8bit encoding
@@ -215,11 +220,16 @@ module RRTS #namespace
           write_var sysex.length - i
           @io.write(sysex[i..-1])
         when TempoEvent
+          @tick += write_var(delta_ticks)
           @io.putc(0xff) # meta
           @io.putc(0x51) # tempo
           write_var 3 # len !!
           write_int event.value, 3
         when LastEvent
+          @tick += write_var(delta_ticks)
+          @io.putc(0xff) # meta
+          @io.putc(0x2f) # EOT
+          write_var 0 # len !!
         else
           tag "TODO: else, event=#{event}"
         end
@@ -239,7 +249,7 @@ module RRTS #namespace
                      :F=>-1, :'Bb'=>-2, :'Eb'=>-3, :'Ab'=>-4, :'Db'=>-5, :'Gb'=>-6, :'Cb'=>-7
                     }
       def write_track track
-        tag "write_track #{track}, pos=#{@io.pos}"
+#         tag "write_track #{track}, pos=#{@io.pos}"
         write_id MTRK
         memposlen = @io.pos
         write_int 0 # dummy for position
@@ -247,23 +257,23 @@ module RRTS #namespace
         @last_command = 0
         notes_to_close = []
         unless @done_chunk_metas
-          tag "write time_signature event at pos #{@io.pos}"
+#           tag "write time_signature event at pos #{@io.pos}"
           if time_signature = @inputnode.time_signature
             write_var 0  # delta
-            tag "put metacode on pos #{@io.pos}"
+#             tag "put metacode on pos #{@io.pos}"
             @io.putc(0xff)
-            tag "put timesigcode on pos #{@io.pos}"
+#             tag "put timesigcode on pos #{@io.pos}"
             @io.putc(0x58) # time sig
             write_var 4 # length of meta
             @io.putc time_signature[0]
             @io.putc time_signature[1]
-            tag "writing inputnode.ticks_per_beat = #{@inputnode.clocks_per_beat}"
+#             tag "writing inputnode.ticks_per_beat = #{@inputnode.clocks_per_beat}"
             @io.putc @inputnode.clocks_per_beat
             @io.putc 0  # 32s per 24 clocks  Unclear....
           end
           key = @inputnode.key
           if key
-            tag "write key event at pos #{@io.pos}"
+#             tag "write key event at pos #{@io.pos}"
             write_var 0  # delta
             @io.putc(0xff)
             @io.putc(0x59)
@@ -275,7 +285,7 @@ module RRTS #namespace
         end
         # dump the track metas
         if track.sequencenr
-          tag "write seqnr at pos #{@io.pos}"
+#           tag "write seqnr at pos #{@io.pos}"
           write_var 0  # delta
           @io.putc(0xff)
           @io.putc(0x0)
@@ -283,7 +293,7 @@ module RRTS #namespace
           write_int track.sequencenr, 2
         end
         if track.portindex
-          tag "write portindex at pos #{@io.pos}"
+#           tag "write portindex at pos #{@io.pos}"
           write_var 0  # delta
           @io.putc(0xff)
           @io.putc(0x21)
@@ -294,12 +304,15 @@ module RRTS #namespace
         write_meta_string track.name, 0x3
         write_meta_string track.intended_device, 0x9
         for event in track
+#           tag "put event #{event.class} in track at pos #{@io.pos}"
           raise RRTSError.new("Can't record MIDI file from realtime events") unless Integer === event.time
 #           tag "event.time=#{event.time}"
           handle_notes_to_close(track, notes_to_close, event.time) unless notes_to_close.empty?
+#           tag "after notes to close.... pos = #{@io.pos}"
           write_event track, event, notes_to_close
         end
-        sz = @io.pos - memposlen
+        sz = @io.pos - memposlen - 4 # substract 4 extra bytes for the length itself
+#         tag "pos=#{@io.pos}, memposlen=#{memposlen}, -> sz = #{sz}"
         p = @io.pos
         @io.pos = memposlen
         write_int sz

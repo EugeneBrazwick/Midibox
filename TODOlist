@@ -3,6 +3,7 @@
 0002  do feb 25 22:22:53 CET 2010 TODO make rplaymidi++ work as a two step system
                                        a) build an in-memory chunk     NODE -> midifile->chunk
                                        b) play the tracks in the chunk NODE -> chunk -> device[s]
+      vr mrt 19 21:00:38 CET 2010 more or less, by virtue of midifilereader + -writer.
 0003 za feb 27 21:50:12 CET 2010 BUG rplaymidi reads a NoteOn without a NoteOff
          in fixtures/eurodance.midi.  Note 12, Rhythm track. I believe this was recorded
          with arecordmidi. So who's to blame? Is there an official midi file dumper somewhere?

@@ -45,8 +45,7 @@ module RRTS
         @events = []
         @key = @@key
         @@key += 1
-        @sequencenr = nil
-        @portindex = nil
+        @sequencenr = @portindex = @voicename = nil
         # these may change as the track is recorded(!)
         # also do not manipulate the strings.
         # Some of these metaevent should become metaevents.
@@ -59,20 +58,25 @@ module RRTS
           when :combine_notes then @combine_notes = v
           when :combine_progchanges then @combine_progchanges = v
           when :combine_lsb_msb then @combine_lsb_msb = v
-          when :tmpltrack
+          when :tmpltrack, :template
             @sequencenr = v.sequencenr
             @copyright = v.copyright
             @portindex = v.portindex
             @voicename = v.voicename
             @name = v.name
-            @portindex = v.portindex
           when :channel then @channel = v
           else
-            raise RRTSError.new("invalid option '#{v}' for Track")
+            raise RRTSError.new("invalid option '#{k}' for Track")
           end
         end
         rewind
         @open_notes = nil
+      end
+
+      def to_yaml_properties
+        [:@copyright, :@name, :@intended_device, :@voicename, :@portindex,
+         :@key, :@sequencenr, :@channel
+        ]
       end
 
       # attempt to locate matching NoteOn event (with vel > 0)
@@ -211,11 +215,12 @@ module RRTS
           when :split_tracks then @split_tracks = v
           end
         end
-        options.remove(:split_tracks)
+        options.delete(:split_tracks)
         @track_options = options
         # keys are formatted as such: = "#{seqnr}:#{portnr}:#{channel}"
         @track_index = {} if @split_tracks
         self << first_track if first_track
+        tag "CompoundTrack.new, split_tracks=#@split_tracks"
         # erm..... This is dangerous to cache. Can be done later
   #       @all_tracks = []
       end

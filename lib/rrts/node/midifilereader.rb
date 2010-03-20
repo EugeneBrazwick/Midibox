@@ -356,7 +356,7 @@ module RRTS #namespace
         #   puts "time_division=#{time_division}"
         #       /* interpret and set tempo */
         smpte_timing = (time_division & 0x8000) != 0
-        require_relative '../midiqueue'
+        require_relative '../tempo'
         unless smpte_timing
           # time_division is ticks per quarter
           tempo = Tempo.new 120, ticks_per_beat: time_division
@@ -425,7 +425,7 @@ module RRTS #namespace
     class MidiIOReader < EventsNode
       private
       def initialize io, options = {}
-        require_relative '../midiqueue'
+        require_relative '../tempo'
         @tempo = Tempo.new
         @chunk = nil # cached if internalize is set
 #         tag "options=#{options.inspect}"
@@ -439,6 +439,7 @@ module RRTS #namespace
         end
         options.delete(:auto_close)
         options.delete(:internalize)
+        tag "MidiIOReader.new, @internalize=#@internalize, options=#{options.inspect}"
         if @internalize
           require_relative 'chunk'
           chunk = Chunk.new(options)
@@ -504,6 +505,11 @@ module RRTS #namespace
       # override
       def listing
         @chunk && @chunk.listing || super
+      end
+
+      # override
+      def chunk
+        @chunk || self
       end
     end # class MidiIOReader
 

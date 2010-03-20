@@ -353,8 +353,6 @@ module RRTS #namespace
         MidifileDumper.new(@io, node).dump
       end
 
-      alias :<< :connect_to
-
     end # class MidiIOWriter
 
     class MidiFileWriter < MidiIOWriter

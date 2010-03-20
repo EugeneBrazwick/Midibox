@@ -17,16 +17,26 @@ module RRTS
       MINOR = false
       private
       def initialize options = {}
-        @options = options
-        require_relative '../midiqueue'
+        @split_tracks = true
+        for k, v in options
+          @split_tracks = v if k == :split_tracks
+          # the rest is passed on
+        end
+        @options = options    # to pass to CompoundTrack
+        require_relative '../tempo'
         @tempo = Tempo.new
         @time_signature = nil #  4, 4  do not set it! Otherwise saving/loading MIDI will have
         @clocks_per_beat = nil
             # differences.  Can be interpreted on other level if so required
         @key = nil # :C, MAJOR no default here
         @track = nil
+        # track remains empty until the first event is sent (using <<)
       end
       public
+
+      def to_yaml_properties
+        [:@tempo, :@time_signature, :@clocks_per_beat, :@key, :@track]
+      end
 
       # the initial tempo (Tempo instance). Note this is an override from EventsNode
       attr_accessor :tempo
@@ -54,7 +64,7 @@ module RRTS
             else
               @track = CompoundTrack.new(@track, @options)
             end
-          elsif @options[:split_tracks]
+          elsif @split_tracks
             @track = CompoundTrack.new(event, @options)
           else
             @track = event

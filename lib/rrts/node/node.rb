@@ -4,7 +4,13 @@ module RRTS # namespace
 
   module Node
 
-    Base = Object
+    class Base
+      def connect_to node
+        raise RRTSError.new("not implemented: #{self.class}::#{__FUNCTION__}")
+      end
+
+      alias :<< :connect_to
+    end
 
     class EventsNode < Base
       include Enumerable # even if still abstract
@@ -16,7 +22,7 @@ module RRTS # namespace
 
       # returns a default tempo
       def tempo
-        require_relative '../midiqueue'
+        require_relative '../tempo'
         Tempo.new
       end
 
@@ -28,6 +34,14 @@ module RRTS # namespace
 
       def sequencenr
         0
+      end
+
+      def chunk
+        self
+      end
+
+      def voicename
+        nil
       end
     end
 

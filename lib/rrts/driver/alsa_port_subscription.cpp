@@ -11,7 +11,8 @@ VALUE alsaPortSubscriptionClass;
 
 // External doc: http://www.alsa-project.org/~tiwai/alsa-subs.html
 
-/* [client, port] dest
+/* call-seq:
+   dest -> [client, port]
 
 Get destination address of a port_subscribe container as a tuple of two integers:
 clientid plus portid
@@ -25,7 +26,8 @@ wrap_snd_seq_port_subscribe_get_dest(VALUE v_port_subs)
   return rb_ary_new3(2, INT2NUM(adr->client), INT2NUM(adr->port));
 }
 
-/* clientid dest_client
+/* call-seq:
+     dest_client -> clientid
 See #dest
 */
 static VALUE
@@ -37,7 +39,8 @@ wrap_snd_seq_port_subscribe_get_dest_client(VALUE v_port_subs)
   return INT2NUM(adr->client);
 }
 
-/* portid dest_port
+/* call-seq: 
+     dest_port -> portid
 See #dest
 */
 static VALUE
@@ -49,7 +52,8 @@ wrap_snd_seq_port_subscribe_get_dest_port(VALUE v_port_subs)
   return INT2NUM(adr->port);
 }
 
-/* bool exclusive?
+/* call-seq:
+    exclusive? -> bool
 Get the exclusive mode of a port_subscribe container. If a port is exclusive
 no one can subscribe it, and there can only be one subscriber.
 */
@@ -61,7 +65,8 @@ wrap_snd_seq_port_subscribe_get_exclusive(VALUE v_port_subs)
   return INT2BOOL(snd_seq_port_subscribe_get_exclusive(port_subs));
 }
 
-/* int queue
+/* call-seq:
+    queue -> int
 Get the queue id of a port_subscribe container.
 */
 static VALUE
@@ -72,7 +77,8 @@ wrap_snd_seq_port_subscribe_get_queue(VALUE v_port_subs)
   return INT2NUM(snd_seq_port_subscribe_get_queue(port_subs));
 }
 
-/* [client, port] sender
+/* call-seq:
+    sender -> [client, port]
 Get sender address of a port_subscribe container.
 See #dest
 */
@@ -85,7 +91,8 @@ wrap_snd_seq_port_subscribe_get_sender(VALUE v_port_subs)
   return rb_ary_new3(2, INT2NUM(adr->client), INT2NUM(adr->port));
 }
 
-/* clientid sender_client
+/* call-seq: 
+     sender_client -> clientid
 See #sender
 */
 static VALUE
@@ -97,7 +104,8 @@ wrap_snd_seq_port_subscribe_get_sender_client(VALUE v_port_subs)
   return INT2NUM(adr->client);
 }
 
-/* portid sender_port
+/* call-seq: 
+   sender_port -> portid
 See #sender
 */
 static VALUE
@@ -109,7 +117,8 @@ wrap_snd_seq_port_subscribe_get_sender_port(VALUE v_port_subs)
   return INT2NUM(adr->port);
 }
 
-/* bool time_real?
+/* call-seq:
+    time_real? -> bool
 Get the real-time update mode of a port_subscribe container.
 */
 static VALUE
@@ -120,7 +129,8 @@ wrap_snd_seq_port_subscribe_get_time_real(VALUE v_port_subs)
   return INT2BOOL(snd_seq_port_subscribe_get_time_real(port_subs));
 }
 
-/* bool time_update?
+/* call-seq:
+    time_update? -> bool
 Get the timestamping mode of a port_subscribe container.
 */
 static VALUE
@@ -136,7 +146,8 @@ VALUE v_clientid, v_portid; \
 rb_scan_args(argc, argv, "11", &v_clientid, &v_portid); \
 solve_address(v_clientid, v_portid)
 
-/* dest=(address)
+/* call-seq:
+    dest=(address)
 
 Set destination address of a port_subscribe container.
 
@@ -161,7 +172,8 @@ wrap_snd_seq_port_subscribe_set_dest(int argc, VALUE *argv, VALUE v_port_subs)
   return Qnil;
 }
 
-/* exclusive=(bool)
+/* call-seq:
+     exclusive=(bool)
 Set the exclusive mode of a port_subscribe container. Should be set before construction
 */
 static VALUE
@@ -173,7 +185,8 @@ wrap_snd_seq_port_subscribe_set_exclusive(VALUE v_port_subs, VALUE v_val)
   return Qnil;
 }
 
-/* queue=(queue)
+/* call-seq;
+    queue=(queue)
 Set the queue id of a port_subscribe container.
 Parameters:
   [qid] queueid or MidiQueue
@@ -192,7 +205,8 @@ wrap_snd_seq_port_subscribe_set_queue(VALUE v_port_subs, VALUE v_queue_id)
   return Qnil;
 }
 
-/* sender=(address)
+/* call-seq:
+    sender=(address)
 
 Set sender address of a port_subscribe container. See also #dest=
 */
@@ -210,7 +224,8 @@ wrap_snd_seq_port_subscribe_set_sender(int argc, VALUE *argv, VALUE v_port_subs)
   return Qnil;
 }
 
-/* real_time=(bool)
+/* call-seq: 
+     real_time=(bool)
 Set the real-time mode of a port_subscribe container.
 */
 static VALUE
@@ -226,7 +241,8 @@ wrap_snd_seq_port_subscribe_set_time_real(VALUE v_port_subs, VALUE v_val)
   return Qnil;
 }
 
-/*  time_update=(bool)
+/*  call-seq:
+     time_update=(bool)
 Set the timestamp-update mode of a port_subscribe container.
 */
 static VALUE

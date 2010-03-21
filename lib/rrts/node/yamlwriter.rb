@@ -3,11 +3,12 @@
 # The reverse of yamlreader
 module RRTS #namespace
 
+  require_relative '../rrts'
+  require_relative 'node'
+
   module Node
 
-    require_relative '../rrts'
-    require_relative 'node'
-
+    # class to create streamable yaml output
     class YamlIOWriter < Base
       private
       def initialize io, node = nil
@@ -26,7 +27,7 @@ module RRTS #namespace
 
     end # class YamlIOWriter
 
-
+    # Convenience class for dumping to a named file
     class YamlFileWriter < YamlIOWriter
       private
       def initialize filename, node = nil

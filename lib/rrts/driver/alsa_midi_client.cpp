@@ -51,9 +51,10 @@ wrap_snd_seq_client_info_get_client(VALUE v_client_info)
   return INT2NUM(snd_seq_client_info_get_client(client_info));
 }
 
-/*
-int ClientInfo#type
-Get client type of a client_info container.
+/* call-seq:
+   ClientInfo#type -> int
+Get client type of a client_info container. Can be SND_SEQ_USER_CLIENT
+ or SND_SEQ_KERNEL_CLIENT
 */
 static VALUE
 wrap_snd_seq_client_info_get_type(VALUE v_client_info)
@@ -63,8 +64,8 @@ wrap_snd_seq_client_info_get_type(VALUE v_client_info)
   return INT2NUM(snd_seq_client_info_get_type(client_info));
 }
 
-/*
- string ClientInfo#name
+/* call-seq:
+   ClientInfo#name -> string
 Get the name of a client_info container.
 */
 static VALUE
@@ -75,8 +76,8 @@ wrap_snd_seq_client_info_get_name(VALUE v_client_info)
   return rb_str_new2(snd_seq_client_info_get_name(client_info));
 }
 
-/*
-bool ClientInfo#broadcast_filter?
+/* call-seq:
+ClientInfo#broadcast_filter? -> bool
 Get the broadcast filter usage of a client_info container.
 */
 static VALUE
@@ -87,8 +88,8 @@ wrap_snd_seq_client_info_get_broadcast_filter(VALUE v_client_info)
   return INT2BOOL(snd_seq_client_info_get_broadcast_filter(client_info));
 }
 
-/*
-bool ClientInfo#error_bounce?
+/* call-seq:
+   ClientInfo#error_bounce? -> bool
 Get the error-bounce usage of a client_info container.
 */
 static VALUE
@@ -99,8 +100,8 @@ wrap_snd_seq_client_info_get_error_bounce(VALUE v_client_info)
   return INT2BOOL(snd_seq_client_info_get_error_bounce(client_info));
 }
 
-/*
-int    ClientInfo#num_ports
+/* call-seq:
+   ClientInfo#num_ports -> int
 Get the number of opened ports of a client_info container.
 */
 static VALUE
@@ -111,8 +112,8 @@ wrap_snd_seq_client_info_get_num_ports(VALUE v_client_info)
   return INT2NUM(snd_seq_client_info_get_num_ports(client_info));
 }
 
-/*
-int ClientInfo#event_lost
+/* call-seq:
+ ClientInfo#event_lost -> int
 Get the number of lost events of a client_info container.
 */
 static VALUE

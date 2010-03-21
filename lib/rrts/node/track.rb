@@ -28,6 +28,7 @@ module RRTS
       # either a single tick, or a real_time tuple [sec, nsec]
       attr_accessor :end_time
 
+      # tracks support tracks, so always true
       def has_tracks?
         true
       end
@@ -40,6 +41,14 @@ module RRTS
       include Enumerable
       private
 
+=begin rdoc
+Setup an empty track. Supported options are:
+- combine_notes, create NoteEvent from NoteOn + NoteOff
+- combine_progchanges, create extended program changes that include the bank selection
+- combine_lsb_msb, create control14 events (but just as ControllerEvent)
+- tmpltrack or template: create a split track from a source track. Copies stuff like
+       the copyright notice etc..
+=end
       def initialize options = {}
         super()
         @events = []
@@ -111,11 +120,17 @@ module RRTS
       # access to the Array of MidiEvent instances
       attr :events
 
+      # the track can be given a name, 
+      # intended_device is the device that is the target, since a lot of midievents
+      # are devicedependent
       attr_accessor :copyright, :name, :intended_device
       # order in the original MIDI file ??
       attr_accessor :sequencenr
       # generated unique key per track (unique per process)
       attr :key
+      # the portindex is a relative indicator, and not a portid. For example, you
+      # might have read from 3 ports to create the chunk. 
+      # channel is the channel recorded from, but may also be the target channel.
       attr_accessor :portindex, :channel
 
       # returns array of tracks, but if events is empty it returns []
@@ -128,6 +143,8 @@ module RRTS
         @events[@ptr]
       end
 
+      # returns the next event (ordered by time and priority)
+      # the first call (or after a rewind) returns the first event
       def next
         r = @events[@ptr]
         raise StopIteration.new unless r
@@ -135,10 +152,12 @@ module RRTS
         r
       end
 
+      # reset the track pointer to 0
       def rewind
         @ptr = 0
       end
 
+      # record an event in the track
       def << event
         last = @events.last
         raise RRTSError.new("bad timestamp for recorded event") if last && event.time_diff(last) < 0
@@ -194,6 +213,7 @@ module RRTS
         event.track = self
       end
 
+      # each is delegated to the events array
       def each &block
         @events.each(&block)
       end
@@ -206,6 +226,13 @@ module RRTS
     class CompoundTrack < BaseTrack
       include Enumerable
       private
+=begin rdoc
+  create a new compound track, optionally inserting the first track
+  Option recognized is 
+  - split_tracks (default true). If set events are shifted on channel as well as on
+        original track.
+  All other options are passed to the created tracks (as caused by _split_tracks_)
+=end  
       def initialize first_track = nil, options = {}
         @split_tracks = true
         super()
@@ -234,7 +261,6 @@ module RRTS
         t
       end
 
-      # this is not entirely accurate
       public
   #     def end_time= tm
   #       @tracks.each {|track| track.end_time = tm }
@@ -265,6 +291,8 @@ module RRTS
         l
       end
 
+      # returns the next event in sequence, selecting it from any subtrack
+      # available
       def next
         l = mint = nil
         for t in @tracks
@@ -279,6 +307,7 @@ module RRTS
         l
       end
 
+      # reset the track pointer for all subtracks (recursively)
       def rewind
         # @tracks is an ordinary array so this enumerates tracks
         @tracks.each(&:rewind)
@@ -300,7 +329,7 @@ module RRTS
 #         using == :each ? self : super
 #       end
 
-      # an array of all contained tracks that actually have events
+      # a flat array of all contained tracks that actually have events
       def listing
         @tracks.inject([]) { |tot, track| tot.concat track.listing }
       end

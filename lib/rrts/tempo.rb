@@ -79,7 +79,8 @@ module RRTS
      protected
 
 #      attr :handle  DIRTY!
-
+ 
+     # used by initialize_copy
      def copy_to_i handle
        @handle.copy_to handle
      end
@@ -95,6 +96,7 @@ module RRTS
        @smpte_timing
      end
 
+     # override, yaml cannot dump handles
      def to_yaml opts = {}
        hash = {:smpte_timing=>@smpte_timing, :ppq=>@handle.ppq, :tempo=>@handle.tempo,
                :skew=>@handle.skew, :skew_base=>@handle.skew_base}

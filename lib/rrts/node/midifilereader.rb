@@ -450,6 +450,7 @@ module RRTS #namespace
       end
 
       public
+      # enumerate the loaded events
       def each &block
         return to_enum unless block
         begin
@@ -464,45 +465,54 @@ module RRTS #namespace
         end
       end
 
+      # The current tempo as maintained by the loader
       attr_accessor :tempo
 
+      # This is only called for reading from pipes, where this option is not
+      # available
       def time_signature= bogo
       end
 
+      # Change the tempo. Should be set before starting a queue
       def ticks_per_beat= ppq
         @tempo.ppq = ppq
       end
 
       alias :ppq= :ticks_per_beat=
 
+      # Anything else than MidiEvent is ignored, otherwise yielded
       def << event
-        tag "<<#{event}, tick=#{event.time.inspect}"
+#         tag "<<#{event}, tick=#{event.time.inspect}"
         yield(event) if MidiEvent === event
       end
 
-      # only works when @internalize was set
+      # only works when @internalize was set, and rewinds the chunk
       def rewind
         @chunk && @chunk.rewind
       end
 
+      # only works when @internalize was set and returns a tuple like [3,4]
       def time_signature
         @chunk && @chunk.time_signature
       end
 
-      # tuple [:C, true] for Cmajor etc.
+      # tuple [:C, true] for Cmajor etc. Only works if @internalize was set
+      # and delegates to @chunk
       def key
         @chunk && @chunk.key
       end
 
+      # Normally 24. Delegates to chunk is available, otherwise nil
       def clocks_per_beat
         @chunk && @chunk.clocks_per_beat
       end
 
+      # As saved in @tempo (always available), at least when a TempoEvent was present
       def ticks_per_beat
         @tempo.ppq
       end
 
-      # override
+      # override. Returns flat array of all tracks
       def listing
         @chunk && @chunk.listing || super
       end
@@ -524,8 +534,10 @@ module RRTS #namespace
 =end
     class MidiFileReader < MidiIOReader
       private
+      # Open and read the file. See MidiIOReader
+      # The file is automatically closed when done
       def initialize filename, options = {}
-        super File.new(filename, 'rb:ascii-8bit')
+        super(File.new(filename, 'rb:ascii-8bit'), options)
       end
     end # class MidiFileReader
 
@@ -542,6 +554,7 @@ module RRTS #namespace
     class MidiPipeReader < MidiIOReader
       private
       # Please read the docs for IO#popen and IO#open.
+      # Can open fd, or a process 
       def initialize io = STDIN, options = { auto_close: false }
         case io
         when String, Array

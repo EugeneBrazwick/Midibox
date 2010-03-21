@@ -340,8 +340,11 @@ module RRTS #namespace
 
     end # class MidifileDumper
 
+    # The writer is not an EventsNode. Is serves as a sink.
     class MidiIOWriter < Base
       private
+      # If node is given it is the source written to io, otherwise
+      # call connect_to later.
       def initialize io, node = nil
         super()
         @io = io
@@ -349,14 +352,17 @@ module RRTS #namespace
       end
 
       public
+      # Dump the node to @io, using the Midi file format
       def connect_to node
         MidifileDumper.new(@io, node).dump
       end
 
     end # class MidiIOWriter
 
+    # Convenience class for dump to named file
     class MidiFileWriter < MidiIOWriter
       private
+      # See MidiIOWriter. The file is automatically closed when done.
       def initialize filename, node = nil
         super(File.new(filename, 'wb:ascii-8bit'), node)
       end

@@ -120,7 +120,7 @@ Setup an empty track. Supported options are:
       # access to the Array of MidiEvent instances
       attr :events
 
-      # the track can be given a name, 
+      # the track can be given a name,
       # intended_device is the device that is the target, since a lot of midievents
       # are devicedependent
       attr_accessor :copyright, :name, :intended_device
@@ -129,13 +129,13 @@ Setup an empty track. Supported options are:
       # generated unique key per track (unique per process)
       attr :key
       # the portindex is a relative indicator, and not a portid. For example, you
-      # might have read from 3 ports to create the chunk. 
+      # might have read from 3 ports to create the chunk.
       # channel is the channel recorded from, but may also be the target channel.
       attr_accessor :portindex, :channel
 
       # returns array of tracks, but if events is empty it returns []
-      def listing
-        if @events.empty? then [] else [self] end
+      def listing(allow_empty = false)
+        if !allow_empty && @events.empty? then [] else [self] end
       end
 
       # returns the 'next' event to be enumerated, or nil if EOT was reached
@@ -155,6 +155,11 @@ Setup an empty track. Supported options are:
       # reset the track pointer to 0
       def rewind
         @ptr = 0
+      end
+
+      def fix
+        @events = []
+        rewind
       end
 
       # record an event in the track
@@ -228,11 +233,11 @@ Setup an empty track. Supported options are:
       private
 =begin rdoc
   create a new compound track, optionally inserting the first track
-  Option recognized is 
+  Option recognized is
   - split_tracks (default true). If set events are shifted on channel as well as on
         original track.
   All other options are passed to the created tracks (as caused by _split_tracks_)
-=end  
+=end
       def initialize first_track = nil, options = {}
         @split_tracks = true
         super()
@@ -247,7 +252,7 @@ Setup an empty track. Supported options are:
         # keys are formatted as such: = "#{seqnr}:#{portnr}:#{channel}"
         @track_index = {} if @split_tracks
         self << first_track if first_track
-        tag "CompoundTrack.new, split_tracks=#@split_tracks"
+#         tag "CompoundTrack.new, split_tracks=#@split_tracks"
         # erm..... This is dangerous to cache. Can be done later
   #       @all_tracks = []
       end
@@ -330,8 +335,18 @@ Setup an empty track. Supported options are:
 #       end
 
       # a flat array of all contained tracks that actually have events
-      def listing
-        @tracks.inject([]) { |tot, track| tot.concat track.listing }
+      def listing(allow_empty = false)
+        @tracks.inject([]) do |tot, track|
+#           tag "tot=#{tot}, track=#{track}, key=#{track.key}, result=#{tot + track.listing}"
+          tot + track.listing(allow_empty)
+        end
+      end
+
+      def fix
+        # tracks is just an array
+#         tag "fix"
+        @tracks.each(&:fix)
+#         tag "fixed"
       end
     end # class CompoundTrack
 

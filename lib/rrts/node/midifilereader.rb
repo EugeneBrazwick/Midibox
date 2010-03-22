@@ -439,7 +439,7 @@ module RRTS #namespace
         end
         options.delete(:auto_close)
         options.delete(:internalize)
-        tag "MidiIOReader.new, @internalize=#@internalize, options=#{options.inspect}"
+#         tag "MidiIOReader.new, @internalize=#@internalize, options=#{options.inspect}"
         if @internalize
           require_relative 'chunk'
           chunk = Chunk.new(options)
@@ -554,7 +554,7 @@ module RRTS #namespace
     class MidiPipeReader < MidiIOReader
       private
       # Please read the docs for IO#popen and IO#open.
-      # Can open fd, or a process 
+      # Can open fd, or a process
       def initialize io = STDIN, options = { auto_close: false }
         case io
         when String, Array

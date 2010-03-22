@@ -97,7 +97,7 @@ wrap_snd_seq_queue_timer_set_resolution(VALUE v_info, VALUE v_reso)
 }
 
 void
-alsa_timer_init()
+alsa_midi_timer_init()
 {
   alsaQueueTimerClass = rb_define_class_under(alsaDriver, "AlsaQueueTimer_i", rb_cObject);
   WRAP_CONSTANT(SND_SEQ_TIMER_ALSA); // = 0,

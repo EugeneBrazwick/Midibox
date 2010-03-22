@@ -6,12 +6,12 @@ require 'forwardable'
 module RRTS
 
   module Node
-=begin rdoc    
+=begin rdoc
     a Chunk has some meta information and contains a *single* track
     but this may be a CompoundTrack
     A chunk is an enumerable of events, but more importantly, it
     has actual storage for events.
-    
+
     The following methods delegate to @track:
     - rewind, Reset the track, and/or all subtracks
     - each. Chunks can be treated as eventservers
@@ -48,6 +48,7 @@ module RRTS
             # differences.  Can be interpreted on other level if so required
         @key = nil # :C, MAJOR no default here
         @track = nil
+        @track_index = {} # hash indexed by key
         # track remains empty until the first event is sent (using <<)
       end
       public
@@ -65,7 +66,9 @@ module RRTS
       attr_accessor :key, :time_signature, :clocks_per_beat
       # the internal track, normally a CompoundTrack
       attr :track
-
+      # a hash indexed by Track#key. Also a flat list of all tracks.
+      # it is maintained as tracks are added using <<.
+      attr :track_index
       # Sets the ticks per beat. Tempochanges later on are possible
       # by sending a TempoEvent
       def ticks_per_beat= ppq
@@ -82,6 +85,7 @@ module RRTS
       def << event
         case event
         when BaseTrack
+          @track_index[event.key] = event
           if @track # aready exists
             if CompoundTrack === @track
               @track << event
@@ -104,6 +108,27 @@ module RRTS
       # Are tracks supported, or only events? Always true for Chunk.
       def has_tracks?
         true
+      end
+
+      # recreate track.events (after being loaded) as empty array
+      def fix_tracks
+        @track.fix
+        @track_index = {}
+#         tag "track=#{@track.inspect}"
+#         tag "listing = #{@track.listing}"
+        for track in @track.listing(true) # allow empty!
+          @track_index[track.key] = track
+        end
+      end
+
+      # return the designated track from the index. Event should be received
+      # from a yaml stream where it lost its track reference.
+      def track_for(event)
+#         case event.track
+#         when BaseTrack then
+        @track_index[event.track] or raise RRTSError.new("Track #{event.track} could not be located, keys=#{@track_index.keys.inspect}")
+#         else event.track
+#         end
       end
     end # class Chunk
 

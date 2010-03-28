@@ -61,8 +61,8 @@ alsaMidiEventClass_populate(VALUE v_ev, VALUE v_sequencer, VALUE v_midievent)
   if (snd_seq_ev_is_tick(ev))
     rb_iv_set(v_midievent, "@time", UINT2NUM(ev->time.tick));
   else if (snd_seq_ev_is_real(ev))
-    rb_iv_set(v_midievent, "@time", rb_ary_new3(2, UINT2NUM(ev->time.time.tv_sec),
-                                                   UINT2NUM(ev->time.time.tv_nsec)));
+    rb_iv_set(v_midievent, "@time",
+              DBL2NUM(1000000000.0 * ev->time.time.tv_sec + ev->time.time.tv_nsec));
   const ID id_port = rb_intern("port");
   const uint source_client = ev->source.client,
   source_port = ev->source.port,

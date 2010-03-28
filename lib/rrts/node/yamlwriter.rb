@@ -23,6 +23,8 @@ module RRTS #namespace
         require 'yaml'
         @io.write node.chunk.to_yaml
         node.each { |event| @io.write event.to_yaml }
+      ensure
+        @io.close
       end
 
     end # class YamlIOWriter
@@ -34,6 +36,23 @@ module RRTS #namespace
         super(File.new(filename, 'w'), node)
       end
     end # class MidiFileWriter
+
+    class YamlPipeWriter < YamlIOWriter
+      private
+      def initialize io = STDOUT
+        case io
+        when String, Array
+          io = IO.popen(io, 'w')
+        when Integer
+          io = IO.open(io, 'w')
+        when IO
+        else
+          raise RRTSError.new("Cannot open '#{io}'")
+        end
+        super
+      end
+    end # class YamlPipeWriter
+
   end # Node
 end # RRTS
 

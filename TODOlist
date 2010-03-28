@@ -1,15 +1,15 @@
-0001  wo feb 24 11:40:47 CET 2010 TODO event_output MidiEvent support
+-0001  wo feb 24 11:40:47 CET 2010 TODO event_output MidiEvent support
       za mrt  6 22:48:43 CET 2010 DONE
-0002  do feb 25 22:22:53 CET 2010 TODO make rplaymidi++ work as a two step system
+-0002  do feb 25 22:22:53 CET 2010 TODO make rplaymidi++ work as a two step system
                                        a) build an in-memory chunk     NODE -> midifile->chunk
                                        b) play the tracks in the chunk NODE -> chunk -> device[s]
       vr mrt 19 21:00:38 CET 2010 more or less, by virtue of midifilereader + -writer.
-0003 za feb 27 21:50:12 CET 2010 BUG rplaymidi reads a NoteOn without a NoteOff
+-0003 za feb 27 21:50:12 CET 2010 BUG rplaymidi reads a NoteOn without a NoteOff
          in fixtures/eurodance.midi.  Note 12, Rhythm track. I believe this was recorded
          with arecordmidi. So who's to blame? Is there an official midi file dumper somewhere?
      di mrt 16 20:26:02 CET 2010 FIXED. At least in midifilereader.rb
 0004 do mrt  4 23:20:06 CET 2010 BUG rmidiroute.rb:14:in `block in midi_route': undefined method `set_subs'
-0005 do mrt  4 23:24:01 CET 2010 TODO writing ev: param := ':modwheel', reading same event -> param == 1.
+-0005 do mrt  4 23:24:01 CET 2010 TODO writing ev: param := ':modwheel', reading same event -> param == 1.
                                       This is an inconsistency. Must be mapped back.
      za mrt  6 22:48:43 CET 2010 DONE
 0006 ma mrt  8 21:08:06 CET 2010 BUG emptying the buffers is no good enough to avoid hanging notes.
@@ -18,12 +18,26 @@
           I noticed the following: the INT-handler truly gets first. So we flush the queue.
           After that NoteOff's for hanging notes are sent, but to no avail
           Finally we get in the ensure of the Sequencer constructor.
-0007 do mrt 11 21:39:48 CET 2010 BUG using alsa mallocs causes a critical condition since it uses
+-0007 do mrt 11 21:39:48 CET 2010 BUG using alsa mallocs causes a critical condition since it uses
           malloc (probably) and not the ruby wrappers.  ALLOC or ALLOC_N.
           Also a failure should raise NoMemError. The least I can do is make sure these all go
           trough one container.
-0008 do mrt 11 23:36:01 CET 2010 TODO: queue_timer interface is lacking...
+     za mrt 27 21:40:51 CET 2010
+-0008 do mrt 11 23:36:01 CET 2010 TODO: queue_timer interface is lacking...
      ma mrt 15 19:00:52 CET 2010 DONE
-0009 ma mrt 15 19:01:17 CET 2010 BUG: merging events through pipes cannot work since notes will
+-0009 ma mrt 15 19:01:17 CET 2010 BUG: merging events through pipes cannot work since notes will
           be out of order.
      ma mrt 15 20:13:17 CET 2010 FIXED
+0010 wo mrt 24 23:41:10 CET 2010 TODO: snd_seq_event_output should signal a possible block.
+        Also we should take care in not sending half messages. So we must make sure ahead that there
+        will be enough space. Compare SYSEX handling where outputbuffer is sometimes increased.
+        Problem: sometimes we send 2 or 3 events. Could be bad if ev1 is send and then 2 fails.
+        The solution is to do polls using Kernel#sleep and NOT the c version!!
+        This way the C calls can remain as they are, even though the API is changed.
+        That way we can actually interrupt the sequencer and enter the ensure.
+        All that is left is to use trap on INT etc. to execute remove stuff on the queue.
+        See miniarp.
+-0011 za mrt 27 18:18:19 CET 2010 FIXME: I discovered rb_thread_blocking_region.
+        This means there is really no problem using blocking after all.
+        Should wrap ALL potentially blocking calls. I don't know for sure if this is the case...
+     za mrt 27 21:41:42 CET 2010

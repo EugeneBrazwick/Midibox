@@ -33,7 +33,9 @@ extend Forwardable
                   :subs_read=> SND_SEQ_PORT_CAP_SUBS_READ,
                   :subs_write=> SND_SEQ_PORT_CAP_SUBS_WRITE,
                   :subscription_read=> SND_SEQ_PORT_CAP_SUBS_READ,
+                  :read_subscription=> SND_SEQ_PORT_CAP_SUBS_READ,
                   :subscription_write=> SND_SEQ_PORT_CAP_SUBS_WRITE,
+                  :write_subscription=> SND_SEQ_PORT_CAP_SUBS_WRITE,
                   :no_export=> SND_SEQ_PORT_CAP_NO_EXPORT
                 }
   TypeBitsMap = {
@@ -75,7 +77,9 @@ Parameters:
     * :subs_read - true, to announce support of subscriptions for reading
     * :subs_write - true, similar
     * :subscription_read - same as subs_read, since I don't understand the name
+    * :read_subscription - ""
     * :subscription_write - similar
+    * :write_subscription - ""
     * :no_export - others may not subscribe to this port
     * :specific - uses device specific messages
     * :hardware_specific - better name for specific
@@ -102,6 +106,7 @@ Parameters:
     * :midi_voices - number of midi voices supported, may leave this 0
     * :synth_voices - number of midi voices supported, may leave this 0
     * :port - portnumber to use, sets port_specified as well
+    * :port_id, same as port
     * :port_specified - passed on as is, might be overwritten by setting port, so do not use this.
     * :simple - true, make it a simple port without buffering or queueing
     * :direct - same as simple
@@ -136,12 +141,13 @@ public
     @seq_handle = sequencer.instance_variable_get(:@handle)
     if params and params[:client_id]
       @client_id = params[:client_id]
-      @port = params[:port]
+      @port = params[:port] || params[:port_id]
       # sort of lightweight portref.  It can be used to connect
       # but it is not open
       return self
     end
     unless name.respond_to?(:to_str)
+      # supposedly: 'name' == portinfo
       @handle = name.copy_to
       @client_id = @handle.client
       @port = @handle.port # int
@@ -149,12 +155,16 @@ public
       capsbits = typebits = 0
       @client_id = sequencer.client_id
       @simple = false
+      @port = nil
       if params
         for k, v in params
           case k
           when :simple, :direct
             raise RRTSError.new("Invalid parameters specified for simple MidiPort") if @handle
-            @simple = true
+            @simple = v
+          when :port, :port_id
+            tag "port #{v} supplied by user"
+            @port = v
           else
             if lu = CapsBitsMap[k]
               capsbits |= lu
@@ -174,8 +184,13 @@ public
         @port = @seq_handle.create_simple_port(name, capsbits, typebits)
       else
         @handle ||= port_info_malloc
+#         tag "port=#@port"
+        @handle.port_specified = @port
+        @handle.port = @port if @port
         @handle.capability = capsbits
+#         tag "capsbits=#{'0x%x' % capsbits}, typebits=#{'0x%x' % typebits}"
         @handle.type = typebits
+#         tag "name='#{name}'"
         @handle.name = name
         @seq_handle.create_port(@handle)
         @port = @handle.port # int !

@@ -31,6 +31,7 @@ module RRTS
         tempo = nil
         if params
           for k, v in params
+#             tag "k=#{k}, v=#{v.inspect}"
             case k
             when :tempo
               tempo = case v when Integer then require_relative('tempo'); Tempo.new(v) else v end
@@ -41,6 +42,7 @@ module RRTS
             end
           end
         end
+#         tag "tempo=#{tempo.inspect}"
         self.tempo = tempo if tempo
         if block_given?
           begin
@@ -74,10 +76,11 @@ module RRTS
     # * [tmpo] Tempo instance, or a hash
     def tempo= tmpo
       if Hash === tmpo
+#         tag "setting tempo to #{tmpo.inspect}"
         beats = tmpo[:beats] || tmpo[:bpm] || tmpo[:qpm] || tmpo[:frames]
         tmpo[:smpte_timing] = tmpo[:frames]
         tmpo.delete_if{|k,v| [:beats, :bpm, :qpm, :frames].include?(k) }
-#         puts "beats=#{beats}, hash is now #{tmpo.inspect}"
+#         tag "beats=#{beats}, hash is now #{tmpo.inspect}"
         require_relative 'tempo'
         tmpo = Tempo.new beats, tmpo
       end

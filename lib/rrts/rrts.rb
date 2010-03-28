@@ -22,7 +22,15 @@ module RRTS
   end
 
   def tag msg = ''
-    STDERR.puts "#{caller[0]} #{msg}"
+    # avoid puts for threading problems
+    STDERR.print "#{caller[0]} #{msg}\n"
   end
 
+  def todo msg = ''
+    tag 'Todo: ' + msg
+  end
+
+  def niy
+    tag 'Not implemented yet: ' + msg
+  end
 end

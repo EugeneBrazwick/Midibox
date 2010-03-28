@@ -172,7 +172,7 @@ module RRTS #namespace
             if event.value.length == 3
               @io.putc(event.value[0])
               @io.putc(0) # delta
-              tag "produce running state at pos #{@io.pos}"
+#               tag "produce running state at pos #{@io.pos}"
               @io.putc(Driver::MIDI_CTL_LSB_BANK)
               @io.putc(event.value[1])
               program = event.value[2]
@@ -231,13 +231,13 @@ module RRTS #namespace
           @io.putc(0x2f) # EOT
           write_var 0 # len !!
         else
-          tag "TODO: else, event=#{event}"
+          todo "else, event=#{event}"
         end
       end
 
       def write_meta_string text, metabyte
         return unless text
-        tag "write meta #{text} at pos #{@io.pos}"
+#         tag "write meta #{text} at pos #{@io.pos}"
         write_var 0  # delta
         @io.putc(0xff)
         @io.putc metabyte
@@ -355,6 +355,8 @@ module RRTS #namespace
       # Dump the node to @io, using the Midi file format
       def connect_to node
         MidifileDumper.new(@io, node).dump
+      ensure
+        @io.close
       end
 
     end # class MidiIOWriter

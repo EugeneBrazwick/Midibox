@@ -9,6 +9,9 @@
 
 extern VALUE alsaDriver, alsaMidiError;
 
+#define RAISE_MIDI_ERROR_FMT6(fmt, a, b, c, d, e, f) rb_raise(alsaMidiError, fmt, a, b, c, d, e, f)
+#define RAISE_MIDI_ERROR_FMT5(fmt, a, b, c, d, e) rb_raise(alsaMidiError, fmt, a, b, c, d, e)
+#define RAISE_MIDI_ERROR_FMT4(fmt, a, b, c, d) rb_raise(alsaMidiError, fmt, a, b, c, d)
 #define RAISE_MIDI_ERROR_FMT3(fmt, a, b, c) rb_raise(alsaMidiError, fmt, a, b, c)
 #define RAISE_MIDI_ERROR_FMT2(fmt, a, b) rb_raise(alsaMidiError, fmt, a, b)
 #define RAISE_MIDI_ERROR_FMT1(fmt, a) rb_raise(alsaMidiError, fmt, a)
@@ -16,6 +19,11 @@ extern VALUE alsaDriver, alsaMidiError;
 #define RAISE_MIDI_ERROR(when, e) \
   RAISE_MIDI_ERROR_FMT3("%s failed with error %d: %s", when, e, snd_strerror(e))
 
+#define CantHappen() RAISE_MIDI_ERROR_FMT0("CantHappen")
+
+/* helper, apply method to v_val, if the method exists. Replace v_val with the
+result
+*/
 static inline void rrts_deref(VALUE &v_val, const char *method)
 {
 //   fprintf(stderr, "%s:%d:rrts_deref(%p, %s)\n", __FILE__, __LINE__, &v_val, method);
@@ -29,6 +37,8 @@ static inline void rrts_deref(VALUE &v_val, const char *method)
 //   fprintf(stderr, "ALIVE!\n");
 }
 
+/* Same as rrts_deref but uses an instance variable and not a getter
+*/
 static inline void rrts_deref_dirty(VALUE &v_val, const char *ivar)
 {
   const ID id = rb_intern(ivar);
@@ -63,6 +73,7 @@ public:
   VALUE operator ->() const { return V; }
   VALUE operator *() const { return V; }
   operator VALUE() const { return V; }
+  operator RData *() const { return RDATA(V); }
 };
 
 extern VALUE param2sym(uint param);
@@ -83,6 +94,17 @@ extern VALUE param2sym(uint param);
 
 #define INSPECT(x) RSTRING_PTR(rb_inspect(x))
 
+#define rb_check_float_type(c) (rb_type(c) == T_FLOAT ? (c) : Qnil)
+
+static inline void *rtty_calloc(size_t n)
+{
+  void * const result = xmalloc(n);
+  memset(result, 0, n);
+  return result;
+}
+
+#define XMALLOC(what) (what##_t *)rtty_calloc(what##_sizeof())
+
 // strct could be 'queue_timer' for example. Excludes _t suffix.
 // clss should then be QueueTimer
 // The argcount for the wrapper should be -1 (== variable)
@@ -96,8 +118,7 @@ wrap_snd_seq_##strct##_copy_to(int argc, VALUE *argv, VALUE v_self) \
   snd_seq_##strct##_t *self, *dst; \
   if (NIL_P(v_dst)) \
   { \
-    const int r = snd_seq_##strct##_malloc(&dst); \
-    if (r < 0) RAISE_MIDI_ERROR("allocating " #strct, r); \
+    dst = XMALLOC(snd_seq_##strct); \
     v_dst = Data_Wrap_Struct(alsa##clss##Class, 0/*mark*/, snd_seq_##strct##_free/*free*/, dst); \
     retval = v_dst; \
   } \

@@ -6,10 +6,10 @@ module RRTS # namespace
 
     class Base
       def connect_to node
-        raise RRTSError.new("not implemented: #{self.class}::#{__FUNCTION__}")
+        raise RRTSError.new("not implemented: #{self.class}::connect_to")
       end
 
-      alias :<< :connect_to
+#       alias :<< :connect_to  MIXES UP sending events...
     end
 
     class EventsNode < Base

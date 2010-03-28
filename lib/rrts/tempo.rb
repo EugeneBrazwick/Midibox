@@ -23,20 +23,24 @@ module RRTS
 
     Frames2TempoPPQ = { 24=>[500_000, 12], 25=>[400_000, 10], 29=>[100_000_000, 2997], 30=>[500_000, 15] }
 
-#  Parameters:
-#  * [beats] quarters per minute, defaults to 120. But with smpte_timing it is the framecount!
-#  * [params] any of
-#       * [:smpte_timing] using frames, not beats (quarters). Must be first!
-#                         This is specifically for movie soundtracks as the tempo is
-#                         tied to the number of frames (images) per second.
-#                         If set, the +beats+ parameter is in fact the framecount.
-#       * [:ticks] overrides the default of 384 for beats, or 40 for frames
-#
-# Example:
-#     Tempo.new 25, smpte_timing: true
+=begin rdoc
+  Parameters:
+  * [beats] quarters per minute, defaults to 120. But with smpte_timing it is the framecount!
+  * [params] any of
+      * [:smpte_timing] using frames, not beats (quarters). Must be first!
+                        This is specifically for movie soundtracks as the tempo is
+                        tied to the number of frames (images) per second.
+                        If set, the +beats+ parameter is in fact the framecount.
+      * [:ticks] overrides the default of 384 for beats, or 40 for frames
+      * [:skew] ?
+      * [:skew_base] ?
+ Example:
+     Tempo.new 25, smpte_timing: true
+=end
      def initialize beats = 120, params = nil
        frames = nil
        @smpte_timing, ticks = false, 384
+       skew = skew_base = nil
        if params
          for k, v in params
            case k
@@ -50,6 +54,8 @@ module RRTS
            when :ticks_per_frame
              raise RRTSError.new("illegal parameter '#{k}' for Tempo") unless @smpte_timing
              ticks = v
+           when :skew then skew = v
+           when :skew_base then skew_base = v
            else raise RRTSError.new("illegal parameter '#{k}' for Tempo")
            end
          end
@@ -70,6 +76,8 @@ module RRTS
        @handle = queue_tempo_malloc
        @handle.ppq = ppq
        @handle.tempo = tempo
+       @handle.skew = skew if skew
+       @handle.skew_base = skew_base if skew_base
      end
 
      def initialize_copy other
@@ -79,7 +87,7 @@ module RRTS
      protected
 
 #      attr :handle  DIRTY!
- 
+
      # used by initialize_copy
      def copy_to_i handle
        @handle.copy_to handle
@@ -98,11 +106,14 @@ module RRTS
 
      # override, yaml cannot dump handles
      def to_yaml opts = {}
-       hash = {:smpte_timing=>@smpte_timing, :ppq=>@handle.ppq, :tempo=>@handle.tempo,
+       hash = {:smpte_timing=>@smpte_timing, :ppq=>@handle.ppq,
+#                :tempo=>@handle.tempo,
                :skew=>@handle.skew, :skew_base=>@handle.skew_base}
        if @smpte_timing
          hash[:ticks_per_frame] = @ticks_per_frame
          hash[:frames] = @frames
+       else
+         hash[:beats] = 60_000_000 / @handle.tempo
        end
        hash.to_yaml(opts)
      end
@@ -114,6 +125,11 @@ module RRTS
        else
          @handle.ppq
        end
+     end
+
+     # pulses (ticks) per second
+     def pps
+       @smpte_timing ? @ticks_per_frame * @frames : @handle.ppq * 1_000_000 / tempo
      end
   end  # Tempo
 end # RRTS

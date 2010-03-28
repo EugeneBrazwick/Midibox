@@ -313,7 +313,7 @@ module RRTS
     end
 
     # returns the time difference (self - other)
-    # The events must have compatible timestamps. Other can also be a timestamp
+    # The events must have compatible timestamps.
     def time_diff other
       otime = MidiEvent === other ? other.time : other
       if Array === @time
@@ -324,6 +324,7 @@ module RRTS
       end
     end
 
+    # returns the event time increased with delta. Delta must have a compatible type
     def time_plus delta
       if Array === @time
         d = 1_000_000_000 * (@time[0] - delta[0]) + @time[1] - delta[1]
@@ -349,7 +350,9 @@ module RRTS
       def initialize event
         @event = event
       end
+
       public
+
       def [](*f)
         @event.flag(*f)
       end

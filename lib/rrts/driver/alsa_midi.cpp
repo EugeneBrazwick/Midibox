@@ -2,6 +2,8 @@
 // If changed do:         make
 // To create Makefile:    ruby ./extruby.rb
 
+#define DEBUG
+
 // #define DUMP_API
 
 #pragma implementation
@@ -24,6 +26,10 @@
 
 #include <ruby/dl.h>
 #include <alsa/asoundlib.h>
+
+#if defined(DEBUG)
+#include <signal.h>
+#endif
 
 VALUE alsaDriver, alsaMidiError;
 
@@ -87,13 +93,11 @@ The returned instance is automatically freed when the object goes out of scope.
 static VALUE
 wrap_snd_seq_client_info_malloc(VALUE v_module)
 {
-  snd_seq_client_info_t *m = 0;
 #if defined(DUMP_API)
   fprintf(DUMP_STREAM, "snd_seq_client_info_malloc(null)\n");
 #endif
-  const int r = snd_seq_client_info_malloc(&m);
-  if (r < 0) RAISE_MIDI_ERROR("allocating client_info", r);
-  return Data_Wrap_Struct(alsaClientInfoClass, 0/*mark*/, snd_seq_client_info_free/*free*/, m);
+  return Data_Wrap_Struct(alsaClientInfoClass, 0/*mark*/, snd_seq_client_info_free/*free*/,
+                          XMALLOC(snd_seq_client_info));
 }
 
 /* AlsaSystemInfo_i system_info_malloc
@@ -102,13 +106,11 @@ Returns: a new AlsaSystemInfo_i instance which is automatically freed
 */
 static VALUE wrap_snd_seq_system_info_malloc(VALUE v_module)
 {
-  snd_seq_system_info_t *m = 0;
 #if defined(DUMP_API)
   fprintf(DUMP_STREAM, "snd_seq_system_info_malloc(null)\n");
 #endif
-  const int r = snd_seq_system_info_malloc(&m);
-  if (r < 0) RAISE_MIDI_ERROR("allocating system_info", r);
-  return Data_Wrap_Struct(alsaSystemInfoClass, 0/*mark*/, snd_seq_system_info_free/*free*/, m);
+  return Data_Wrap_Struct(alsaSystemInfoClass, 0/*mark*/, snd_seq_system_info_free/*free*/,
+                          XMALLOC(snd_seq_system_info));
 }
 
 /* AlsaMidiEvent_i Driver#ev_malloc
@@ -130,13 +132,11 @@ goes out of scope
 static VALUE
 wrap_snd_seq_queue_info_malloc(VALUE v_module)
 {
-  snd_seq_queue_info_t *m = 0;
 #if defined(DUMP_API)
   fprintf(DUMP_STREAM, "snd_seq_queue_info_malloc(null)\n");
 #endif
-  const int r = snd_seq_queue_info_malloc(&m);
-  if (r < 0) RAISE_MIDI_ERROR("allocating queue_info", r);
-  return Data_Wrap_Struct(alsaQueueInfoClass, 0/*mark*/, snd_seq_queue_info_free/*free*/, m);
+  return Data_Wrap_Struct(alsaQueueInfoClass, 0/*mark*/, snd_seq_queue_info_free/*free*/,
+                          XMALLOC(snd_seq_queue_info));
 }
 
 
@@ -150,13 +150,11 @@ Returns:
 static VALUE
 wrap_snd_seq_port_info_malloc(VALUE v_module)
 {
-  snd_seq_port_info_t *m = 0;
 #if defined(DUMP_API)
   fprintf(DUMP_STREAM, "snd_seq_port_info_malloc(null)\n");
 #endif
-  const int r = snd_seq_port_info_malloc(&m);
-  if (r < 0) RAISE_MIDI_ERROR("allocating port_info", r);
-  return Data_Wrap_Struct(alsaPortInfoClass, 0/*mark*/, snd_seq_port_info_free, m);
+  return Data_Wrap_Struct(alsaPortInfoClass, 0/*mark*/, snd_seq_port_info_free,
+                          XMALLOC(snd_seq_port_info));
 }
 
 /* AlsaQueueTempo_i queue_tempo_malloc
@@ -165,13 +163,11 @@ wrap_snd_seq_port_info_malloc(VALUE v_module)
 static VALUE
 wrap_snd_seq_queue_tempo_malloc(VALUE v_module)
 {
-  snd_seq_queue_tempo_t *m = 0;
 #if defined(DUMP_API)
   fprintf(DUMP_STREAM, "snd_seq_queue_tempo_malloc(null)\n");
 #endif
-  const int r = snd_seq_queue_tempo_malloc(&m);
-  if (r < 0) RAISE_MIDI_ERROR("allocating queue_tempo", r);
-  return Data_Wrap_Struct(alsaQueueTempoClass, 0/*mark*/, snd_seq_queue_tempo_free/*free*/, m);
+  return Data_Wrap_Struct(alsaQueueTempoClass, 0/*mark*/, snd_seq_queue_tempo_free/*free*/,
+                          XMALLOC(snd_seq_queue_tempo));
 }
 
 /* AlsaQueueStatus_i queue_tempo_malloc. Not required since done automatically
@@ -180,13 +176,11 @@ wrap_snd_seq_queue_tempo_malloc(VALUE v_module)
 static VALUE
 wrap_snd_seq_queue_status_malloc(VALUE v_module)
 {
-  snd_seq_queue_status_t *m = 0;
 #if defined(DUMP_API)
   fprintf(DUMP_STREAM, "snd_seq_queue_status_malloc(null)\n");
 #endif
-  const int r = snd_seq_queue_status_malloc(&m);
-  if (r < 0) RAISE_MIDI_ERROR("allocating queue_status", r);
-  return Data_Wrap_Struct(alsaQueueStatusClass, 0/*mark*/, snd_seq_queue_status_free/*free*/, m);
+  return Data_Wrap_Struct(alsaQueueStatusClass, 0/*mark*/, snd_seq_queue_status_free/*free*/,
+                          XMALLOC(snd_seq_queue_status));
 }
 
 /* AlsaPortSubscription_i port_subscribe_malloc
@@ -195,13 +189,11 @@ Returns: a new port_subscribe structure which will be freed automatically
 static VALUE
 wrap_snd_seq_port_subscribe_malloc(VALUE v_mod)
 {
-  snd_seq_port_subscribe_t *m = 0;
 #if defined(DUMP_API)
   fprintf(DUMP_STREAM, "snd_seq_port_subscribe_malloc(null)\n");
 #endif
-  const int r = snd_seq_port_subscribe_malloc(&m);
-  if (r < 0) RAISE_MIDI_ERROR("allocating port_subscribe", r);
-  return Data_Wrap_Struct(alsaPortSubscriptionClass, 0/*mark*/, snd_seq_port_subscribe_free/*free*/, m);
+  return Data_Wrap_Struct(alsaPortSubscriptionClass, 0/*mark*/, snd_seq_port_subscribe_free/*free*/,
+                          XMALLOC(snd_seq_port_subscribe));
 }
 
 /* :rdoc: AlsaRemoveEvents_i remove_events_malloc
@@ -210,13 +202,11 @@ Returns a new remove_events structure, which is freed automatically
 static VALUE
 wrap_snd_seq_remove_events_malloc(VALUE v_mod)
 {
-  snd_seq_remove_events_t *m = 0;
 #if defined(DUMP_API)
   fprintf(DUMP_STREAM, "snd_seq_remove_events_malloc(null)\n");
 #endif
-  const int r = snd_seq_remove_events_malloc(&m);
-  if (r < 0) RAISE_MIDI_ERROR("allocating remove_events", r);
-  return Data_Wrap_Struct(alsaRemoveEventsClass, 0/*mark*/, snd_seq_remove_events_free/*free*/, m);
+  return Data_Wrap_Struct(alsaRemoveEventsClass, 0/*mark*/, snd_seq_remove_events_free/*free*/,
+                          XMALLOC(snd_seq_remove_events));
 }
 
 /* :rdoc: AlsaClientPool_i client_pool_malloc
@@ -225,13 +215,11 @@ Allocates a new client_pool structure, which is automatically freed
 static VALUE
 wrap_snd_seq_client_pool_malloc(VALUE v_mod)
 {
-  snd_seq_client_pool_t *m = 0;
 #if defined(DUMP_API)
   fprintf(DUMP_STREAM, "snd_seq_client_pool_malloc(null)\n");
 #endif
-  const int r = snd_seq_client_pool_malloc(&m);
-  if (r < 0) RAISE_MIDI_ERROR("allocating client_pool", r);
-  return Data_Wrap_Struct(alsaClientPoolClass, 0/*mark*/, snd_seq_client_pool_free/*free*/, m);
+  return Data_Wrap_Struct(alsaClientPoolClass, 0/*mark*/, snd_seq_client_pool_free/*free*/,
+                          XMALLOC(snd_seq_client_pool));
 }
 
 /* string strerror errno
@@ -333,6 +321,48 @@ param2sym_v(VALUE v_module, VALUE v_param)
   return v_param; // asume it is already a symbol then
 }
 
+#if defined(DEBUG)
+struct rbtbr_data_block {
+  int blocktime;
+};
+
+static VALUE
+i_block_test(void *ptr)
+{
+  struct rbtbr_data_block &block = *(struct rbtbr_data_block *)ptr;
+  sigset_t newmask;
+  sigemptyset(&newmask);
+  sigaddset(&newmask, SIGINT);
+  pthread_sigmask(SIG_BLOCK, &newmask, 0);
+  sleep(block.blocktime);
+  pthread_sigmask(SIG_UNBLOCK, &newmask, 0);
+  return Qnil;
+}
+
+static VALUE
+alsaDriver_block_test(VALUE v_driver, VALUE v_blocktime)
+{
+  // I don't trust ruby's 'sleep' method.  A real sleep that cannot be interrupted:
+  struct rbtbr_data_block block = { NUM2INT(v_blocktime) };
+  return rb_thread_blocking_region(i_block_test, &block, RUBY_UBF_PROCESS, 0);
+}
+
+static VALUE
+alsaDriver_block_test_pure_sleep(VALUE v_driver, VALUE v_blocktime)
+{
+  sleep(NUM2INT(v_blocktime));
+  return Qnil;
+}
+static VALUE
+alsaDriver_block_test_ruby_sleep(VALUE v_driver, VALUE v_blocktime)
+{
+  const ID id_sleep = rb_intern("sleep");
+  rb_funcall(v_driver, id_sleep, 1, v_blocktime);
+  return Qnil;
+}
+#endif
+
+
 /* RRTS
 This is the main namespace. Ruby RealTime Sequencer. But how RT can it be?
 Currently it contains the Alsa (Advanced Linux Sound Architecture) MIDI Driver
@@ -389,6 +419,16 @@ The following rules were used
   ev.queue_queue refers to the queue as a subject of a queue control event
 * all other queue params have a queue_ prefix, including value.  ev.value is the control value.
   Example: ev.data.queue.param.value  should be replaced with ev.queue_value.
+* I have decided that nonblocking IO will cause the EAGAIN systemerror be raised, if this is
+  appropriate. However the output_event call can't always use this since it would cause events
+  to be partly transmitted in some cases.  So this call will always block.
+  All functions that may block now (read should) use rb_thread_blocking_region. Blocking mode
+  should therefore really be on, as this is much easier, and I don't really see any use of
+  nonblocking mode anymore.
+  Here is a list of all blocking methods:
+  * snd_seq_event_input
+  * snd_seq_event_output
+  * snd_seq_drain_output
 
 *IMPORTANT*: using this API as is, will not be the most efficient way to deal with
 alsa_midi.so.  Please use the ruby classes and additional methods in this library.
@@ -440,6 +480,11 @@ Init_alsa_midi()
   rb_define_module_function(alsaDriver, "strerror", RUBY_METHOD_FUNC(wrap_snd_strerror), 1);
   rb_define_module_function(alsaDriver, "parse_address", RUBY_METHOD_FUNC(wrap_snd_seq_parse_address), 1);
 
+#if defined(DEBUG)
+  rb_define_method(alsaDriver, "block_test", RUBY_METHOD_FUNC(alsaDriver_block_test), 1);
+  rb_define_method(alsaDriver, "block_test_pure_sleep", RUBY_METHOD_FUNC(alsaDriver_block_test_pure_sleep), 1);
+  rb_define_method(alsaDriver, "block_test_ruby_sleep", RUBY_METHOD_FUNC(alsaDriver_block_test_ruby_sleep), 1);
+#endif
 
   alsa_seq_init();
   alsa_midi_queue_init();

@@ -233,7 +233,7 @@ class MidifileParser #:no-doc:
       when 0xb # control msg with 2 parameter byte
         param = read_byte & 0x7f
         val =  read_byte & 0x7f
-        event = ControllerEvent).new(channel, param, val, destination: port, tick: tick)
+        event = ControllerEvent.new(channel, param, val, destination: port, tick: tick)
         track << event
       when 0xe
         event = PitchbendEvent.new(cmd & 0x0f, read_fixed(2) - 0x2000, destination: port, tick: tick)
@@ -323,6 +323,7 @@ class MidifileParser #:no-doc:
     #   puts "time_division=#{time_division}"
     #       /* interpret and set tempo */
     @smpte_timing = (time_division & 0x8000) != 0
+    require 'rrts/tempo'
     unless @smpte_timing
       # time_division is ticks per quarter
       queue_tempo = Tempo.new 120, ticks_per_beat: time_division
@@ -512,14 +513,14 @@ end
 require 'rrts/sequencer'
 
   #   /* open sequencer */
-Sequencer.new('rplaymidi') do |seq|
+Sequencer.new('rplaymidi', blockingmode: Sequencer::Blocking) do |seq|
   @seq = seq
   file_names = opts.parse ARGV
-  if @ports.empty?
+  if !@ports || @ports.empty?
   # 			/* use env var for compatibility with pmidi */
     ports_str = ENV["ALSA_OUTPUT_PORTS"]
     parse_ports(ports_str) if ports_str && !ports_str.empty?
-    if @ports.empty?
+    if !@ports || @ports.empty?
       raise RRTSError.new("Please specify at least one port with --port.")
     end
   end

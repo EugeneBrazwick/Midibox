@@ -75,7 +75,7 @@ module RRTS
 
     class YamlPipeReader < YamlIOReader
       private
-      def initialize io = STDIN
+      def initialize io = STDIN, options = {}
         case io
         when String, Array
           io = IO.popen(io, 'r')

@@ -13,6 +13,7 @@
 
 #include <ruby/dl.h>
 #include <alsa/asoundlib.h>
+#include <math.h> // floor
 
 //  DOC on all events + types http://alsa-project.org/alsa-doc/alsa-lib/group___seq_events.html
 
@@ -296,14 +297,26 @@ wrap_snd_seq_ev_schedule_tick(VALUE v_ev, VALUE v_qid, VALUE v_relative, VALUE v
 Sets the queue and realtime for the event. The subscription must support this.
 */
 static VALUE
-wrap_snd_seq_ev_schedule_real(VALUE v_ev, VALUE v_qid, VALUE v_relative, VALUE v_timetuple)
+wrap_snd_seq_ev_schedule_real(VALUE v_ev, VALUE v_qid, VALUE v_relative, VALUE v_time)
 {
   snd_seq_event_t *ev;
   Data_Get_Struct(v_ev, snd_seq_event_t, ev);
-  v_timetuple = rb_check_array_type(v_timetuple);
-  if (!RTEST(v_timetuple)) RAISE_MIDI_ERROR_FMT0("bad realtime for schedule_real");
-  VALUE secs = rb_ary_entry(v_timetuple, 0), nsecs = rb_ary_entry(v_timetuple, 1);
-  const snd_seq_real_time tm = { NUM2UINT(secs), NUM2UINT(nsecs) };
+  VALUE v_timedbl = rb_check_float_type(v_time);
+  snd_seq_real_time tm;
+  if (RTEST(v_timedbl))
+    {
+      const double t = NUM2DBL(v_timedbl);
+      const snd_seq_real_time ctm = { uint(t), uint((t - floor(t)) * 1000000000.0) };
+      tm = ctm;
+    }
+  else
+    {
+      v_time = rb_check_array_type(v_time);
+      if (!RTEST(v_time)) RAISE_MIDI_ERROR_FMT0("bad realtime for schedule_real");
+      VALUE secs = rb_ary_entry(v_time, 0), nsecs = rb_ary_entry(v_time, 1);
+      const snd_seq_real_time ctm = { NUM2UINT(secs), NUM2UINT(nsecs) };
+      tm = ctm;
+    }
 #if defined(DUMP_API)
   fprintf(DUMP_STREAM, "snd_seq_ev_schedule_real(%p, %d, %s, %ud-%ud)\n", ev, NUM2INT(v_qid), BOOL2INT(v_relative) ? "true" : "false", tm.tv_sec, tm.tv_nsec);
 #endif
@@ -974,6 +987,14 @@ alsaMidiEventClass_set_time(int argc, VALUE *argv, VALUE v_ev)
           ev->time.tick = NUM2UINT(v_sec);
           return Qnil;
         }
+      VALUE v_secdbl = rb_check_float_type(v_sec);
+      if (RTEST(v_secdbl))
+        {
+          const double t = NUM2DBL(v_secdbl);
+          ev->time.time.tv_sec = uint(t);
+          ev->time.time.tv_nsec = uint((t - floor(t)) * 1000000000.0);
+          return Qnil;
+        }
       v_sec = rb_check_array_type(v_sec);
       if (!RTEST(v_sec)) RAISE_MIDI_ERROR_FMT0("API call error: bad time format");
       v_nsec = rb_ary_entry(v_sec, 1);
@@ -984,7 +1005,7 @@ alsaMidiEventClass_set_time(int argc, VALUE *argv, VALUE v_ev)
   return Qnil;
 }
 
-/* sec, nsec time_real
+/* float time_real
 Returns a realtime tuple: seconds + nanoseconds
 */
 static VALUE
@@ -992,10 +1013,13 @@ alsaMidiEventClass_time_real(VALUE v_ev)
 {
   snd_seq_event_t *ev;
   Data_Get_Struct(v_ev, snd_seq_event_t, ev);
-  return rb_ary_new3(2, UINT2NUM(ev->time.time.tv_sec), UINT2NUM(ev->time.time.tv_nsec));
+  return DBL2NUM(double(ev->time.time.tv_sec) + 1000000000.0 * ev->time.time.tv_nsec);
 }
 
-/* time_real=(sec, nsec)
+/* call-seq:
+    time_real=(sec, nsec)
+    time_real=float
+
 See #time=
 */
 static VALUE
@@ -1007,6 +1031,14 @@ alsaMidiEventClass_set_time_real(int argc, VALUE *argv, VALUE v_ev)
   Data_Get_Struct(v_ev, snd_seq_event_t, ev);
   if (NIL_P(v_nsec))
   {
+    VALUE v_secdbl = rb_check_float_type(v_sec);
+    if (RTEST(v_secdbl))
+      {
+        const double t = NUM2DBL(v_secdbl);
+        ev->time.time.tv_sec = uint(t);
+        ev->time.time.tv_nsec = uint((t - floor(t)) * 1000000000.0);
+        return Qnil;
+      }
     v_sec = rb_check_array_type(v_sec);
     if (!RTEST(v_sec)) RAISE_MIDI_ERROR_FMT0("API call error: realtime needs sec+nsec tuple");
     v_nsec = rb_ary_entry(v_sec, 1);
@@ -1029,23 +1061,32 @@ alsaMidiEventClass_set_queue_time(int argc, VALUE *argv, VALUE v_ev)
   snd_seq_event_t *ev;
   Data_Get_Struct(v_ev, snd_seq_event_t, ev);
   if (NIL_P(v_nsec))
-  {
-    if (FIXNUM_P(v_sec))
     {
-      ev->data.queue.param.time.tick = NUM2UINT(v_sec);
-      return Qnil;
+      if (FIXNUM_P(v_sec))
+        {
+          ev->data.queue.param.time.tick = NUM2UINT(v_sec);
+          return Qnil;
+        }
+      VALUE v_secdbl = rb_check_float_type(v_sec);
+      if (RTEST(v_secdbl))
+        {
+          const double t = NUM2DBL(v_secdbl);
+          ev->data.queue.param.time.time.tv_sec = uint(t);
+          ev->data.queue.param.time.time.tv_nsec = uint((t - floor(t)) * 1000000000.0);
+          return Qnil;
+        }
+      v_sec = rb_check_array_type(v_sec);
+      if (!RTEST(v_sec)) RAISE_MIDI_ERROR_FMT0("API call error: bad time format");
+      v_nsec = rb_ary_entry(v_sec, 1);
+      v_sec = rb_ary_entry(v_sec, 0);
     }
-    v_sec = rb_check_array_type(v_sec);
-    if (!RTEST(v_sec)) RAISE_MIDI_ERROR_FMT0("API call error: bad time format");
-    v_nsec = rb_ary_entry(v_sec, 1);
-    v_sec = rb_ary_entry(v_sec, 0);
-  }
   ev->data.queue.param.time.time.tv_sec = NUM2UINT(v_sec);
   ev->data.queue.param.time.time.tv_nsec = NUM2UINT(v_nsec);
   return Qnil;
 }
 
-/* sec, nsec queue_time_real
+/* call-seq:
+    float queue_time_real
 Returns the set realtime for a queue-control event
 */
 static VALUE
@@ -1053,11 +1094,13 @@ alsaMidiEventClass_queue_time_real(VALUE v_ev)
 {
   snd_seq_event_t *ev;
   Data_Get_Struct(v_ev, snd_seq_event_t, ev);
-  return rb_ary_new3(2, UINT2NUM(ev->data.queue.param.time.time.tv_sec),
-                        UINT2NUM(ev->data.queue.param.time.time.tv_nsec));
+  return DBL2NUM(double(ev->data.queue.param.time.time.tv_sec)
+                 + 1000000000.0 * ev->data.queue.param.time.time.tv_nsec);
 }
 
-/* queue_time_real=(sec, nsec)
+/* call-seq:
+    queue_time_real=(sec, nsec)
+    queue_time_real = float
 
 Works in the same way as #time_real=, see also #queue_time=
 */
@@ -1069,12 +1112,20 @@ alsaMidiEventClass_set_queue_time_real(int argc, VALUE *argv, VALUE v_ev)
   snd_seq_event_t *ev;
   Data_Get_Struct(v_ev, snd_seq_event_t, ev);
   if (NIL_P(v_nsec))
-  {
-    v_sec = rb_check_array_type(v_sec);
-    if (!RTEST(v_sec)) RAISE_MIDI_ERROR_FMT0("API call error: realtime needs sec+nsec tuple");
-    v_nsec = rb_ary_entry(v_sec, 1);
-    v_sec = rb_ary_entry(v_sec, 0);
-  }
+    {
+      VALUE v_secdbl = rb_check_float_type(v_sec);
+      if (RTEST(v_secdbl))
+        {
+          const double t = NUM2DBL(v_secdbl);
+          ev->data.queue.param.time.time.tv_sec = uint(t);
+          ev->data.queue.param.time.time.tv_nsec = uint((t - floor(t)) * 1000000000.0);
+          return Qnil;
+        }
+      v_sec = rb_check_array_type(v_sec);
+      if (!RTEST(v_sec)) RAISE_MIDI_ERROR_FMT0("API call error: realtime needs sec+nsec tuple");
+      v_nsec = rb_ary_entry(v_sec, 1);
+      v_sec = rb_ary_entry(v_sec, 0);
+    }
   ev->data.queue.param.time.time.tv_sec = NUM2UINT(v_sec);
   ev->data.queue.param.time.time.tv_nsec = NUM2UINT(v_nsec);
   return Qnil;
@@ -1118,8 +1169,10 @@ alsaMidiEventClass_set_dest_port(VALUE v_ev, VALUE v_portid)
   return Qnil;
 }
 
-/* timespec time
-Returns either the realtime (as a tuple [sec,nsec], or the ticks)
+/* call-seq:
+    time -> float
+    time -> int
+Returns either the realtime (as a float, or the ticks)
 */
 static VALUE
 alsaMidiEventClass_time(VALUE v_ev)
@@ -1129,13 +1182,8 @@ alsaMidiEventClass_time(VALUE v_ev)
   //   fprintf(stderr, __FILE__ ":%d: ev->time.tick=%ud, ev->time.time.tv_sec=%ud,nsec=%ud\n", __LINE__, ev->time.tick, ev->time.time.tv_sec, ev->time.time.tv_nsec);
   snd_seq_timestamp_t t = ev->time;
   const bool real = snd_seq_ev_is_real(ev);
-  if (real)
-    {
-      VALUE v_secs = UINT2NUM(t.time.tv_sec);
-      VALUE v_nsecs = UINT2NUM(t.time.tv_nsec);
-      return rb_ary_new3(2, v_secs, v_nsecs);
-    }
-  return UINT2NUM(t.tick);
+  return real ? DBL2NUM(double(t.time.tv_sec) + double(t.time.tv_nsec) / 1000000000.0)
+              : UINT2NUM(t.tick);
 }
 
 /* int time_tick
@@ -1186,9 +1234,11 @@ alsaMidiEventClass_set_queue_value(VALUE v_ev, VALUE v_val)
   return Qnil;
 }
 
-/* timespecification queue_time
+/* call-seq:
+      queue_time -> float
+      queue_time -> int
 snd_seq_ev_is_real is used to decide whether ticks are returned or
-a realtime (as a tuple [sec,nsec])
+a realtime (as a float)
 */
 static VALUE
 alsaMidiEventClass_queue_time(VALUE v_ev)
@@ -1197,16 +1247,12 @@ alsaMidiEventClass_queue_time(VALUE v_ev)
   Data_Get_Struct(v_ev, snd_seq_event_t, ev);
   const snd_seq_timestamp_t &t = ev->data.queue.param.time;
   const bool real = snd_seq_ev_is_real(ev);
-  if (real)
-    {
-      VALUE v_secs = UINT2NUM(t.time.tv_sec);
-      VALUE v_nsecs = UINT2NUM(t.time.tv_nsec);
-      return rb_ary_new3(2, v_secs, v_nsecs);
-    }
-  return UINT2NUM(t.tick);
+  return real ? DBL2NUM(double(t.time.tv_sec) + double(t.time.tv_nsec) / 1000000000.0)
+              : UINT2NUM(t.tick);
 }
 
-/* int queue_time_tick
+/* call-seq:
+    queue_time_tick -> int
 Returns the queue time in ticks for a queue-control-message.
 If the event was realtime it returns nil instead
 */
@@ -1219,7 +1265,8 @@ alsaMidiEventClass_queue_time_tick(VALUE v_ev)
   return UINT2NUM(ev->data.queue.param.time.tick);
 }
 
-/* queue_time_tick=(value)
+/* call-seq:
+      queue_time_tick= int
 See #queue_time=
 */
 static VALUE
@@ -1231,7 +1278,8 @@ alsaMidiEventClass_set_queue_time_tick(VALUE v_ev, VALUE v_val)
   return Qnil;
 }
 
-/* int queue_position
+/* call-seq:
+      queue_position -> int
 Returns the position parameter for a queue-control message
 */
 static VALUE
@@ -1242,7 +1290,8 @@ alsaMidiEventClass_queue_position(VALUE v_ev)
   return UINT2NUM(ev->data.queue.param.position);
 }
 
-/* queue_position=(value)
+/* call-seq:
+    queue_position= int
 Alter the position. Do not confuse with queue_pos.
 What is this anyway?
 */
@@ -1410,25 +1459,40 @@ wrap_snd_seq_ev_set_queue_tempo(VALUE v_ev, VALUE v_q, VALUE v_tempo)
   return v_ev;
 }
 
-/* self set_queue_pos_real(queue, [sec, nsec])
+/* call-seq:
+    set_queue_pos_real(queue, [sec, nsec]) -> self
+    set_queue_pos_real(queue, float) -> self
 Make it a a realtime seek event, for changing the current position in queue.
 Events are hence skipped or resend
 */
 static VALUE
-wrap_snd_seq_ev_set_queue_pos_real(VALUE v_ev, VALUE v_q, VALUE v_timetuple)
+wrap_snd_seq_ev_set_queue_pos_real(VALUE v_ev, VALUE v_q, VALUE v_time)
 {
   snd_seq_event_t *ev;
   Data_Get_Struct(v_ev, snd_seq_event_t, ev);
-  v_timetuple = rb_check_array_type(v_timetuple);
-  if (!RTEST(v_timetuple)) RAISE_MIDI_ERROR_FMT0("bad realtime for queuepos_real");
-  VALUE secs = rb_ary_entry(v_timetuple, 0), nsecs = rb_ary_entry(v_timetuple, 1);
-  const snd_seq_real_time tm = { NUM2UINT(secs), NUM2UINT(nsecs) };
+  VALUE v_timedbl = rb_check_float_type(v_time);
+  snd_seq_real_time tm;
+  if (RTEST(v_timedbl))
+    {
+      const double t = NUM2DBL(v_timedbl);
+      const snd_seq_real_time ctm = { uint(t), uint((t - floor(t)) * 1000000000.0) };
+      tm = ctm;
+    }
+  else
+    {
+      v_time = rb_check_array_type(v_time);
+      if (!RTEST(v_time)) RAISE_MIDI_ERROR_FMT0("bad realtime for queuepos_real");
+      VALUE secs = rb_ary_entry(v_time, 0), nsecs = rb_ary_entry(v_time, 1);
+      const snd_seq_real_time ctm = { NUM2UINT(secs), NUM2UINT(nsecs) };
+      tm = ctm;
+    }
   RRTS_DEREF_DIRTY(v_q, @id);
   snd_seq_ev_set_queue_pos_real(ev, NUM2UINT(v_q), &tm);
   return v_ev;
 }
 
-/* self set_queue_pos_tick(queue, ticks)
+/* call-seq:
+    set_queue_pos_tick(queue, int) -> self
 See #set_queue_pos_real
 */
 static VALUE

@@ -61,17 +61,22 @@ extend Forwardable
   PollIn = POLLIN
   # for the poll methods
   PollOut = POLLOUT
+  POLLTIME = 0.01 # 10 ms
 private
-#   parameters:
-#     [client_name] name of the instantiated client, if nil no client will be instantiated
-#     [params]     hash of optional parameters:
-#        [:name]         default 'default'
-#        [:openmode]     default Duplex
-#        [:map_ports]    default true if clientname yields true
-#        [:blockingmode] default Blocking
-#        [:dump_notes]   if true dump to stderr and do NOT play them!! Only works with HACKED cpp
-#                        backend
-#     [block] encapsulation for automatic close. Works like IO::open.
+=begin rdoc
+   parameters:
+     [client_name] name of the instantiated client, if nil no client will be instantiated
+     [params]     hash of optional parameters:
+        [:name]         default 'default'. Do not alter.
+        [:openmode]     default Duplex
+        [:map_ports]    default true if client_name yields true
+        [:blockingmode] default Blocking
+        [:dump_notes]   if true dump to stderr and do NOT play them!! Only works with HACKED cpp
+                        backend
+        [:polltime]     timeout in seconds for sleep, for nonblockingmode, default is 0.01
+                        If left nil methods will currently fail.
+     [block] encapsulation for automatic close. Works like IO::open.
+=end
   def initialize client_name = nil, params = nil, &block
     @client = @handle = nil
     @client_id = @ports = @ports_index = @clients = nil  # not guaranteed open does this
@@ -91,7 +96,6 @@ protected
 
 public
 
-
 # See #new
 # Only call this after a close, if you want to reopen it.
 # Just use 'new'.
@@ -101,15 +105,17 @@ public
     openmode, blockingmode = Duplex, Blocking
     map_ports = client_name
     dump_notes = false
+    @polltime = 0.01
     if params
       for key, value in params
         case key
         when :name then name = value
         when :openmode then openmode = value
         when :blockingmode then blockingmode = value
-        when :clientname then clientname = value
+        when :client_name, :clientname then client_name = value
         when :map_ports then map_ports = value
         when :dump_notes then dump_notes = true
+        when :polltime then @polltime = value
         else
           raise RRTSError.new("Illegal parameter '#{key}' for Sequencer")
         end
@@ -137,6 +143,7 @@ public
   end
 
   # closes the sequencer. Must be called to free resources, unless a block is passed to 'new'
+  # This is normally automatically called if you pass a block to the constructor
   def close
     return unless @handle
     if @queues
@@ -253,7 +260,7 @@ public
   end
 
   def_delegators :@handle, :poll_descriptors, :poll_descriptors_count, :poll_descriptors_revents,
-                 :drain_output, :start_queue, :nonblock,
+                 :start_queue, :nonblock,
                  # do not use alloc_named_queue, but say 'MidiQueue.new'
                  :alloc_named_queue,
                  :set_queue_tempo,
@@ -269,13 +276,32 @@ public
   # the following two are here for completeness sake. Please use the MidiPort methods instead!
   def_delegators :@handle, :connect_from, :connect_to
 
-  # drain_output is just a flush, so let's support that name:
-  def_delegator :@handle, :drain_output, :flush
 
   # this means a sequencer behaves a lot like a client
   #def_delegator :@client, :client_name, :name  CONFLICTS with 'name == default'... COnfusing
   def_delegators :@client, :broadcast_filter?, :error_bounce?, :event_lost, :events_lost,
                            :num_ports, :num_open_ports, :type
+
+  def drain_output
+    loop do
+      begin
+        return @handle.drain_output
+      rescue Errno::EAGAIN
+        sleep(POLLTIME)
+      end
+    end
+#     loop do
+# this now fails since the sleep is placed inside drain_output
+# Unfortunately drain_output seems to block signals....
+#       r = @handle.drain_output and return r
+#       raise RRTSError.new('flush failed: resource temporarily unavailable') unless @polltime
+#       tag "polling operational!!"
+#       sleep @polltime
+#     end
+  end
+
+  # drain_output is just a flush, so let's support that name:
+  alias :flush :drain_output
 
   # Same as event_output, except for returnvalue (self).
   def << event
@@ -338,8 +364,11 @@ public
                                          port: SND_SEQ_PORT_SYSTEM_TIMER)
   end
 
+  # a shortcut
   alias :subscribers_unknown :subscribers_unknown_port
+  # a shortcut
   alias :any_subscribers :subscribers_unknown_port
+  # a shortcut
   alias :system_timer :system_timer_port
 
   # returns true if the sequencer is currently open (which it normally is)
@@ -397,16 +426,20 @@ public
 
   # Create a queue with given name, plus options
   # See MidiQueue#new
-  # Important, a queue created using this method is automatically freed
-  # the queuename should be unique however.
+  # Important, a queue created using this method is automatically freed when
+  # the sequencer closes.
+  # The queuename should be unique however.
   def create_queue queuename, options = nil
     require_relative 'midiqueue'
     (@queues ||= {})[queuename] = MidiQueue.new self, queuename, options
   end
 
-  # return the named queue. Bit boring since most apps only have 1 queue
+  # return the queue with the given name. Bit boring since most apps only have 1 queue
+  # The queue must exist
   def queue name
-    @queues && @queues[name]
+    r = @queues && @queues[name]
+    raise RRTSError.new("Queue '#{name}' does not exist") unless r
+    r
   end
 
   # without argument return MidiClient which is us, otherwise locate client with that name

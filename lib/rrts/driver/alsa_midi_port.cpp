@@ -8,7 +8,7 @@
 
 VALUE alsaPortInfoClass;
 
-/* call-seq: 
+/* call-seq:
     client=(clientid)
 
 Set the client or clientid of a port_info container, that is to be created
@@ -32,7 +32,7 @@ Parameters:
 port    portid, can be nil to unset the port
 
 Setting it will set _port_specified_ to 1 (true), and also setting it to nil
-will set _port_specified_ to 0 (false). 
+will set _port_specified_ to 0 (false).
 
 To be used for a port being created
 */
@@ -42,11 +42,15 @@ wrap_snd_seq_port_info_set_port(VALUE v_port_info, VALUE v_portnr)
   snd_seq_port_info_t *port_info;
   Data_Get_Struct(v_port_info, snd_seq_port_info_t, port_info);
   if (NIL_P(v_portnr))
+    {
+//       fprintf(stderr, "snd_seq_port_info_set_port_specified(%d)\n", 0);
       snd_seq_port_info_set_port_specified(port_info, 0);
+    }
   else
     {
       snd_seq_port_info_set_port(port_info, NUM2INT(v_portnr));
-      snd_seq_port_info_set_port_specified(port_info, 0);
+//       fprintf(stderr, "snd_seq_port_info_set_port_specified(%d)\n", 1);
+      snd_seq_port_info_set_port_specified(port_info, 1);
     }
   return Qnil;
 }
@@ -56,14 +60,17 @@ Set the port-specified mode of a port_info container. This method is not
 required since setting the port will automatically set it. See #port=
 
 Parameters:
-  [val] true if specifying the port id at creation
+  [val] true if specifying the port id at creation. This also seems to
+        be the default.
 */
 static VALUE
 wrap_snd_seq_port_info_set_port_specified(VALUE v_port_info, VALUE v_bool)
 {
   snd_seq_port_info_t *port_info;
   Data_Get_Struct(v_port_info, snd_seq_port_info_t, port_info);
-  snd_seq_port_info_set_port_specified(port_info, BOOL2INT(v_bool));
+  const int b = BOOL2INT(v_bool);
+//   fprintf(stderr, "snd_seq_port_info_set_port_specified(%d)\n", b);
+  snd_seq_port_info_set_port_specified(port_info, b);
   return Qnil;
 }
 
@@ -79,7 +86,7 @@ wrap_snd_seq_port_info_get_client(VALUE v_port_info)
   return INT2NUM(snd_seq_port_info_get_client(port_info));
 }
 
-/* call-seq: 
+/* call-seq:
        port -> int
 Returns the portid
 */
@@ -187,7 +194,7 @@ wrap_snd_seq_port_info_get_write_use(VALUE v_port_info)
   return INT2NUM(snd_seq_port_info_get_write_use(port_info));
 }
 
-/* call-seq: 
+/* call-seq:
       synth_voices -> int
 Returns the number of non-MIDI(?) voices
 */
@@ -223,7 +230,7 @@ wrap_snd_seq_port_info_get_timestamp_real(VALUE v_port_info)
   return INT2BOOL(snd_seq_port_info_get_timestamp_real(port_info));
 }
 
-/* call-seq: 
+/* call-seq:
    timestamping? -> bool
 Returns true if the port will timestamp events automatically on arrival
 */
@@ -288,7 +295,7 @@ wrap_snd_seq_port_info_set_synth_voices(VALUE v_port_info, VALUE v_count)
   return Qnil;
 }
 
-/* call-seq: 
+/* call-seq:
      midi_channels=(count)
 Sets the number of MIDI channels the port supports
 */
@@ -327,7 +334,7 @@ wrap_snd_seq_port_info_set_capability(VALUE v_port_info, VALUE v_bits)
   return Qnil;
 }
 
-/* call-seq: 
+/* call-seq:
     name=(string)
 Sets the port name. Note: must be called prior to creating a port
 */

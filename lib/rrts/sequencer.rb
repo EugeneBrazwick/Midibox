@@ -61,21 +61,21 @@ extend Forwardable
   PollIn = POLLIN
   # for the poll methods
   PollOut = POLLOUT
-  POLLTIME = 0.01 # 10 ms
+#   POLLTIME = 0.01 # 10 ms
 private
 =begin rdoc
    parameters:
-     [client_name] name of the instantiated client, if nil no client will be instantiated
-     [params]     hash of optional parameters:
-        [:name]         default 'default'. Do not alter.
-        [:openmode]     default Duplex
-        [:map_ports]    default true if client_name yields true
-        [:blockingmode] default Blocking
-        [:dump_notes]   if true dump to stderr and do NOT play them!! Only works with HACKED cpp
-                        backend
-        [:polltime]     timeout in seconds for sleep, for nonblockingmode, default is 0.01
-                        If left nil methods will currently fail.
-     [block] encapsulation for automatic close. Works like IO::open.
+   client_name::  name of the instantiated client, if nil no client will be instantiated
+   params::       hash of optional parameters:
+        name::         default 'default'. Do not alter.
+        openmode::     default Duplex
+        map_ports::    default true if client_name is given
+        blockingmode:: default Blocking
+        dump_notes::   if true dump to stderr and do NOT play them!! Only works with HACKED cpp
+                       backend
+        polltime::     timeout in seconds for sleep, for nonblockingmode, default is 0.01
+                       If left nil methods will currently fail.
+   block:: encapsulation for automatic close. Works like IO::open.
 =end
   def initialize client_name = nil, params = nil, &block
     @client = @handle = nil
@@ -215,7 +215,7 @@ public
                SND_SEQ_EVENT_USR_VAR4=>VarUserEvent
              }
 
-# Returns a tuple MidiEvent + boolean, or nil
+# Returns a MidiEvent
 #
 #   Obtains a MidiEvent from the sequencer.
 #   This function firstly receives the event byte-stream data from sequencer as much as possible at once.
@@ -223,28 +223,17 @@ public
 #   By calling this function sequentially, events are extracted from the input buffer.
 #   If there is no input from sequencer, function falls into sleep in blocking mode until
 #   an event is received,
-#   or returns nil in non-blocking mode. Occasionally, it may raise ENOSPC error. This means
-#   that the input
-#   FIFO of sequencer overran, and some events are lost.
+#   or it raises Errno::EAGAIN in non-blocking mode.
+#
+#   Occasionally, it may raise an Errno::ENOSPC error. This means
+#   that the input FIFO of sequencer overran, and some events are lost.
 #   Once this error is returned, the input FIFO is cleared automatically.
 #
-#   Function returns the event plus a boolean indicating more bytes remain in the input buffer
-#   Application can determine from the returned value whether to call input once more or not,
-#       if there's more data it will probably(!) not block, even in blocking mode.
-#
-#Example:
-#   remains = 1
-#   while remains > 0
-#     (ev, remains = @sequencer.event_input) or break
-#     case ev
-#     ..
-#     end
-#   end
-#
   def event_input
-    (ev, more = @handle.event_input) or return nil
+#     tag "Calling event_input"
+    ev = @handle.event_input
+#     tag "received event #{ev.typeid}"
 #     typeid = ev.typeid
-    klass = Klassmap[ev.type] || MidiEvent
     #     puts "#{File.basename(__FILE__)}:#{__LINE__}:typeid=#{typeid},vel=#{ev_i.velocity},NOTEON=#{SND_SEQ_EVENT_NOTEON}"
 # LET's fix things later.
 #    if typeid == SND_SEQ_EVENT_NOTEON && ev.velocity == 0
@@ -256,7 +245,7 @@ public
      What is required is based solely on the typeid
 =end
 #     puts "Instantiating #{klass}, since ev.type=#{ev.type.inspect}"
-    return klass.new(self, ev), more
+    (Klassmap[ev.type] || MidiEvent).new(self, ev)
   end
 
   def_delegators :@handle, :poll_descriptors, :poll_descriptors_count, :poll_descriptors_revents,
@@ -287,7 +276,7 @@ public
       begin
         return @handle.drain_output
       rescue Errno::EAGAIN
-        sleep(POLLTIME)
+        sleep(@polltime)
       end
     end
 #     loop do
@@ -454,6 +443,8 @@ public
   attr :client_id
   # returns a hash, indexed by queuename
   attr :queues
+  # float, polltime in seconds
+  attr :polltime
 end # Sequencer
 
 end # RRTS

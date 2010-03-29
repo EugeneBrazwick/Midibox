@@ -277,8 +277,8 @@ public
     @seq_handle.connect_from self, port
   end
 
-  alias :>> :connect_to
-  alias :<< :connect_from
+#   alias :>> :connect_to
+#   alias :<< :connect_from                     Ambiguous with sending events.
 
   # bool capability?(symbolarray)
   # better way to query caps. Pass the symbols to query

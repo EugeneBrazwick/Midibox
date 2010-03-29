@@ -1,4 +1,4 @@
-#!/usr/bin/ruby1.9.1 -w
+#!/usr/bin/ruby -w
 # encoding: utf-8
 
 =begin
@@ -30,7 +30,7 @@ ARA: copied src at 17 feb 2010
 This is the Object Oriented version of rrecordmidi.rb.
 =end
 
-require_relative './alsa_midi.so'
+require_relative '../lib/rrts/driver/alsa_midi.so'
 
 include RRTS::Driver
 
@@ -170,7 +170,8 @@ class Metronome #:no-doc:
 end # Metronome
 
 def create_queue
-  require_relative 'midiqueue'
+  require_relative '../lib/rrts/midiqueue'
+  require_relative '../lib/rrts/tempo'
   @queue = MidiQueue.new @sequencer, 'rrecordmidi',
                          tempo: Tempo.new(@smpte_timing ? @frames : @beats,
                                           smpte_timing: @smpte_timing,
@@ -190,7 +191,7 @@ end
 
 def connect_ports
   sp, mp = @source_ports.each, @myports.each
-  loop { mp.next.⇐ sp.next }
+  loop { mp.next.connect_from sp.next }
 end
 
 # records a byte to be written to the .mid file
@@ -245,9 +246,9 @@ end
 
 def record_event ev
 #         ignore events without proper timestamps
-#   puts "ev.receiver_queue_id=#{ev.receiver_queue_id}, queue.id=#{@queue.id}"
+#   puts "ev.receiver_queue=#{ev.receiver_queue}, queue.id=#{@queue.id}"
 #   puts "ev.time=#{ev.time.inspect}"
-  return if ev.receiver_queue_id != @queue.id || !(Integer === ev.time)
+  return if ev.receiver_queue != @queue.id || !(Integer === ev.time)
 #   puts "handling #{ev.type}"
   print '.'
   #         determine which track to record to
@@ -496,7 +497,7 @@ opts.on('-s', '--[no-]channel-split') { |val| @channel_split = val }
 # trace
 
 #       open sequencer
-require_relative 'sequencer'
+require_relative '../lib/rrts/sequencer'
 include RRTS
 Sequencer.new('rrecordmidi') do |seq|
   @sequencer = seq # export ....
@@ -562,20 +563,19 @@ Sequencer.new('rrecordmidi') do |seq|
       @metronome.pattern 0
     end
 
-    Signal.trap('INT') { @stop = true }
-    Signal.trap('TERM') { @stop = true }
-
     # FIXME. this is a busy loop. Why not just use blocking ???
-    npfds = @sequencer.poll_descriptors_count(POLLIN);
-    until @stop do
+    npfds = @sequencer.poll_descriptors_count(POLLIN)
+    descriptors = @sequencer.poll_descriptors(npfds, POLLIN)
+    loop do
+      begin
     #   trace do
-      descriptors = @sequencer.poll_descriptors(npfds, POLLIN);
-      revents = @sequencer.poll_descriptors_revents(descriptors)
+        descriptors.poll # infinite block
+#       revents = @sequencer.poll_descriptors_revents(descriptors)
     #   end
-      more = true
-      until @stop || !more
-        (event, more = @sequencer.event_input) or break
-        record_event event
+        record_event @sequencer.event_input
+      rescue Interrupt
+        tag "interrupt handled silently"
+        break
       end
     end
     # trace

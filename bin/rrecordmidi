@@ -1,4 +1,4 @@
-#!/usr/bin/ruby1.9.1 -w
+#!/usr/bin/ruby -w
 =begin
  * rrecordmidi.rb - record standard MIDI files from sequencer ports
  *
@@ -29,9 +29,14 @@ IMPORTANT: never been tested on writing correct MIDI files!
 
 # /* TODO: sequencer queue timer selection */
 
-require_relative 'rrts'
+require_relative '../lib/rrts/rrts'
 
 include RRTS::Driver
+
+def tag msg = ''
+  # avoid puts for threading problems
+  STDERR.print "#{caller[0]} #{msg}\n"
+end
 
 BUFFER_SIZE = 4088
 
@@ -560,18 +565,21 @@ end
 Signal.trap('INT') { @stop = true }
 Signal.trap('TERM') { @stop = true }
 
-# FIXME. this is a busy loop. Why not just use blocking ???
 npfds = @seq.poll_descriptors_count(POLLIN);
 until @stop do
 #   trace do
-    descriptors = @seq.poll_descriptors(npfds, POLLIN);
-    revents = @seq.poll_descriptors_revents(descriptors)
+  descriptors = @seq.poll_descriptors(npfds, POLLIN);
+#   tag "block for input"
+  descriptors.poll
+#   tag "input pending"
 #   end
-  more = true
-  until @stop || !more
-    (event, more = @seq.event_input) or break
+#   more = true
+#   until @stop || !more
+#     tag "calling event_input"
+    event = @seq.event_input
+#     tag "received event #{event.inspect}"
     record_event event
-  end
+#   end
 end
 # trace
 finish_tracks

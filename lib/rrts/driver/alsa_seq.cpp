@@ -106,7 +106,7 @@ wrap_snd_seq_client_id(VALUE v_seq)
   return INT2NUM(r);
 }
 
-/* nonblock([nonblock])
+/* nonblock([none])
 Set nonblock mode.
 
 Parameters:
@@ -295,31 +295,32 @@ i_event_input(void *ptr)
 {
   snd_seq_event_t *ev = 0;
   snd_seq_t *seq = (snd_seq_t *)ptr;
-  int r = snd_seq_event_input(seq, &ev);
+  const int r = snd_seq_event_input(seq, &ev);
   // according to mailing lists, these must NOT be freed.
   // And it can't even since event_free is deprecated
   if (r < 0)
   {
     VALUE cls = alsaMidiError;
+    const char *msg = snd_strerror(r);
     switch (r)
     {
       case -EAGAIN:
         cls = rb_funcall(rb_mErrno, rb_intern("const_get"), 1, ID2SYM(rb_intern("EAGAIN")));
-        r = -r;
       case -ENOSPC:
+//         fprintf(stderr, "blocking mode = %d\n", snd_seq_get
         cls = rb_funcall(rb_mErrno, rb_intern("const_get"), 1, ID2SYM(rb_intern("ENOSPC")));
-        r = -r;
+        msg = "no space for event, you probably called snd_seq_event_input too soon";
         break;
     }
-    rb_raise(cls, "%s", snd_strerror(r));
-    ev = 0;
+    rb_raise(cls, "%s", msg);
   }
-  //   fprintf(stderr, __FILE__":%d:event_input -> %p\n", __LINE__, ev);
-  return rb_ary_new3(2, Data_Wrap_Struct(alsaMidiEventClass, 0/*mark*/, 0/*free*/, ev),
-                     INT2BOOL(r > 0));
+  // Otherwise r is always 1; the alsa documentation is WRONG!!
+//   fprintf(stderr, __FILE__":%d:event_input -> %p, rescode=%d\n", __LINE__, ev, r);
+  return Data_Wrap_Struct(alsaMidiEventClass, 0/*mark*/, 0/*free*/, ev);
 }
 
-/* [AlsaMidiEvent_i, more] event_input
+/* call-seq:
+    event_input -> AlsaMidiEvent_i
 retrieve an event from sequencer
 
 Obtains an input event from sequencer.
@@ -327,15 +328,11 @@ This function firstly receives the event byte-stream data from sequencer as much
 possible at once. Then it retrieves the first event record and store the pointer on ev.
 By calling this function sequentially, events are extracted from the input buffer.
 If there is no input from sequencer, function falls into sleep in blocking mode until
-an event is received, or returns nil in non-blocking mode. Occasionally, it may raise
+an event is received, or raise EAGAIN in non-blocking mode. Occasionally, it may raise
 the ENOSPC SystemError. This means that the input FIFO of sequencer overran,
 and some events are lost. Once this error is returned, the input FIFO is cleared automatically.
 
-Function returns the event plus a boolean indicating more bytes remain in the input buffer.
-It may also raise the EAGAIN SystemError if in nonblocking mode.
-An application can determine from the returned value whether to call input once more or not,
-if there's more data it will probably(!) not block, even in blocking mode.
-
+Function returns the event. It may also raise the EAGAIN SystemError if in nonblocking mode.
 */
 static VALUE
 wrap_snd_seq_event_input(VALUE v_seq)
@@ -1636,14 +1633,16 @@ wrap_snd_seq_set_queue_timer(VALUE v_seq, VALUE v_qid, VALUE v_timer)
   return v_seq;
 }
 
-/* int poll_descriptors_count(eventmask)
+/* call-seq:
+    poll_descriptors_count(eventmask) -> int
 
 Parameters:
-  [eventmask] the poll events to be checked (POLLIN or POLLOUT or combination)
+  [eventmask] (int) the poll events to be checked (POLLIN or POLLOUT or combination)
 
  Get the number of poll descriptors. The polling events to be checked can be
  specified by the second argument.
- When both input and output are to be checked, pass POLLIN|POLLOUT
+ When both input and output are to be checked, pass POLLIN|POLLOUT.
+ There are also two constants in Sequencer: Sequencer::PollIn and Sequencer::PollOut.
 */
 static VALUE
 wrap_snd_seq_poll_descriptors_count(VALUE v_seq, VALUE v_pollflags)
@@ -1653,9 +1652,11 @@ wrap_snd_seq_poll_descriptors_count(VALUE v_seq, VALUE v_pollflags)
   return INT2NUM(snd_seq_poll_descriptors_count(seq, NUM2INT(v_pollflags)));
 }
 
-/* AlsaPollFds_i poll_descriptors([space, ]eventmask)
+/* call-seq:
+    poll_descriptors([[space, ]eventmask]) -> AlsaPollFds_i
 
 Get poll descriptors. If space is omitted snd_seq_poll_descriptors_count is used for that.
+If eventmask is missing as well then PollIn is used.
 
  Parameters:
     [space]      space in the poll descriptor array
@@ -1665,49 +1666,52 @@ Get poll descriptors assigned to the sequencer handle. Since a sequencer handle 
 you need to set which direction(s) is/are polled in events argument. When POLLIN bit is specified,
 the incoming events to the ports are checked.
 
+These descriptors have a method poll() that serves as a wrapper around the poll() system call.
 To check the returned poll-events, call #poll_descriptors_revents
 instead of reading the pollfd structs directly.
-
-Alsa examples call fds.poll(timeout_msec) since revents has a fixed and/or unknown timeout.
-Whatever.
 */
 static VALUE
 wrap_snd_seq_poll_descriptors(int argc, VALUE *argv, VALUE v_seq)
 {
   VALUE v_fdcount, v_pollflags;
-  rb_scan_args(argc, argv, "11", &v_fdcount, &v_pollflags);
+  rb_scan_args(argc, argv, "02", &v_fdcount, &v_pollflags);
   snd_seq_t *seq;
   Data_Get_Struct(v_seq, snd_seq_t, seq);
   size_t space;
+  int pollflags;
   if (NIL_P(v_pollflags))
     {
       v_pollflags = v_fdcount;
-      space = snd_seq_poll_descriptors_count(seq, NUM2INT(v_pollflags));
+      pollflags = NIL_P(v_pollflags) ? POLLIN : NUM2INT(v_pollflags);
+      space = snd_seq_poll_descriptors_count(seq, pollflags);
     }
   else
+    {
       space = NUM2UINT(v_fdcount);
+      pollflags = NUM2INT(v_pollflags);
+    }
   // 2
   struct pollfd * const fds = ALLOC_N(struct pollfd, space + sizeof(size_t));
-  if (!fds) return INT2NUM(-ENOMEM);
   // 3
   *(size_t *)fds = space;
-  /*const int fill = */ snd_seq_poll_descriptors(seq, (struct pollfd *)(((size_t *)fds) + 1), space, NUM2INT(v_pollflags));
+  /*const int fill = */
+  snd_seq_poll_descriptors(seq, (struct pollfd *)(((size_t *)fds) + 1), space, pollflags);
 //  return rb_ary_new3(2, INT2NUM(fill), v_room);
   return Data_Wrap_Struct(alsaPollFdsClass, 0/*mark*/, free/*free*/, fds);
 }
 
 /* boolarray poll_descriptors_revents(pollfds)
 
-get returned events from poll descriptors
+get returned events from poll descriptors, after you called AlsaPollFds_i#poll().
 
  Parameters:
    pollfds    AlsaPollFds_i, the poll descriptors
 
 Returns boolean array or nil if there are no events.
-The resulintg array holds an entry per filedescriptor, in the same order, holding true if
+The resulting array holds an entry per filedescriptor, in the same order, holding true if
 there was an event at that index. At least one of them must hold true.
 
-However, you cannot specify a poll timeout, and the alsa examples all use poll instead!!
+NOTE: this method does not poll() at all.
 */
 static VALUE
 wrap_snd_seq_poll_descriptors_revents(VALUE v_seq, VALUE v_fds)
@@ -1720,7 +1724,7 @@ wrap_snd_seq_poll_descriptors_revents(VALUE v_seq, VALUE v_fds)
   unsigned short revents[nfds];
   const int r = snd_seq_poll_descriptors_revents(seq, (struct pollfd *)(((size_t *)fds) + 1), nfds, revents);
   if (r < 0)
-    RAISE_MIDI_ERROR("polling descriptors", r);
+    RAISE_MIDI_ERROR("fetching revents", r);
   bool located = false;
   for (size_t i = 0; i < nfds && !located; i++)
     located = revents[i];
@@ -1734,29 +1738,49 @@ wrap_snd_seq_poll_descriptors_revents(VALUE v_seq, VALUE v_fds)
   return v_revents;
 }
 
-/* boolarray poll(timeout_msec)
-
-Wrapper around poll (not ppoll -- currently)
-Returns nil if no events where present
-Returns an array of booleans where the index matches the polldescriptors passed.
-At least one of them will be true.
-*/
-static VALUE
-wrapPoll(VALUE v_descriptors, VALUE v_timeout_msec)
+struct wrapPolldata
 {
+  GCSafeValue v_descriptors;
+  GCSafeValue v_timeout_msec;
+};
+
+static VALUE
+i_wrapPoll(void *ptr)
+{
+  const struct wrapPolldata *const data = (struct wrapPolldata *)ptr;
   struct pollfd *fds;
-  Data_Get_Struct(v_descriptors, struct pollfd, fds);
+  Data_Get_Struct(data->v_descriptors, struct pollfd, fds);
   const size_t nfds = *(size_t *)fds;
   fds = (struct pollfd *)(((size_t *)fds) + 1);
-  const int r = poll(fds, nfds, NUM2UINT(v_timeout_msec));
+  const int r = poll(fds, nfds, NIL_P(data->v_timeout_msec) ? -1 : NUM2UINT(data->v_timeout_msec));
   if (r < 0)
     RAISE_MIDI_ERROR("polling descriptors", r);
-  else if (r == 0)
+  if (r == 0)
     return Qnil;
   VALUE v_revents = rb_ary_new2(nfds);
   for (size_t i = 0; i < nfds; i++)
     rb_ary_store(v_revents, i, INT2BOOL(fds[i].revents));
   return v_revents;
+}
+
+/* boolarray poll([timeout_msec = -1])
+
+Wrapper around poll (not ppoll -- currently)
+Returns nil if no events where present
+Returns an array of booleans where the index matches the polldescriptors passed.
+At least one of them will be true.
+
+This method will block if +timeout_msec+ is larger than 0, regardless of the sequencers
+blocking mode (since we don't depend on AlsaSequencer_i).
+If timeout is -1 it will block indefinitely
+*/
+static VALUE
+wrapPoll(int argc, VALUE *argv, VALUE v_descriptors)
+{
+  VALUE v_timeout_msec;
+  rb_scan_args(argc, argv, "01", &v_timeout_msec);
+  struct wrapPolldata data = { v_descriptors, v_timeout_msec };
+  return rb_thread_blocking_region(i_wrapPoll, &data, RUBY_UBF_IO, 0);
 }
 
 /* int output_buffer_size
@@ -2080,7 +2104,7 @@ void alsa_seq_init()
   rb_define_method(alsaSequencerClass, "port_info", RUBY_METHOD_FUNC(wrap_snd_seq_get_port_info), 1);
   rb_define_method(alsaSequencerClass, "any_port_info", RUBY_METHOD_FUNC(wrap_snd_seq_get_any_port_info), 2);
   rb_define_method(alsaSequencerClass, "set_port_info", RUBY_METHOD_FUNC(wrap_snd_seq_set_port_info), 2);
-  rb_define_method(alsaPollFdsClass, "poll", RUBY_METHOD_FUNC(wrapPoll), 1);
+  rb_define_method(alsaPollFdsClass, "poll", RUBY_METHOD_FUNC(wrapPoll), -1);
   rb_define_method(alsaSequencerClass, "remove_events", RUBY_METHOD_FUNC(wrap_snd_seq_remove_events), -1);
   rb_define_method(alsaSequencerClass, "client_pool", RUBY_METHOD_FUNC(wrap_snd_seq_get_client_pool), -1);
   rb_define_method(alsaSequencerClass, "client_pool=", RUBY_METHOD_FUNC(wrap_snd_seq_set_client_pool), 1);

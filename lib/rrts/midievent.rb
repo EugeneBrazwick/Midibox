@@ -339,9 +339,17 @@ module RRTS
       0
     end
 
-    # this ruins track... But we may be able to recover from it...
+    # this ruins the event... But we may be able to recover from it...
     def to_yaml *args
-      @track = @track.key if @track.respond_to?(:key)
+      if instance_variable_defined?(:@track) # don't wake the sleeping dog
+        @track = @track.key if @track.respond_to?(:key)
+      end
+      if instance_variable_defined?(:@dest)
+        @dest = @dest.address if @dest.respond_to?(:address)
+      end
+      if instance_variable_defined?(:@source)
+        @source = @source.address if @source.respond_to?(:address)
+      end
       super
     end
 

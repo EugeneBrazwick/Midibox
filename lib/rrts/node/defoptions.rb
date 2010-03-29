@@ -16,6 +16,12 @@ module RRTS #namespace
         @spam = false
         @blockingmode = true
         @write_ahead = 3
+        @smpte_timing = false
+        @beats = 120  # quarters per minute
+        @frames = 0
+        @channel_split = true
+        @ticks = nil   # default 384 ticks per quarter or 40 for smpte_timing
+
         Sequencer.new do |seq|
           opts.banner = "Usage: #$PROGRAM_NAME [options]"
           opts.on('-h', '--help', 'this help') { puts opts.to_s; exit 1 }
@@ -41,9 +47,32 @@ module RRTS #namespace
           end
           opts.on('-i', '--input=VAL') { |arg| @input = arg }
           opts.on('-o', '--output=VAL') { |arg| @output = arg }
-          opts.on('--nonblocking') { @blockingmode = false }
+          opts.on('--[no-]blocking') { |arg| @blockingmode = arg }
           opts.on('--write_ahead=VAL', 'in seconds', Integer) { |arg| @write_ahead = arg }
+          opts.on('-s', '--[no-]channel-split') { |arg| @channel_split = arg }
+
+          opts.on('-b', '--bpm=VAL', '--beats=VAL', Integer,
+                  'tempo in beats per minute') do |bpm|
+            raise OptionParser::InvalidArgument.new("Invalid tempo #{bpm}") unless (4..6000) === bpm
+            @beats = bpm
+            @smpte_timing = false
+          end
+
+          opts.on('-f', '--fps=VAL', '--frames=VAL', Integer, [24, 25, 39, 30],
+                  'use frames per second') do |fps|
+            @frames = fps
+            @smpte_timing = true
+          end
+
+          opts.on('-t', '--ticks=VAL', Integer, 'use ticks per beat or frame') do |ticks|
+            raise OptionParser::InvalidArgument.new('Invalid number of ticks') unless (1..0x7fff) === ticks
+            @ticks = ticks
+          end
+
           opts.parse arguments
+          @ticks = @smpte_timing ? 40 : 384 unless @ticks
+          @ticks = 255 if @smpte_timing && @ticks > 255
+
         end # close Sequencer
       end # initialize
 
@@ -58,7 +87,21 @@ module RRTS #namespace
 
       public
 
-      attr :input, :output
+      attr :input, :output #, :ticks, :beats, :frames, :write_ahead, :clientname
+
+=begin
+      def smpte_timing?
+        @smpte_timing
+      end
+
+      def blocking?
+        @blockingmode
+      end
+
+      def spam?
+        @spam
+      end
+=end
 
       # create an input node belongning to input
       def input_node
@@ -72,7 +115,10 @@ module RRTS #namespace
           require_relative 'midifilereader'
           MidiFileReader.new(@input)
         else
-          todo 'read from alsaport'
+          require_relative 'recorder'
+          Recorder.new(@input, clientname: @clientname, blockingmode: @blockingmode,
+                       smpte_timing: @smpte_timing, frames: @frames, beats: @beats,
+                       ticks: @ticks, channel_split: @channel_split)
         end
       end
 

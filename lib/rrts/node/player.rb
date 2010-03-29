@@ -4,6 +4,7 @@ module RRTS
   module Node
 
     require_relative 'node'
+    require_relative '../rrts'
 
     # this class is related to MidiIOWriter and YamlIOWriter.
     # this time, it writes to a sequencer
@@ -34,8 +35,7 @@ Valid options are:
       def initialize dest_port_specifier, input_node = nil, options = {}
         (options, input_node = input_node, nil) if Hash === input_node
         # candidate option:
-        # [ threaded ] Create the sequencer in a thread. Doing this will not prevent ruby from
-        # being locked up. Do not use blockingmode.
+        # [ threaded ] Create the sequencer in a thread.
         @dest_port_specifier = dest_port_specifier
         @name = 'rplayer' # name for the client
         @end_delay = nil

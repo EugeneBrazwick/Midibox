@@ -39,7 +39,7 @@ module RRTS #namespace
 
     class YamlPipeWriter < YamlIOWriter
       private
-      def initialize io = STDOUT
+      def initialize io = STDOUT, node = nil
         case io
         when String, Array
           io = IO.popen(io, 'w')

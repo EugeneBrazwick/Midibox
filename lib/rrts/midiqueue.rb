@@ -58,10 +58,11 @@ module RRTS
     end
 
     protected
-    # DO NOT USE
-    attr :id
 
     public
+
+    # DO NOT USE.  Used by rrecordmidi++ to identify a queue.
+    attr :id
 
     # free the queue. If it is still running it is stopped first
     def free

@@ -1,4 +1,5 @@
-/*
+/* gcc ../extsrc/arecordmidi.c -o arecordmidi -I /usr/include/alsa /usr/lib/libasound.so
+ *
  * arecordmidi.c - record standard MIDI files from sequencer ports
  *
  * Copyright (c) 2004-2005 Clemens Ladisch <clemens@ladisch.de>
@@ -29,8 +30,10 @@
 #include <getopt.h>
 #include <sys/poll.h>
 #include <alsa/asoundlib.h>
-#include "aconfig.h"
-#include "version.h"
+// #include "aconfig.h"
+// #include "version.h"
+
+#define SND_UTIL_VERSION_STR "1.0"
 
 #define BUFFER_SIZE 4088
 
@@ -855,15 +858,15 @@ int main(int argc, char *argv[])
 	signal(SIGINT, sighandler);
 	signal(SIGTERM, sighandler);
 
-        fprintf(stderr, "calling poll_descriptors_count\n");
+//         fprintf(stderr, "calling poll_descriptors_count\n");
 	npfds = snd_seq_poll_descriptors_count(seq, POLLIN);
 	pfds = alloca(sizeof(*pfds) * npfds);
 	for (;;) {
-          fprintf(stderr, "calling poll_descriptors\n");
+//           fprintf(stderr, "calling poll_descriptors\n");
           snd_seq_poll_descriptors(seq, pfds, npfds, POLLIN);
-          fprintf(stderr, "calling poll\n");
-          if (poll(pfds, npfds, -1) < 0)
-			break;
+//           fprintf(stderr, "calling poll\n");
+          if (poll(pfds, npfds, -1) < 0) /*  -1 == block forever */
+            break;
 		do {
 			snd_seq_event_t *event;
 			err = snd_seq_event_input(seq, &event);

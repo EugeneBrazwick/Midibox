@@ -22,7 +22,10 @@ module RRTS #namespace
       def connect_to node
         require 'yaml'
         @io.write node.chunk.to_yaml
-        node.each { |event| @io.write event.to_yaml }
+        node.each do |event|
+          @io.write event.to_yaml
+          @io.flush unless node.spamming?
+        end
       ensure
         @io.close
       end

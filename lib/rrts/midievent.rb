@@ -219,14 +219,47 @@ module RRTS
                     :tune_request=>SND_SEQ_EVENT_TUNE_REQUEST,#40
                     :reset=>SND_SEQ_EVENT_RESET, #41
                     :sensing=>SND_SEQ_EVENT_SENSING, #42
-                    :echo=>SND_SEQ_EVENT_ECHO #50
+                    :echo=>SND_SEQ_EVENT_ECHO, #50
+                    :port_subscribed=>SND_SEQ_EVENT_PORT_SUBSCRIBED,
+                    :port_unsubscribed=>SND_SEQ_EVENT_PORT_UNSUBSCRIBED,
+                    :port_start=>SND_SEQ_EVENT_PORT_START,
+                    :port_exit=>SND_SEQ_EVENT_PORT_EXIT,
+                    :port_change=>SND_SEQ_EVENT_PORT_CHANGE,
+                    :oss=>SND_SEQ_EVENT_OSS,
+                    :none=>SND_SEQ_EVENT_NONE,
+                    :client_start=>SND_SEQ_EVENT_CLIENT_START,
+                    :client_exit=>SND_SEQ_EVENT_CLIENT_EXIT,
+                    :client_change=>SND_SEQ_EVENT_CLIENT_CHANGE,
+                    :system=>SND_SEQ_EVENT_SYSTEM,
+                    :result=>SND_SEQ_EVENT_RESULT,
+                    :bounce=>SND_SEQ_EVENT_BOUNCE,
+                    :usr0=>SND_SEQ_EVENT_USR0,
+                    :usr1=>SND_SEQ_EVENT_USR1,
+                    :usr2=>SND_SEQ_EVENT_USR2,
+                    :usr3=>SND_SEQ_EVENT_USR3,
+                    :usr4=>SND_SEQ_EVENT_USR4,
+                    :usr5=>SND_SEQ_EVENT_USR5,
+                    :usr6=>SND_SEQ_EVENT_USR6,
+                    :usr7=>SND_SEQ_EVENT_USR7,
+                    :usr8=>SND_SEQ_EVENT_USR8,
+                    :usr9=>SND_SEQ_EVENT_USR9,
+                    :usr_var0=>SND_SEQ_EVENT_USR_VAR0,
+                    :usr_var1=>SND_SEQ_EVENT_USR_VAR1,
+                    :usr_var2=>SND_SEQ_EVENT_USR_VAR2,
+                    :usr_var3=>SND_SEQ_EVENT_USR_VAR3,
+                    :usr_var4=>SND_SEQ_EVENT_USR_VAR4
                     }
     # returns [type, flags] as two integers from the current @type and @flags
     def debunktypeflags_i
 #       puts "#{File.basename(__FILE__)}:#{__LINE__}:debunktypeflags_i"
-      flags = 0
-      for k, v in @flags
-        v and f = Flag2IntMap[k] and flags |= f
+      if @flags
+        flags = 0
+        for k, v in @flags
+          v and f = Flag2IntMap[k] and flags |= f
+        end
+      else
+        flags = SND_SEQ_TIME_MODE_ABS | SND_SEQ_TIME_STAMP_TICK
+        # this should match DEFAULT_FLAGS!!
       end
       type = Type2IntMap[@type] or raise RRTSError.new("internal error: no mapping for :#{@type}")
 #       puts "returning [#{type}, #{flags}], type=#@type"
@@ -917,7 +950,11 @@ module RRTS
     end
 
     public
+    # the nr of usecs per beat
     alias :tempo :value
+    # this is a better name
+    alias :usecs_per_beat :value
+
 
     # technically it is a meta event
     def status
@@ -1073,4 +1110,44 @@ module RRTS
   end
 
   class VoiceNameEvent < ProgramNameEvent; end
+
+  # class for time signature changes
+  class TimeSignatureEvent < MetaEvent
+    private
+    # Typically num/denom is 4/4 or 3/4 etc..
+    def initialize num, denom, clocks_per_beat = 24
+      super()
+      @num, @denom, @clocks_per_beat = num, denom, clocks_per_beat
+    end
+
+    public
+    attr :num, :denom, :clocks_per_beat
+
+    # returns a tuple [numerator, denominator]
+    def time_signature
+      [@num, @denom]
+    end
+  end # class TimeSignatureEvent
+
+  class KeySignatureEvent < MetaEvent
+    private
+    # key can be :C or :'C#' etc
+    def initialize key, major
+      super()
+      @key, @major = key, major
+    end
+
+    public
+
+    attr :key
+
+    def major?
+      @major
+    end
+
+    # returns a tuple [key, major?]
+    def key_signature
+      [@key, @major]
+    end
+  end
 end # RRTS

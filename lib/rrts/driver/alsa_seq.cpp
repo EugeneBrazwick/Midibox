@@ -1159,13 +1159,15 @@ wrap_snd_seq_disconnect_to(int argc, VALUE *v_params, VALUE v_seq)
   return r ? INT2NUM(r) : Qnil;
 }
 
-/* [clientid, portid] parse_address(arg)
+/* call-seq:
+    parse_address(string) -> [client_id, port_id]
+
 parse the given string and get the sequencer address
 
 Parameters:
   [arg] the string to be parsed
 
-Returns clientid + portid on success or it raises a AlsaMidiError.
+Returns clientid + portid on success or it raises an AlsaMidiError.
 
 This function parses the sequencer client and port numbers from the given string.
 The client and port tokes are separated by either colon or period, e.g. 128:1.
@@ -1173,7 +1175,7 @@ The function accepts also a client name not only digit numbers.
 
 The arguments could be '20:2' or 'MIDI2:0' etc.  Portnames are not understood!
 
-See Driver#parse_address
+See Sequencer#parse_address
 */
 static VALUE
 wrap_snd_seq_parse_address(VALUE v_seq, VALUE v_arg)

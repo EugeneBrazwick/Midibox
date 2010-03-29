@@ -32,7 +32,6 @@ module RRTS #namespace
 #             raise RRTSError.new("illegal option '#{k}' for MidifileDumper")
 #           end
 #         end
-        @done_chunk_metas = false
         @last_command = 0
       end
 
@@ -230,6 +229,23 @@ module RRTS #namespace
           @io.putc(0xff) # meta
           @io.putc(0x2f) # EOT
           write_var 0 # len !!
+        when TimeSignatureEvent
+          @tick += write_var(delta_ticks)
+          @io.putc(0xff)
+          @io.putc(0x58) # time sig
+          write_var 4 # length of meta
+          @io.putc event.num
+          @io.putc event.denom
+          @io.putc event.clocks_per_beat
+          @io.putc 0  # 32s per 24 clocks  Unclear....
+        when KeySignatureEvent
+          write_var 0  # delta
+          @io.putc(0xff)
+          @io.putc(0x59)
+          write_var 2 # length of meta
+          @io.putc MapKey2Byte[event.key]
+          @io.putc(if event.major? then 1 else 0 end)
+          end
         else
           todo "else, event=#{event}"
         end
@@ -256,33 +272,6 @@ module RRTS #namespace
         @tick = 0
         @last_command = 0
         notes_to_close = []
-        unless @done_chunk_metas
-#           tag "write time_signature event at pos #{@io.pos}"
-          if time_signature = @inputnode.time_signature
-            write_var 0  # delta
-#             tag "put metacode on pos #{@io.pos}"
-            @io.putc(0xff)
-#             tag "put timesigcode on pos #{@io.pos}"
-            @io.putc(0x58) # time sig
-            write_var 4 # length of meta
-            @io.putc time_signature[0]
-            @io.putc time_signature[1]
-#             tag "writing inputnode.ticks_per_beat = #{@inputnode.clocks_per_beat}"
-            @io.putc @inputnode.clocks_per_beat
-            @io.putc 0  # 32s per 24 clocks  Unclear....
-          end
-          key = @inputnode.key
-          if key
-#             tag "write key event at pos #{@io.pos}"
-            write_var 0  # delta
-            @io.putc(0xff)
-            @io.putc(0x59)
-            write_var 2 # length of meta
-            @io.putc MapKey2Byte[key[0]]
-            @io.putc(key[1] ? 1 : 0)
-          end
-          @done_chunk_metas = true
-        end
         # dump the track metas
         if track.sequencenr
 #           tag "write seqnr at pos #{@io.pos}"
@@ -333,6 +322,7 @@ module RRTS #namespace
       end
 
       public
+
       def dump
         write_id MTHD
         write_smf

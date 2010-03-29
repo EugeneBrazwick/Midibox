@@ -12,12 +12,14 @@
 -0005 do mrt  4 23:24:01 CET 2010 TODO writing ev: param := ':modwheel', reading same event -> param == 1.
                                       This is an inconsistency. Must be mapped back.
      za mrt  6 22:48:43 CET 2010 DONE
-0006 ma mrt  8 21:08:06 CET 2010 BUG emptying the buffers is no good enough to avoid hanging notes.
+-0006 ma mrt  8 21:08:06 CET 2010 BUG emptying the buffers is no good enough to avoid hanging notes.
                                      NoteOns may already have arrived in a device so we MUST send the NoteOffs.
                                      First make sure we use MidiEvent.
           I noticed the following: the INT-handler truly gets first. So we flush the queue.
           After that NoteOff's for hanging notes are sent, but to no avail
           Finally we get in the ensure of the Sequencer constructor.
+          No problem, use rb_thread_blocking_region and SignalException
+      ma mrt 29 17:29:03 CEST 2010
 -0007 do mrt 11 21:39:48 CET 2010 BUG using alsa mallocs causes a critical condition since it uses
           malloc (probably) and not the ruby wrappers.  ALLOC or ALLOC_N.
           Also a failure should raise NoMemError. The least I can do is make sure these all go
@@ -28,7 +30,7 @@
 -0009 ma mrt 15 19:01:17 CET 2010 BUG: merging events through pipes cannot work since notes will
           be out of order.
      ma mrt 15 20:13:17 CET 2010 FIXED
-0010 wo mrt 24 23:41:10 CET 2010 TODO: snd_seq_event_output should signal a possible block.
+-0010 wo mrt 24 23:41:10 CET 2010 TODO: snd_seq_event_output should signal a possible block.
         Also we should take care in not sending half messages. So we must make sure ahead that there
         will be enough space. Compare SYSEX handling where outputbuffer is sometimes increased.
         Problem: sometimes we send 2 or 3 events. Could be bad if ev1 is send and then 2 fails.
@@ -37,7 +39,11 @@
         That way we can actually interrupt the sequencer and enter the ensure.
         All that is left is to use trap on INT etc. to execute remove stuff on the queue.
         See miniarp.
+        The entire way blocking woks has been reviewed
+    ma mrt 29 17:29:03 CEST 2010
 -0011 za mrt 27 18:18:19 CET 2010 FIXME: I discovered rb_thread_blocking_region.
         This means there is really no problem using blocking after all.
         Should wrap ALL potentially blocking calls. I don't know for sure if this is the case...
      za mrt 27 21:41:42 CET 2010
+0012 ma mrt 29 17:30:34 CEST 2010 TODO: missing events in alsa_seq.cpp event_output
+      queue messages and alsa connection messages are blatantly missing

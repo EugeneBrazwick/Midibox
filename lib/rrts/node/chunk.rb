@@ -5,6 +5,13 @@ require 'forwardable'
 
 module RRTS
 
+=begin SOME THOUGHTS
+
+Sending non events to nodes is probably bad.
+Instead of sending a track to a chunk we could sent a meta event like
+CreateTrackEvent.
+=end
+
   module Node
 =begin rdoc
     a Chunk has some meta information and contains a *single* track
@@ -27,7 +34,7 @@ module RRTS
       # constant for setting the key
       MAJOR = true
       # constant for setting the key
-      # It should be possible to change the key using an event
+      # It is possible to change the key using a KeySignatureEvent
       MINOR = false
       private
       # Option used is _split_tracks_ to record each channel on its
@@ -43,9 +50,9 @@ module RRTS
         @options = options    # to pass to CompoundTrack
         require_relative '../tempo'
         @tempo = Tempo.new
-        @time_signature = nil #  4, 4  do not set it! Otherwise saving/loading MIDI will have
+        @time_signature = nil #  4, 4  do not set it! Otherwise saving/loading MIDI will result in
+                              # differences.  Can be interpreted on other level if so required
         @clocks_per_beat = nil
-            # differences.  Can be interpreted on other level if so required
         @key = nil # :C, MAJOR no default here
         @track = nil
         @track_index = {} # hash indexed by key
@@ -63,12 +70,14 @@ module RRTS
       # the key is a tuple like [:C, MAJOR]
       # the time signature is a tuple like [4,4]
       # clocks_per_beat is typically 24
+      # These values may change during recording(!)
       attr_accessor :key, :time_signature, :clocks_per_beat
       # the internal track, normally a CompoundTrack
       attr :track
       # a hash indexed by Track#key. Also a flat list of all tracks.
       # it is maintained as tracks are added using <<.
       attr :track_index
+
       # Sets the ticks per beat. Tempochanges later on are possible
       # by sending a TempoEvent
       def ticks_per_beat= ppq
@@ -98,6 +107,13 @@ module RRTS
             @track = event
           end
           return self
+        when TimeSignatureEvent
+          @time_signature = event.time_signature
+          @clocks_per_beat = event.clocks_per_beat
+        when KeySignatureEvent
+          @key = event.key_signature
+        when TempoEvent
+          @tempo.tempo = event.usecs_per_beat
         end
         @track << event
         self

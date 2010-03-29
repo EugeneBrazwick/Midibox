@@ -299,8 +299,9 @@ module RRTS #namespace
                 denominator = read_byte
                 clocks_per_beat = read_byte
                 skip 1  # last byte == ???? number of 32's in a MIDI beat (== 24 clocks)
-                @builder.time_signature = numerator, denominator
-                @builder.clocks_per_beat = clocks_per_beat # normally 24
+                event = TimeSignatureEvent.new numerator, denominator, clocks_per_beat
+#                 @builder.time_signature = numerator, denominator
+#                 @builder.clocks_per_beat = clocks_per_beat # normally 24
 #                 tag "setup time_sig #{numerator}/#{denominator} tpb=#{clocks_per_beat}, pos is now #@pos"
               when 0x59 # key signature
                 invalid_format('key signature must be 2 long') unless len == 2
@@ -314,7 +315,8 @@ module RRTS #namespace
                 else
                   key = [:F, :'Bb', :'Eb', :'Ab', :'Db', :'Gb', :'Cb'][-sf - 1]
                 end
-                @builder.key = key, (read_byte == 0)
+#                 @builder.key = key, (read_byte == 0)
+                event =  KeySignatureEvent.new(key, (read_byte == 0))
               else # ignore all other meta events
                 skip len
               end

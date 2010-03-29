@@ -62,6 +62,10 @@ extend Forwardable
   # for the poll methods
   PollOut = POLLOUT
 #   POLLTIME = 0.01 # 10 ms
+
+  # hash with *open* sequencers, indexed by client_name
+  @@sequencers = {}
+
 private
 =begin rdoc
    parameters:
@@ -124,7 +128,10 @@ public
     @handle = seq_open name, openmode, blockingmode
     begin
       @handle.dump_notes = true if dump_notes
-      @handle.client_name = client_name if client_name
+      if client_name
+        @handle.client_name = client_name
+        @@sequencers[client_name] = self
+      end
       @client_id = @handle.client_id
       ports! if map_ports
       @client = clients[@client_id]  # ports! is not necessarily called!
@@ -153,6 +160,7 @@ public
         queue.free
       end
     end
+    client_name = @client.name and @@sequencers.delete(client_name)
     t = @handle
     @handle = nil
     t.close
@@ -162,7 +170,9 @@ public
 
   # client_name = newname
   def client_name= arg
+    name = @client.name and @@sequencers.delete(name)
     @client.name = @handle.client_name = arg
+    @@sequencers[arg] = self
   end
 
   Klassmap = { SND_SEQ_EVENT_CLOCK=>ClockEvent, SND_SEQ_EVENT_NOTE=>NoteEvent,
@@ -302,18 +312,22 @@ public
   # MidiPort parse_address pattern. In addition to '0:0' or 'UM-2:1' we also understand 'UM-2 PORT2'
   # May throw AlsaMidiError if the port is invalid or does not exist
   def parse_address portspec
+    if portspec.respond_to?(:to_ary)
+      port(portspec.to_ary)
+    else
 #     puts "#{File.basename(__FILE__)}:#{__LINE__}:parse_address(#{portspec.inspect}),ports=#{ports.keys.inspect}"
-    midiport = ports[portspec] and return midiport
+      midiport = ports[portspec] and return midiport
 #     puts "#{File.basename(__FILE__)}:#{__LINE__}:parse_address(#{portspec.inspect})"
-    port(@handle.parse_address(portspec))
+      port(@handle.parse_address(portspec))
+    end
   end
 
   # call-seq:
-  #  port(clientid, portid) -> MidiPort
-  #  port(portspecstring) -> MidiPort
-  #  port(clientstring, portid) -> MidiPort
-  #  port(:specialportsymbol) -> MidiPort, supported are :system_timer and :subscribers_unknown
-  #  MidiPort([clientid, portid]) -> MidiPort
+  #   port(clientid, portid) -> MidiPort
+  #   port(portspecstring) -> MidiPort
+  #   port(clientstring, portid) -> MidiPort
+  #   port(:specialportsymbol) -> MidiPort, supported are :system_timer and :subscribers_unknown
+  #   port([clientid, portid]) -> MidiPort
   #
   # The port must exist
   def port clientid, portid = nil
@@ -420,6 +434,7 @@ public
   # The queuename should be unique however.
   def create_queue queuename, options = nil
     require_relative 'midiqueue'
+#     tag "create_queue options=#{options.inspect}"
     (@queues ||= {})[queuename] = MidiQueue.new self, queuename, options
   end
 
@@ -432,10 +447,17 @@ public
   end
 
   # without argument return MidiClient which is us, otherwise locate client with that name
+  # or with that id, if numeric (or numeric string)
+  # Note however that prefixing zeroes is not smart and will not work as expected
   def client name = nil
     return @client if name.nil?
-    r = clients.find{|id,c| c.name == name } and return r[1]
-    r = clients!.find{|id,c| c.name == name } and return r[1]
+    if Integer === name || name =~ /^\d+$/
+      id = Integer(name)
+      r = clients[id] || clients![id] and return r
+    else
+      r = clients.find{|id,c| c.name == name } and return r[1]
+      r = clients!.find{|id,c| c.name == name } and return r[1]
+    end
     raise RRTSError.new("client '#{name}' not located")
   end
 
@@ -445,6 +467,11 @@ public
   attr :queues
   # float, polltime in seconds
   attr :polltime
+
+  # returns the *opened* sequencer with that name.
+  def self.[](name)
+    @@sequencers[name]
+  end
 end # Sequencer
 
 end # RRTS

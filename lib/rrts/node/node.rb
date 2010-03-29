@@ -26,6 +26,14 @@ module RRTS # namespace
         Tempo.new
       end
 
+      # returns true if the node floods the 'each' method.
+      # For example, reading from a file will give us a records almost immediately.
+      # If false then we need additional flushes on the connected outputnode.
+      # Putting it in another manner: returning true means that each will virtually not block
+      def spamming?
+        true
+      end
+
       # we must assume the node has events so it behaves like a single eventsource.
       # good enough for 'listing'
       def listing

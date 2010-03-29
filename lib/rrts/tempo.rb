@@ -66,7 +66,7 @@ module RRTS
          # ALSA doesn't know about the SMPTE time divisions, so
          # we pretend to have a musical tempo with the equivalent
          # number of ticks/s.
-         (tempo, mult = Frames2TempoPPQ[@frames]) or fail
+         (tempo, mult = Frames2TempoPPQ[@frames]) or raise RRTSError.new("illegal framecount #@frames")
          @ticks_per_frame = ticks
          ppq = mult * ticks # per frame
        else

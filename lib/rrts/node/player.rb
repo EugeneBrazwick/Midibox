@@ -37,14 +37,14 @@ Valid options are:
         # candidate option:
         # [ threaded ] Create the sequencer in a thread.
         @dest_port_specifier = dest_port_specifier
-        @name = 'rplayer' # name for the client
+        @client_name = 'rplayer' # name for the client
         @end_delay = nil
         @blockingmode = Blocking
         @spam = false
         @write_ahead = 3.0
         for k, v in options
           case k
-          when :name, :clientname, :client_name then @name = v
+          when :name, :clientname, :client_name then @client_name = v
           when :end_delay then @end_delay = v
           when :blockingmode then @blockingmode = v
           when :spam, :full_throttle then @spam = v
@@ -66,123 +66,137 @@ Valid options are:
           end
         end
       end
+
+      def run_player input_node, seq
+        chunk = input_node.chunk
+        #calculate length of the entire file
+        source = MidiPort.new(seq, @client_name + '_in', midi_generic: true, application: true,
+                              read: true, subs_read: true)
+        dest = seq.parse_address @dest_port_specifier
+        queue = seq.create_queue(@client_name + '_q', tempo: chunk.tempo)
+=begin
+        We send MIDI events with explicit destination addresses, so we don't
+        need any connections to the playback ports.  But we connect to those
+        anyway to force any underlying RawMIDI ports to remain open while
+        we're playing - otherwise, ALSA would reset the port after every
+        event.
+=end
+        tag "connect #{source} to #{dest}"
+        source.connect_to dest
+        queue.start
+        # The queue won't be started until the START_QUEUE event is
+        # actually flushed to the kernel, which is exactly what we want.
+        noteons = {} # per per channel, per note
+        max_tick = 0
+        realtime_0 = Time.new #- @write_ahead # Time supports tv_sec and tv_nsec
+        pps = input_node.tempo.pps # if no idiot changes this during play...
+#           tag "realtime_0 = #{realtime_0}, pps=#{pps}"
+        begin # of ensure block
+          input_node.each do |event|
+#               tag "handling event #{event}"
+            event.sender_queue = queue
+            event.source = source
+            event.dest = dest
+            max_tick = event.tick
+            unless @spam
+              # Or should we use our tempo?? They should probably be the very same??
+              # TODO: which is it?
+              diff = (Float === max_tick ? max_tick : max_tick.to_f / pps) -
+                     (Time.new - realtime_0)
+#                 tag "diff=#{diff}"
+              if diff > @write_ahead
+#                   tag "SLEEPING, since #{diff} > #@write_ahead"
+                seq.flush # !UURGHH
+                sleep 1
+              end
+# We should wait unless tick is less than write_ahead seconds away.
+              # Simply by sleeping
+            end
+            case event
+            when MetaEvent
+              # ignore these
+              next
+            # when NoteEvent  assume this goes well?
+            when NoteOnEvent
+              # If you're wise, these will not be present in the input.
+              # but the defaults in midifilereader are still bad.
+              if event.velocity == 0 # it counts as a NoteOff then.
+                (noteons[event.channel] ||= {})[event.note] = nil
+              else
+                (noteons[event.channel] ||= {})[event.note] = event
+              end
+            when NoteOffEvent
+              (noteons[event.channel] ||= {})[event.note] = nil
+            end
+            seq << event
+            seq.flush unless input_node.spamming?
+          end
+        rescue Interrupt
+#             tag "removing events from queue"
+          protect_from_signals { seq.remove_events; seq.flush; seq.sync_output_queue }
+        ensure
+#             tag "ensure operational, noteons=#{noteons.keys.inspect}"
+          hangs = false
+            #       puts "channels=#{channels.keys.inspect}"
+          for channel, data in noteons
+            for note, event in data
+              next unless event
+#                 tag "sending kill for note #{note} on port #{k} on ch #{event.channel}"
+              seq << NoteOffEvent.new(channel, note, direct: true, dest: dest,
+                                      sender: source)
+              hangs = true
+            end
+          end
+          if hangs
+#               tag "calling flush"
+            seq.flush # is direct so should not matter
+#               tag "call sync_output_queue"
+            seq.sync_output_queue
+            sleep @end_delay if @end_delay # prevent seq from closing down before the deed is done....
+          end
+#             tag "sending queue.stop to system_timer"
+          #  schedule queue stop at end of song
+          event = StopEvent.new queue, tick: max_tick, dest: seq.system_timer,
+                                sender_queue: queue, source: source
+          seq << event
+          # make sure that the sequencer sees all our events
+          begin
+#               tag "another flush"
+            seq.flush
+=begin
+  There are three possibilities how to wait until all events have
+  been played:
+  1) send an event back to us (like pmidi does), and wait for it;
+  2) wait for the EVENT_STOP notification for our queue which is sent
+  by the system timer port (this would require a subscription);
+  3) wait until the output pool is empty.
+  The last is the simplest.
+=end
+#               tag "and another sync"
+            seq.sync_output_queue
+          rescue Interrupt
+#               tag "interrupted, remove events"
+            protect_from_signals { seq.remove_events; seq.flush; seq.sync_output_queue }
+          end
+          # give the last notes time to die away
+          sleep(@end_delay) if @end_delay
+        end  #ensure
+      end
+
     public
 
       # override
       def connect_to input_node
-        chunk = input_node.chunk
         require_relative '../sequencer'
-        Sequencer.new(@name, blockingmode: @blockingmode) do |seq|
-          #calculate length of the entire file
-          source = MidiPort.new(seq, @name + '_in', midi_generic: true, application: true)
-          dest = seq.parse_address @dest_port_specifier
-          queue = seq.create_queue(@name + '_q', tempo: chunk.tempo)
-=begin
-          We send MIDI events with explicit destination addresses, so we don't
-          need any connections to the playback ports.  But we connect to those
-          anyway to force any underlying RawMIDI ports to remain open while
-          we're playing - otherwise, ALSA would reset the port after every
-          event.
-=end
-          source.connect_to dest
-          queue.start
-          # The queue won't be started until the START_QUEUE event is
-          # actually flushed to the kernel, which is exactly what we want.
-          noteons = {} # per per channel, per note
-          max_tick = 0
-          realtime_0 = Time.new #- @write_ahead # Time supports tv_sec and tv_nsec
-          pps = input_node.tempo.pps # if no idiot changes this during play...
-#           tag "realtime_0 = #{realtime_0}, pps=#{pps}"
-          begin # of ensure block
-            input_node.each do |event|
-#               tag "handling event #{event}"
-              event.sender_queue = queue
-              event.source = source
-              event.dest = dest
-              max_tick = event.tick
-              unless @spam
-                # Or should we use our tempo?? They should probably be the very same??
-                # TODO: which is it?
-                diff = (Float === max_tick ? max_tick : max_tick.to_f / pps) -
-                       (Time.new - realtime_0)
-#                 tag "diff=#{diff}"
-                if diff > @write_ahead
-#                   tag "SLEEPING, since #{diff} > #@write_ahead"
-                  seq.flush # !UURGHH
-                  sleep 1
-                end
-# We should wait unless tick is less than write_ahead seconds away.
-                # Simply by sleeping
-              end
-              case event
-              when MetaEvent
-                # ignore these
-                next
-              # when NoteEvent  assume this goes well?
-              when NoteOnEvent
-                # If you're wise, these will not be present in the input.
-                # but the defaults in midifilereader are still bad.
-                if event.velocity == 0 # it counts as a NoteOff then.
-                  (noteons[event.channel] ||= {})[event.note] = nil
-                else
-                  (noteons[event.channel] ||= {})[event.note] = event
-                end
-              when NoteOffEvent
-                (noteons[event.channel] ||= {})[event.note] = nil
-              end
-              seq << event
-            end
-          rescue Interrupt
-#             tag "removing events from queue"
-            protect_from_signals { seq.remove_events; seq.flush; seq.sync_output_queue }
-          ensure
-#             tag "ensure operational, noteons=#{noteons.keys.inspect}"
-            hangs = false
-              #       puts "channels=#{channels.keys.inspect}"
-            for channel, data in noteons
-              for note, event in data
-                next unless event
-#                 tag "sending kill for note #{note} on port #{k} on ch #{event.channel}"
-                seq << NoteOffEvent.new(channel, note, direct: true, dest: dest,
-                                        sender: source)
-                hangs = true
-              end
-            end
-            if hangs
-#               tag "calling flush"
-              seq.flush # is direct so should not matter
-#               tag "call sync_output_queue"
-              seq.sync_output_queue
-              sleep @end_delay if @end_delay # prevent seq from closing down before the deed is done....
-            end
-#             tag "sending queue.stop to system_timer"
-            #  schedule queue stop at end of song
-            event = StopEvent.new queue, tick: max_tick, dest: seq.system_timer,
-                                  sender_queue: queue, source: source
-            seq << event
-            # make sure that the sequencer sees all our events
-            begin
-#               tag "another flush"
-              seq.flush
-=begin
-    There are three possibilities how to wait until all events have
-    been played:
-    1) send an event back to us (like pmidi does), and wait for it;
-    2) wait for the EVENT_STOP notification for our queue which is sent
-    by the system timer port (this would require a subscription);
-    3) wait until the output pool is empty.
-    The last is the simplest.
-=end
-#               tag "and another sync"
-              seq.sync_output_queue
-            rescue Interrupt
-#               tag "interrupted, remove events"
-              protect_from_signals { seq.remove_events; seq.flush; seq.sync_output_queue }
-            end
-            # give the last notes time to die away
-            sleep(@end_delay) if @end_delay
-          end  #ensure
-        end # close sequencer
+        if seq = Sequencer[@client_name]
+#           tag "dipping in existing sequencer #@client_name"
+          run_player input_node, seq
+        else
+#           tag "creating sequencer #@client_name"
+          Sequencer.new(@client_name, blockingmode: @blockingmode) do |seq|
+            run_player input_node, seq
+          end # close sequencer
+        end
       end # connect_to
     end # class Player
   end # Node
@@ -193,5 +207,5 @@ if __FILE__ == $0
   include RRTS
   include Node
   r = MidiFileReader.new('../../../fixtures/eurodance.midi')
-  Player.new('20:1', r, blockingmode: Player::NonBlocking, name: 'test', spam: true)
+  Player.new('20:1', r, blockingmode: Player::NonBlocking, client_name: 'test', spam: true)
 end

@@ -7,11 +7,12 @@ module RRTS #namespace
 
     class DefaultOptions
       private
-      def initialize arguments = ARGV
-        require 'optparse'
+      # passing a Hash is not yet supported
+      def initialize arguments = []
+        raise RRTSError, 'evil input' unless Array === arguments
+#         tag "DefaultOptions.new, arguments = #{arguments.inspect}"
         @input = @output = nil # stdin + stdout
 #         @wrap = false
-        opts = OptionParser.new
         @client_name = 'rclient'
         @spam = false
         @blockingmode = true
@@ -19,11 +20,14 @@ module RRTS #namespace
         @smpte_timing = false
         @beats = 120  # quarters per minute
         @frames = nil  # not 0!
-        @channel_split = true
+        @split_channels = false
         @ticks = nil   # default 384 ticks per quarter or 40 for smpte_timing
-
+        @combine_lsb_msb = @combine_notes = @combine_progchanges = true
+        @sleeptime = 2
         require_relative '../sequencer'
         Sequencer.new do |seq|
+          require 'optparse'
+          opts = OptionParser.new
           opts.banner = "Usage: #$PROGRAM_NAME [options]"
           opts.on('-h', '-?', '--help', 'this help') { puts opts.to_s; exit 1 }
           opts.on('-V', '--version', 'show_version') do
@@ -51,7 +55,15 @@ module RRTS #namespace
           opts.on('-o', '--output=VAL', 'port or filename, default STDOUT') { |arg| @output = arg }
           opts.on('--[no-]blocking', 'set blocking mode of the sequencer, default blocking') { |arg| @blockingmode = arg }
           opts.on('--write_ahead=VAL', 'in seconds', Integer) { |arg| @write_ahead = arg }
-          opts.on('-s', '--[no-]channel-split', 'split channels from MIDI file, default true') { |arg| @channel_split = arg }
+          opts.on('-s', '--[no-]channel-split', '--[no-]split-channels',
+                  'split channels from MIDI file, default false ') { |arg| @split_channels = arg }
+          opts.on('--[no-]combine-notes', 'combine note events') { |arg| @combine_notes = arg }
+          opts.on('--[no-]combine-progchanges', 'combine progchanges') { |arg| @combine_progchanges = arg }
+          opts.on('--[no-]combine-lsb_msb', 'combine control14 events') { |arg| @combine_lsb_msb = arg }
+          opts.on('--sleeptime=VAL', Integer, 'when ahead of writing') { |arg| @sleeptime = arg }
+          opts.on('--no-tampering', 'leave all events as is') do
+            @split_channels = @combine_lsb_msb = @combine_notes = @combine_progchanges = false
+          end
           opts.on('-b', '--bpm=VAL', '--beats=VAL', Integer,
                   'tempo in beats per minute') do |bpm|
             raise OptionParser::InvalidArgument.new("Invalid tempo #{bpm}") unless (4..6000) === bpm
@@ -130,20 +142,36 @@ module RRTS #namespace
 
       # create an input node belongning to input
       def input_node
+#         tag "input_node, input=#@input"
+        options = { spam: @spam, write_ahead: @write_ahead, sleeptime: @sleeptime,
+                    split_channels: @split_channels,
+                    combine_lsb_msb: @combine_lsb_msb,
+                    combine_notes: @combine_notes,
+                    combine_progchanges: @combine_progchanges
+                  }
         case @input
-        when nil then require_relative 'yamlreader'; YamlPipeReader.new
-        when /\.yaml$/ then require_relative 'yamlreader'; YamlFileReader.new(@input)
+        when nil
+          require_relative 'yamlreader'
+#           tag "ALERT READING FROM STDIN!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+          YamlPipeReader.new nil, options
+        when /\.yaml$/
+          require_relative 'yamlreader'
+          YamlFileReader.new(@input, options)
         when /\.ygz$|\.yaml.gz$/
           require_relative 'yamlreader'
-          YamlPipeReader.new("zcat #{escape_shell_single_word(@input)}") #.tap{|t|tag "t=#{t}"})
+          YamlPipeReader.new("zcat #{escape_shell_single_word(@input)}", #.tap{|t|tag "t=#{t}"})
+                             options)
         when /\.midi?/i
+#           tag "Returning MidiFileReader(input=#@input)"
           require_relative 'midifilereader'
-          MidiFileReader.new(@input)
+          MidiFileReader.new(@input, options)
         else
           require_relative 'recorder'
-          Recorder.new(@input, client_name: @client_name, blockingmode: @blockingmode,
-                       smpte_timing: @smpte_timing, frames: @frames, beats: @beats,
-                       ticks: @ticks, channel_split: @channel_split)
+          Recorder.new(@input,
+                       options.merge({ client_name: @client_name,
+                                       blockingmode: @blockingmode,
+                                       smpte_timing: @smpte_timing, frames: @frames, beats: @beats,
+                                       ticks: @ticks }))
         end
       end
 
@@ -161,7 +189,7 @@ module RRTS #namespace
         else
           require_relative 'player'
           Player.new(@output, client_name: @client_name, spam: @spam, blockingmode: @blockingmode,
-                     write_ahead: @write_ahead)
+                     write_ahead: @write_ahead, sleeptime: @sleeptime)
         end
       end
     end # class DefaultOptions

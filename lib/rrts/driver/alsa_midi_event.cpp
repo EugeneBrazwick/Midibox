@@ -1455,6 +1455,7 @@ wrap_snd_seq_ev_set_queue_tempo(VALUE v_ev, VALUE v_q, VALUE v_tempo)
   snd_seq_event_t *ev;
   Data_Get_Struct(v_ev, snd_seq_event_t, ev);
   RRTS_DEREF_DIRTY(v_q, @id);
+  RRTS_DEREF(v_tempo, usecs_per_beat); // apply this, if existing
   snd_seq_ev_set_queue_tempo(ev, NUM2UINT(v_q), NUM2UINT(v_tempo));
   return v_ev;
 }

@@ -1,0 +1,310 @@
+--- !ruby/object:RRTS::ChunkCreateEvent 
+channel: 
+combine_lsb_msb: true
+combine_notes: true
+combine_progchanges: true
+flags: 
+  :time_mode_absolute: true
+  :time_mode_ticks: true
+param: 
+source: 
+split_channels: false
+time: 
+track: 
+type: :chunk_create
+value: 
+velocity: 
+--- !ruby/object:RRTS::TempoEvent 
+channel: 
+flags: 
+  :time_mode_absolute: true
+  :time_mode_ticks: true
+param: 
+queue: 0
+source: 
+time: 
+track: 
+type: :tempo
+value: 
+  :smpte_timing: false
+  :ppq: 384
+  :skew: 0
+  :skew_base: 0
+  :beats: 120
+velocity: 
+--- !ruby/object:RRTS::TrackCreateEvent 
+channel: 
+flags: 
+  :time_mode_absolute: true
+  :time_mode_ticks: true
+param: 
+source: 
+time: 
+track: 
+type: :track_create
+value: 2
+velocity: 
+--- !ruby/object:RRTS::TempoEvent 
+channel: 
+flags: 
+  :time_mode_absolute: true
+  :time_mode_ticks: true
+param: 
+queue: 0
+source: 
+time: 0
+track: 2
+type: :tempo
+value: 500000
+velocity: 
+--- !ruby/object:RRTS::TimeSignatureEvent 
+channel: 
+clocks_per_beat: 24
+denom: 2
+flags: 
+  :time_mode_absolute: true
+  :time_mode_ticks: true
+num: 4
+param: 
+source: 
+time: 0
+track: 2
+type: :meta
+value: 
+velocity: 
+--- !ruby/object:RRTS::SystemExclusiveEvent 
+channel: 
+flags: 
+  :time_mode_absolute: true
+  :time_mode_ticks: true
+param: 
+source: 
+time: 529
+track: 2
+type: :sysex
+value: !binary |
+  8EEQAAAIEhAASSADBPc=
+
+velocity: 
+--- !ruby/object:RRTS::SystemExclusiveEvent 
+channel: 
+flags: 
+  :time_mode_absolute: true
+  :time_mode_ticks: true
+param: 
+source: 
+time: 529
+track: 2
+type: :sysex
+value: !binary |
+  8EEQAAAIEhAASTIAAA8HDwABD0D3
+
+velocity: 
+--- !ruby/object:RRTS::SystemExclusiveEvent 
+channel: 
+flags: 
+  :time_mode_absolute: true
+  :time_mode_ticks: true
+param: 
+source: 
+time: 552
+track: 2
+type: :sysex
+value: !binary |
+  8EEQAAAIEhAAQSADDPc=
+
+velocity: 
+--- !ruby/object:RRTS::SystemExclusiveEvent 
+channel: 
+flags: 
+  :time_mode_absolute: true
+  :time_mode_ticks: true
+param: 
+source: 
+time: 560
+track: 2
+type: :sysex
+value: !binary |
+  8EEQAAAIEhAAQTIBAAwHDwABD0r3
+
+velocity: 
+--- !ruby/object:RRTS::SystemExclusiveEvent 
+channel: 
+flags: 
+  :time_mode_absolute: true
+  :time_mode_ticks: true
+param: 
+source: 
+time: 568
+track: 2
+type: :sysex
+value: !binary |
+  8EEQAAAIEhAAQCADDfc=
+
+velocity: 
+--- !ruby/object:RRTS::SystemExclusiveEvent 
+channel: 
+flags: 
+  :time_mode_absolute: true
+  :time_mode_ticks: true
+param: 
+source: 
+time: 568
+track: 2
+type: :sysex
+value: !binary |
+  8EEQAAAIEhAAQDIAAA8HDwABD0n3
+
+velocity: 
+--- !ruby/object:RRTS::SystemExclusiveEvent 
+channel: 
+flags: 
+  :time_mode_absolute: true
+  :time_mode_ticks: true
+param: 
+source: 
+time: 583
+track: 2
+type: :sysex
+value: !binary |
+  8EEQAAAIEhAARCADCfc=
+
+velocity: 
+--- !ruby/object:RRTS::SystemExclusiveEvent 
+channel: 
+flags: 
+  :time_mode_absolute: true
+  :time_mode_ticks: true
+param: 
+source: 
+time: 591
+track: 2
+type: :sysex
+value: !binary |
+  8EEQAAAIEhAARDIBAAsGDwEEEUP3
+
+velocity: 
+--- !ruby/object:RRTS::SystemExclusiveEvent 
+channel: 
+flags: 
+  :time_mode_absolute: true
+  :time_mode_ticks: true
+param: 
+source: 
+time: 599
+track: 2
+type: :sysex
+value: !binary |
+  8EEQAAAIEhAARyAACfc=
+
+velocity: 
+--- !ruby/object:RRTS::SystemExclusiveEvent 
+channel: 
+flags: 
+  :time_mode_absolute: true
+  :time_mode_ticks: true
+param: 
+source: 
+time: 599
+track: 2
+type: :sysex
+value: !binary |
+  8EEQAAAIEhAARyEEBPc=
+
+velocity: 
+--- !ruby/object:RRTS::SystemExclusiveEvent 
+channel: 
+flags: 
+  :time_mode_absolute: true
+  :time_mode_ticks: true
+param: 
+source: 
+time: 606
+track: 2
+type: :sysex
+value: !binary |
+  8EEQAAAIEhAARzIBAA8HEgABDz73
+
+velocity: 
+--- !ruby/object:RRTS::SystemExclusiveEvent 
+channel: 
+flags: 
+  :time_mode_absolute: true
+  :time_mode_ticks: true
+param: 
+source: 
+time: 614
+track: 2
+type: :sysex
+value: !binary |
+  8EEQAAAIEhAASCADBfc=
+
+velocity: 
+--- !ruby/object:RRTS::SystemExclusiveEvent 
+channel: 
+flags: 
+  :time_mode_absolute: true
+  :time_mode_ticks: true
+param: 
+source: 
+time: 622
+track: 2
+type: :sysex
+value: !binary |
+  8EEQAAAIEhAASDIAAA8HDwABD0H3
+
+velocity: 
+--- !ruby/object:RRTS::SystemExclusiveEvent 
+channel: 
+flags: 
+  :time_mode_absolute: true
+  :time_mode_ticks: true
+param: 
+source: 
+time: 5806
+track: 2
+type: :sysex
+value: !binary |
+  8EEQAAAIEhAARiAACvc=
+
+velocity: 
+--- !ruby/object:RRTS::SystemExclusiveEvent 
+channel: 
+flags: 
+  :time_mode_absolute: true
+  :time_mode_ticks: true
+param: 
+source: 
+time: 5806
+track: 2
+type: :sysex
+value: !binary |
+  8EEQAAAIEhAARiEDBvc=
+
+velocity: 
+--- !ruby/object:RRTS::SystemExclusiveEvent 
+channel: 
+flags: 
+  :time_mode_absolute: true
+  :time_mode_ticks: true
+param: 
+source: 
+time: 5813
+track: 2
+type: :sysex
+value: !binary |
+  8EEQAAAIEhAARjIBAAoGDwEBEEb3
+
+velocity: 
+--- !ruby/object:RRTS::LastEvent 
+channel: 
+flags: 
+  :time_mode_absolute: true
+  :time_mode_ticks: true
+param: 
+source: 
+time: 21457
+track: 2
+type: :meta
+value: 
+velocity: 

@@ -4,21 +4,208 @@ module RRTS # namespace
 
   module Node
 
-    class Base
-      def connect_to node
-        raise RRTSError.new("not implemented: #{self.class}::connect_to")
+    require 'monitor'
+
+=begin rdoc
+The Base Node class. It uses Monitor for simple syncing.
+If we take a MIDI event as a message any node structure is nothing more than a
+messageprocessing network of multiple consumers and multiple producers.
+
+My solution is to use Threads for the producers and Fibers for the consumers.
+This allows us to avoid the use of callbacks in the consumers which is awkward
+(since state has to be kept within instance variables, instead of local variables).
+
+Note: maybe Monitor is a bit fat. It may become an include in Filter and Consumer
+=end
+    class Base < Monitor
+      private
+      # Create a new node
+      def initialize options = nil
+        super()
+        @consumers = []
+        @producercount = 0
+        options.each { |k, v| parse_option(k, v) } if options
       end
 
-#       alias :<< :connect_to  MIXES UP sending events...
-    end
+      def parse_option k, v
+        raise RRTSError, "illegal option '#{k}' for #{self.class}"
+      end
 
-    class EventsNode < Base
-      include Enumerable # even if still abstract
+      # Basic consuming fiber structure. The event handling is all within an
+      # exclusive block.  To stop, the producer must send a nil (this is handled
+      # automatically by the Producer class).
+      def each_fiber when_done = nil
+        synchronize { @producercount += 1 }
+        Fiber.new do |ev|
+          begin # ensure
+            loop do
+              synchronize do
+                if ev
+                  yield(ev)
+                else
+                  raise StopIteration if (@producercount -= 1) == 0
+                  # interesting enough a break dissolves!!!
+                  # and return is illegal here
+                end
+              end # synchronize
+              ev = Fiber.yield
+            end # loop
+          ensure
+            when_done.call if when_done
+          end
+        end
+      end
+
+      # keep repeating the passed block, until not interrupted (through Interrupt)
+      def protect_from_interrupt
+        loop do
+          begin
+            return yield
+          rescue Interrupt
+            # ignore it!
+            next
+          end
+        end
+      end
 
       public
-      def has_tracks?
-        false
+
+      # Add one or an array of consumers
+      def >> consumer
+        consumer = [consumer] unless consumer.respond_to?(:to_ary)
+        @consumers += consumer.to_ary
+        self
       end
+
+=begin rdoc
+this method should overriden by consumers and filters
+to do something different.
+However it must return the result of each_fiber(!)
+
+To push things to a consumer use:
+    consume = consumer.consume
+    source.each do |ev|
+      # process 'ev'
+      consume.resume ev
+   end
+
+The default Base behaves like /dev/null in that sense.
+
+You can pass a lambda to 'each_fiber' to be called when done. (in fact it is ensured to be called)
+See Base#each_fiber.
+
+However, an alternative strategy is available.
+If producer has a method to_chunk we can chunkify the producer and use the chunk as our
+producer. We can then actively consume it.
+It is also possible to dump a chunks tracks but not the events, and use each_fiber to
+receive the events to dump.
+
+Example: midifilereader can dump a chunk with all its tracks. But is also possible to just send
+it the events. It then creates a default chunk with a single default track.
+=end
+      def consume producer, &when_done
+        each_fiber(when_done) { |ev| }
+        # *IMPORTANT*: any code here is executed BEFORE the loop!!
+        # I mean to say, there should not be any code here. It must return
+        # the result from the 'each_fiber' call.
+      end
+
+      # passing complete chunks is a very quick way of passing messages.
+      def chunk
+        nil
+      end
+
+      attr :consumers # for debugging purposes currently BAD EFFECTS!!! AAARGHH
+    end
+
+=begin rdoc
+A Producer is a producer of events.
+=end
+    class Producer < Base
+      include Enumerable # since we use 'each' already
+
+      private
+=begin rdoc
+      Create a new producer.
+      Valid options are:
+      spam:: use spamming mode. If so the producer returns events as fast as possible.
+             Setting this will ignore +write_ahead+
+      full_throttle:: same as spam
+      write_ahead:: number of seconds to be ahead with producing events. If the next event
+                    is scheduled more than this away, we sleep for +sleeptime+ seconds.
+                    Default is 3.
+      sleeptime:: number of seconds to sleep if too far ahead. Default is 2.
+
+      IMPORTANT: these options only work for the 'produce' and 'run' call and not for 'each' in
+      general (as I am lazy and otherwise all implementors must add the same timing sequence
+      over and over (3 times for now)).
+      Also it is convenient having each always use 'spam' mode.
+=end
+      def initialize options = nil
+        @write_ahead = 3
+        @sleeptime = 2
+        @spam = false
+        @threads = true
+        super
+      end
+
+      def parse_option k, v
+        case k
+        when :spam, :full_throttle then @spam = v
+        when :write_ahead then @write_ahead = v
+        when :sleeptime then @sleeptime = v
+        when :threads then @threads = v
+        else super
+        end
+      end
+
+      def send_nils_to(cons)
+        protect_from_interrupt do
+          cons.each do |out|
+            begin
+              out.resume nil
+            rescue FiberError
+              # ignore, normal if Fiber already exited (p.e. on an Interrupt)
+            end
+          end
+        end
+      end
+
+      # code run by the thread
+      def run_thread
+        # the consumers MUST be created within the thread!
+        cons = @consumers.map{|consumer| consumer.consume(self) }
+        cons.delete(nil)
+        # cannot break nor return
+        unless cons.empty?
+          begin
+            realtime_0 = Time.now
+            each do |ev|
+              unless @spam
+                tick = ev.tick
+                pps = tempo.pps # the initial value is only a default. It may change
+                    # it is likely that the value is correct after each has been called.
+                    # does it really matter?
+                diff = (Float === tick ? tick : tick.to_f / pps) - (Time.now - realtime_0)
+                if diff > @write_ahead
+#                   tag "producer will sleep for #@sleeptime seconds"
+                  sleep @sleeptime
+                end
+              end
+              cons.each { |out| out.resume ev }
+            end
+          rescue Interrupt
+            send_nils_to(cons)
+          ensure
+            send_nils_to(cons)
+          end
+        end
+      end
+
+      public
+#       def has_tracks?
+#         false
+#       end
 
       # returns a default tempo
       def tempo
@@ -31,29 +218,107 @@ module RRTS # namespace
       # If false then we need additional flushes on the connected outputnode.
       # Putting it in another manner: returning true means that each will virtually not block
       def spamming?
-        true
+        @spam
       end
 
+      # Returns a flat array of all contributing nodes. Track compatibility method
       # we must assume the node has events so it behaves like a single eventsource.
       # good enough for 'listing'
-      def listing
-        [self]
+#       def listing
+#         [self]
+#       end
+
+      # Default sequencenumber, always 0. Track compatibility method
+#       def sequencenr
+#         0
+#       end
+
+      # Track compatibility method.
+#       def chunk
+#         nil
+#       end
+
+      # Track compatibility method. Default nil
+#       def voicename
+#         nil
+#       end
+
+=begin rdoc
+Example of the structure of a produce method. To override, keeping the same structuring.
+It would be better though to simply override 'each'.
+
+Note it returns a thread, and that 'join' should be called upon it
+=end
+      def produce
+        Thread.new { run_thread }
       end
 
-      def sequencenr
-        0
+      # short for 'produce.join' which works fine for simple tests
+      def run
+        @threads ? produce.join : run_thread
+      end
+    end # class Producer
+
+    # Almost (as in almost) the same as Base
+    class Filter < Base
+      include Enumerable
+      private
+
+      # create a new filter. If producer is passed we connect to it.
+      # There are no special options, but there is a 'condition'
+      # which is the actual filter proc. If not given it is effectively
+      # equal to { |ev| true }
+      def initialize producer = nil, options = nil, &condition
+        @condition = condition
+        @spam = producer && producer.spamming?
+        super(options)
+        producer >> self if producer
       end
 
-      def chunk
-        self
+      # override
+      def each_fiber when_done = nil
+        synchronize { @producercount += 1 }
+        Fiber.new do |ev|
+          begin
+            loop do
+              synchronize do
+                yield ev
+                raise StopIteration if ev.nil? && (@producercount -= 1) == 0
+              end
+              ev = Fiber.yield
+            end
+          ensure
+            when_done.call if when_done
+          end
+        end
       end
 
-      def voicename
-        nil
+      public
+
+      #override
+      def consume producer, &when_done
+        @spam = producer.spamming?
+        cons = @consumers.map { |consumer| consumer.consume(self) }
+        cons.delete(nil)
+        return nil if cons.empty?
+        each_fiber(when_done) do |ev|
+          if ev.nil? || !@condition || @condition.call(ev)
+            cons.each { |out| out.resume ev }
+          end
+        end
       end
-    end
+
+      # basicly, when we are attached to a spamming producer
+      def spamming?
+        @spam
+      end
+    end # class Filter
+
+    # Consumer class. Currently empty
+    Consumer = Base
 
     # Peekable improves Enumerator with a 'peek' method
+=begin
     class Peekable < Enumerator
       private
 
@@ -101,6 +366,7 @@ module RRTS # namespace
         end
       end
     end# class Peekable
+=end
 
   end # Node
 end # module RRTS namespace

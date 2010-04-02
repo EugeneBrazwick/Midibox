@@ -1,0 +1,49 @@
+--- !ruby/object:RRTS::ControllerEvent 
+channel: 3
+flags: 
+  :time_mode_absolute: true
+  :time_mode_ticks: true
+  :coarse: true
+param: :modwheel
+source: 
+time: 514
+track: 2
+type: :controller
+value: 0
+velocity: 
+--- !ruby/object:RRTS::PitchbendEvent 
+channel: 3
+flags: 
+  :time_mode_absolute: true
+  :time_mode_ticks: true
+param: 
+source: 
+time: 576
+track: 2
+type: :pitchbend
+value: 0
+velocity: 
+--- !ruby/object:RRTS::PitchbendEvent 
+channel: 3
+flags: 
+  :time_mode_absolute: true
+  :time_mode_ticks: true
+param: 
+source: 
+time: 5798
+track: 2
+type: :pitchbend
+value: 0
+velocity: 
+--- !ruby/object:RRTS::PitchbendEvent 
+channel: 3
+flags: 
+  :time_mode_absolute: true
+  :time_mode_ticks: true
+param: 
+source: 
+time: 9745
+track: 2
+type: :pitchbend
+value: 0
+velocity: 

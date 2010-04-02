@@ -1,0 +1,1607 @@
+--- !ruby/object:RRTS::ControllerEvent 
+channel: 2
+flags: 
+  :time_mode_absolute: true
+  :time_mode_ticks: true
+  :coarse: true
+param: :modwheel
+source: 
+time: 514
+track: 2
+type: :controller
+value: 0
+velocity: 
+--- !ruby/object:RRTS::ControllerEvent 
+channel: 2
+flags: 
+  :time_mode_absolute: true
+  :time_mode_ticks: true
+  :coarse: true
+param: :pan
+source: 
+time: 545
+track: 2
+type: :controller
+value: 64
+velocity: 
+--- !ruby/object:RRTS::ControllerEvent 
+channel: 2
+flags: 
+  :time_mode_absolute: true
+  :time_mode_ticks: true
+  :coarse: true
+param: :reverb
+source: 
+time: 545
+track: 2
+type: :controller
+value: 0
+velocity: 
+--- !ruby/object:RRTS::ControllerEvent 
+channel: 2
+flags: 
+  :time_mode_absolute: true
+  :time_mode_ticks: true
+  :coarse: true
+param: :chorus
+source: 
+time: 545
+track: 2
+type: :controller
+value: 23
+velocity: 
+--- !ruby/object:RRTS::ControllerEvent 
+channel: 2
+flags: 
+  :time_mode_absolute: true
+  :time_mode_ticks: true
+  :coarse: true
+param: :expression
+source: 
+time: 545
+track: 2
+type: :controller
+value: 72
+velocity: 
+--- !ruby/object:RRTS::ControllerEvent 
+channel: 2
+flags: 
+  :time_mode_absolute: true
+  :time_mode_ticks: true
+  :coarse: true
+param: :bank
+source: 
+time: 560
+track: 2
+type: :controller
+value: 83
+velocity: 
+--- !ruby/object:RRTS::ControllerEvent 
+channel: 2
+flags: 
+  :time_mode_absolute: true
+  :time_mode_ticks: true
+  :coarse: true
+param: :bank_lsb
+source: 
+time: 560
+track: 2
+type: :controller
+value: 4
+velocity: 
+--- !ruby/object:RRTS::ProgramChangeEvent 
+channel: 2
+flags: 
+  :time_mode_absolute: true
+  :time_mode_ticks: true
+param: 
+source: 
+time: 560
+track: 2
+type: :pgmchange
+value: 38
+velocity: 
+--- !ruby/object:RRTS::ControllerEvent 
+channel: 2
+flags: 
+  :time_mode_absolute: true
+  :time_mode_ticks: true
+  :coarse: true
+param: :pan
+source: 
+time: 560
+track: 2
+type: :controller
+value: 64
+velocity: 
+--- !ruby/object:RRTS::ControllerEvent 
+channel: 2
+flags: 
+  :time_mode_absolute: true
+  :time_mode_ticks: true
+  :coarse: true
+param: :expression
+source: 
+time: 560
+track: 2
+type: :controller
+value: 80
+velocity: 
+--- !ruby/object:RRTS::ControllerEvent 
+channel: 2
+flags: 
+  :time_mode_absolute: true
+  :time_mode_ticks: true
+  :coarse: true
+param: :reverb
+source: 
+time: 560
+track: 2
+type: :controller
+value: 0
+velocity: 
+--- !ruby/object:RRTS::ControllerEvent 
+channel: 2
+flags: 
+  :time_mode_absolute: true
+  :time_mode_ticks: true
+  :coarse: true
+param: :chorus
+source: 
+time: 560
+track: 2
+type: :controller
+value: 23
+velocity: 
+--- !ruby/object:RRTS::NoteOnEvent 
+channel: 2
+flags: 
+  :time_mode_absolute: true
+  :time_mode_ticks: true
+param: 
+source: 
+time: 691
+track: 2
+type: :noteon
+value: 36
+velocity: 123
+--- !ruby/object:RRTS::NoteOnEvent 
+channel: 2
+flags: 
+  :time_mode_absolute: true
+  :time_mode_ticks: true
+param: 
+source: 
+time: 829
+track: 2
+type: :noteon
+value: 36
+velocity: 0
+--- !ruby/object:RRTS::NoteOnEvent 
+channel: 2
+flags: 
+  :time_mode_absolute: true
+  :time_mode_ticks: true
+param: 
+source: 
+time: 1006
+track: 2
+type: :noteon
+value: 36
+velocity: 123
+--- !ruby/object:RRTS::NoteOnEvent 
+channel: 2
+flags: 
+  :time_mode_absolute: true
+  :time_mode_ticks: true
+param: 
+source: 
+time: 1167
+track: 2
+type: :noteon
+value: 36
+velocity: 0
+--- !ruby/object:RRTS::NoteOnEvent 
+channel: 2
+flags: 
+  :time_mode_absolute: true
+  :time_mode_ticks: true
+param: 
+source: 
+time: 1336
+track: 2
+type: :noteon
+value: 36
+velocity: 118
+--- !ruby/object:RRTS::NoteOnEvent 
+channel: 2
+flags: 
+  :time_mode_absolute: true
+  :time_mode_ticks: true
+param: 
+source: 
+time: 1505
+track: 2
+type: :noteon
+value: 36
+velocity: 0
+--- !ruby/object:RRTS::NoteOnEvent 
+channel: 2
+flags: 
+  :time_mode_absolute: true
+  :time_mode_ticks: true
+param: 
+source: 
+time: 1666
+track: 2
+type: :noteon
+value: 36
+velocity: 118
+--- !ruby/object:RRTS::NoteOnEvent 
+channel: 2
+flags: 
+  :time_mode_absolute: true
+  :time_mode_ticks: true
+param: 
+source: 
+time: 1843
+track: 2
+type: :noteon
+value: 36
+velocity: 0
+--- !ruby/object:RRTS::NoteOnEvent 
+channel: 2
+flags: 
+  :time_mode_absolute: true
+  :time_mode_ticks: true
+param: 
+source: 
+time: 1996
+track: 2
+type: :noteon
+value: 29
+velocity: 118
+--- !ruby/object:RRTS::NoteOnEvent 
+channel: 2
+flags: 
+  :time_mode_absolute: true
+  :time_mode_ticks: true
+param: 
+source: 
+time: 2158
+track: 2
+type: :noteon
+value: 29
+velocity: 0
+--- !ruby/object:RRTS::NoteOnEvent 
+channel: 2
+flags: 
+  :time_mode_absolute: true
+  :time_mode_ticks: true
+param: 
+source: 
+time: 2327
+track: 2
+type: :noteon
+value: 29
+velocity: 118
+--- !ruby/object:RRTS::NoteOnEvent 
+channel: 2
+flags: 
+  :time_mode_absolute: true
+  :time_mode_ticks: true
+param: 
+source: 
+time: 2519
+track: 2
+type: :noteon
+value: 29
+velocity: 0
+--- !ruby/object:RRTS::NoteOnEvent 
+channel: 2
+flags: 
+  :time_mode_absolute: true
+  :time_mode_ticks: true
+param: 
+source: 
+time: 2649
+track: 2
+type: :noteon
+value: 31
+velocity: 118
+--- !ruby/object:RRTS::NoteOnEvent 
+channel: 2
+flags: 
+  :time_mode_absolute: true
+  :time_mode_ticks: true
+param: 
+source: 
+time: 2818
+track: 2
+type: :noteon
+value: 31
+velocity: 0
+--- !ruby/object:RRTS::NoteOnEvent 
+channel: 2
+flags: 
+  :time_mode_absolute: true
+  :time_mode_ticks: true
+param: 
+source: 
+time: 2979
+track: 2
+type: :noteon
+value: 31
+velocity: 123
+--- !ruby/object:RRTS::NoteOnEvent 
+channel: 2
+flags: 
+  :time_mode_absolute: true
+  :time_mode_ticks: true
+param: 
+source: 
+time: 3148
+track: 2
+type: :noteon
+value: 31
+velocity: 0
+--- !ruby/object:RRTS::NoteOnEvent 
+channel: 2
+flags: 
+  :time_mode_absolute: true
+  :time_mode_ticks: true
+param: 
+source: 
+time: 3310
+track: 2
+type: :noteon
+value: 36
+velocity: 123
+--- !ruby/object:RRTS::NoteOnEvent 
+channel: 2
+flags: 
+  :time_mode_absolute: true
+  :time_mode_ticks: true
+param: 
+source: 
+time: 3479
+track: 2
+type: :noteon
+value: 36
+velocity: 0
+--- !ruby/object:RRTS::NoteOnEvent 
+channel: 2
+flags: 
+  :time_mode_absolute: true
+  :time_mode_ticks: true
+param: 
+source: 
+time: 3640
+track: 2
+type: :noteon
+value: 36
+velocity: 123
+--- !ruby/object:RRTS::NoteOnEvent 
+channel: 2
+flags: 
+  :time_mode_absolute: true
+  :time_mode_ticks: true
+param: 
+source: 
+time: 3809
+track: 2
+type: :noteon
+value: 36
+velocity: 0
+--- !ruby/object:RRTS::NoteOnEvent 
+channel: 2
+flags: 
+  :time_mode_absolute: true
+  :time_mode_ticks: true
+param: 
+source: 
+time: 3970
+track: 2
+type: :noteon
+value: 36
+velocity: 123
+--- !ruby/object:RRTS::NoteOnEvent 
+channel: 2
+flags: 
+  :time_mode_absolute: true
+  :time_mode_ticks: true
+param: 
+source: 
+time: 4139
+track: 2
+type: :noteon
+value: 36
+velocity: 0
+--- !ruby/object:RRTS::NoteOnEvent 
+channel: 2
+flags: 
+  :time_mode_absolute: true
+  :time_mode_ticks: true
+param: 
+source: 
+time: 4300
+track: 2
+type: :noteon
+value: 36
+velocity: 127
+--- !ruby/object:RRTS::NoteOnEvent 
+channel: 2
+flags: 
+  :time_mode_absolute: true
+  :time_mode_ticks: true
+param: 
+source: 
+time: 4462
+track: 2
+type: :noteon
+value: 36
+velocity: 0
+--- !ruby/object:RRTS::NoteOnEvent 
+channel: 2
+flags: 
+  :time_mode_absolute: true
+  :time_mode_ticks: true
+param: 
+source: 
+time: 4638
+track: 2
+type: :noteon
+value: 29
+velocity: 118
+--- !ruby/object:RRTS::NoteOnEvent 
+channel: 2
+flags: 
+  :time_mode_absolute: true
+  :time_mode_ticks: true
+param: 
+source: 
+time: 4784
+track: 2
+type: :noteon
+value: 29
+velocity: 0
+--- !ruby/object:RRTS::NoteOnEvent 
+channel: 2
+flags: 
+  :time_mode_absolute: true
+  :time_mode_ticks: true
+param: 
+source: 
+time: 4961
+track: 2
+type: :noteon
+value: 29
+velocity: 123
+--- !ruby/object:RRTS::NoteOnEvent 
+channel: 2
+flags: 
+  :time_mode_absolute: true
+  :time_mode_ticks: true
+param: 
+source: 
+time: 5122
+track: 2
+type: :noteon
+value: 29
+velocity: 0
+--- !ruby/object:RRTS::NoteOnEvent 
+channel: 2
+flags: 
+  :time_mode_absolute: true
+  :time_mode_ticks: true
+param: 
+source: 
+time: 5130
+track: 2
+type: :noteon
+value: 31
+velocity: 102
+--- !ruby/object:RRTS::NoteOnEvent 
+channel: 2
+flags: 
+  :time_mode_absolute: true
+  :time_mode_ticks: true
+param: 
+source: 
+time: 5191
+track: 2
+type: :noteon
+value: 31
+velocity: 0
+--- !ruby/object:RRTS::NoteOnEvent 
+channel: 2
+flags: 
+  :time_mode_absolute: true
+  :time_mode_ticks: true
+param: 
+source: 
+time: 5291
+track: 2
+type: :noteon
+value: 31
+velocity: 113
+--- !ruby/object:RRTS::NoteOnEvent 
+channel: 2
+flags: 
+  :time_mode_absolute: true
+  :time_mode_ticks: true
+param: 
+source: 
+time: 5452
+track: 2
+type: :noteon
+value: 31
+velocity: 0
+--- !ruby/object:RRTS::NoteOnEvent 
+channel: 2
+flags: 
+  :time_mode_absolute: true
+  :time_mode_ticks: true
+param: 
+source: 
+time: 5452
+track: 2
+type: :noteon
+value: 33
+velocity: 113
+--- !ruby/object:RRTS::NoteOnEvent 
+channel: 2
+flags: 
+  :time_mode_absolute: true
+  :time_mode_ticks: true
+param: 
+source: 
+time: 5598
+track: 2
+type: :noteon
+value: 33
+velocity: 0
+--- !ruby/object:RRTS::NoteOnEvent 
+channel: 2
+flags: 
+  :time_mode_absolute: true
+  :time_mode_ticks: true
+param: 
+source: 
+time: 5621
+track: 2
+type: :noteon
+value: 31
+velocity: 118
+--- !ruby/object:RRTS::NoteOnEvent 
+channel: 2
+flags: 
+  :time_mode_absolute: true
+  :time_mode_ticks: true
+param: 
+source: 
+time: 5760
+track: 2
+type: :noteon
+value: 31
+velocity: 0
+--- !ruby/object:RRTS::ControllerEvent 
+channel: 2
+flags: 
+  :time_mode_absolute: true
+  :time_mode_ticks: true
+  :coarse: true
+param: :pan
+source: 
+time: 5790
+track: 2
+type: :controller
+value: 64
+velocity: 
+--- !ruby/object:RRTS::ControllerEvent 
+channel: 2
+flags: 
+  :time_mode_absolute: true
+  :time_mode_ticks: true
+  :coarse: true
+param: :expression
+source: 
+time: 5790
+track: 2
+type: :controller
+value: 72
+velocity: 
+--- !ruby/object:RRTS::ControllerEvent 
+channel: 2
+flags: 
+  :time_mode_absolute: true
+  :time_mode_ticks: true
+  :coarse: true
+param: :reverb
+source: 
+time: 5790
+track: 2
+type: :controller
+value: 0
+velocity: 
+--- !ruby/object:RRTS::ControllerEvent 
+channel: 2
+flags: 
+  :time_mode_absolute: true
+  :time_mode_ticks: true
+  :coarse: true
+param: :chorus
+source: 
+time: 5790
+track: 2
+type: :controller
+value: 23
+velocity: 
+--- !ruby/object:RRTS::NoteOnEvent 
+channel: 2
+flags: 
+  :time_mode_absolute: true
+  :time_mode_ticks: true
+param: 
+source: 
+time: 5959
+track: 2
+type: :noteon
+value: 36
+velocity: 127
+--- !ruby/object:RRTS::NoteOnEvent 
+channel: 2
+flags: 
+  :time_mode_absolute: true
+  :time_mode_ticks: true
+param: 
+source: 
+time: 6128
+track: 2
+type: :noteon
+value: 36
+velocity: 0
+--- !ruby/object:RRTS::NoteOnEvent 
+channel: 2
+flags: 
+  :time_mode_absolute: true
+  :time_mode_ticks: true
+param: 
+source: 
+time: 6274
+track: 2
+type: :noteon
+value: 36
+velocity: 123
+--- !ruby/object:RRTS::NoteOnEvent 
+channel: 2
+flags: 
+  :time_mode_absolute: true
+  :time_mode_ticks: true
+param: 
+source: 
+time: 6435
+track: 2
+type: :noteon
+value: 36
+velocity: 0
+--- !ruby/object:RRTS::NoteOnEvent 
+channel: 2
+flags: 
+  :time_mode_absolute: true
+  :time_mode_ticks: true
+param: 
+source: 
+time: 6443
+track: 2
+type: :noteon
+value: 36
+velocity: 127
+--- !ruby/object:RRTS::NoteOnEvent 
+channel: 2
+flags: 
+  :time_mode_absolute: true
+  :time_mode_ticks: true
+param: 
+source: 
+time: 6604
+track: 2
+type: :noteon
+value: 36
+velocity: 0
+--- !ruby/object:RRTS::NoteOnEvent 
+channel: 2
+flags: 
+  :time_mode_absolute: true
+  :time_mode_ticks: true
+param: 
+source: 
+time: 6604
+track: 2
+type: :noteon
+value: 36
+velocity: 123
+--- !ruby/object:RRTS::NoteOnEvent 
+channel: 2
+flags: 
+  :time_mode_absolute: true
+  :time_mode_ticks: true
+param: 
+source: 
+time: 6773
+track: 2
+type: :noteon
+value: 36
+velocity: 0
+--- !ruby/object:RRTS::NoteOnEvent 
+channel: 2
+flags: 
+  :time_mode_absolute: true
+  :time_mode_ticks: true
+param: 
+source: 
+time: 6935
+track: 2
+type: :noteon
+value: 36
+velocity: 123
+--- !ruby/object:RRTS::NoteOnEvent 
+channel: 2
+flags: 
+  :time_mode_absolute: true
+  :time_mode_ticks: true
+param: 
+source: 
+time: 7119
+track: 2
+type: :noteon
+value: 36
+velocity: 0
+--- !ruby/object:RRTS::NoteOnEvent 
+channel: 2
+flags: 
+  :time_mode_absolute: true
+  :time_mode_ticks: true
+param: 
+source: 
+time: 7265
+track: 2
+type: :noteon
+value: 36
+velocity: 118
+--- !ruby/object:RRTS::NoteOnEvent 
+channel: 2
+flags: 
+  :time_mode_absolute: true
+  :time_mode_ticks: true
+param: 
+source: 
+time: 7449
+track: 2
+type: :noteon
+value: 36
+velocity: 0
+--- !ruby/object:RRTS::NoteOnEvent 
+channel: 2
+flags: 
+  :time_mode_absolute: true
+  :time_mode_ticks: true
+param: 
+source: 
+time: 7587
+track: 2
+type: :noteon
+value: 36
+velocity: 123
+--- !ruby/object:RRTS::NoteOnEvent 
+channel: 2
+flags: 
+  :time_mode_absolute: true
+  :time_mode_ticks: true
+param: 
+source: 
+time: 7756
+track: 2
+type: :noteon
+value: 36
+velocity: 0
+--- !ruby/object:RRTS::NoteOnEvent 
+channel: 2
+flags: 
+  :time_mode_absolute: true
+  :time_mode_ticks: true
+param: 
+source: 
+time: 7756
+track: 2
+type: :noteon
+value: 36
+velocity: 127
+--- !ruby/object:RRTS::NoteOnEvent 
+channel: 2
+flags: 
+  :time_mode_absolute: true
+  :time_mode_ticks: true
+param: 
+source: 
+time: 7918
+track: 2
+type: :noteon
+value: 36
+velocity: 0
+--- !ruby/object:RRTS::NoteOnEvent 
+channel: 2
+flags: 
+  :time_mode_absolute: true
+  :time_mode_ticks: true
+param: 
+source: 
+time: 7918
+track: 2
+type: :noteon
+value: 36
+velocity: 123
+--- !ruby/object:RRTS::NoteOnEvent 
+channel: 2
+flags: 
+  :time_mode_absolute: true
+  :time_mode_ticks: true
+param: 
+source: 
+time: 8071
+track: 2
+type: :noteon
+value: 36
+velocity: 0
+--- !ruby/object:RRTS::NoteOnEvent 
+channel: 2
+flags: 
+  :time_mode_absolute: true
+  :time_mode_ticks: true
+param: 
+source: 
+time: 8087
+track: 2
+type: :noteon
+value: 36
+velocity: 123
+--- !ruby/object:RRTS::NoteOnEvent 
+channel: 2
+flags: 
+  :time_mode_absolute: true
+  :time_mode_ticks: true
+param: 
+source: 
+time: 8248
+track: 2
+type: :noteon
+value: 36
+velocity: 0
+--- !ruby/object:RRTS::NoteOnEvent 
+channel: 2
+flags: 
+  :time_mode_absolute: true
+  :time_mode_ticks: true
+param: 
+source: 
+time: 8248
+track: 2
+type: :noteon
+value: 36
+velocity: 127
+--- !ruby/object:RRTS::NoteOnEvent 
+channel: 2
+flags: 
+  :time_mode_absolute: true
+  :time_mode_ticks: true
+param: 
+source: 
+time: 8401
+track: 2
+type: :noteon
+value: 36
+velocity: 0
+--- !ruby/object:RRTS::ControllerEvent 
+channel: 2
+flags: 
+  :time_mode_absolute: true
+  :time_mode_ticks: true
+  :coarse: true
+param: :pan
+source: 
+time: 8417
+track: 2
+type: :controller
+value: 64
+velocity: 
+--- !ruby/object:RRTS::ControllerEvent 
+channel: 2
+flags: 
+  :time_mode_absolute: true
+  :time_mode_ticks: true
+  :coarse: true
+param: :expression
+source: 
+time: 8424
+track: 2
+type: :controller
+value: 72
+velocity: 
+--- !ruby/object:RRTS::ControllerEvent 
+channel: 2
+flags: 
+  :time_mode_absolute: true
+  :time_mode_ticks: true
+  :coarse: true
+param: :reverb
+source: 
+time: 8424
+track: 2
+type: :controller
+value: 0
+velocity: 
+--- !ruby/object:RRTS::ControllerEvent 
+channel: 2
+flags: 
+  :time_mode_absolute: true
+  :time_mode_ticks: true
+  :coarse: true
+param: :chorus
+source: 
+time: 8424
+track: 2
+type: :controller
+value: 23
+velocity: 
+--- !ruby/object:RRTS::NoteOnEvent 
+channel: 2
+flags: 
+  :time_mode_absolute: true
+  :time_mode_ticks: true
+param: 
+source: 
+time: 8578
+track: 2
+type: :noteon
+value: 36
+velocity: 127
+--- !ruby/object:RRTS::NoteOnEvent 
+channel: 2
+flags: 
+  :time_mode_absolute: true
+  :time_mode_ticks: true
+param: 
+source: 
+time: 8747
+track: 2
+type: :noteon
+value: 36
+velocity: 0
+--- !ruby/object:RRTS::NoteOnEvent 
+channel: 2
+flags: 
+  :time_mode_absolute: true
+  :time_mode_ticks: true
+param: 
+source: 
+time: 8908
+track: 2
+type: :noteon
+value: 36
+velocity: 123
+--- !ruby/object:RRTS::NoteOnEvent 
+channel: 2
+flags: 
+  :time_mode_absolute: true
+  :time_mode_ticks: true
+param: 
+source: 
+time: 9070
+track: 2
+type: :noteon
+value: 36
+velocity: 0
+--- !ruby/object:RRTS::NoteOnEvent 
+channel: 2
+flags: 
+  :time_mode_absolute: true
+  :time_mode_ticks: true
+param: 
+source: 
+time: 9077
+track: 2
+type: :noteon
+value: 36
+velocity: 127
+--- !ruby/object:RRTS::NoteOnEvent 
+channel: 2
+flags: 
+  :time_mode_absolute: true
+  :time_mode_ticks: true
+param: 
+source: 
+time: 9239
+track: 2
+type: :noteon
+value: 36
+velocity: 0
+--- !ruby/object:RRTS::NoteOnEvent 
+channel: 2
+flags: 
+  :time_mode_absolute: true
+  :time_mode_ticks: true
+param: 
+source: 
+time: 9239
+track: 2
+type: :noteon
+value: 36
+velocity: 123
+--- !ruby/object:RRTS::NoteOnEvent 
+channel: 2
+flags: 
+  :time_mode_absolute: true
+  :time_mode_ticks: true
+param: 
+source: 
+time: 9408
+track: 2
+type: :noteon
+value: 36
+velocity: 0
+--- !ruby/object:RRTS::NoteOnEvent 
+channel: 2
+flags: 
+  :time_mode_absolute: true
+  :time_mode_ticks: true
+param: 
+source: 
+time: 9569
+track: 2
+type: :noteon
+value: 36
+velocity: 123
+--- !ruby/object:RRTS::NoteOnEvent 
+channel: 2
+flags: 
+  :time_mode_absolute: true
+  :time_mode_ticks: true
+param: 
+source: 
+time: 9730
+track: 2
+type: :noteon
+value: 36
+velocity: 0
+--- !ruby/object:RRTS::ControllerEvent 
+channel: 2
+flags: 
+  :time_mode_absolute: true
+  :time_mode_ticks: true
+  :coarse: true
+param: :pan
+source: 
+time: 9738
+track: 2
+type: :controller
+value: 64
+velocity: 
+--- !ruby/object:RRTS::ControllerEvent 
+channel: 2
+flags: 
+  :time_mode_absolute: true
+  :time_mode_ticks: true
+  :coarse: true
+param: :expression
+source: 
+time: 9745
+track: 2
+type: :controller
+value: 72
+velocity: 
+--- !ruby/object:RRTS::ControllerEvent 
+channel: 2
+flags: 
+  :time_mode_absolute: true
+  :time_mode_ticks: true
+  :coarse: true
+param: :reverb
+source: 
+time: 9745
+track: 2
+type: :controller
+value: 0
+velocity: 
+--- !ruby/object:RRTS::ControllerEvent 
+channel: 2
+flags: 
+  :time_mode_absolute: true
+  :time_mode_ticks: true
+  :coarse: true
+param: :chorus
+source: 
+time: 9745
+track: 2
+type: :controller
+value: 23
+velocity: 
+--- !ruby/object:RRTS::NoteOnEvent 
+channel: 2
+flags: 
+  :time_mode_absolute: true
+  :time_mode_ticks: true
+param: 
+source: 
+time: 9899
+track: 2
+type: :noteon
+value: 36
+velocity: 127
+--- !ruby/object:RRTS::NoteOnEvent 
+channel: 2
+flags: 
+  :time_mode_absolute: true
+  :time_mode_ticks: true
+param: 
+source: 
+time: 10068
+track: 2
+type: :noteon
+value: 36
+velocity: 0
+--- !ruby/object:RRTS::NoteOnEvent 
+channel: 2
+flags: 
+  :time_mode_absolute: true
+  :time_mode_ticks: true
+param: 
+source: 
+time: 10222
+track: 2
+type: :noteon
+value: 36
+velocity: 123
+--- !ruby/object:RRTS::NoteOnEvent 
+channel: 2
+flags: 
+  :time_mode_absolute: true
+  :time_mode_ticks: true
+param: 
+source: 
+time: 10383
+track: 2
+type: :noteon
+value: 36
+velocity: 0
+--- !ruby/object:RRTS::NoteOnEvent 
+channel: 2
+flags: 
+  :time_mode_absolute: true
+  :time_mode_ticks: true
+param: 
+source: 
+time: 10560
+track: 2
+type: :noteon
+value: 36
+velocity: 123
+--- !ruby/object:RRTS::NoteOnEvent 
+channel: 2
+flags: 
+  :time_mode_absolute: true
+  :time_mode_ticks: true
+param: 
+source: 
+time: 10721
+track: 2
+type: :noteon
+value: 36
+velocity: 0
+--- !ruby/object:RRTS::NoteOnEvent 
+channel: 2
+flags: 
+  :time_mode_absolute: true
+  :time_mode_ticks: true
+param: 
+source: 
+time: 10882
+track: 2
+type: :noteon
+value: 31
+velocity: 123
+--- !ruby/object:RRTS::NoteOnEvent 
+channel: 2
+flags: 
+  :time_mode_absolute: true
+  :time_mode_ticks: true
+param: 
+source: 
+time: 11051
+track: 2
+type: :noteon
+value: 31
+velocity: 0
+--- !ruby/object:RRTS::NoteOnEvent 
+channel: 2
+flags: 
+  :time_mode_absolute: true
+  :time_mode_ticks: true
+param: 
+source: 
+time: 11051
+track: 2
+type: :noteon
+value: 29
+velocity: 107
+--- !ruby/object:RRTS::NoteOnEvent 
+channel: 2
+flags: 
+  :time_mode_absolute: true
+  :time_mode_ticks: true
+param: 
+source: 
+time: 11166
+track: 2
+type: :noteon
+value: 29
+velocity: 0
+--- !ruby/object:RRTS::NoteOnEvent 
+channel: 2
+flags: 
+  :time_mode_absolute: true
+  :time_mode_ticks: true
+param: 
+source: 
+time: 11212
+track: 2
+type: :noteon
+value: 29
+velocity: 113
+--- !ruby/object:RRTS::NoteOnEvent 
+channel: 2
+flags: 
+  :time_mode_absolute: true
+  :time_mode_ticks: true
+param: 
+source: 
+time: 11397
+track: 2
+type: :noteon
+value: 29
+velocity: 0
+--- !ruby/object:RRTS::NoteOnEvent 
+channel: 2
+flags: 
+  :time_mode_absolute: true
+  :time_mode_ticks: true
+param: 
+source: 
+time: 11543
+track: 2
+type: :noteon
+value: 29
+velocity: 118
+--- !ruby/object:RRTS::NoteOnEvent 
+channel: 2
+flags: 
+  :time_mode_absolute: true
+  :time_mode_ticks: true
+param: 
+source: 
+time: 11727
+track: 2
+type: :noteon
+value: 29
+velocity: 0
+--- !ruby/object:RRTS::NoteOnEvent 
+channel: 2
+flags: 
+  :time_mode_absolute: true
+  :time_mode_ticks: true
+param: 
+source: 
+time: 11873
+track: 2
+type: :noteon
+value: 31
+velocity: 123
+--- !ruby/object:RRTS::NoteOnEvent 
+channel: 2
+flags: 
+  :time_mode_absolute: true
+  :time_mode_ticks: true
+param: 
+source: 
+time: 12049
+track: 2
+type: :noteon
+value: 31
+velocity: 0
+--- !ruby/object:RRTS::NoteOnEvent 
+channel: 2
+flags: 
+  :time_mode_absolute: true
+  :time_mode_ticks: true
+param: 
+source: 
+time: 12203
+track: 2
+type: :noteon
+value: 31
+velocity: 118
+--- !ruby/object:RRTS::NoteOnEvent 
+channel: 2
+flags: 
+  :time_mode_absolute: true
+  :time_mode_ticks: true
+param: 
+source: 
+time: 12349
+track: 2
+type: :noteon
+value: 31
+velocity: 0
+--- !ruby/object:RRTS::NoteOnEvent 
+channel: 2
+flags: 
+  :time_mode_absolute: true
+  :time_mode_ticks: true
+param: 
+source: 
+time: 12364
+track: 2
+type: :noteon
+value: 36
+velocity: 118
+--- !ruby/object:RRTS::NoteOnEvent 
+channel: 2
+flags: 
+  :time_mode_absolute: true
+  :time_mode_ticks: true
+param: 
+source: 
+time: 12472
+track: 2
+type: :noteon
+value: 36
+velocity: 0
+--- !ruby/object:RRTS::NoteOnEvent 
+channel: 2
+flags: 
+  :time_mode_absolute: true
+  :time_mode_ticks: true
+param: 
+source: 
+time: 12533
+track: 2
+type: :noteon
+value: 36
+velocity: 118
+--- !ruby/object:RRTS::NoteOnEvent 
+channel: 2
+flags: 
+  :time_mode_absolute: true
+  :time_mode_ticks: true
+param: 
+source: 
+time: 12702
+track: 2
+type: :noteon
+value: 36
+velocity: 0
+--- !ruby/object:RRTS::NoteOnEvent 
+channel: 2
+flags: 
+  :time_mode_absolute: true
+  :time_mode_ticks: true
+param: 
+source: 
+time: 12856
+track: 2
+type: :noteon
+value: 36
+velocity: 123
+--- !ruby/object:RRTS::NoteOnEvent 
+channel: 2
+flags: 
+  :time_mode_absolute: true
+  :time_mode_ticks: true
+param: 
+source: 
+time: 13032
+track: 2
+type: :noteon
+value: 36
+velocity: 0
+--- !ruby/object:RRTS::NoteOnEvent 
+channel: 2
+flags: 
+  :time_mode_absolute: true
+  :time_mode_ticks: true
+param: 
+source: 
+time: 13186
+track: 2
+type: :noteon
+value: 36
+velocity: 123
+--- !ruby/object:RRTS::NoteOnEvent 
+channel: 2
+flags: 
+  :time_mode_absolute: true
+  :time_mode_ticks: true
+param: 
+source: 
+time: 13378
+track: 2
+type: :noteon
+value: 36
+velocity: 0
+--- !ruby/object:RRTS::NoteOnEvent 
+channel: 2
+flags: 
+  :time_mode_absolute: true
+  :time_mode_ticks: true
+param: 
+source: 
+time: 13516
+track: 2
+type: :noteon
+value: 31
+velocity: 127
+--- !ruby/object:RRTS::NoteOnEvent 
+channel: 2
+flags: 
+  :time_mode_absolute: true
+  :time_mode_ticks: true
+param: 
+source: 
+time: 13678
+track: 2
+type: :noteon
+value: 31
+velocity: 0
+--- !ruby/object:RRTS::NoteOnEvent 
+channel: 2
+flags: 
+  :time_mode_absolute: true
+  :time_mode_ticks: true
+param: 
+source: 
+time: 13685
+track: 2
+type: :noteon
+value: 29
+velocity: 107
+--- !ruby/object:RRTS::NoteOnEvent 
+channel: 2
+flags: 
+  :time_mode_absolute: true
+  :time_mode_ticks: true
+param: 
+source: 
+time: 13800
+track: 2
+type: :noteon
+value: 29
+velocity: 0
+--- !ruby/object:RRTS::NoteOnEvent 
+channel: 2
+flags: 
+  :time_mode_absolute: true
+  :time_mode_ticks: true
+param: 
+source: 
+time: 13847
+track: 2
+type: :noteon
+value: 29
+velocity: 113
+--- !ruby/object:RRTS::NoteOnEvent 
+channel: 2
+flags: 
+  :time_mode_absolute: true
+  :time_mode_ticks: true
+param: 
+source: 
+time: 14031
+track: 2
+type: :noteon
+value: 29
+velocity: 0
+--- !ruby/object:RRTS::NoteOnEvent 
+channel: 2
+flags: 
+  :time_mode_absolute: true
+  :time_mode_ticks: true
+param: 
+source: 
+time: 14177
+track: 2
+type: :noteon
+value: 29
+velocity: 118
+--- !ruby/object:RRTS::NoteOnEvent 
+channel: 2
+flags: 
+  :time_mode_absolute: true
+  :time_mode_ticks: true
+param: 
+source: 
+time: 14338
+track: 2
+type: :noteon
+value: 29
+velocity: 0
+--- !ruby/object:RRTS::NoteOnEvent 
+channel: 2
+flags: 
+  :time_mode_absolute: true
+  :time_mode_ticks: true
+param: 
+source: 
+time: 14507
+track: 2
+type: :noteon
+value: 31
+velocity: 123
+--- !ruby/object:RRTS::NoteOnEvent 
+channel: 2
+flags: 
+  :time_mode_absolute: true
+  :time_mode_ticks: true
+param: 
+source: 
+time: 14668
+track: 2
+type: :noteon
+value: 31
+velocity: 0
+--- !ruby/object:RRTS::NoteOnEvent 
+channel: 2
+flags: 
+  :time_mode_absolute: true
+  :time_mode_ticks: true
+param: 
+source: 
+time: 14837
+track: 2
+type: :noteon
+value: 31
+velocity: 127
+--- !ruby/object:RRTS::NoteOnEvent 
+channel: 2
+flags: 
+  :time_mode_absolute: true
+  :time_mode_ticks: true
+param: 
+source: 
+time: 14999
+track: 2
+type: :noteon
+value: 31
+velocity: 0
+--- !ruby/object:RRTS::NoteOnEvent 
+channel: 2
+flags: 
+  :time_mode_absolute: true
+  :time_mode_ticks: true
+param: 
+source: 
+time: 14999
+track: 2
+type: :noteon
+value: 36
+velocity: 127
+--- !ruby/object:RRTS::NoteOnEvent 
+channel: 2
+flags: 
+  :time_mode_absolute: true
+  :time_mode_ticks: true
+param: 
+source: 
+time: 17633
+track: 2
+type: :noteon
+value: 36
+velocity: 0

@@ -182,7 +182,7 @@ public
                SND_SEQ_EVENT_PGMCHANGE=>ProgramChangeEvent,
                SND_SEQ_EVENT_PITCHBEND =>PitchbendEvent,
                SND_SEQ_EVENT_CHANPRESS=>ChannelPressureEvent,
-               SND_SEQ_EVENT_CONTROL14=>Control14Event,
+               # SND_SEQ_EVENT_CONTROL14=>Control14Event,  there is no such event
                SND_SEQ_EVENT_SYSEX=>SystemExclusiveEvent,
                SND_SEQ_EVENT_SONGPOS=>SongPositionEvent,
                SND_SEQ_EVENT_SONGSEL=>SongSelectionEvent,
@@ -455,8 +455,8 @@ public
       id = Integer(name)
       r = clients[id] || clients![id] and return r
     else
-      r = clients.find{|id,c| c.name == name } and return r[1]
-      r = clients!.find{|id,c| c.name == name } and return r[1]
+      r = clients.find{|dummy, c| c.name == name } and return r[1]
+      r = clients!.find{|dummy, c| c.name == name } and return r[1]
     end
     raise RRTSError.new("client '#{name}' not located")
   end

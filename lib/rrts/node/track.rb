@@ -1,28 +1,28 @@
 
+require_relative 'node'
+
 module RRTS
 
   module Node
     # It would be nice if this could work like Enumerator
     # But currently 'Enumerator#peek' does not yet exists (probably ruby 1.9.2)
     # This can be fixed by caching the current element by next.
-    # Also Enumerator does not work over threads and MT support might become
-    # rather important.
     # We just import the interface then.
-    # However, currently Enumerator IS being used through 'to_enum' obviously.
 
 =begin rdoc
-    A BaseTrack is an abstract baseclass for tracks. Basicly it is an enumerator,
-    we just support each + next + peek
-
-    Which is what makes it a node. A storage node.
+    A BaseTrack is an abstract baseclass for tracks. Tracks are Producers that
+    use actual storage for events.
+    They should also be consumers and filters but this is not implemented yet.
+    Currently useless anyway.
 =end
-    class BaseTrack < EventsNode
+    class BaseTrack < Producer
       private
-      def initialize
+      def initialize options = nil
+        super #!
         @end_time = 0
       end
 
-      @@key = 0
+      @@key = 1
 
       public
       # either a single tick, or a real_time tuple [sec, nsec]
@@ -49,11 +49,9 @@ Setup an empty track. Supported options are:
 - tmpltrack or template: create a split track from a source track. Copies stuff like
        the copyright notice etc..
 =end
-      def initialize options = {}
-        super()
+      def initialize options = nil
+#         tag "Track.new"
         @events = []
-        @key = @@key
-        @@key += 1
         @sequencenr = @portindex = @voicename = nil
         # these may change as the track is recorded(!)
         # also do not manipulate the strings.
@@ -62,24 +60,33 @@ Setup an empty track. Supported options are:
         @copyright = @name = @intended_device = nil
         @combine_notes = @combine_progchanges = @combine_lsb_msb = true
         @channel = nil # if set, all events have this channel (range 0..16)
-        for k, v in options
-          case k
-          when :combine_notes then @combine_notes = v
-          when :combine_progchanges then @combine_progchanges = v
-          when :combine_lsb_msb then @combine_lsb_msb = v
-          when :tmpltrack, :template
-            @sequencenr = v.sequencenr
-            @copyright = v.copyright
-            @portindex = v.portindex
-            @voicename = v.voicename
-            @name = v.name
-          when :channel then @channel = v
-          else
-            raise RRTSError.new("invalid option '#{k}' for Track")
-          end
-        end
+        @key = nil
+        super
+#         tag "HERE"
+        @key = Track.allocate_key unless @key
+#         tag "Track.new, options=#{options.inspect}, self=#{self.inspect}"
         rewind
         @open_notes = nil
+#         tag "CONSTRUCTED"
+      end
+
+      def parse_option k, v
+        case k
+        when :combine_notes then @combine_notes = v
+        when :combine_progchanges then @combine_progchanges = v
+        when :combine_lsb_msb then @combine_lsb_msb = v
+        when :tmpltrack, :template
+          @sequencenr = v.sequencenr
+          @copyright = v.copyright
+          @portindex = v.portindex
+          @voicename = v.voicename
+          @name = v.name
+        when :channel then @channel = v
+        when :split_channels # ignore
+        else
+          tag "Unrecognized option #{k} ?"
+          super
+        end
       end
 
       def to_yaml_properties
@@ -107,6 +114,19 @@ Setup an empty track. Supported options are:
 
       public
 
+      def self.allocate_key
+        r = nil
+        Thread.exclusive do
+          r = @@key
+          @@key += 1
+        end
+        r
+      end
+
+      def self.reset_key
+        @@key = 1
+      end
+
 #       def self.sequencenr
 #         @@sequencenr
 #       end
@@ -119,19 +139,19 @@ Setup an empty track. Supported options are:
 
       # access to the Array of MidiEvent instances
       attr :events
-
+      attr :voicename
       # the track can be given a name,
       # intended_device is the device that is the target, since a lot of midievents
       # are devicedependent
-      attr_accessor :copyright, :name, :intended_device
+      attr :copyright, :name, :intended_device
       # order in the original MIDI file ??
-      attr_accessor :sequencenr
+      attr :sequencenr
       # generated unique key per track (unique per process)
       attr :key
       # the portindex is a relative indicator, and not a portid. For example, you
       # might have read from 3 ports to create the chunk.
       # channel is the channel recorded from, but may also be the target channel.
-      attr_accessor :portindex, :channel
+      attr :portindex, :channel
 
       # returns array of tracks, but if events is empty it returns []
       def listing(allow_empty = false)
@@ -162,59 +182,57 @@ Setup an empty track. Supported options are:
         rewind
       end
 
-      # record an event in the track
+      # record an event in the track. Builder interface
+      # FIXME: the conversions here require a separate filter as this is out of place!
       def << event
         last = @events.last
-        raise RRTSError.new("bad timestamp for recorded event") if last && event.time_diff(last) < 0
+        raise RRTSError, "bad timestamp for recorded event" if last && event.time_diff(last) < 0
         case event
         when ControllerEvent
-          if @combine_lsb_msb
-            msb = event.lsb2msb
-            if msb
-              if last && last.param == msb
-  #               tag "merging msb #{last.param} with lsb #{event.param}, values are #{last.value} and #{event.value}"
+          if ControllerEvent === last
+            if @combine_lsb_msb
+              # This assumes the MSB is sent first
+  #             tag "attempt to combine_lsb_msb"
+              msb = event.lsb2msb
+              if msb && last.param == msb
+  #                 tag "merging msb #{last.param} with lsb #{event.param}, values are #{last.value} and #{event.value}"
                 last.value = (last.value << 7) + event.value
                 last.set_flag(coarse: false)
                 return self
               end
-            end
-          elsif @combine_progchanges
-            if event.param == :bank_lsb
-              last = @events.last
-              if ControllerEvent === last && e.param == :bank && last.flag(:coarse)
-                last.value = [last.value, event.value]
-                last.set_flag(coarse: false)
-                return self
-              end
+            elsif @combine_progchanges && event.param == :bank_lsb &&
+                  last.param == :bank && last.flag(:coarse)
+              # combine lsb + msb specifically for banks, even if combine_lsb_msb is false
+              last.value = [last.value, event.value]
+              last.set_flag(coarse: false)
+              return self
             end
           end
         when NoteOnEvent
           if @combine_notes
             return handleNoteOff(event) if event.velocity == 0
             @open_notes ||= {}
-            if @open_notes[event.channel]
-              @open_notes[event.channel].delete(event.note)
-            end
+            @open_notes[event.channel].delete(event.note) if @open_notes[event.channel]
             (@open_notes[event.channel] ||= {})[event.note] = @events.length
           end
         when NoteOffEvent
           return handleNoteOff(event) if @combine_notes
         when ProgramChangeEvent
-          if @combine_progchanges && !(Array === event.value)
-            last = @events.last
-            if ControllerEvent === last && last.param == :bank
-              event.value = Array === last.value ? (last.value + [event.value]) : [last.value, event.value]
-              @events.pop
-            end
+          if @combine_progchanges && !(Array === event.value) &&
+              ControllerEvent === last && last.param == :bank
+            event.value = Array === last.value ? (last.value + [event.value])
+                                               : [last.value, event.value]
+            @events.pop
           end
         when LastEvent
           @open_notes = nil
-        end
-        if MidiEvent === event && !event.track
-          raise StandardError.new("event #{event} has no track")
+          @end_time = event.time
+        when TrackPortIndexEvent
+          @portindex = event.portindex
+        when TrackIntendedDeviceEvent
+          @intended_device = event.intended_device
         end
         @events << event
-        # this could alter it:
         event.track = self
       end
 
@@ -234,29 +252,35 @@ Setup an empty track. Supported options are:
 =begin rdoc
   create a new compound track, optionally inserting the first track
   Option recognized is
-  - split_tracks (default true). If set events are shifted on channel as well as on
+  - split_channels (default true). If set events are shifted on channel as well as on
         original track.
-  All other options are passed to the created tracks (as caused by _split_tracks_)
+  All other options are passed to the created tracks (as caused by _split_channels_)
 =end
-      def initialize first_track = nil, options = {}
-        @split_tracks = true
-        super()
+      def initialize first_track = nil, options = nil
+        @split_channels = false # since pretty useless after all
+        super(options)
         @tracks = []
-        for k, v in options
-          case k
-          when :split_tracks then @split_tracks = v
-          end
-        end
-        options.delete(:split_tracks)
+        options.delete(:split_channels)
         @track_options = options
+        @current_track = first_track
         # keys are formatted as such: = "#{seqnr}:#{portnr}:#{channel}"
-        @track_index = {} if @split_tracks
-        self << first_track if first_track
-#         tag "CompoundTrack.new, split_tracks=#@split_tracks"
+        @track_index = {} if @split_channels
+        @tracks << first_track if first_track
         # erm..... This is dangerous to cache. Can be done later
   #       @all_tracks = []
       end
 
+      def parse_option k, v
+        case k
+        when :split_tracks, :split_channels then @split_channels = v
+        when :combine_lsb_msb, :combine_notes, :combine_progchanges
+            # ignored since it already is stored in @track_options
+        else super
+        end
+      end
+
+      # used by channel splitter, create a track for the channel (using tmpltrack
+      # as a template) or return an already created track.
       def track tmpltrack, channel
         key = "#{tmpltrack.key}:#{tmpltrack.portindex}:#{channel}"
         t = @track_index[key] and return t
@@ -271,15 +295,17 @@ Setup an empty track. Supported options are:
   #       @tracks.each {|track| track.end_time = tm }
   #     endd
 
-      # store an event or track in the current track
+      # store an event in the current track. Builder interface. slightly out of tune
       def << event
-        if BaseTrack === event
+        if TrackCreateEvent === event
           # add a track
-          @tracks << event
-          @current_track = event
+          track = Track.new
+          @tracks << track
+          @current_track = track
         else # it must be a real MidiEvent
-          if @split_tracks
-            track(event.track, event.channel) << event
+#           tag "adding midievent, split_channels= #@split_channels"
+          if @split_channels
+            track(@current_track, event.channel) << event
           else
             @current_track << event
           end
@@ -321,12 +347,13 @@ Setup an empty track. Supported options are:
       # enumerates events, not tracks
       def each
         return to_enum unless block_given?
+        rewind # !
 #         tag "each, self.next->#{p}"
         loop do
+          # locate the smallest event in any subtrack
           p = self.next or break
           yield p
         end
-        # locate the smallest event in any subtrack
       end
 
         # what about args ?
@@ -342,6 +369,7 @@ Setup an empty track. Supported options are:
         end
       end
 
+      # fix after reading yamldata. Currently unused since reading no longer uses tracks
       def fix
         # tracks is just an array
 #         tag "fix"

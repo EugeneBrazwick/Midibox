@@ -9,25 +9,27 @@ module RRTS #namespace
   module Node
 
     # class to create streamable yaml output
-    class YamlIOWriter < Base
+    class YamlIOWriter < Consumer
       private
-      def initialize io, node = nil
+      def initialize io, producer = nil
         super()
-        @io = io
-        connect_to(node) if node
+        @io = io # to write to
+        producer >> self if producer
       end
 
       public
-      # makes the dump
-      def connect_to node
+
+      # override
+      def consume producer
         require 'yaml'
-        @io.write node.chunk.to_yaml
-        node.each do |event|
+        each_fiber -> do
+          #tag("CLOSING IO #{@io.inspect}")
+          @io.close
+          yield if block_given?
+        end do |event|
           @io.write event.to_yaml
-          @io.flush unless node.spamming?
+          @io.flush unless producer.spamming?
         end
-      ensure
-        @io.close
       end
 
     end # class YamlIOWriter
@@ -35,14 +37,14 @@ module RRTS #namespace
     # Convenience class for dumping to a named file
     class YamlFileWriter < YamlIOWriter
       private
-      def initialize filename, node = nil
-        super(File.new(filename, 'w'), node)
+      def initialize filename, producer = nil
+        super(File.new(filename, 'w'), producer)
       end
     end # class MidiFileWriter
 
     class YamlPipeWriter < YamlIOWriter
       private
-      def initialize io = STDOUT, node = nil
+      def initialize io = STDOUT, producer = nil
         case io
         when String, Array
           io = IO.popen(io, 'w')
@@ -52,7 +54,7 @@ module RRTS #namespace
         else
           raise RRTSError.new("Cannot open '#{io}'")
         end
-        super
+        super(io, producer)
       end
     end # class YamlPipeWriter
 

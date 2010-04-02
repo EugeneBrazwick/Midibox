@@ -360,6 +360,27 @@ alsaDriver_block_test_ruby_sleep(VALUE v_driver, VALUE v_blocktime)
   rb_funcall(v_driver, id_sleep, 1, v_blocktime);
   return Qnil;
 }
+static VALUE
+kernel_sleep_eintr_test(VALUE v_kernel)
+{
+  struct pollfd fd[0];
+  fprintf(stderr, "Polling:");
+  for (;; )
+    {
+      fprintf(stderr, ".");
+      const int r = poll(fd, 0, 1000 /*ms*/);
+      //rb_raise(alsaMidiError, "EINTR...."); // EXPERIMENTAL  NO PROBLEM
+      if (r < 0)
+        {
+          if (errno == EINTR)
+            rb_raise(alsaMidiError, "EINTR....");
+        }
+      else
+          break;
+    }
+  fprintf(stderr, "\n");
+  return Qnil;
+}
 #endif
 
 
@@ -484,6 +505,7 @@ Init_alsa_midi()
   rb_define_method(alsaDriver, "block_test", RUBY_METHOD_FUNC(alsaDriver_block_test), 1);
   rb_define_method(alsaDriver, "block_test_pure_sleep", RUBY_METHOD_FUNC(alsaDriver_block_test_pure_sleep), 1);
   rb_define_method(alsaDriver, "block_test_ruby_sleep", RUBY_METHOD_FUNC(alsaDriver_block_test_ruby_sleep), 1);
+  rb_define_method(rb_mKernel, "sleep_eintr_test", RUBY_METHOD_FUNC(kernel_sleep_eintr_test), 0);
 #endif
 
   alsa_seq_init();

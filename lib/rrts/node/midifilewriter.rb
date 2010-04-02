@@ -7,32 +7,28 @@ module RRTS #namespace
     require_relative '../rrts'
     require_relative 'node'
 
-    # 100% the reverse of the MidifileParser
-    class MidifileDumper
-      private
-=begin rdoc
-  Create a new dumper that will write to io, reading from inputnode.
-  If inputnode is not a chunk, the result will have defaults for a lot of things,
-  and is forced to type 0, since there are no tracks.
+=begin
+    100% the reverse of the MidifileParser.
+    There are two cases.
+    1) the easy one.  Our input is a Chunk. Read the chunk, dump the data
+    2) the difficult one.  Our input is a Producer or a Filter in which case
+    we end up in
+      consume
+
 =end
-      def initialize io, inputnode #, options = {}
-        @io, @inputnode = io, inputnode
-#         @type = if @inputnode.has_tracks? then 1 else 0 end
-                  # 0 join all tracks and dump per channel, may lose a lot of info
-                  # 1   track by track, at most 1 channel per track
-                  # 10 EuBr formatting special. Emit header, then tracks, then all events
-                  # using a track meta event when the trackport changes.
-                  # It would be better to change the event layout and change channel to
-                  # trackindex (1 extra bytes) 12 bits in total -> 1024 possible tracks
-                  # But why bother. That can be done better with yaml
-#         for k, v in options
-#           case k
-#           when :type then @type = v
-#           else
-#             raise RRTSError.new("illegal option '#{k}' for MidifileDumper")
-#           end
-#         end
-        @last_command = 0
+
+        # The writer serves as a sink.
+    class MidiIOWriter < Consumer
+    private
+
+=begin
+  Create a new MidiIOWriter that will write to io, reading from producer.
+=end
+      def initialize io, producer = nil
+        super()
+        @io = io
+        @last_command = 0 # for 'running status'
+        producer >> self if producer
       end
 
       # Used to create the constants below at class-parse-time
@@ -113,8 +109,8 @@ module RRTS #namespace
          # this only works if events are recorded in ticks!  FIXME
 #         tag "write_event, at pos #{@io.pos}"
         if (delta_ticks = event.time - @tick) < 0
-          raise RRTSError.new("Invalid delta #{delta_ticks} in source, tick = #@tick, " +
-                            "event.time=#{event.time.inspect}\nevent=#{event}")
+          raise RRTSError, "Invalid delta #{delta_ticks} in source, tick = #@tick, " +
+                           "event.time=#{event.time.inspect}\nevent=#{event}"
         end
 #         tag "writing delta #{delta_ticks} at pos #{@io.pos}, tick:=#{@tick + delta_ticks}"
         status = event.status
@@ -141,24 +137,27 @@ module RRTS #namespace
 #           tag "Controller event on channel #{ch}"
           param = event.param
           param = MidiEvent::Symbol2Param[param] if Symbol === param
-#           tag "store param #{param} at pos #{@io.pos}"
+#           tag "store param #{param} for #{event.param} at pos #{@io.pos}"
+          lsb = MidiEvent::Symbol2Param[event.msb2lsb]
           @io.putc(param)
-          if Array === event.value
-            @io.putc(event.value[0])
+          if Array === event.value   # tuple MSB+LSB
+            # Control14
+            @io.putc(event.value[0] & 0x7f)
             @io.putc(0) # delta
 #             tag "running state at pos #{@io.pos}"
-            @io.putc(param)
-            @io.putc(event.value[1])
-          elsif lsb = event.msb2lsb && !event.flag(:coarse)
-            @io.putc(event.value >> 7)
+            @io.putc(lsb)
+            @io.putc(event.value[1] & 0x7f)
+          elsif lsb && !event.flag(:coarse)
+            # Control14
+            @io.putc((event.value >> 7) & 0x7f)
             @io.putc(0) # delta
 #             tag "running state at pos #{@io.pos}"
-            @io.putc(param)
-            @io.putc(event.value && 0x7f)
+            @io.putc(lsb)
+            @io.putc(event.value & 0x7f)
           else
             event.value = ControllerEvent::ON if event.value == true
             event.value = ControllerEvent::OFF if event.value == false
-            @io.putc(event.value)
+            @io.putc(event.value & 0x7f)
           end
         when ProgramChangeEvent
           @tick += write_var(delta_ticks)
@@ -245,7 +244,6 @@ module RRTS #namespace
           write_var 2 # length of meta
           @io.putc MapKey2Byte[event.key]
           @io.putc(if event.major? then 1 else 0 end)
-          end
         else
           todo "else, event=#{event}"
         end
@@ -308,11 +306,13 @@ module RRTS #namespace
         @io.pos = p
       end
 
-      def write_smf
+      def write_smf chunk
+        raise RRTSError, 'chunk has no track' unless chunk.track
         header_len = 6 # type(2) + numtracks(2) + time_division(2)
         write_int header_len
-        tempo = @inputnode.tempo
-        tracks = @inputnode.listing
+        tempo = chunk.tempo
+#         tag "tempo=#{tempo.inspect}, chunk=#{chunk.inspect}"
+        tracks = chunk.listing
         type = tracks.length > 1 ? 1 : 0
         write_int type, 2
         write_int tracks.length, 2
@@ -321,32 +321,36 @@ module RRTS #namespace
         tracks.each { |track| write_track(track) }
       end
 
-      public
-
-      def dump
+      def dump chunk
         write_id MTHD
-        write_smf
-      end
-
-    end # class MidifileDumper
-
-    # The writer is not an EventsNode. Is serves as a sink.
-    class MidiIOWriter < Base
-      private
-      # If node is given it is the source written to io, otherwise
-      # call connect_to later.
-      def initialize io, node = nil
-        super()
-        @io = io
-        connect_to(node) if node
-      end
-
-      public
-      # Dump the node to @io, using the Midi file format
-      def connect_to node
-        MidifileDumper.new(@io, node).dump
+        write_smf chunk
       ensure
         @io.close
+      end
+
+   public
+      # Dump the events to @io, using the Midi file format
+      def consume producer
+        # this is a kludge.  The MIDI format is not necessarily streamable
+        # Not the events are written, but the tracks.
+        # if there is only one track it wouldn't matter, but let's create a more
+        # general solution.  Just create a Chunk and dump that.
+        if chunk = producer.chunk
+          dump chunk
+          nil
+        else
+          require_relative 'chunk'
+          chunk = Chunk.new
+          # the options for the chunk should be supplied by producer.
+          # now create a fiber for the chunk and return that.
+          chunk.consume producer do
+            # after loading, do this:
+            raise RRTSError, 'Corrupted chunk, has no track' unless chunk.track
+            dump chunk
+            # plus the original exitcode as passed to this consume
+            yield if block_given?
+          end
+        end
       end
 
     end # class MidiIOWriter
@@ -355,8 +359,8 @@ module RRTS #namespace
     class MidiFileWriter < MidiIOWriter
       private
       # See MidiIOWriter. The file is automatically closed when done.
-      def initialize filename, node = nil
-        super(File.new(filename, 'wb:ascii-8bit'), node)
+      def initialize filename, producer = nil
+        super(File.new(filename, 'wb:ascii-8bit'), producer)
       end
     end # class MidiFileWriter
   end # Node
@@ -366,8 +370,8 @@ if __FILE__ == $0
   include RRTS
   include Node
   require_relative 'midifilereader'
-  input = MidiFileReader.new('../../../fixtures/eurodance.midi', split_tracks:false)
+  input = MidiFileReader.new('../../../fixtures/eurodance.midi', spam: true)
   MidiFileWriter.new('/tmp/eurodance.midi', input)
-  MidiFileReader.new('/tmp/eurodance.midi', split_tracks: false)
+  MidiFileReader.new('/tmp/eurodance.midi', spam: true)
 end
 

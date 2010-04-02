@@ -1,10 +1,19 @@
 
-// If changed do:         make
-// To create Makefile:    ruby ./extruby.rb
+// If changed do:         make                          or rake
+// To create Makefile:    ruby ./extruby.rb             or rake
 
-// #define DUMP_API
-// #define TRACE
-#define DEBUG
+/* CONSIDERATIONS
+=================
+
+rb_thread_blocking_region has some conditions that must be satisfied.
+Ruby code should not be called from within its callback.  I experienced
+SEGV and lockups. This means it should guard the pure C calls only.
+
+*/
+
+//#define DUMP_API
+//#define TRACE
+//#define DEBUG
 
 #pragma implementation
 
@@ -290,33 +299,22 @@ wrap_snd_seq_delete_port(VALUE v_seq, VALUE v_portid)
   return r ? INT2NUM(r) : Qnil; // C++ rule, do not raise exceptions on destructors
 }
 
+struct event_input_data
+{
+  snd_seq_t *seq;
+  snd_seq_event_t *ev;
+  int rescode;
+};
+
 static VALUE
 i_event_input(void *ptr)
 {
-  snd_seq_event_t *ev = 0;
-  snd_seq_t *seq = (snd_seq_t *)ptr;
-  const int r = snd_seq_event_input(seq, &ev);
-  // according to mailing lists, these must NOT be freed.
+  struct event_input_data * const data = (struct event_input_data *)ptr;
+  data->ev = 0;
+  data->rescode = snd_seq_event_input(data->seq, &data->ev);
+  // according to mailing lists, data->ev must NOT be freed.
   // And it can't even since event_free is deprecated
-  if (r < 0)
-  {
-    VALUE cls = alsaMidiError;
-    const char *msg = snd_strerror(r);
-    switch (r)
-    {
-      case -EAGAIN:
-        cls = rb_funcall(rb_mErrno, rb_intern("const_get"), 1, ID2SYM(rb_intern("EAGAIN")));
-      case -ENOSPC:
-//         fprintf(stderr, "blocking mode = %d\n", snd_seq_get
-        cls = rb_funcall(rb_mErrno, rb_intern("const_get"), 1, ID2SYM(rb_intern("ENOSPC")));
-        msg = "no space for event, you probably called snd_seq_event_input too soon";
-        break;
-    }
-    rb_raise(cls, "%s", msg);
-  }
-  // Otherwise r is always 1; the alsa documentation is WRONG!!
-//   fprintf(stderr, __FILE__":%d:event_input -> %p, rescode=%d\n", __LINE__, ev, r);
-  return Data_Wrap_Struct(alsaMidiEventClass, 0/*mark*/, 0/*free*/, ev);
+  return Qnil;
 }
 
 /* call-seq:
@@ -337,12 +335,32 @@ Function returns the event. It may also raise the EAGAIN SystemError if in nonbl
 static VALUE
 wrap_snd_seq_event_input(VALUE v_seq)
 {
-  snd_seq_t *seq;
-  Data_Get_Struct(v_seq, snd_seq_t, seq);
+  struct event_input_data data;
+  Data_Get_Struct(v_seq, snd_seq_t, data.seq);
 #if defined(DUMP_API)
-  fprintf(DUMP_STREAM, "snd_seq_event_input(%p, null)\n", seq);
+  fprintf(DUMP_STREAM, "snd_seq_event_input(%p, null)\n", data.seq);
 #endif
-  return rb_thread_blocking_region(i_event_input, seq, RUBY_UBF_IO, 0);
+  // release the GIL during this call
+  rb_thread_blocking_region(i_event_input, &data, RUBY_UBF_IO, 0);
+  if (data.rescode < 0)
+    {
+      VALUE cls = alsaMidiError;
+      const char *msg = snd_strerror(data.rescode);
+      switch (data.rescode)
+        {
+        case -EAGAIN:
+          cls = rb_funcall(rb_mErrno, rb_intern("const_get"), 1, ID2SYM(rb_intern("EAGAIN")));
+        case -ENOSPC:
+  //         fprintf(stderr, "blocking mode = %d\n", snd_seq_get
+          cls = rb_funcall(rb_mErrno, rb_intern("const_get"), 1, ID2SYM(rb_intern("ENOSPC")));
+          msg = "no space for event, you probably called snd_seq_event_input too soon";
+          break;
+        }
+      rb_raise(cls, "%s", msg);
+    }
+  // Otherwise r is always 1; the alsa documentation is WRONG!!
+//   fprintf(stderr, __FILE__":%d:event_input -> %p, rescode=%d\n", __LINE__, ev, r);
+  return Data_Wrap_Struct(alsaMidiEventClass, 0/*mark*/, 0/*free*/, data.ev);
 }
 
 static void
@@ -360,12 +378,6 @@ DUMP_EVENT(snd_seq_event_t *ev, int line)
 typedef int (output_method)(snd_seq_t *, snd_seq_event_t *);
 enum EOutput { Normal, Direct, Buffer, NrofMethods };
 
-static const output_method *dispatch[NrofMethods] = {
-  &snd_seq_event_output,
-  &snd_seq_event_output_direct,
-  &snd_seq_event_output_buffer
-};
-
 static void wait_poll(snd_seq_t *seq, double sleeptime = 0.01)
 {
   /* NO USE ANYWAY
@@ -378,10 +390,10 @@ static void wait_poll(snd_seq_t *seq, double sleeptime = 0.01)
   */
 //   fputs(".", stderr);
 //*blocks ruby!!
-  struct timespec req, rem;
-  req.tv_sec = 0;
-  req.tv_nsec = 10 * 1000; // = 10 ms
-  const int r = nanosleep(&req, &rem) == -1 ? errno : 0;
+  struct timespec req; //, rem;
+  req.tv_sec = uint(sleeptime);
+  req.tv_nsec = uint((sleeptime - uint(sleeptime)) * 1000000000.0);
+  const int r = nanosleep(&req, 0/*&rem*/) == -1 ? errno : 0;
 //   rb_funcall(rb_mKernel, rb_intern("sleep"), 1, DBL2NUM(sleeptime));
   /*
   pthread_sigmask(SIG_SETMASK, &oldmask, 0);
@@ -426,6 +438,28 @@ i_wait_poll(void *ptr)
 //   return INT2NUM((*dispatch[NUM2INT(v_func)])(seq, ev));
 // }
 
+struct event_output_data
+{
+  snd_seq_t *seq;
+  snd_seq_event_t *ev;
+  EOutput func;
+  int rescode;
+};
+
+static VALUE
+i_event_output_dispatch(void *ptr)
+{
+  struct event_output_data * const data = (struct event_output_data *)ptr;
+  static const output_method *dispatch[NrofMethods] =
+    {
+      &snd_seq_event_output,
+      &snd_seq_event_output_direct,
+      &snd_seq_event_output_buffer
+    };
+  data->rescode = (*dispatch[data->func])(data->seq, data->ev);
+  return Qnil;
+}
+
 // returns remaining nr of events (>=0)
 static inline VALUE do_event_output(snd_seq_t *seq, snd_seq_event_t *ev, VALUE v_func)
 {
@@ -441,25 +475,27 @@ static inline VALUE do_event_output(snd_seq_t *seq, snd_seq_event_t *ev, VALUE v
       return INT2NUM(0);
     }
 #endif
-#if defined(DUMP_API)
-  fprintf(DUMP_STREAM, "snd_seq_event_output*(%p, %p)\n", seq, ev);
-#endif
-  trace2("block when queue is full? time=%ld, v_func=%s", time(0), INSPECT(v_func))
-//   struct event_output_data data = { seq, ev, NUM2INT(v_func) };
   for (;;)
     {
-      const int r = (*dispatch[NUM2INT(v_func)])(seq, ev);
+#if defined(DUMP_API)
+      fprintf(DUMP_STREAM, "snd_seq_event_output%s(%p, %p)\n",
+              NUM2INT(v_func) == 0 ? "" : NUM2INT(v_func) == 1 ? "direct" : "buffer", seq, ev);
+#endif
+      trace2("block when queue is full? time=%ld, v_func=%s", time(0), INSPECT(v_func))
+      struct event_output_data data = { seq, ev, EOutput(NUM2INT(v_func)), 0 };
+
+      rb_thread_blocking_region(i_event_output_dispatch, &data, RUBY_UBF_IO, 0);
       //       NUM2INT(rb_thread_blocking_region(i_event_output, &data, RUBY_UBF_IO, 0);
-      trace2("-> %d, time=%ld", r, time(0))
-      if (r >= 0) return INT2NUM(r);
-      switch (r)
+      trace2("-> %d, time=%ld", data.rescode, time(0))
+      if (data.rescode >= 0) return INT2NUM(data.rescode);
+      switch (data.rescode)
         {
         case -EINVAL:
           //HEURISTICS, probably this overflowed the queue.
           // NOTEON=6, NOTEOFF=7
           DUMP_EVENT(ev, __LINE__);
           RAISE_MIDI_ERROR_FMT1("sending event failed with alsa error %d, invalid data, but it "
-                                "could well be an outputqueue-overflow", r);
+                                "could well be an outputqueue-overflow", data.rescode);
         case -EAGAIN:
           // normal condition when nonblocking mode is set
           // Do not raise EAGAIN as this may cause fragmented messages to be sent.
@@ -468,7 +504,7 @@ static inline VALUE do_event_output(snd_seq_t *seq, snd_seq_event_t *ev, VALUE v
           wait_poll(seq);
           break;
         default:
-          RAISE_MIDI_ERROR("sending event", r);
+          RAISE_MIDI_ERROR("sending event", data.rescode);
         }
     }
   CantHappen();
@@ -531,6 +567,7 @@ do_event_output(bool ch_ref, snd_seq_t *seq, VALUE v_seq, VALUE v_ev, snd_seq_ev
       WRITE_CHANNEL_IN_EVENT(ev, v_channel);
     }
   VALUE r = do_event_output(seq, &ev, v_func);
+  trace1("%d: did do_event_output", __LINE__);
 //   fprintf(stderr, "did do_event_output\n");
   return r;
 }
@@ -630,6 +667,9 @@ static int help_snd_seq_drain_output(snd_seq_t *seq)
 {
   for (;;)
     {
+#if defined(DUMP_API)
+      fprintf(stderr, "snd_seq_drain_output(%p)\n", seq);
+#endif
       const int r = snd_seq_drain_output(seq);
       if (r >= 0) return r;
       if (r != -EAGAIN)
@@ -640,298 +680,289 @@ static int help_snd_seq_drain_output(snd_seq_t *seq)
   return 0;
 }
 
-struct event_output_data
-{
-  GCSafeValue v_seq;
-  GCSafeValue v_ev;
-  EOutput func;
-};
-
-static VALUE
-i_event_output_func(void *ptr)
-{
-  const struct event_output_data * const data = (struct event_output_data *)ptr;
-  VALUE v_func = INT2NUM(data->func);
-  snd_seq_t *seq;
-  Data_Get_Struct(data->v_seq, snd_seq_t, seq);
-  VALUE v_ev = data->v_ev;
-  // Now it's gonna be hairy. v_ev might be a MidiEvent descendant and not 'Data'.
-  const ID id_MidiEvent = rb_intern("MidiEvent");
-  if (rb_const_defined(rb_mKernel, id_MidiEvent))
-  {
-    VALUE v_MidiEvent = rb_const_get(rb_mKernel, id_MidiEvent);
-    //   VALUE v_is_a_MidiEvent = rb_funcall(v_ev, ID2SYM(rb_intern("kind_of?")), 1, v_MidiEvent);
-    if (RTEST(rb_obj_is_kind_of(v_ev, v_MidiEvent)))
-    {
-      //       fprintf(stderr, "MIDIEVENT\n");
-      snd_seq_event_t ev;  // I follow the code from aplymidi.c
-      snd_seq_ev_clear(&ev);
-      /* v_ev has the following properties (recap), which may all be nil as well.
-      type: a symbol and never nil
-      flags: a hash with bool values! and never nil either
-      param: a symbol or integer
-      value: note or queueparam etc. sometimes 14 bits or maybe even 21 so may issue 2 or 3 events!
-      specifics:
-      - channel 4 bit
-      - duration 7 bit
-      - source, dest  MidiPort
-      - sender_queue MidiQueue
-      - tick, either tick or realtime-tuple [sec, nsec]
-      */
-      const ID id_sender_queue = rb_intern("@sender_queue");
-      bool have_sender_queue = false; // used later on through macro!!!
-      VALUE v_sender_queue;
-      if (rb_ivar_defined(v_ev, id_sender_queue))
-      {
-        v_sender_queue = rb_ivar_get(v_ev, id_sender_queue);
-        // IMPORTANT @queue is the queue for queue notifications, which may differ
-        RRTS_DEREF_DIRTY(v_sender_queue, @id);
-        have_sender_queue = RTEST(v_sender_queue);
-        if (have_sender_queue)
-          ev.queue = NUM2INT(v_sender_queue);
-      }
-      else
-        snd_seq_ev_set_direct(&ev); // !
-        //       fprintf(stderr, "get source\n");
-      VALUE v_sourceport = rb_iv_get(v_ev, "@source");
-      const ID id_iv_port = rb_intern("@port");
-      const ID id_iv_client_id = rb_intern("@client_id");
-      //       fprintf(stderr, "test v_sourceport\n");
-      if (RTEST(v_sourceport))  // TODO: can you actually leave this out?? Should be an error?
-      {
-        ev.source.port = NUM2INT(rb_ivar_get(v_sourceport, id_iv_port));
-        ev.source.client = NUM2INT(rb_ivar_get(v_sourceport, id_iv_client_id));
-      }
-      //       fprintf(stderr, "callback debunktypeflags_i\n");
-      VALUE v_typeflags = rb_funcall(v_ev, rb_intern("debunktypeflags_i"), 0);
-      //       fprintf(stderr, "split result\n");
-      v_typeflags = rb_check_array_type(v_typeflags);
-      if (!RTEST(v_typeflags))
-        RAISE_MIDI_ERROR_FMT0("BUG: bad type returned from debunktypeflags_i");
-      ev.type = NUM2INT(rb_ary_entry(v_typeflags, 0));
-      ev.flags = NUM2INT(rb_ary_entry(v_typeflags, 1)); // from event.flags SND_SEQ_TIME_STAMP_TICK | SND_SEQ_TIME_STAMP_ABS;
-      //       fprintf(stderr, "time\n");
-      VALUE v_time = rb_iv_get(v_ev, "@time");
-      unsigned char *ch_ref = 0; // We only use that it is 0 or not !!!!
-      WRITE_TIME_IN_CHANNEL(v_time, ev);
-      //       fprintf(stderr, "dest\n");
-      VALUE v_destport = rb_iv_get(v_ev, "@dest");
-
-      /* This is probably incorrect. But aplaymidi uses explicit senders iso a connection
-      so it may not be a good example
-      */
-      if (!RTEST(v_destport))
-        RAISE_MIDI_ERROR_FMT0("no destination set in event");
-      ev.dest.port = NUM2INT(rb_ivar_get(v_destport, id_iv_port));
-      ev.dest.client = NUM2INT(rb_ivar_get(v_destport, id_iv_client_id));
-      //       fprintf(stderr, "typeswitch\n");
-      switch (ev.type)
-      {
-        case SND_SEQ_EVENT_NOTE:
-        {
-          ev.data.note.duration = NUM2UINT(rb_iv_get(v_ev, "@duration"));
-          VALUE v_off_vel = rb_iv_get(v_ev, "@off_velocity");
-          ev.data.note.off_velocity = RTEST(v_off_vel) ? NUM2UINT(v_off_vel) : 0;
-          // fall through !
-        }
-        case SND_SEQ_EVENT_NOTEON:
-        case SND_SEQ_EVENT_NOTEOFF:
-        case SND_SEQ_EVENT_KEYPRESS: // == aftertouch
-        {
-          // fprintf(stderr, "type=%d,NOTEON/OFF/KEYPRES\n", ev.type);
-          snd_seq_ev_set_fixed(&ev);
-          ch_ref = &ev.data.note.channel;
-          VALUE v_note = rb_iv_get(v_ev, "@value");
-          if (FIXNUM_P(v_note))
-            ev.data.note.note = NUM2UINT(v_note);
-          else
-            ev.data.note.note = decode_a_note(StringValueCStr(v_note));
-          VALUE v_vel = rb_iv_get(v_ev, "@velocity");
-          ev.data.note.velocity = RTEST(v_vel) ? NUM2UINT(v_vel) : 0;
-          break;
-        }
-        case SND_SEQ_EVENT_CONTROLLER:
-        {
-          snd_seq_ev_set_fixed(&ev);
-          ch_ref = &ev.data.control.channel;
-          VALUE v_param_coarse = rb_check_array_type(rb_funcall(v_ev, rb_intern("debunkparam_i"),
-                                                                                0));
-
-          if (!RTEST(v_param_coarse))
-            RAISE_MIDI_ERROR_FMT0("BUG: bad type returned by debunkparam_i");
-          //                 fprintf(stderr, "%s:% : debunking done\n", __FILE__, __LINE__);
-          const bool coarse = RTEST(rb_ary_entry(v_param_coarse, 1));
-          const uint param = ev.data.control.param = NUM2INT(rb_ary_entry(v_param_coarse, 0));
-          //                 fprintf(stderr, "got param\n");
-          VALUE v_value = rb_iv_get(v_ev, "@value");
-          int value;
-          if (coarse)
-            value = NUM2INT(v_value) & 0x7f;
-          else
-          {
-            uint lsb_version = PARAM_IS_MSB_LSB_PAIR(param);
-            if (lsb_version)
-            {
-              int msb, lsb = 0;
-              //                     fprintf(stderr, "%d: coarse=%d, value=%d,param=%u\n", __LINE__, coarse, value,ev.data.control.param);
-              if (coarse)
-                msb = NUM2INT(v_value);
-              else if FIXNUM_P(v_value)
-              {
-                const int v = NUM2INT(v_value);
-                msb = v << 7;
-                lsb = v & 0x7f;
-              }
-              else
-              {
-                VALUE v_ar = rb_check_array_type(v_value);
-                if (NIL_P(v_ar)) msb = 0;
-                else
-                {
-                  VALUE v0 = rb_ary_entry(v_ar, 0), v1 = rb_ary_entry(v_ar, 1);
-                  if (!RTEST(v0))
-                    RAISE_MIDI_ERROR_FMT1("Bad args for param %d", param);
-                  msb = NUM2INT(v0);
-                  lsb = RTEST(v1) ? NUM2INT(v1) : 0;
-                }
-              }
-              ev.data.control.value = msb;
-              do_event_output(ch_ref, seq, data->v_seq, v_ev, ev, v_func);
-              //             fprintf(stderr, "%s:%d: CONTROLLER(param=%u,value=%d)\n", __FILE__,__LINE__, lsb_version, lsb);
-              ev.data.control.param = lsb_version;
-              value = lsb;
-            }
-            else
-              value = NUM2INT(v_value) & 0x7f;
-          }
-          ev.data.control.value = value;
-          // fprintf(stderr, "%s:%d: CONTROLLER(param=%u,value=%d)\n", __FILE__,__LINE__, param, value & 0x7f);
-          break;
-        }
-        case SND_SEQ_EVENT_PGMCHANGE:
-        {
-          snd_seq_ev_set_fixed(&ev);
-          ch_ref = &ev.data.control.channel;
-          VALUE v_value = rb_iv_get(v_ev, "@value");
-          int value = 0;
-          if (FIXNUM_P(v_value))
-            value = NUM2INT(v_value);
-          else
-          {
-            VALUE v_ar = rb_check_array_type(v_value);
-            if (!NIL_P(v_ar))
-            {
-              const int len = NUM2INT(rb_funcall(v_ar, rb_intern("length"), 0));
-              const int msb = NUM2INT(rb_ary_entry(v_ar, 0));
-              const int lsb = len == 2 ? 0 : NUM2INT(rb_ary_entry(v_ar, 1));
-              value = NUM2INT(rb_ary_entry(v_ar, len == 2 ? 1 : 2));
-              snd_seq_event_t ev_bank = ev;
-              ev_bank.type = SND_SEQ_EVENT_CONTROLLER;
-              ev_bank.data.control.param = MIDI_CTL_MSB_BANK;
-              ev_bank.data.control.value = msb;
-              do_event_output(ch_ref, seq, data->v_seq, v_ev, ev_bank, v_func);
-              ev_bank.data.control.param = MIDI_CTL_LSB_BANK;
-              ev_bank.data.control.value = lsb;
-              do_event_output(ch_ref, seq, data->v_seq, v_ev, ev_bank, v_func);
-            }
-          }
-          ev.data.control.value = value;
-          break;
-        }
-        case SND_SEQ_EVENT_CHANPRESS:
-        case SND_SEQ_EVENT_PITCHBEND:
-        {
-          snd_seq_ev_set_fixed(&ev);
-          ch_ref = &ev.data.control.channel;
-          const int value = NUM2INT(rb_iv_get(v_ev, "@value"));
-          ev.data.control.value = value;
-          break;
-        }
-        case SND_SEQ_EVENT_SYSEX:
-        {
-          // value is a string.
-          VALUE v_val = rb_iv_get(v_ev, "@value");
-          rb_check_type(v_val, T_STRING);
-          size_t length = RSTRING_LEN(v_val);
-          snd_seq_ev_set_variable(&ev, length, RSTRING_PTR(v_val));
-          if (length > MIDI_BYTES_PER_SEC)
-            ev.data.ext.len = MIDI_BYTES_PER_SEC; // ??
-            size_t event_size = snd_seq_event_length(&ev);
-          // grow the buffer if the complete event does not fit in
-          if (event_size + 1 > snd_seq_get_output_buffer_size(seq))
-          {
-            help_snd_seq_drain_output(seq);
-            const int err = snd_seq_set_output_buffer_size(seq, event_size + 1);
-            if (err < 0) RAISE_MIDI_ERROR("growing output buffer", err);
-          }
-          while (length > MIDI_BYTES_PER_SEC)
-          {
-            for (;;)
-            {
-              const int err = snd_seq_event_output(seq, &ev);
-              if (err >= 0) break;
-              if (err != -EAGAIN)
-                RAISE_MIDI_ERROR("sending sysex", err);
-              wait_poll(seq);
-            }
-            help_snd_seq_drain_output(seq);
-            const int err = snd_seq_sync_output_queue(seq);
-            if (err < 0) RAISE_MIDI_ERROR("syncing queue", err);
-            wait_poll(seq, 1.0);
-            /* AARGH ? The intention is probably to not overrun
-            the number of bytes sent per second.
-            Note that if a queue is used and events are 'staged' the sleep
-            here is stupid.
-            Note: originating from aplaymidi.c
-            */
-            *(char **)ev.data.ext.ptr += MIDI_BYTES_PER_SEC;
-            length -= MIDI_BYTES_PER_SEC; // > 0
-          }
-          ev.data.ext.len = length; // > 0
-          // end send the remainder as well.
-          break;
-        }
-        case SND_SEQ_EVENT_TEMPO:
-        {
-          snd_seq_ev_set_fixed(&ev);
-          const int queue = NUM2INT(rb_iv_get(v_ev, "@queue"));
-          const uint tempo = NUM2UINT(rb_iv_get(v_ev, "@value"));
-          ev.dest.client = SND_SEQ_CLIENT_SYSTEM;
-          ev.dest.port = SND_SEQ_PORT_SYSTEM_TIMER;
-          ev.data.queue.queue = queue;
-          ev.data.queue.param.value = tempo;
-          break;
-        }
-        case SND_SEQ_EVENT_RESET:
-        case SND_SEQ_EVENT_TUNE_REQUEST:
-        case SND_SEQ_EVENT_SENSING:
-        case SND_SEQ_EVENT_ECHO:
-        case SND_SEQ_EVENT_NONE:
-        case SND_SEQ_EVENT_STOP:
-        case SND_SEQ_EVENT_START:
-        case SND_SEQ_EVENT_CONTINUE:
-          snd_seq_ev_set_fixed(&ev);
-          break;
-        default:
-          RAISE_MIDI_ERROR_FMT1("invalid/unsupported type %d", ev.type);
-          break;
-      }
-      return do_event_output(ch_ref, seq, data->v_seq, v_ev, ev, v_func);
-    }
-  }
-  snd_seq_event_t *ev;
-  Data_Get_Struct(v_ev, snd_seq_event_t, ev);
-  return do_event_output(seq, ev, v_func);
-}
-
 static VALUE
 wrap_snd_seq_event_output_func(VALUE v_seq, VALUE v_ev, EOutput func)
 {
-  trace("snd_seq_event_output_func")
-  struct event_output_data data = { v_seq, v_ev, func };
-  return rb_thread_blocking_region(i_event_output_func, &data, RUBY_UBF_IO, 0);
-}
+  trace1("%d: i_event_output_func", __LINE__);
+  VALUE v_func = INT2NUM(func);
+  snd_seq_t *seq;
+  Data_Get_Struct(v_seq, snd_seq_t, seq);
+  // Now it's gonna be hairy. v_ev might be a MidiEvent descendant and not 'Data'.
+  const ID id_MidiEvent = rb_intern("MidiEvent");
+  if (rb_const_defined(rb_mKernel, id_MidiEvent))
+    {
+      VALUE v_MidiEvent = rb_const_get(rb_mKernel, id_MidiEvent);
+      //   VALUE v_is_a_MidiEvent = rb_funcall(v_ev, ID2SYM(rb_intern("kind_of?")), 1, v_MidiEvent);
+      if (RTEST(rb_obj_is_kind_of(v_ev, v_MidiEvent)))
+        {
+          //       fprintf(stderr, "MIDIEVENT\n");
+          snd_seq_event_t ev;  // I follow the code from aplymidi.c
+          snd_seq_ev_clear(&ev);
+          /* v_ev has the following properties (recap), which may all be nil as well.
+          type: a symbol and never nil
+          flags: a hash with bool values! and never nil either
+          param: a symbol or integer
+          value: note or queueparam etc. sometimes 14 bits or maybe even 21 so may issue 2 or 3 events!
+          specifics:
+          - channel 4 bit
+          - duration 7 bit
+          - source, dest  MidiPort
+          - sender_queue MidiQueue
+          - tick, either tick or realtime-tuple [sec, nsec]
+          */
+          const ID id_sender_queue = rb_intern("@sender_queue");
+          bool have_sender_queue = false; // used later on through macro!!!
+          VALUE v_sender_queue;
+          if (rb_ivar_defined(v_ev, id_sender_queue))
+            {
+              v_sender_queue = rb_ivar_get(v_ev, id_sender_queue);
+              // IMPORTANT @queue is the queue for queue notifications, which may differ
+              RRTS_DEREF_DIRTY(v_sender_queue, @id);
+              have_sender_queue = RTEST(v_sender_queue);
+              if (have_sender_queue)
+                ev.queue = NUM2INT(v_sender_queue);
+            }
+          else
+              snd_seq_ev_set_direct(&ev); // !
+            //       fprintf(stderr, "get source\n");
+          VALUE v_sourceport = rb_iv_get(v_ev, "@source");
+          const ID id_iv_port = rb_intern("@port");
+          const ID id_iv_client_id = rb_intern("@client_id");
+          //       fprintf(stderr, "test v_sourceport\n");
+          if (RTEST(v_sourceport))  // TODO: can you actually leave this out?? Should be an error?
+            {
+              ev.source.port = NUM2INT(rb_ivar_get(v_sourceport, id_iv_port));
+              ev.source.client = NUM2INT(rb_ivar_get(v_sourceport, id_iv_client_id));
+            }
+          //       fprintf(stderr, "callback debunktypeflags_i\n");
+          VALUE v_typeflags = rb_funcall(v_ev, rb_intern("debunktypeflags_i"), 0);
+          //       fprintf(stderr, "split result\n");
+          v_typeflags = rb_check_array_type(v_typeflags);
+          if (!RTEST(v_typeflags))
+            RAISE_MIDI_ERROR_FMT0("BUG: bad type returned from debunktypeflags_i");
+          ev.type = NUM2INT(rb_ary_entry(v_typeflags, 0));
+          ev.flags = NUM2INT(rb_ary_entry(v_typeflags, 1)); // from event.flags SND_SEQ_TIME_STAMP_TICK | SND_SEQ_TIME_STAMP_ABS;
+          //       fprintf(stderr, "time\n");
+          VALUE v_time = rb_iv_get(v_ev, "@time");
+          unsigned char *ch_ref = 0; // We only use that it is 0 or not !!!!
+          WRITE_TIME_IN_CHANNEL(v_time, ev);
+          //       fprintf(stderr, "dest\n");
+          VALUE v_destport = rb_iv_get(v_ev, "@dest");
 
+          /* This is probably incorrect. But aplaymidi uses explicit senders iso a connection
+          so it may not be a good example
+          */
+          if (!RTEST(v_destport))
+            RAISE_MIDI_ERROR_FMT0("no destination set in event");
+          ev.dest.port = NUM2INT(rb_ivar_get(v_destport, id_iv_port));
+          ev.dest.client = NUM2INT(rb_ivar_get(v_destport, id_iv_client_id));
+          //       fprintf(stderr, "typeswitch\n");
+          switch (ev.type)
+            {
+            case SND_SEQ_EVENT_NOTE:
+              {
+                ev.data.note.duration = NUM2UINT(rb_iv_get(v_ev, "@duration"));
+                VALUE v_off_vel = rb_iv_get(v_ev, "@off_velocity");
+                ev.data.note.off_velocity = RTEST(v_off_vel) ? NUM2UINT(v_off_vel) : 0;
+                // fall through !
+              }
+            case SND_SEQ_EVENT_NOTEON:
+            case SND_SEQ_EVENT_NOTEOFF:
+            case SND_SEQ_EVENT_KEYPRESS: // == aftertouch
+              {
+                // fprintf(stderr, "type=%d,NOTEON/OFF/KEYPRES\n", ev.type);
+                snd_seq_ev_set_fixed(&ev);
+                ch_ref = &ev.data.note.channel;
+                VALUE v_note = rb_iv_get(v_ev, "@value");
+                if (FIXNUM_P(v_note))
+                  ev.data.note.note = NUM2UINT(v_note);
+                else
+                  ev.data.note.note = decode_a_note(StringValueCStr(v_note));
+                VALUE v_vel = rb_iv_get(v_ev, "@velocity");
+                ev.data.note.velocity = RTEST(v_vel) ? NUM2UINT(v_vel) : 0;
+                break;
+              }
+            case SND_SEQ_EVENT_CONTROLLER:
+              {
+                snd_seq_ev_set_fixed(&ev);
+                ch_ref = &ev.data.control.channel;
+                VALUE v_param_coarse = rb_check_array_type(rb_funcall(v_ev, rb_intern("debunkparam_i"),
+                                                                                      0));
+
+                if (!RTEST(v_param_coarse))
+                  RAISE_MIDI_ERROR_FMT0("BUG: bad type returned by debunkparam_i");
+                //                 fprintf(stderr, "%s:% : debunking done\n", __FILE__, __LINE__);
+                const bool coarse = RTEST(rb_ary_entry(v_param_coarse, 1));
+                const uint param = ev.data.control.param = NUM2INT(rb_ary_entry(v_param_coarse, 0));
+                //                 fprintf(stderr, "got param\n");
+                VALUE v_value = rb_iv_get(v_ev, "@value");
+                int value;
+                if (coarse)
+                  value = NUM2INT(v_value) & 0x7f;
+                else
+                {
+                  uint lsb_version = PARAM_IS_MSB_LSB_PAIR(param);
+                  if (lsb_version)
+                  {
+                    int msb, lsb = 0;
+                    //                     fprintf(stderr, "%d: coarse=%d, value=%d,param=%u\n", __LINE__, coarse, value,ev.data.control.param);
+                    if (coarse)
+                      msb = NUM2INT(v_value);
+                    else if FIXNUM_P(v_value)
+                    {
+                      const int v = NUM2INT(v_value);
+                      msb = v << 7;
+                      lsb = v & 0x7f;
+                    }
+                    else
+                    {
+                      VALUE v_ar = rb_check_array_type(v_value);
+                      if (NIL_P(v_ar)) msb = 0;
+                      else
+                      {
+                        VALUE v0 = rb_ary_entry(v_ar, 0), v1 = rb_ary_entry(v_ar, 1);
+                        if (!RTEST(v0))
+                          RAISE_MIDI_ERROR_FMT1("Bad args for param %d", param);
+                        msb = NUM2INT(v0);
+                        lsb = RTEST(v1) ? NUM2INT(v1) : 0;
+                      }
+                    }
+                    ev.data.control.value = msb;
+                    do_event_output(ch_ref, seq, v_seq, v_ev, ev, v_func);
+                    //             fprintf(stderr, "%s:%d: CONTROLLER(param=%u,value=%d)\n", __FILE__,__LINE__, lsb_version, lsb);
+                    ev.data.control.param = lsb_version;
+                    value = lsb;
+                  }
+                  else
+                    value = NUM2INT(v_value) & 0x7f;
+                }
+                ev.data.control.value = value;
+                // fprintf(stderr, "%s:%d: CONTROLLER(param=%u,value=%d)\n", __FILE__,__LINE__, param, value & 0x7f);
+                break;
+              }
+            case SND_SEQ_EVENT_PGMCHANGE:
+              {
+                snd_seq_ev_set_fixed(&ev);
+                ch_ref = &ev.data.control.channel;
+                VALUE v_value = rb_iv_get(v_ev, "@value");
+                int value = 0;
+                if (FIXNUM_P(v_value))
+                    value = NUM2INT(v_value);
+                else
+                  {
+                    VALUE v_ar = rb_check_array_type(v_value);
+                    if (!NIL_P(v_ar))
+                      {
+                        const int len = NUM2INT(rb_funcall(v_ar, rb_intern("length"), 0));
+                        const int msb = NUM2INT(rb_ary_entry(v_ar, 0));
+                        const int lsb = len == 2 ? 0 : NUM2INT(rb_ary_entry(v_ar, 1));
+                        value = NUM2INT(rb_ary_entry(v_ar, len == 2 ? 1 : 2));
+                        snd_seq_event_t ev_bank = ev;
+                        ev_bank.type = SND_SEQ_EVENT_CONTROLLER;
+                        ev_bank.data.control.param = MIDI_CTL_MSB_BANK;
+                        ev_bank.data.control.value = msb;
+                        do_event_output(ch_ref, seq, v_seq, v_ev, ev_bank, v_func);
+                        ev_bank.data.control.param = MIDI_CTL_LSB_BANK;
+                        ev_bank.data.control.value = lsb;
+                        do_event_output(ch_ref, seq, v_seq, v_ev, ev_bank, v_func);
+                      }
+                  }
+                ev.data.control.value = value;
+                break;
+              }
+            case SND_SEQ_EVENT_CHANPRESS:
+            case SND_SEQ_EVENT_PITCHBEND:
+              {
+                snd_seq_ev_set_fixed(&ev);
+                ch_ref = &ev.data.control.channel;
+                const int value = NUM2INT(rb_iv_get(v_ev, "@value"));
+                ev.data.control.value = value;
+                break;
+              }
+            case SND_SEQ_EVENT_SYSEX:
+              {
+                // value is a string.
+                VALUE v_val = rb_iv_get(v_ev, "@value");
+                rb_check_type(v_val, T_STRING);
+                size_t length = RSTRING_LEN(v_val);
+                snd_seq_ev_set_variable(&ev, length, RSTRING_PTR(v_val));
+                if (length > MIDI_BYTES_PER_SEC)
+                  ev.data.ext.len = MIDI_BYTES_PER_SEC; // ??
+                  size_t event_size = snd_seq_event_length(&ev);
+                // grow the buffer if the complete event does not fit in
+                if (event_size + 1 > snd_seq_get_output_buffer_size(seq))
+                  {
+                    help_snd_seq_drain_output(seq);
+                    const int err = snd_seq_set_output_buffer_size(seq, event_size + 1);
+                    if (err < 0) RAISE_MIDI_ERROR("growing output buffer", err);
+                  }
+                while (length > MIDI_BYTES_PER_SEC)
+                  {
+                    for (;;)
+                      {
+                        const int err = snd_seq_event_output(seq, &ev);
+                        if (err >= 0) break;
+                        if (err != -EAGAIN)
+                          RAISE_MIDI_ERROR("sending sysex", err);
+                        wait_poll(seq);
+                      }
+                    help_snd_seq_drain_output(seq);
+                    const int err = snd_seq_sync_output_queue(seq);
+                    if (err < 0) RAISE_MIDI_ERROR("syncing queue", err);
+                    wait_poll(seq, 1.0);
+                    /* AARGH ? The intention is probably to not overrun
+                    the number of bytes sent per second.
+                    Note that if a queue is used and events are 'staged' the sleep
+                    here is stupid.
+                    Note: originating from aplaymidi.c
+                    */
+                    *(char **)ev.data.ext.ptr += MIDI_BYTES_PER_SEC;
+                    length -= MIDI_BYTES_PER_SEC; // > 0
+                  }
+                ev.data.ext.len = length; // > 0
+                // end send the remainder as well.
+                break;
+              }
+            case SND_SEQ_EVENT_TEMPO:
+              {
+                snd_seq_ev_set_fixed(&ev);
+                VALUE v_queue = rb_iv_get(v_ev, "@queue");
+                VALUE v_tempo = rb_iv_get(v_ev, "@value");
+                RRTS_DEREF_DIRTY(v_queue, @id);
+                RRTS_DEREF(v_tempo, usecs_per_beat);
+                const int queue = NUM2INT(v_queue);
+                const uint tempo = NUM2UINT(v_tempo);
+                ev.dest.client = SND_SEQ_CLIENT_SYSTEM;
+                ev.dest.port = SND_SEQ_PORT_SYSTEM_TIMER;
+                ev.data.queue.queue = queue;
+                ev.data.queue.param.value = tempo;
+                break;
+              }
+            case SND_SEQ_EVENT_RESET:
+            case SND_SEQ_EVENT_TUNE_REQUEST:
+            case SND_SEQ_EVENT_SENSING:
+            case SND_SEQ_EVENT_ECHO:
+            case SND_SEQ_EVENT_NONE:
+            case SND_SEQ_EVENT_STOP:
+            case SND_SEQ_EVENT_START:
+            case SND_SEQ_EVENT_CONTINUE:
+              snd_seq_ev_set_fixed(&ev);
+              break;
+            default:
+              RAISE_MIDI_ERROR_FMT1("invalid/unsupported type %d", ev.type);
+              break;
+            }
+          VALUE r = do_event_output(ch_ref, seq, v_seq, v_ev, ev, v_func);
+          trace1("%d: do_event_output OK", __LINE__)
+          return r;
+        }
+    }
+  snd_seq_event_t *ev;
+  Data_Get_Struct(v_ev, snd_seq_event_t, ev);
+  VALUE r = do_event_output(seq, ev, v_func);
+  trace1("%d: do_event_output OK", __LINE__)
+  return r;
+}
 
 /* int event_output(event)
 
@@ -1191,20 +1222,16 @@ wrap_snd_seq_parse_address(VALUE v_seq, VALUE v_arg)
 
 struct sync_output_queue_data
 {
-  const GCSafeValue v_seq;
+  snd_seq_t *seq;
+  int rescode;
 };
 
 static VALUE
 i_sync_output_queue(void *ptr)
 {
-  const sync_output_queue_data * const data = (sync_output_queue_data *)ptr;
-  snd_seq_t *seq;
-  Data_Get_Struct(data->v_seq, snd_seq_t, seq);
-  const int r = snd_seq_sync_output_queue(seq);
-  // According to the CRAPPY docs this should return 0 or negative errorcode.
-  // However it apparently can also return 1. I hope it's OK.
-  if (r < 0) RAISE_MIDI_ERROR("syncing output queue", r);
-  return data->v_seq;
+  sync_output_queue_data * const data = (sync_output_queue_data *)ptr;
+  data->rescode = snd_seq_sync_output_queue(data->seq);
+  return Qnil;
 }
 
 /* self sync_output_queue
@@ -1215,19 +1242,22 @@ See the note on blocking ruby at #event_output
 static VALUE
 wrap_snd_seq_sync_output_queue(VALUE v_seq)
 {
-  struct sync_output_queue_data data = { v_seq };
-  return rb_thread_blocking_region(i_sync_output_queue, &data, RUBY_UBF_IO, 0);
+  struct sync_output_queue_data data;
+  Data_Get_Struct(v_seq, snd_seq_t, data.seq);
+  // release the GIL during this call
+  rb_thread_blocking_region(i_sync_output_queue, &data, RUBY_UBF_IO, 0);
+  // According to the CRAPPY docs this should return 0 or negative errorcode.
+  // However it apparently can also return 1. I hope it's OK.
+  if (data.rescode < 0) RAISE_MIDI_ERROR("syncing output queue", data.rescode);
+  return v_seq;
 }
 
 static VALUE
 i_drain_output(void *ptr)
 {
-  snd_seq_t *const seq = (snd_seq_t *)ptr;
-  const int r = snd_seq_drain_output(seq);
-  if (r == -EAGAIN)
-    rb_raise(rb_funcall(rb_mErrno, rb_intern("const_get"), 1, ID2SYM(rb_intern("EAGAIN"))),
-             "%s", snd_strerror(r));
-  return INT2NUM(r);
+  struct sync_output_queue_data * const data = (sync_output_queue_data *)ptr;
+  data->rescode = snd_seq_drain_output(data->seq);
+  return Qnil;
 }
 
 /* int drain_output
@@ -1245,9 +1275,18 @@ If nonblocking is set, then it polls and keeps waiting until successfull
 static VALUE
 wrap_snd_seq_drain_output(VALUE v_seq)
 {
-  snd_seq_t *seq;
-  Data_Get_Struct(v_seq, snd_seq_t, seq);
-  return rb_thread_blocking_region(i_drain_output, seq, RUBY_UBF_IO, 0);
+  sync_output_queue_data data;
+  Data_Get_Struct(v_seq, snd_seq_t, data.seq);
+  // release the GIL during this call
+  rb_thread_blocking_region(i_drain_output, &data, RUBY_UBF_IO, 0);
+  if (data.rescode < 0)
+    {
+      if (data.rescode == -EAGAIN)
+        rb_raise(rb_funcall(rb_mErrno, rb_intern("const_get"), 1, ID2SYM(rb_intern("EAGAIN"))),
+                 "%s", snd_strerror(data.rescode));
+      RAISE_MIDI_ERROR("flush", data.rescode);
+    }
+  return INT2NUM(data.rescode);
 }
 
 /* int input_pending(fetch_sequencer_fifo = true)
@@ -1744,20 +1783,36 @@ struct wrapPolldata
 {
   GCSafeValue v_descriptors;
   GCSafeValue v_timeout_msec;
+  int rescode, err;
 };
 
 static VALUE
 i_wrapPoll(void *ptr)
 {
-  const struct wrapPolldata *const data = (struct wrapPolldata *)ptr;
+  struct wrapPolldata *const data = (struct wrapPolldata *)ptr;
   struct pollfd *fds;
   Data_Get_Struct(data->v_descriptors, struct pollfd, fds);
   const size_t nfds = *(size_t *)fds;
   fds = (struct pollfd *)(((size_t *)fds) + 1);
-  const int r = poll(fds, nfds, NIL_P(data->v_timeout_msec) ? -1 : NUM2UINT(data->v_timeout_msec));
-  if (r < 0)
-    RAISE_MIDI_ERROR("polling descriptors", r);
-  if (r == 0)
+  data->rescode = poll(fds, nfds, NIL_P(data->v_timeout_msec) ? -1
+                                                              : NUM2UINT(data->v_timeout_msec));
+  if (data->rescode < 0)
+    {
+      data->err = errno;
+      // It is dangerous to return nil, since the caller will think he can continue.
+      // even though a ^C was spotted. This will only be detected when back in ruby
+      if (errno == EINTR)
+        {
+          // Will this work? or will it immediately drop out?
+           struct timespec req;
+           req.tv_sec = 0;
+           req.tv_nsec = 10000000;
+           nanosleep(&req, 0);
+           data->rescode = 0; // ignore
+        }
+      return Qnil;
+    }
+  if (data->rescode == 0)
     return Qnil;
   VALUE v_revents = rb_ary_new2(nfds);
   for (size_t i = 0; i < nfds; i++)
@@ -1775,14 +1830,24 @@ At least one of them will be true.
 This method will block if +timeout_msec+ is larger than 0, regardless of the sequencers
 blocking mode (since we don't depend on AlsaSequencer_i).
 If timeout is -1 it will block indefinitely
+
+On interrupts it will return prematurely, but no error is raised
+According to the also docs you should not use the return value but use
+poll_descriptors_revents instead
 */
 static VALUE
 wrapPoll(int argc, VALUE *argv, VALUE v_descriptors)
 {
   VALUE v_timeout_msec;
   rb_scan_args(argc, argv, "01", &v_timeout_msec);
-  struct wrapPolldata data = { v_descriptors, v_timeout_msec };
-  return rb_thread_blocking_region(i_wrapPoll, &data, RUBY_UBF_IO, 0);
+  struct wrapPolldata data = { v_descriptors, v_timeout_msec, 0, 0 };
+  // release the GIL during this call
+  VALUE r = rb_thread_blocking_region(i_wrapPoll, &data, RUBY_UBF_IO, 0);
+  if (data.rescode < 0)
+        // In a thread this causes a SEGV, looks like a pthread bug?
+        // Or poll should be ppoll (?) and shield from immediate interrupts ??
+    RAISE_MIDI_ERROR("polling descriptors", data.err);
+  return r;
 }
 
 /* int output_buffer_size

@@ -20,9 +20,9 @@ Identity is a class that just attaches an input to an output.
 Functionality is gained by using specific input- and outputoptions
 
 Examples:
-  Identity.new input: 'song.yaml', output: '20:1'
-  Identity.new input: 'UM-2 MIDI 1', output: 'song.yaml.gz'
-  Identity.new input: 'song.midi', output: 'song.ygz'
+  Identity.new '--input=song.yaml', '--output='20:1'
+  Identity.new '--input=UM-2 MIDI 1', '--output=song.yaml.gz'
+  Identity.new '--input=song.midi', '--output=song.ygz'
 
 Extensions understood:
     .mid
@@ -33,27 +33,54 @@ Extensions understood:
 
 Anything else is treated as a portidentifier.
 =end
-    class Identity < Node::EventsNode
+    class Identity < Node::Filter
       private
-      def initialize options = nil
-        # how are options processed. Should be possible to use DefaultOptions
-        # but they use ARGV.
-        # With no options it connects stdin to stdout using yaml... Which is indeed stupid.
-        unless options
-          require_relative '../lib/rrts/node/defoptions'
-          options = Node::DefaultOptions.new([])
+      def initialize *options
+        super()
+        require_relative '../lib/rrts/node/defoptions'
+#         tag "Parsing options #{options.inspect}"
+        if options
+          # THIS IS A MESS. How does *options work???
+          if options.count == 1
+            if Node::DefaultOptions === options[0]
+              options = options[0]
+            elsif Array === options[0]
+              options = Node::DefaultOptions.new(options[0])
+            else
+              options = Node::DefaultOptions.new(options)
+            end
+          else
+            options = Node::DefaultOptions.new(options)
+          end
+        else
+          options = Node::DefaultOptions.new(ARGV)
         end
+#         tag "done parsing"
         @in = options.input_node
+#         tag "get output node"
         @out = options.output_node
+#         tag "connect"
+        @in >> @out
+#         tag "DONE"
       end
       public
+
+      # three delegators
+      def produce
+        @in.produce
+      end
+
       def run
-        @out.connect_to @in
+        @in.run
       end
 
       def each &block
-        @io.each &block
+        return to_enum unless block
+        @in.each(&block)
       end
+
+#       def consume producer, &when_done
+#       end
     end
 
     I = Identity
@@ -70,5 +97,5 @@ if __FILE__ == $0
   I.new(Node::DefaultOptions.new(['-i', '/tmp/eurodance.ygz', '-o', '20:1'])).run
 =end
   # using ARGV here:
-  I.new(Node::DefaultOptions.new).run
+  I.new.run
 end

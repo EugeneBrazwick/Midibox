@@ -86,11 +86,11 @@ module RRTS
       # note that LSB is in fact send first here!!!! At least that's what arecordmidi.c does
       # the following is a list of registered parameters
       #  0 = pitchbend range  MSB == semitones,  LSB = cents
-      #  1 = master fine tuning   14 bit data in cents where 0x2000 is A440
+      #  1 = master fine tuning   14 bit data in cents where 0x2000 is a440
       #  2 = coarse tuning        14 bit semitones where 0x40 = a440
       #  0x3fff = unset any 'current' RPN
       # My MIDI reference says that MSB can be send before LSB. Even in this case.
-      # IMPORTANT: since these are controller event the value is in fact the RPN (and not param)
+      # IMPORTANT: since these are controller events the value is in fact the RPN (and not param)
       # they set the RPN and then following data_entry and data_increment and data_decrement
       # messages will all effect this parameter.
       :nonreg_parm_num_lsb=>MIDI_CTL_NONREG_PARM_NUM_LSB,
@@ -104,7 +104,7 @@ module RRTS
     new Sequencer, AlsaMidiEvent_i
     new typesymbol [,...]
 =end
-    def initialize arg0, arg1 = {}
+    def initialize arg0, arg1 = nil
       case arg1 when AlsaMidiEvent_i # input_event handling
         arg1.populate(arg0, self) # See alsa_midi++.cpp
         #       puts "called populate, @type=#@type, type=#{type}"
@@ -118,53 +118,47 @@ module RRTS
         # @off_velocity = @duration = hardly ever used
         @time = nil
 #         puts "#{File.basename(__FILE__)}:#{__LINE__}:@tick:=nil"
-        for k, v in arg1
-          case k
-          when :value
-            if arg1[:param]
-              case v
-              when TrueClass, FalseClass then @value = v ? ON : OFF
-              else @value = v
-              end
-            else
-              @value = v
-            end
-          when :channel
-            #RTTSError.new("illegal channel #{v}") unless v.between?(1, 16)
-             # can be a range or maybe even an array of channels!!
-            # or an array of ranges... ???
-            @channel = v
+        arg1.each { |k, v| parse_option k, v } if arg1
+      end
+    end
+
+    def parse_option k, v
+      case k
+      when :value then @value = v
+      when :channel
+        #RTTSError.new("illegal channel #{v}") unless v.between?(1, 16)
+         # can be a range or maybe even an array of channels!!
+        # or an array of ranges... ???
+        @channel = v
 #             tag "channel:=#@channel"
-          when :duration then @duration = v
-          when :velocity then @velocity = v
-          when :off_velocity then @off_velocity = v
-          when :source, :sender
-            @source = v
-          when :dest, :destination then @dest = v
-          when :sender_queue
-            @sender_queue = v # LEAVE THE HACKING to alsa_midi_event yes please... .respond_to(:id) ? v.id : v
-          when :tick, :time
-            @time = v
+      when :duration then @duration = v
+      when :velocity then @velocity = v
+      when :off_velocity then @off_velocity = v
+      when :source, :sender
+        @source = v
+      when :dest, :destination then @dest = v
+      when :sender_queue
+        @sender_queue = v # LEAVE THE HACKING to alsa_midi_event yes please... .respond_to(:id) ? v.id : v
+      when :tick, :time
+        @time = v
 #             puts "#{File.basename(__FILE__)}:#{__LINE__}:@tick:=#{v}"
-          when :queue
-            @queue = v
-          when :time_mode_tick then set_flag(time_mode_tick: v, time_mode_real: !v)
-          when :time_mode_real then set_flag(time_mode_tick: !v, time_mode_real: v)
-          when :time_mode_relative
-            set_flag(time_mode_relative: v, time_mode_absolute: !v)
-          when :time_mode_absolute
-            set_flag(time_mode_relative: !v, time_mode_absolute: v)
-          when :coarse
-            if v && arg1[:value] > 0x7f
-              raise RRTSError.new("overflowing coarse controller value[#{arg1[:param]}] #{arg1[:value]}")
-            end
-              set_flag(coarse: v)
-          when :param then @param = v
-          when :track then @track = v
-          when :direct then @sender_queue = @time = nil # bit of a hack...
-          else raise RRTSError.new("illegal option '#{k}' for #{self.class}")
-          end
+      when :queue
+        @queue = v
+      when :time_mode_tick then set_flag(time_mode_tick: v, time_mode_real: !v)
+      when :time_mode_real then set_flag(time_mode_tick: !v, time_mode_real: v)
+      when :time_mode_relative
+        set_flag(time_mode_relative: v, time_mode_absolute: !v)
+      when :time_mode_absolute
+        set_flag(time_mode_relative: !v, time_mode_absolute: v)
+      when :coarse
+        if v && @value && @value > 0x7f  # this is not waterproof
+          raise RRTSError, "overflowing coarse controller value[#{arg1[:param]}] #{arg1[:value]}"
         end
+        set_flag(coarse: v)
+      when :param then @param = v
+      when :track then @track = v
+      when :direct then @sender_queue = @time = nil # bit of a hack...
+      else raise RRTSError.new("illegal option '#{k}' for #{self.class}")
       end
     end
 
@@ -421,10 +415,10 @@ module RRTS
     private
     # new Sequencer, event
     # new type, channel, value, [,...]
-    def initialize arg0, arg1 = nil, value = nil, params = {}
+    def initialize arg0, arg1 = nil, value = nil, params = nil
       case arg1 when AlsaMidiEvent_i then super(arg0, arg1)
       else
-        params[:channel] = arg1
+        (params ||= {})[:channel] = arg1
         params[:value] = value
         super arg0, params
       end
@@ -439,10 +433,10 @@ module RRTS
     # new(channel, note, velocity [,...])
 
     # It is allowed to use strings like 'C4' or 'd5' or 'Eb6' for 'note' (arg1)
-    def initialize channel, note = nil, velocity = nil, params = {}
+    def initialize channel, note = nil, velocity = nil, params = nil
       case note when AlsaMidiEvent_i then super(channel, note)
       else
-        params[:velocity] = velocity
+        (params ||= {})[:velocity] = velocity
         super :noteon, channel, note, params
       end
     end
@@ -470,10 +464,10 @@ module RRTS
     # new sequencer, event
     # new channel, note, pressure[,...]
     # It is allowed to use strings like 'C4' or 'd5' or 'Eb6' for 'note' (arg1)
-    def initialize channel, note = nil, velocity = nil, params = {}
+    def initialize channel, note = nil, velocity = nil, params = nil
       case note when AlsaMidiEvent_i then super(channel, note)
       else
-        params[:velocity] = velocity
+        (params ||= {})[:velocity] = velocity
         super :keypress, channel, note, params
       end
     end
@@ -502,7 +496,7 @@ module RRTS
     # new(channel, note [,...])
 
     # It is allowed to use strings like 'C4' or 'd5' or 'Eb6' for 'note' (arg1)
-    def initialize channel, note = nil, params = {}
+    def initialize channel, note = nil, params = nil
       @off_velocity = 0
       case note when AlsaMidiEvent_i then super(channel, note)
       else
@@ -532,11 +526,11 @@ module RRTS
     private
     # new(channel, note, velocity [, ...])
     # It is allowed to use strings like 'C4' or 'd5' or 'Eb6' for 'note' (arg1)
-    def initialize arg0, arg1 = nil, velocity = nil, params = {}
+    def initialize arg0, arg1 = nil, velocity = nil, params = nil
       @off_velocity = 0
       case arg1 when AlsaMidiEvent_i then super(arg0, arg1)
       else
-        params[:velocity] = velocity
+        (params ||= {})[:velocity] = velocity
         super :note, arg0, arg1, params
       end
     end
@@ -615,11 +609,11 @@ module RRTS
 #     It is also possible to pass a tuple as 'value'.
 #     ControllerEvent.new channel, :bank_select, [1, 23]
 #     This would select bank 1*128+23.    BROKEN???
-    def initialize channel, param = nil, value = 0, params = {}
+    def initialize channel, param = nil, value = 0, params = nil
       case param when AlsaMidiEvent_i then super(channel, param)
       else
         params, value = value, 0 if Hash === value
-        params[:param] = Driver::param2sym(param)
+        (params ||= {})[:param] = Driver::param2sym(param)
         super :controller, channel, value, params
       end
     end
@@ -632,7 +626,7 @@ module RRTS
     end
 
     def to_s
-      "ControllerEvent ch:#@channel, param: #@param -> #@value"
+      "ControllerEvent[#@time] ch:#@channel, param: #@param -> #@value"
     end
 
     LSB2MSB = { :bank_lsb=>:bank, :modwheel_lsb=>:modwheel, :breath_lsb=>:breath,
@@ -648,21 +642,24 @@ module RRTS
               }
     MSB2LSB = LSB2MSB.invert
 
-    # returns msb param, if this is an lsb param
+    # returns msb param symbol, if this is an lsb param, otherwise nil
     def lsb2msb
-      LSB2MSB[@param]
+      LSB2MSB[Symbol === @param ? @param : Driver::param2sym(@param)]
     end
 
-    # returns lsb param, if this is an msb param
+    # returns lsb param symbol, if this is an msb param and nil otherwise
     def msb2lsb
-      MSB2LSB[@param]
+      MSB2LSB[Symbol === @param ? @param : Driver::param2sym(@param)]
     end
 
+    # you can treat it as a boolean as well
     alias :lsb? :lsb2msb
+
+    # you can treat it as a boolean as well
     alias :msb? :msb2lsb
   end # class ControllerEvent
 
-  Control14Event = ControllerEvent
+  # Control14Event = ControllerEvent  BAD IDEA, there is no such thing
 
   # PRGCHANGE events
   class ProgramChangeEvent < VoiceEvent
@@ -676,7 +673,7 @@ module RRTS
     # Or it may be a tuple [bank_msb, progno]
     # Or even [bank_msb, bank_lsb, progno]
     # The last one will of course send 3 events when send.
-    def initialize channel, program = nil, params = {}
+    def initialize channel, program = nil, params = nil
       case program when AlsaMidiEvent_i then super(channel, program)
       else
         super :pgmchange, channel, program, params
@@ -684,6 +681,9 @@ module RRTS
     end
 
     public
+    # program can be a single value in range 0..127.
+    # Or it may be a tuple [bank_msb, progno]
+    # Or even [bank_msb, bank_lsb, progno]
     alias :program :value
 
     def status
@@ -705,7 +705,7 @@ module RRTS
     private
 #       Note that value is a 14 bits signed integer
 #       in the range -0x2000 to 0x2000
-    def initialize channel, value = nil, params = {}
+    def initialize channel, value = nil, params = nil
       case value when AlsaMidiEvent_i then super(channel, value)
       else
         super :pitchbend, channel, value, params
@@ -729,7 +729,7 @@ module RRTS
 
     # new(channel, pressure [,...])
     # Pressure should be in the range 0..127
-    def initialize arg0, arg1 = nil, params = {}
+    def initialize arg0, arg1 = nil, params = nil
       case arg1 when AlsaMidiEvent_i then super(arg0, arg1)
       else
         super :chanpress, arg0, arg1, params
@@ -747,7 +747,7 @@ module RRTS
   # has a channel ????  FIXME ??
   class SongPositionEvent < VoiceEvent
     private
-    def initialize arg0, arg1 = nil, params = {}
+    def initialize arg0, arg1 = nil, params = nil
       case arg1 when AlsaMidiEvent_i then super(arg0, arg1)
       else
         super :songpos, arg0, arg1, params
@@ -758,7 +758,7 @@ module RRTS
   # has a channel ????  FIXME ??
   class SongSelectionEvent < VoiceEvent
     private
-    def initialize arg0, arg1 = nil, params = {}
+    def initialize arg0, arg1 = nil, params = nil
       case arg1 when AlsaMidiEvent_i then super(arg0, arg1)
       else
         super :songsel, arg0, arg1, params
@@ -767,7 +767,7 @@ module RRTS
   end
 
 =begin
-  a Universal SysEx:
+  an important universal SysEx is:
   0xF0  SysEx
   0x7E  Non-Realtime
   0x7F  The SysEx channel. Could be from 0x00 to 0x7F. Here we set it to "disregard channel".
@@ -777,14 +777,21 @@ module RRTS
 =end
 
   class SystemExclusiveEvent < MidiEvent
+    # value to send to enable GM on a GM compatible device
+    # After sending progchanges 0 to 127 have fixed voices, according to the GM specs
+    # Bank should probably set to 0 but I think it is ignored
+    ENABLE_GM = "\xf0\x7e\x7f\x09\x01\xf7".force_encoding('ascii-8bit')
+    # value to send to disable GM on a GM enabled device
+    DISABLE_GM = "\xf0\x7e\x7f\x09\x00\xf7".force_encoding('ascii-8bit')
+
     private
     # new Sequencer, event
 
     # new(data [,...])
-    def initialize data, params = {}
+    def initialize data, params = nil
       case params when AlsaMidiEvent_i then super(data, params)
       else
-        params[:value] = data
+        (params ||= {})[:value] = data
         super :sysex, params
       end
     end
@@ -804,10 +811,10 @@ module RRTS
     private
     # new Sequencer, event
     # new type, queue, [,...]
-    def initialize arg0, arg1 = nil, params = {}
+    def initialize arg0, arg1 = nil, params = nil
       case arg1 when AlsaMidiEvent_i then super(arg0, arg1)
       else
-        params[:queue] = arg1
+        (params ||= {})[:queue] = arg1
         super arg0, params
       end
     end
@@ -816,17 +823,17 @@ module RRTS
   class StartEvent < QueueEvent
     private
     # create a new StartEvent
-    def initialize queue, params = {}
+    def initialize queue, params = nil
       case params when AlsaMidiEvent_i then super(queue, params)
       else
-        super :start, arg0, arg1
+        super :start, queue, params
       end
     end
   end
 
   class StopEvent < QueueEvent
     private
-    def initialize queue, params = {}
+    def initialize queue, params = nil
       case params when AlsaMidiEvent_i then super(queue, params)
       else
         super :stop, queue, params
@@ -836,7 +843,7 @@ module RRTS
 
   class ContinueEvent < QueueEvent
     private
-    def initialize queue, params = {}
+    def initialize queue, params = nil
       case params when AlsaMidiEvent_i then super(queue, params)
       else
         super :continue, queue, params
@@ -846,7 +853,7 @@ module RRTS
 
   class ClockEvent < QueueEvent
     private
-    def initialize queue, params = {}
+    def initialize queue, params = nil
       case params when AlsaMidiEvent_i then super
       else
         super :clock, queue, params
@@ -858,7 +865,7 @@ module RRTS
     private
     # new Sequencer, event
     # new queue, [,...]
-    def initialize queue, params = {}
+    def initialize queue, params = nil
       case params when AlsaMidiEvent_i then super
       else
         super :tick, queue, params
@@ -874,10 +881,10 @@ module RRTS
     new sequencer, event
     new queue, tick [, params]
 =end
-    def initialize arg0, arg1 = nil, params = {}
+    def initialize arg0, arg1 = nil, params = nil
       case arg1 when AlsaMidiEvent_i then super(arg0, arg1)
       else
-        params[:value] = arg1
+        (params ||= {})[:value] = arg1
         super :setpos_tick, arg0, params
       end
     end
@@ -894,10 +901,10 @@ module RRTS
     new sequencer, event
     new queue, tick [, params]
 =end
-    def initialize arg0, arg1 = nil, params = {}
+    def initialize arg0, arg1 = nil, params = nil
       case arg1 when AlsaMidiEvent_i then super(arg0, arg1)
       else
-        params[:value] = arg1
+        (params ||= {})[:value] = arg1
         super :setpos_time, arg0, params
       end
     end
@@ -914,10 +921,10 @@ module RRTS
     new sequencer, event
 =end
     # new(queue, value[, params])
-    def initialize arg0, arg1 = nil, params = {}
+    def initialize arg0, arg1 = nil, params = nil
       case arg1 when AlsaMidiEvent_i then super(arg0, arg1)
       else
-        params[:value] = arg1
+        (params ||= {})[:value] = arg1
         super :sync_pos, arg0, params
       end
     end
@@ -928,7 +935,7 @@ module RRTS
 
    # There is also a META Tempo bit in a MIDI file.
 
-   # TempoEvent.
+   # TempoEvent. Also abused as a meta event sometimes
   class TempoEvent < QueueEvent
     private
 =begin
@@ -939,22 +946,25 @@ module RRTS
     #  call-seq:
     #     new(queue, tempo[, params])
     # tempo is an integer indicating the nr of microseconds per beat
+    # or it can be a Tempo
     # queue can be a MidiQueue or a queueid.
-    def initialize queue, tempo = nil, params = {}
+    def initialize queue, tempo = nil, params = nil
       if AlsaMidiEvent_i === tempo
         super(queue, tempo)
       else
-        params[:value] = tempo
+        (params ||= {})[:value] = tempo
         super :tempo, queue, params
       end
     end
 
     public
-    # the nr of usecs per beat
+    # the nr of usecs per beat, or the stored Tempo
     alias :tempo :value
-    # this is a better name
-    alias :usecs_per_beat :value
 
+    # this is a better name
+    def usecs_per_beat
+      Tempo === @value ? @value.usecs_per_beat : @value
+    end
 
     # technically it is a meta event
     def status
@@ -970,10 +980,10 @@ module RRTS
     new sequencer, event
     new queue, skew[, params]
 =end
-    def initialize arg0, arg1 = nil, params = {}
+    def initialize arg0, arg1 = nil, params = nil
       case arg1 when AlsaMidiEvent_i then super(arg0, arg1)
       else
-        params[:value] = arg1
+        (params ||= {})[:value] = arg1
         super :queue_skew, arg0, params
       end
     end
@@ -986,7 +996,7 @@ module RRTS
     private
     # new Sequencer, AlsaMidiEvent_i
     # new [,...]
-    def initialize arg0 = {}, arg1 = nil
+    def initialize arg0 = nil, arg1 = nil
       case arg1 when AlsaMidiEvent_i then super
       else super(:tune_request, arg0)
       end
@@ -996,7 +1006,7 @@ module RRTS
   # TODO: these classes can be made on the fly.
   class ResetEvent < MidiEvent
     private
-    def initialize params = {}, arg1 = nil
+    def initialize params = nil, arg1 = nil
       case arg1 when AlsaMidiEvent_i then super
       else super :reset, params
       end
@@ -1005,7 +1015,7 @@ module RRTS
 
   class SensingEvent < MidiEvent
     private
-    def initialize arg0 = {}, arg1 = nil
+    def initialize arg0 = nil, arg1 = nil
       case arg1 when AlsaMidiEvent_i then super
       else super :sensing, arg0
       end
@@ -1014,7 +1024,7 @@ module RRTS
 
   class EchoEvent < MidiEvent
     private
-    def initialize params = {}, arg1 = nil
+    def initialize params = nil, arg1 = nil
       case arg1 when AlsaMidiEvent_i then super
       else super :echo, params
       end
@@ -1067,7 +1077,7 @@ module RRTS
   class MetaEvent < MidiEvent
     private
     # can never be constructed through AlsaMidi since there is no such event
-    def initialize params = {}
+    def initialize params = nil
       super :meta, params
     end
 
@@ -1087,8 +1097,8 @@ module RRTS
 
   class MetaTextEvent < MetaEvent
     private
-    def initialize value, params = {}
-      params[:value] = value
+    def initialize value, params = nil
+      (params ||= {})[:value] = value
       super params
     end
   end
@@ -1103,7 +1113,7 @@ module RRTS
 
   class ProgramNameEvent < MetaTextEvent
     private
-    def initialize(channel, value, params = {})
+    def initialize channel, value, params = {}
       params[:channel] = channel
       super(value, params)
     end
@@ -1149,5 +1159,65 @@ module RRTS
     def key_signature
       [@key, @major]
     end
+  end
+
+  class TrackEvent < MidiEvent
+  end
+
+  class TrackCreateEvent < TrackEvent
+    private
+    def initialize
+      super(:track_create)
+      require_relative 'node/track'
+      @value = Node::Track.allocate_key
+    end
+    public
+    alias :key :value
+  end
+
+  class ChunkCreateEvent < TrackEvent
+    private
+    def initialize params = nil
+      @split_channels = false
+      @combine_notes = @combine_lsb_msb = @combine_progchanges = true
+      super(:chunk_create, params)
+    end
+
+    #override
+    def parse_option k, v
+      case k
+      when :split_channels then @split_channels = v
+      when :combine_lsb_msb then @combine_lsb_msb = v
+      when :combine_progchanges then @combine_progchanges = v
+      when :combine_notes then @combine_notes = v
+      else super
+      end
+    end
+
+    public
+
+    attr :split_channels, :combine_lsb_msb, :combine_notes, :combine_progchanges
+  end
+
+  class TrackPortIndexEvent < TrackEvent
+    private
+    def initialize i, params = nil
+      super(:trackportindex, params)
+      @value = i
+    end
+    public
+
+    alias :portindex :value
+  end
+
+  class TrackIntendedDeviceEvent < TrackEvent
+    private
+    def initialize dev, params = nil
+      super(:intended_device, params)
+      @value = dev
+    end
+    public
+
+    alias :intended_device :value
   end
 end # RRTS

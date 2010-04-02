@@ -46,4 +46,58 @@
         Should wrap ALL potentially blocking calls. I don't know for sure if this is the case...
      za mrt 27 21:41:42 CET 2010
 0012 ma mrt 29 17:30:34 CEST 2010 TODO: missing events in alsa_seq.cpp event_output
-      queue messages and alsa connection messages are blatantly missing
+      queue messages and alsa connection messages are blatantly missing.
+      To see this disconnect two ports using kaconnect, and player complains.
+0013 ma mrt 29 17:33:12 CEST 2010 TODO: checking impact GC on realtime filters
+      There is a GC.count method that tells you how many times the GC has run.
+0014 ma mrt 29 21:21:36 CEST 2010 HOWTO implement splitter.
+      The next task is to split a recording into its separate channels and save these
+      and then to play them back simultaneously (which is the reverse process).
+        I) could make a node with an outputconnector per channel and then connect the yamlwriters
+        to this.
+        II) alternatively a filter could be used between each writer and the original node.
+        This way several nodes all connect to one socket but they read different stuff.
+        III) a mix. The splitter receives a request for some event. If there are events in
+        the stashbuffer for the output we return the first (FIFO). Otherwise we start
+        reading events from the input. If the event matches the splitter condition we return it
+        and we are done.  Otherwise we stash the event in a FIFO buffer attached to another
+        splitter output (the one with the proper condition). Maybe we could try them one
+        by one. Finally, if there is no splitter condition valid, the event is discarded.
+      II make look cleaner but has a problem. Each filter has to be given all data which
+      increases the number of event handlings. It is also closer to how things work now.
+      The writer is always the active reading process, while the reader process reads
+      on demand.
+      I is clumsier in that we now have to connect our next node to some named subnode of the
+      splitter.
+      What to split? channels come to mind. And maybe port destinations.
+      A range of keys on the keyboard.  A minimum or maximum gate time.
+      Now we are getting somewhere. It can be completely generic with any kind of query
+      on an event that is possible. The query would obviously be a ruby block.
+      Indentity can be seen as a Splitter with { |ev| true } as its condition.
+      A Splitter must be given names + conditions to setup its output structure.
+0015 do apr  1 10:40:41 CEST 2010 TODO: review 'combine' and split options. Currently only active
+    in Chunk#consume which is stupid and the wrong place.  The previous version had major problems
+    with blocking but that is no longer the case.  So this can be done by filters.
+    Well, 'split_channels' really only applies to Chunk at the moment. All producers
+    are pure messagecreators, and tracks no longer apply. In that sense, a Chunk is now a Filter
+    and not a Producer perse.
+    Currently I cannot combine notes in Recorder, which is bad. On the other hand, combining
+    still delays the original noteon message!  So it depends on the situation. And it is not
+    a big deal if disfunctional! YamlWriter should be able to use it though. And MidiFileReader
+    could use it.  Workaround: use a chunk filter.
+0016 do apr  1 23:10:40 CEST 2010 FIXME: CTRL-C + Player -> small delay shutting down
+    This can be avoided by sending a special InterruptEvent if the caller is interrupted (which
+    is now more likely then Player itself). In fact Player cannot be interrupted since it calls
+    each_fiber which does not return (it's weird). On receipt of this event we clean
+    the queue (but no close yet)
+-0017 do apr  1 23:14:14 CEST 2010 BUG: Player + threads deadlocks. But it strange since basicly,
+    there is only one extra thread, because the main process is just calling 'join'.
+    It may also be event_output hanging. But why? What have threads got to do with this?
+    It is now certain that event_output() hangs (the wrapper in alsa_midi.so)
+    It seems that using rb_funcall is a nono for code within a rb_thread_blocking_region
+    callback. What is likely happening is that the GIL somehow got locked.
+    This could then be fixed by putting it in a more precise spot. It now embraces too much code,
+    that would not block anyway.
+     vr apr  2 12:24:10 CEST 2010
+0018 vr apr  2 10:36:35 CEST 2010 FIXME: Chunk as a producer does not create the TrackEvents and
+    the initial tempo may also be missing.

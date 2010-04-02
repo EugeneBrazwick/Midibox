@@ -27,15 +27,13 @@ module RRTS #namespace
     require_relative '../rrts'
     require_relative 'node'
 
-    # The Parser will be a class that is basically used in the chunk constructor.
-
 =begin rdoc
-  The parser scans a midifile and records its tracks in a chunk.
-  It does this by storing the synthesized parsernodes into the passed builder
-  using '<<'. The builder should take care of the level.
-  The parser maintains a reference to the generated tracks and chunks, as long
-  as they are being read.
-  When done it stores an EOFError exception into the builder.
+  The MidiIOReader is a Producer that creates MidiEvents from a MIDI file
+  (Standard Midi Fileformat)
+
+  It does this by creating events.
+
+  Normally you would connect it to a chunk node.
 
   ----
 
@@ -46,21 +44,74 @@ module RRTS #namespace
   are used. But they player may not even have three ports available, and even if so,
   they may refer to different devices than what was recorded.
 
-  Supported options:
-  * split_tracks, default false. Only works if internalize is true.
-  * combine_notes, default false (but may likely change).
-  If internalize is false this will delay the emission of the Note events
-  until the NoteOff is read
-  * combine_progchanges, default false (but may likely change)
-
 =end
-    class MidifileParser
+    class MidiIOReader < Producer
       private
-      # the parser will not close the io.
-      def initialize io, builder, track_options = {}, &block
-        @io, @builder, @block = io, builder, block
-        @track_options = track_options
+
+      def parse_option k, v
+        case k
+        when :auto_close then @auto_close = v
+        when :split_channels then @split_channels = v
+        when :combine_notes then @combine_notes = v
+        when :combine_progchanges then @combine_progchanges = v
+        when :combine_lsb_msb then @combine_lsb_msb = v
+        when :no_tampering then @combine_lsb_msb = @combine_notes = @combine_progchanges =
+                                @split_channels = !v
+        else super
+        end
+      end
+
+=begin rdoc
+    MidiIOReader is a simple node.
+
+    [input]  IO
+    [output] MidiEvents
+
+    supported options:
+    * split_tracks, default false.
+    * combine_notes, default true
+      This will delay the emission of the Note events until the NoteOff is read
+    * combine_progchanges, default true. Combine bank + progchange messages.
+    * combine_lsb_msb, default true. Combine control14 messages
+    * auto_close, default true. Close the stream on EOF or on errors
+    * no_tampering, setting it to true sets split_channels, combine_progchanges, combine_notes,
+      and combine_lsb_msb to the opposite of the value passed here (normally 'true')
+
+*IMPORTANT*  these combine + split options do not do anything here at all. They are
+passed to Chunk, if you send the output into a Chunk consumer node. However, this node
+must have been created first and therefore already has its own options set.
+So consider it likely that they will vanish.
+=end
+      def initialize io, options = {}
+        require_relative '../tempo'
+        @io = io # what we read from
+#         @track_options = options
         @pos = 0 # io.pos does not work on pipes. So there...
+        @split_channels = false
+        @combine_lsb_msb = @combine_notes = @combine_progchanges = true
+#         @tempo = Tempo.new
+#         @chunk = nil # cached if internalize is set, and should contain all tracks + events (!)
+#         tag "options=#{options.inspect}"
+        @auto_close = true
+        super(options)
+#         tag "MidiIOReader.new, @internalize=#@internalize, options=#{options.inspect}"
+=begin
+        if @internalize
+          require_relative 'chunk'
+          chunk = Chunk.new(split_channels: @split_channels, combine_lsb_msb: @combine_lsb_msb,
+                             combine_notes: @combine_notes,
+                             combine_progchanges: @combine_progchanges)
+          parser = MidifileParser.new @io, combine_lsb_msb: @combine_lsb_msb,
+                             combine_notes: @combine_notes,
+                             combine_progchanges: @combine_progchanges
+          parser >> chunk
+          parser.run
+          # careful assignment of the completed chunk
+          @chunk = chunk
+        end
+      end
+=end
+
 =begin  These options are for the builder?
         Well we have two builders. Although the code could be shared.
         And I think that would be better.
@@ -78,14 +129,6 @@ module RRTS #namespace
           end
         end
 =end
-        case read_id # .tap {|v| tag "v=#{v}, MTHD=#{MTHD},RIFF=#{RIFF}"}
-        when MTHD
-          read_smf
-        when RIFF
-          read_riff
-        else
-          raise RRTSError.new("#@io is not a Standard MIDI File")
-        end
       end
 
       def read_byte
@@ -163,7 +206,9 @@ module RRTS #namespace
 
       #  reads one complete track from the file
       # it may set metadata in track, but the events are added to @builder!
-      def read_track track, track_end
+      # there MUST be a current track or this information is lost for those that
+      # do not make the chunk !
+      def read_track track_key, track_end
         tick = 0 # keep track of timings
         last_cmd = 0 # for running status
 #         tag "read_track, starting at pos #@pos, last_cmd := 0, track_end = #{track_end}"
@@ -197,29 +242,25 @@ module RRTS #namespace
           when 0x8
             note = read_byte & 0x7f
             off_vel = read_byte & 0x7f
-            event = NoteOffEvent.new(channel, note, off_velocity: off_vel, track: track,
-                                     tick: tick)
+            event = NoteOffEvent.new(channel, note, off_velocity: off_vel)
           when 0x9, 0xa #* channel msg with 2 parameter bytes */
             note = read_byte & 0x7f
             vel =  read_byte & 0x7f
             klass = status == 0x9 ? NoteOnEvent : KeypressEvent
-            event = klass.new(channel, note, vel, track: track, tick: tick)
+            event = klass.new(channel, note, vel)
           when 0xb # controller
             param = read_byte & 0x7f
             val =  read_byte & 0x7f
             # coarse: true since ControllerEvent must interpret this value as 7 bits int.
-            event = ControllerEvent.new(channel, param, val, track: track, tick: tick, coarse: true)
+            event = ControllerEvent.new(channel, param, val, coarse: true)
           when 0xc
-            event =  ProgramChangeEvent.new(channel, read_byte & 0x7f, track: track,
-                                            tick: tick)
+            event =  ProgramChangeEvent.new(channel, read_byte & 0x7f)
           when 0xd
-            event = ChannelPressureEvent.new(channel, read_byte & 0x7f, track: track,
-                                             tick: tick)
+            event = ChannelPressureEvent.new(channel, read_byte & 0x7f)
           when 0xe
             a = read_byte & 0x7f  # lo
             b = read_byte & 0x7f  # hi
-            event = PitchbendEvent.new(channel, a + b << 7 - 0x2000, track: track,
-                                       tick: tick)
+            event = PitchbendEvent.new(channel, a + b << 7 - 0x2000)
           when 0xf
             case cmd
             when 0xf0, 0xf7 # sysex, continued sysex, or escaped commands
@@ -233,7 +274,7 @@ module RRTS #namespace
                 len -= 1
               end
               sysex += read(len)
-              event = SysexEvent.new(sysex, track: track, tick: tick)
+              event = SysexEvent.new(sysex)
             when 0xff # meta event
               c = read_byte
 #               tag "read byte #{c} == meta event kind, pos = #@pos"
@@ -242,23 +283,20 @@ module RRTS #namespace
               case c
               when 0x21 # port number
                 read_error('0 length portnumber') if len < 1
-                track.portindex = read_byte
+                event = TrackPortIndexEvent.new(read_byte)
                 skip(len - 1) unless len == 1
               when 0x2f # end of track
-                track.end_time = tick
-                event = LastEvent.new(track: track, tick: tick)
+                event = LastEvent.new
                 skip(track_end - @pos) unless track_end < @pos
-                @builder.<<(event, &@block)
-                return
               when 0x51 # tempo
 #                 tag "got tempo, len = #{len}"
                 read_error('tempo too short') if len < 3
-                if @builder.tempo.smpte_timing?
+                if @tempo.smpte_timing?
                   #  SMPTE timing doesn't change
                   skip len
                 else
                   # nrof microseconds for a single beat
-                  event = TempoEvent.new(0, read_int(3), track: track, tick: tick)
+                  event = TempoEvent.new(0, read_int(3))
                   skip(len - 3) if len > 3
                 end
               when 0x0 # sequence nr of the track
@@ -289,7 +327,7 @@ module RRTS #namespace
                 # should be prefixed with MetaChannelEvent
                 event = ProgramNameEvent.new(meta_channel, read(len))
               when 0x9 # intended device
-                track.intended_device = read(len)
+                event = TrackIntendedDeviceEvent.new(read(len))
               when 0x20
                 meta_channel = read_byte
               when 0x58 # time signature
@@ -328,7 +366,12 @@ module RRTS #namespace
             invalid_format("Invalid command #{cmd}")
           end
 #           tag "sending event #{event} to builder, time=#{event && event.time.inspect}"
-          @builder.<<(event, &@block) if event
+          if event
+            event.track = track_key
+            event.tick = tick
+            @yielder.call(event)
+            return if LastEvent === event
+          end
         end # while
         # expected was EOT metaevent
         raise RRTSError.new("#{@io}: invalid MIDI data (offset=#@pos, track_end=#{track_end})")
@@ -341,6 +384,13 @@ module RRTS #namespace
       # reads an entire Standard MIDI File
       def read_smf
         # the curren position is immediately after the "MThd" id
+        require_relative '../midievent'
+        track_options = { split_channels: @split_channels,
+                          combine_lsb_msb: @combine_lsb_msb,
+                          combine_notes: @combine_notes,
+                          combine_progchanges: @combine_progchanges}
+        ev = ChunkCreateEvent.new(track_options)
+        @yielder.call(ev)
         header_len = read_int 4
         invalid_format("header_len=#{header_len} < 6") if header_len < 6
         type = read_int 2
@@ -361,14 +411,14 @@ module RRTS #namespace
         require_relative '../tempo'
         unless smpte_timing
           # time_division is ticks per quarter
-          tempo = Tempo.new 120, ticks_per_beat: time_division
+          @tempo = Tempo.new 120, ticks_per_beat: time_division
         else
-          tempo = Tempo.new(0x80 - ((time_division >> 8) & 0x7f), smpte_timing: true,
+          @tempo = Tempo.new(0x80 - ((time_division >> 8) & 0x7f), smpte_timing: true,
                                   ticks_per_frame: (time_division & 0xff))
           # upper byte is negative frames per second
           # lower byte is ticks per frame
         end
-        @builder.tempo = tempo
+        @yielder.call TempoEvent.new(0, @tempo)
         #   read tracks
         for i in (0...num_tracks)
           # search for MTrk chunk
@@ -381,13 +431,13 @@ module RRTS #namespace
             skip len
           end
           require_relative 'track'
-          require_relative '../midievent'
-          track = Track.new @track_options
-          @builder << track
-          read_track(track, @pos + len)
+          ev = TrackCreateEvent.new
+          @yielder.call(ev)
+          read_track(ev.key, @pos + len)
         end
       end
 
+      # this will call read_smf
       def read_riff
         # skip file length
         skip 4
@@ -404,125 +454,92 @@ module RRTS #namespace
         invalid_format('MTHD expected') unless read_id == MTHD
         read_smf
       end
-    end # class MidifileParser
-
-=begin rdoc
-    MidiIOReader is a simple node.
-
-    [input]  IO
-    [output] MidiEvents
-
-    supported options:
-    * split_tracks, default false. Only works if internalize is true.
-    * combine_notes, default false (but may likely change).
-      If internalize is false this will delay the emission of the Note events
-      until the NoteOff is read
-    * combine_progchanges, default false (but may likely change)
-    * auto_close, default true. Close the stream on EOF or on errors
-    * internalize, default true. Read the stream
-      until EOF first, only then is the first event available.
-      If false is passed then split_tracks, combine_notes and combine_progchanges
-      are all ignored!
-=end
-    class MidiIOReader < EventsNode
-      private
-      def initialize io, options = {}
-        require_relative '../tempo'
-        @tempo = Tempo.new
-        @chunk = nil # cached if internalize is set
-#         tag "options=#{options.inspect}"
-        @io = io
-        @auto_close = @internalize = true
-        for k, v in options
-          case k
-          when :auto_close then @auto_close = v
-          when :internalize then @internalize = v
-          end
-        end
-        options.delete(:auto_close)
-        options.delete(:internalize)
-#         tag "MidiIOReader.new, @internalize=#@internalize, options=#{options.inspect}"
-        if @internalize
-          require_relative 'chunk'
-          chunk = Chunk.new(options)
-          options.delete(:split_tracks)
-          MidifileParser.new @io, chunk, options
-          @chunk = chunk
-        end
-      end
 
       public
+
+#       def produce
+#         @chunk && @chunk.produce || super
+#       end
+
       # enumerate the loaded events
       def each &block
+#         return (@chunk ? @chunk.to_enum : to_enum) unless block
         return to_enum unless block
         begin
-          @chunk and return @chunk.each(&block)
-          builder = self
-          #           tag "creating MidifileParser"
-          MidifileParser.new @io, builder, &block
-          # Otherwise we are already done (!!) No really!
-#           tag "should we send LastEvent?" But it has no track? So NO! (stupid idea)
+          @yielder = block
+          case read_id # .tap {|v| tag "v=#{v}, MTHD=#{MTHD},RIFF=#{RIFF}"}
+          when MTHD
+            read_smf
+          when RIFF
+            read_riff # which also calls read_smf
+          else
+            raise RRTSError.new("#@io is not a Standard MIDI File")
+          end
         ensure
           @io.close if !@io.closed? && @auto_close
         end
       end
 
+      def split_channels?
+        @split_channels
+      end
+
       # The current tempo as maintained by the loader
-      attr_accessor :tempo
+#       attr_accessor :tempo
 
       # This is only called for reading from pipes, where this option is not
-      # available
-      def time_signature= bogo
-      end
+      # available ????
+#       def time_signature= bogo
+#       end
 
       # Change the tempo. Should be set before starting a queue
-      def ticks_per_beat= ppq
-        @tempo.ppq = ppq
-      end
+#       def ticks_per_beat= ppq
+#         @tempo.ppq = ppq
+#       end
 
-      alias :ppq= :ticks_per_beat=
+#       alias :ppq= :ticks_per_beat=
 
       # Anything else than MidiEvent is ignored, otherwise yielded
-      def << event
-#         tag "<<#{event}, tick=#{event.time.inspect}"
-        yield(event) if MidiEvent === event
-      end
+      # Builder compatibility/signature/interface
+#       def << event
+#         yield(event) if MidiEvent === event
+#       end
 
       # only works when @internalize was set, and rewinds the chunk
-      def rewind
-        @chunk && @chunk.rewind
-      end
+#       def rewind
+#         @chunk && @chunk.rewind
+#       end
 
       # only works when @internalize was set and returns a tuple like [3,4]
-      def time_signature
-        @chunk && @chunk.time_signature
-      end
-
+#       def time_signature
+#         @chunk && @chunk.time_signature
+#       end
+#
       # tuple [:C, true] for Cmajor etc. Only works if @internalize was set
       # and delegates to @chunk
-      def key
-        @chunk && @chunk.key
-      end
+#       def key
+#         @chunk && @chunk.key
+#       end
 
       # Normally 24. Delegates to chunk is available, otherwise nil
-      def clocks_per_beat
-        @chunk && @chunk.clocks_per_beat
-      end
+#       def clocks_per_beat
+#         @chunk && @chunk.clocks_per_beat
+#       end
 
       # As saved in @tempo (always available), at least when a TempoEvent was present
-      def ticks_per_beat
-        @tempo.ppq
-      end
+#       def ticks_per_beat
+#         @tempo.ppq
+#       end
 
       # override. Returns flat array of all tracks
-      def listing
-        @chunk && @chunk.listing || super
-      end
+#       def listing
+#         @chunk && @chunk.listing || super
+#       end
 
       # override
-      def chunk
-        @chunk || self
-      end
+#       def chunk
+# #         @chunk
+#       end
     end # class MidiIOReader
 
 =begin rdoc

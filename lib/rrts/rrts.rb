@@ -33,4 +33,4 @@ module RRTS
   def niy
     tag 'Not implemented yet: ' + msg
   end
-end
+end # module RRTS

@@ -129,7 +129,9 @@ module RRTS
 
      # pulses (ticks) per second
      def pps
-       @smpte_timing ? @ticks_per_frame * @frames : @handle.ppq * 1_000_000 / tempo
+       @smpte_timing ? @ticks_per_frame * @frames : @handle.ppq * 1_000_000 / @handle.tempo
      end
+
+     alias :usecs_per_beat :tempo
   end  # Tempo
 end # RRTS

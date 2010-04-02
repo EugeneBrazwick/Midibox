@@ -8,7 +8,7 @@ module RRTS
 
     # this class is related to MidiIOReader and YamlIOReader.
     # But now we read from one port (or several).
-    class Recorder < EventsNode
+    class Recorder < Producer
 
       private
 
@@ -23,8 +23,10 @@ options::  a hash with the following names options:
   blockingmode:: default true
   clientname:: default 'rrecorder'
   client_name:: alias
+
+More options as for Producer#new
 =end
-      def initialize src_port_specifier, options = {}
+      def initialize src_port_specifier, options = nil
         @src_port_specifiers = src_port_specifier.respond_to?(:to_str) ?
                                  src_port_specifier.to_str.split(',') : src_port_specifier
         @smpte_timing = false
@@ -32,20 +34,23 @@ options::  a hash with the following names options:
         @beats = 120
         @client_name = 'rrecorder'
         @blockingmode = true
-        for k, v in options
-          case k
-          when :smpte_timing then @smpte_timing = v; @beats = nil
-          when :ticks then @ticks = v
-          when :blockingmode then @blockingmode = v
-          when :beats then @beats = v; @frames = nil; @smpte_timing = true
-          when :frames then @frames = v; @beats = nil; @smpte_timing = false
-          when :clientname, :client_name then @client_name = v
-          when :channel_split # ignored, has no meaning
-          else raise RRTSError.new("illegal option '#{k}' for Recorder")
-          end
-        end
+        super(options)
         @ticks = @smpte_timing ? 40 : 384 unless @ticks
         @ticks = 255 if @smpte_timing && @ticks > 255
+      end
+
+      #override
+      def parse_option k, v
+        case k
+        when :smpte_timing then @smpte_timing = v; @beats = nil
+        when :ticks then @ticks = v
+        when :blockingmode then @blockingmode = v
+        when :beats then @beats = v; @frames = nil; @smpte_timing = true
+        when :frames then @frames = v; @beats = nil; @smpte_timing = false
+        when :clientname, :client_name then @client_name = v
+        when :channel_split # ignored, has no meaning
+        else super
+        end
       end
 
       def run_recorder seq
@@ -68,18 +73,21 @@ options::  a hash with the following names options:
         descriptors = seq.poll_descriptors
         loop do
           begin
+#             tag "thread is waiting for poll"
             descriptors.poll
             event = seq.event_input
             case event
             when ClockEvent, TickEvent # do nothing
+#               tag "received CLOCK/TICK"
             else
               yield event
             end
           rescue Errno::EAGAIN
             sleep(seq.polltime)
           rescue Interrupt
-            # silent break
-            break
+            tag "Interrupt 'received'"
+            # silent break. Unfortunately ruby SEGV's on a ^C within a thread
+            return
           end
         end # loop
       end
@@ -87,24 +95,26 @@ options::  a hash with the following names options:
       public
 
       # enumerate the events
-      def each &block
+      def each(&block)
         return to_enum unless block
         require_relative '../sequencer'
         if seq = Sequencer[@client_name]
 #           tag "dipping in existing sequencer #@client_name"
-          run_recorder seq, &block
+          run_recorder(seq, &block)
         else
 #           tag "each, creating sequencer '#@client_name'"
-          Sequencer.new(@client_name, blockingmode: @blockingmode) do |seq|
-            run_recorder seq, &block
+          Sequencer.new(@client_name, blockingmode: @blockingmode) do |seq2|
+            run_recorder(seq2, &block)
           end # close Sequencer
         end
+#       rescue Interrupt  # ^C -> SEGV
+        # return quietly
       end # def each
 
-      # each may block.
-      def spamming?
-        false
-      end
+      # we obviously never spam
+#       def spamming?
+#         false
+#       end
     end # class Recorder
 
   end # module Node
@@ -113,7 +123,8 @@ end # module RRTS
 if __FILE__ == $0
   include RRTS
   include Node
-  input = Recorder.new('20:0')
+  input = Recorder.new('20:0', threads: true)
   require_relative 'yamlwriter'
   YamlPipeWriter.new(STDOUT, input)
+  input.run
 end

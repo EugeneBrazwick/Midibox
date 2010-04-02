@@ -27,9 +27,10 @@ CreateTrackEvent.
 	    it returns the event with smallest timestamp and priority
     - peek. Return the same event as next but without changing the track position
     - listing. Return a flat array with all contained tracks
+
+A chunk can also be used as a consumer.
 =end
-    class Chunk < EventsNode
-      include Enumerable
+    class Chunk < Producer
       extend Forwardable
       # constant for setting the key
       MAJOR = true
@@ -37,27 +38,34 @@ CreateTrackEvent.
       # It is possible to change the key using a KeySignatureEvent
       MINOR = false
       private
-      # Option used is _split_tracks_ to record each channel on its
+      # Option used is _split_channels_ to record each channel on its
       # own track. This does not merge tracks, even if they share a channel
       # All other options are passed on to the track
       # However, a track is only created when the first event is send
-      def initialize options = {}
-        @split_tracks = true
-        for k, v in options
-          @split_tracks = v if k == :split_tracks
-          # the rest is passed on
-        end
-        @options = options    # to pass to CompoundTrack
-        require_relative '../tempo'
-        @tempo = Tempo.new
+      def initialize producer = nil, options = nil
+        @split_channels = false
+        @options = options # for creating tracks
+#         require_relative '../tempo'
+        @tempo = nil # similar, should be taken as 'Tempo.new'
         @time_signature = nil #  4, 4  do not set it! Otherwise saving/loading MIDI will result in
                               # differences.  Can be interpreted on other level if so required
         @clocks_per_beat = nil
         @key = nil # :C, MAJOR no default here
         @track = nil
-        @track_index = {} # hash indexed by key
-        # track remains empty until the first event is sent (using <<)
+        @track_index = {} # hash indexed by key, contains all tracks within the chunk.
+        super(options)
+        # track remain empty until the first event is sent (using <<)
+        producer >> self if producer
       end
+
+      def parse_option k, v
+        case k
+        when :split_tracks, :split_channels then @split_channels = v
+        when :combine_lsb_msb, :combine_notes, :combine_progchanges
+        else super
+        end
+      end
+
       public
 
       def to_yaml_properties
@@ -87,36 +95,72 @@ CreateTrackEvent.
       # ppq == pulses per quarter, same as ticks per beat
       alias :ppq= :ticks_per_beat=
 
-      # builder compatibilty. It is possible to add events
-      # but the argument can also be a track. That track will
-      # then be used as the current track. More than one track
-      # can be added to the chunk
-      def << event
-        case event
-        when BaseTrack
-          @track_index[event.key] = event
-          if @track # aready exists
-            if CompoundTrack === @track
-              @track << event
-            else
-              @track = CompoundTrack.new(@track, @options)
-            end
-          elsif @split_tracks
-            @track = CompoundTrack.new(event, @options)
-          else
-            @track = event
-          end
-          return self
-        when TimeSignatureEvent
-          @time_signature = event.time_signature
-          @clocks_per_beat = event.clocks_per_beat
-        when KeySignatureEvent
-          @key = event.key_signature
-        when TempoEvent
-          @tempo.tempo = event.usecs_per_beat
+      def consume producer, &when_done
+        if chunk = producer.chunk
+          # clone it (by reference even)
+          @split_channels = chunk.split_channels
+          @options = chunk.options    # to pass to CompoundTrack
+          @tempo = chunk.tempo
+          @time_signature = chunk.time_signature
+          @clocks_per_beat = chunk.clocks_per_beat
+          @key = chunk.key # :C, MAJOR no default here
+          @track = chunk.track
+          @track_index = chunk.track_index
+          when_done.call if when_done
+          return nil
         end
-        @track << event
-        self
+        each_fiber(when_done) do |event|
+#           tag "Chunk receives event #{event}"
+          case event
+          when ChunkCreateEvent
+            @split_channels = event.split_channels
+            @options = { :combine_lsb_msb=>event.combine_lsb_msb,
+                         :combine_notes=>event.combine_notes,
+                         :combine_progchanges=>event.combine_progchanges,
+                         :split_channels=>@split_channels}
+#             tag "ChunkCreateEvent received, options is now #{@options.inspect}"
+            event = nil # cannot store this event, there is no track yet
+          when TrackCreateEvent
+#             tag "CREATE TRACK, options=#{@options.inspect}"
+            track = Track.new(@options)
+#             tag "HERE"
+            @track_index[track.key] = track
+            if @track # aready exists
+              unless CompoundTrack === @track
+                @track = CompoundTrack.new(@track, @options)
+                event = nil
+                # currently, compound tracks have no key
+#                 @track_index[@track.key] = @track
+              end
+            elsif @split_channels
+              @track = CompoundTrack.new(track, @options)
+              event = nil
+#               @track_index[@track.key] = @track
+            else
+              @track = track
+              event = nil
+            end
+          when TimeSignatureEvent
+            @time_signature = event.time_signature
+            @clocks_per_beat = event.clocks_per_beat
+          when KeySignatureEvent
+            @key = event.key_signature
+          when TempoEvent
+            if Tempo === (t = event.tempo) # NOT usecs_per_beat
+              @tempo = t
+            else
+              raise RTTSError, 'no tempo available' unless @tempo
+              # don't know if you get the correct result if only usecs_per_beat is known
+              @tempo.tempo = t
+            end
+            # sometimes arrives when there is not yet a track made
+            event = nil unless @track
+          when ControllerEvent
+#             tag "received: #{event}"
+          end
+#           tag "event=#{event.inspect}"
+          @track << event if event
+        end
       end
 
       def_delegators :@track, :each, :rewind, :next, :peek, :listing
@@ -145,6 +189,10 @@ CreateTrackEvent.
         @track_index[event.track] or raise RRTSError.new("Track #{event.track} could not be located, keys=#{@track_index.keys.inspect}")
 #         else event.track
 #         end
+      end
+
+      def to_chunk
+        self
       end
     end # class Chunk
 

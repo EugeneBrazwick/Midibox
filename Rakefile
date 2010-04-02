@@ -22,7 +22,7 @@ end
 # there aren't yet....
 task :test do
   require 'rake/runtest'
-  Rake.run_tests 'test**/**Test.rb'
+  Rake.run_tests 'test/ts_*.rb'
 end
 
 file ALSALIB => FileList['lib/rrts/driver/*.cpp'] do

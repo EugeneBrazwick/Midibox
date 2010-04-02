@@ -329,6 +329,7 @@ alsa_midi_queue_init()
   alsaQueueStatusClass = rb_define_class_under(alsaDriver, "AlsaQueueStatus_i", rb_cObject);
 
   rb_define_method(alsaQueueTempoClass, "tempo=", RUBY_METHOD_FUNC(wrap_snd_seq_queue_tempo_set_tempo), 1);
+  rb_define_method(alsaQueueTempoClass, "usecs_per_beat=", RUBY_METHOD_FUNC(wrap_snd_seq_queue_tempo_set_tempo), 1);
   rb_define_method(alsaQueueTempoClass, "ppq=", RUBY_METHOD_FUNC(wrap_snd_seq_queue_tempo_set_ppq), 1);
   rb_define_method(alsaQueueTempoClass, "copy_to", RUBY_METHOD_FUNC(wrap_snd_seq_queue_tempo_copy_to), -1);
   rb_define_method(alsaQueueTempoClass, "skew=", RUBY_METHOD_FUNC(wrap_snd_seq_queue_tempo_set_skew), 1);
@@ -337,6 +338,7 @@ alsa_midi_queue_init()
   rb_define_method(alsaQueueTempoClass, "skew", RUBY_METHOD_FUNC(wrap_snd_seq_queue_tempo_get_skew), 0);
   rb_define_method(alsaQueueTempoClass, "ppq", RUBY_METHOD_FUNC(wrap_snd_seq_queue_tempo_get_ppq), 0);
   rb_define_method(alsaQueueTempoClass, "tempo", RUBY_METHOD_FUNC(wrap_snd_seq_queue_tempo_get_tempo), 0);
+  rb_define_method(alsaQueueTempoClass, "usecs_per_beat", RUBY_METHOD_FUNC(wrap_snd_seq_queue_tempo_get_tempo), 0);
   rb_define_method(alsaQueueTempoClass, "queue", RUBY_METHOD_FUNC(wrap_snd_seq_queue_tempo_get_queue), 0);
 
   rb_define_method(alsaQueueInfoClass, "flags=", RUBY_METHOD_FUNC(wrap_snd_seq_queue_info_set_flags), 1);

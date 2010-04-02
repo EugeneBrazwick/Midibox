@@ -106,6 +106,7 @@ module RRTS
 =end
     def initialize arg0, arg1 = nil
       case arg1 when AlsaMidiEvent_i # input_event handling
+        @flags = DEFAULT_FLAGS
         arg1.populate(arg0, self) # See alsa_midi++.cpp
         #       puts "called populate, @type=#@type, type=#{type}"
       else # result of user construction
@@ -120,6 +121,7 @@ module RRTS
 #         puts "#{File.basename(__FILE__)}:#{__LINE__}:@tick:=nil"
         arg1.each { |k, v| parse_option k, v } if arg1
       end
+      raise RTTSError, "internal error, no flags" unless @flags
     end
 
     def parse_option k, v
@@ -166,7 +168,7 @@ module RRTS
     # coarse_b should be true if we need to send a single event.
     # otherwise an MSB + LSB should both be send
     def debunkparam_i
-#       tag "param = #{@param.inspect}"
+#       tag "param = #{@param.inspect}, event = #{self}, flags=#{@flags.inspect}"
       if Symbol === @param
         p = Symbol2Param[@param] or raise RRTSError.new("Bad paramname '#@param'")
         return p, @flags[:coarse]
@@ -418,9 +420,9 @@ module RRTS
     def initialize arg0, arg1 = nil, value = nil, params = nil
       case arg1 when AlsaMidiEvent_i then super(arg0, arg1)
       else
-        (params ||= {})[:channel] = arg1
-        params[:value] = value
         super arg0, params
+        @value = value
+        @channel = arg1
       end
     end
   end
@@ -436,15 +438,15 @@ module RRTS
     def initialize channel, note = nil, velocity = nil, params = nil
       case note when AlsaMidiEvent_i then super(channel, note)
       else
-        (params ||= {})[:velocity] = velocity
         super :noteon, channel, note, params
+        @velocity = velocity
       end
     end
 
     public
 
     def to_s
-      "NoteOnEvent ch:#@channel, #@value, vel:#@velocity"
+      "NoteOnEvent[#@time] ch:#@channel, #@value, vel:#@velocity"
     end
 
     alias :note :value
@@ -467,8 +469,8 @@ module RRTS
     def initialize channel, note = nil, velocity = nil, params = nil
       case note when AlsaMidiEvent_i then super(channel, note)
       else
-        (params ||= {})[:velocity] = velocity
         super :keypress, channel, note, params
+        @velocity = velocity
       end
     end
 
@@ -610,7 +612,8 @@ module RRTS
 #     ControllerEvent.new channel, :bank_select, [1, 23]
 #     This would select bank 1*128+23.    BROKEN???
     def initialize channel, param = nil, value = 0, params = nil
-      case param when AlsaMidiEvent_i then super(channel, param)
+      case param when AlsaMidiEvent_i
+        super(channel, param)
       else
         params, value = value, 0 if Hash === value
         (params ||= {})[:param] = Driver::param2sym(param)
@@ -948,12 +951,13 @@ module RRTS
     # tempo is an integer indicating the nr of microseconds per beat
     # or it can be a Tempo
     # queue can be a MidiQueue or a queueid.
+    # if tempo is nil we use queue.tempo instead
     def initialize queue, tempo = nil, params = nil
       if AlsaMidiEvent_i === tempo
         super(queue, tempo)
       else
-        (params ||= {})[:value] = tempo
         super :tempo, queue, params
+        @value = tempo ? tempo : queue.tempo
       end
     end
 
@@ -964,6 +968,10 @@ module RRTS
     # this is a better name
     def usecs_per_beat
       Tempo === @value ? @value.usecs_per_beat : @value
+    end
+
+    def to_s
+      "TempoEvent[time: #@time] usecs_per_beat: #{usecs_per_beat}"
     end
 
     # technically it is a meta event
@@ -983,8 +991,8 @@ module RRTS
     def initialize arg0, arg1 = nil, params = nil
       case arg1 when AlsaMidiEvent_i then super(arg0, arg1)
       else
-        (params ||= {})[:value] = arg1
         super :queue_skew, arg0, params
+        @value = arg1
       end
     end
 

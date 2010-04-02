@@ -87,9 +87,10 @@ Valid options are:
 #           tag "realtime_0 = #{realtime_0}, pps=#{pps}"
         when_done = lambda do
                     # on closing !
+          return unless queue # if no queue, then we haven't even started yet
           begin
             protect_from_interrupt do
-#               tag "closing down, noteon.channels=#{noteons.keys.inspect}"
+#               tag "closing down, please wait. noteon.channels=#{noteons.keys.inspect}"
               hangs = false
               for channel, data in noteons
                 for note, event in data
@@ -103,7 +104,7 @@ Valid options are:
               if hangs
 #                 tag "calling flush"
                 seq.flush # is direct so should not matter
-                tag "call sync_output_queue"
+#                 tag "call sync_output_queue"
                 seq.sync_output_queue
               end
 #               tag "sending queue.stop to system_timer"
@@ -134,6 +135,7 @@ Valid options are:
             next
           # when NoteEvent  assume this goes well?
           when TempoEvent
+#             tag "got TempoEvent #{event}"
             unless queue
 #               tag "setting up the queue, now we have the tempo"
               queue = seq.create_queue(@client_name + '_q', tempo: event.usecs_per_beat)
@@ -157,6 +159,7 @@ Valid options are:
           # producers always send ahead,
 #           unless producer.spamming?
           seq.flush
+#           seq.sync_output_queue
 #           tag "return to producer"
 #           end
         end

@@ -5,6 +5,7 @@ module RRTS # namespace
   module Node
 
     require 'monitor'
+    require_relative '../rrts'  # for tag etc
 
 =begin rdoc
 The Base Node class. It uses Monitor for simple syncing.
@@ -27,8 +28,13 @@ Note: maybe Monitor is a bit fat. It may become an include in Filter and Consume
         options.each { |k, v| parse_option(k, v) } if options
       end
 
+      # FIXME. this is a mess!
       def parse_option k, v
-        raise RRTSError, "illegal option '#{k}' for #{self.class}"
+        case k
+        when :split_channels, :combine_notes, :combine_progchanges, :combine_lsb_msb,  # ????
+             :spam, :write_ahead, :sleeptime
+        else raise RRTSError, "illegal option '#{k}' for #{self.class}"
+        end
       end
 
       # Basic consuming fiber structure. The event handling is all within an

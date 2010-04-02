@@ -1363,7 +1363,8 @@ wrap_snd_seq_set_queue_info(VALUE v_seq, VALUE v_qid, VALUE v_qi)
   return v_seq;
 }
 
-/* self set_queue_tempo(queue, tempo)
+/* call-seq:
+    set_queue_tempo(queue, tempo) -> self
 
 set the tempo of the queue
 
@@ -1390,7 +1391,50 @@ wrap_snd_seq_set_queue_tempo(VALUE v_seq, VALUE v_qid, VALUE v_tempo)
   return v_seq;
 }
 
-/* AlsaQueueInfo_i queue_info q [, info]
+/* call-seq:
+      queue_tempo(queue, tempo) -> tempo
+      queue_tempo(queue) -> tempo
+
+obtain the current tempo of the queue
+
+Parameters:
+        q       MidiQueue or queue id to be queried
+        tempo   AlsaQueueTempo_i or Tempo to store the current tempo,
+               if not given room is allocated
+
+Returns:
+    the retrieve AlsaQueueTempo_i (not Tempo)
+
+See also:
+    AlsaSequencer_i#set_queue_tempo
+*/
+static VALUE
+wrap_snd_seq_get_queue_tempo(int argc, VALUE *argv, VALUE v_seq)
+{
+  VALUE v_qid, v_tempo;
+  rb_scan_args(argc, argv, "11", &v_qid, &v_tempo);
+  snd_seq_queue_tempo_t * tempo;
+  if (!RTEST(v_tempo))
+    {
+      tempo = XMALLOC(snd_seq_queue_tempo);
+      v_tempo = Data_Wrap_Struct(alsaQueueTempoClass, 0/*mark*/, snd_seq_queue_tempo_free,
+                                 tempo);
+    }
+  else
+    {
+      RRTS_DEREF_DIRTY(v_tempo, @handle);
+      Data_Get_Struct(v_tempo, snd_seq_queue_tempo_t, tempo);
+    }
+  RRTS_DEREF_DIRTY(v_qid, @id);
+  snd_seq_t *seq;
+  Data_Get_Struct(v_seq, snd_seq_t, seq);
+  const int r = snd_seq_get_queue_tempo(seq, NUM2INT(v_qid), tempo);
+  if (r < 0) RAISE_MIDI_ERROR("get tempo", r);
+  return v_tempo;
+}
+
+/* call-seq:
+    queue_info q [, info] -> AlsaQueueInfo_i
 
 obtain queue attributes
 
@@ -2147,6 +2191,7 @@ void alsa_seq_init()
   rb_define_method(alsaSequencerClass, "set_queue_info", RUBY_METHOD_FUNC(wrap_snd_seq_set_queue_info), 2);
   rb_define_method(alsaSequencerClass, "queue_status", RUBY_METHOD_FUNC(wrap_snd_seq_get_queue_status), -1);
   rb_define_method(alsaSequencerClass, "set_queue_tempo", RUBY_METHOD_FUNC(wrap_snd_seq_set_queue_tempo), 2);
+  rb_define_method(alsaSequencerClass, "queue_tempo", RUBY_METHOD_FUNC(wrap_snd_seq_get_queue_tempo), -1);
   rb_define_method(alsaSequencerClass, "queue_timer", RUBY_METHOD_FUNC(wrap_snd_seq_get_queue_timer), -1);
   rb_define_method(alsaSequencerClass, "set_queue_timer", RUBY_METHOD_FUNC(wrap_snd_seq_set_queue_timer), 2);
   rb_define_method(alsaSequencerClass, "create_queue", RUBY_METHOD_FUNC(wrap_snd_seq_create_queue), 1);

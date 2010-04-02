@@ -35,11 +35,11 @@ Anything else is treated as a portidentifier.
 =end
     class Identity < Node::Filter
       private
-      def initialize *options
-        super()
+      def initialize *options, &condition
+        super(&condition)
         require_relative '../lib/rrts/node/defoptions'
 #         tag "Parsing options #{options.inspect}"
-        if options
+        unless options.empty?
           # THIS IS A MESS. How does *options work???
           if options.count == 1
             if Node::DefaultOptions === options[0]
@@ -88,6 +88,7 @@ Anything else is treated as a portidentifier.
 end #RRTS
 
 if __FILE__ == $0
+#   GC.stress = true                    THE END OF EVERYTHING....
   include RRTS
   include Nodes
   require_relative '../lib/rrts/node/defoptions'
@@ -97,5 +98,9 @@ if __FILE__ == $0
   I.new(Node::DefaultOptions.new(['-i', '/tmp/eurodance.ygz', '-o', '20:1'])).run
 =end
   # using ARGV here:
-  I.new.run
+  begin
+    I.new.run
+  rescue Interrupt
+  end
+#   tag "GC.count = #{GC.count}"
 end

@@ -37,16 +37,29 @@ More options as for Producer#new
         super(options)
         @ticks = @smpte_timing ? 40 : 384 unless @ticks
         @ticks = 255 if @smpte_timing && @ticks > 255
+        @spam = true #  override, since false will cannot possibly what you intended
+#         tag "new Recorder, ticks=#@ticks, smpte_timing=#@smpte_timing, options=#{options.inspect}"
       end
 
       #override
       def parse_option k, v
         case k
-        when :smpte_timing then @smpte_timing = v; @beats = nil
+        when :smpte_timing
+          if @smpte_timing = v
+            @beats = nil
+          end
         when :ticks then @ticks = v
         when :blockingmode then @blockingmode = v
-        when :beats then @beats = v; @frames = nil; @smpte_timing = true
-        when :frames then @frames = v; @beats = nil; @smpte_timing = false
+        when :beats
+          if @beats = v
+            @frames = nil
+            @smpte_timing = false
+          end
+        when :frames
+          if @frames = v
+            @beats = nil
+            @smpte_timing = true
+          end
         when :clientname, :client_name then @client_name = v
         when :channel_split # ignored, has no meaning
         else super
@@ -57,6 +70,7 @@ More options as for Producer#new
 #           client = seq.client
         queue = seq.create_queue(@client_name + '_q', smpte_timing: @smpte_timing,
                                  frames: @frames, beats: @beats, ticks: @ticks)
+#         tag "created queue, tempo info: ppq=#{queue.tempo.ppq}, uspb=#{queue.tempo.usecs_per_beat}"
         port_params = { write: true, subs_write: true, midi_generic: true, application: true,
                         midi_channels: 16, timestamping: true, timestamp_queue: queue,
                         port_specified: false
@@ -65,9 +79,13 @@ More options as for Producer#new
         source_ports = @src_port_specifiers.map { |port_name| seq.parse_address port_name }
         source_ports.each_with_index do |src, i|
           ports << (port = MidiPort.new(seq, @client_name + ('_p%02d') % (i + 1), port_params))
-          tag "connect #{port} from #{src}"
+#           tag "connect #{port} from #{src}"
           port.connect_from src
         end
+#         yield(TrackCreateEvent.new)
+#         tag "send initial TempoEvent"
+        yield(TempoEvent.new(queue))
+#         tag "starting queue"
         queue.start
         seq.flush
         descriptors = seq.poll_descriptors

@@ -88,12 +88,17 @@ module RRTS
       @seq_handle.set_queue_tempo @id, tmpo
     end
 
-    # returns a AlsaQueueStatus_i instance
+    # returns a new AlsaQueueTempo_i instance, containing the tempo
+    def tempo
+      @seq_handle.queue_tempo @id
+    end
+
+    # returns a new AlsaQueueStatus_i instance, containing status information
     def status
       @seq_handle.queue_status @id
     end
 
-    # returns a AlsaQueueInfo_i instance
+    # returns a AlsaQueueInfo_i instance, containing queue information
     def info
       @seq_handle.queue_info @id
     end

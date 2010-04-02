@@ -16,6 +16,7 @@ module RRTS
   # *  Driver::AlsaSequencer_i#nonblock
   # *  Driver::AlsaSequencer_i#alloc_named_queue,  but please use MidiQueue#new
   # *  Driver::AlsaSequencer_i#set_queue_tempo
+  # *  Driver::AlsaSequencer_i#queue_tempo
   # *  Driver::AlsaSequencer_i#output_buffer_size
   # *  Driver::AlsaSequencer_i#output_buffer_size=
   # *  Driver::AlsaSequencer_i#input_buffer_size
@@ -262,7 +263,7 @@ public
                  :start_queue, :nonblock,
                  # do not use alloc_named_queue, but say 'MidiQueue.new'
                  :alloc_named_queue,
-                 :set_queue_tempo,
+                 :set_queue_tempo, :queue_tempo,
                  :output_buffer_size=, :output_buffer_size,
                  :input_buffer_size=, :input_buffer_size, :sync_output_queue,
                  :create_port, :event_output, :queue_status,
@@ -304,7 +305,7 @@ public
 
   # Same as event_output, except for returnvalue (self).
   def << event
-#     puts "#{File.basename(__FILE__)}:#{__LINE__}: << event(#{event.inspect})"
+#     tag "<< #{event}"
     @handle.event_output event
     self
   end

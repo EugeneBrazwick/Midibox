@@ -96,14 +96,14 @@ extern VALUE param2sym(uint param);
 
 #define rb_check_float_type(c) (rb_type(c) == T_FLOAT ? (c) : Qnil)
 
-static inline void *rtty_calloc(size_t n)
+static inline void *rtts_calloc(size_t n)
 {
   void * const result = xmalloc(n);
   memset(result, 0, n);
   return result;
 }
 
-#define XMALLOC(what) (what##_t *)rtty_calloc(what##_sizeof())
+#define XMALLOC(what) (what##_t *)rtts_calloc(what##_sizeof())
 
 // strct could be 'queue_timer' for example. Excludes _t suffix.
 // clss should then be QueueTimer

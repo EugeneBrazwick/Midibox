@@ -74,6 +74,15 @@ Note: maybe Monitor is a bit fat. It may become an include in Filter and Consume
         end
       end
 
+      # make connections from given producer(s) to ourselves
+      def connect_from producer
+        if Array === producer  #  .respond_to?(:each) <- dangerous. All nodes have :each!
+          producer.each { |prod| prod >> self }
+        else
+          producer >> self
+        end
+      end
+
       public
 
       # Add one or an array of consumers
@@ -270,15 +279,25 @@ Note it returns a thread, and that 'join' should be called upon it
       include Enumerable
       private
 
-      # create a new filter. If producer is passed we connect to it.
-      # There are no special options, but there is a 'condition'
-      # which is the actual filter proc. If not given it is effectively
-      # equal to { |ev| true }
+      # create a new filter. If +producer+ is set we connect to it, but it can also be
+      # an array of producers.
+      # Ther +condition+ is the actual filter proc. If not given it is effectively
+      # equal to { |ev| true }. It should accept a single argument and return a boolean
+      # It is also possible to pass the condition in +options+.
       def initialize producer = nil, options = nil, &condition
         @condition = condition
+#         tag "Filter.new, condition=#{@condition.inspect}"
         @spam = producer && producer.spamming?
         super(options)
-        producer >> self if producer
+        connect_from(producer) if producer
+      end
+
+      # override
+      def parse_option k, v
+        case k
+        when :condition then @condition = v
+        else super
+        end
       end
 
       # override
@@ -299,6 +318,13 @@ Note it returns a thread, and that 'join' should be called upon it
         end
       end
 
+      # internal handler for consumer part.
+      # ev cannot be nil.
+      # if an override does not call super the event is effectively discarded.
+      def handle_event ev, cons
+        cons.each { |out| out.resume ev }
+      end
+
       public
 
       #override
@@ -308,8 +334,12 @@ Note it returns a thread, and that 'join' should be called upon it
         cons.delete(nil)
         return nil if cons.empty?
         each_fiber(when_done) do |ev|
-          if ev.nil? || !@condition || @condition.call(ev)
-            cons.each { |out| out.resume ev }
+          if ev.nil?
+            # this is an obligation and inconvenient for handle_event overrides
+            cons.each { |out| out.resume nil }
+          else
+#             tag "calling handle_event, based on #@condition"
+            handle_event(ev, cons) if !@condition || @condition.call(ev)
           end
         end
       end
@@ -459,7 +489,7 @@ but it requires timevalues and not a simple range.
 parameter to use, in this case 'note'. That need than be mapped according to a waveshape (or
 any function)
 8) Morphers.  Gradually change the influence of two nodes over time. Would it not be
-cool to morph a vienna wals into a samba?
+cool to morph a vienna walz into a samba?
 9) Channelmerger.  Maps input from tracks to output with 16 channels max.
 10) Channelmapper.  Can filter out channels, and duplicate them as well.
 11) Chord generator.

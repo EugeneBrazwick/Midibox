@@ -309,13 +309,13 @@ module RRTS
     # notes and control events have a channel. We use the range 1..16
     # The channel can be set to an enumerable. This will make the
     # messages be sent to all the given channels
-    attr :channel
+    attr_accessor :channel
     # notes have this
-    attr :velocity
+    attr_accessor :velocity
     # for NoteEvent specific
     attr :off_velocity
     # for NoteEvent specific
-    attr :duration
+    attr_accessor :duration
     # can be 'event' for result messages, but normally used for controls
     attr :param
     # value is a note or a control-value, a result-value, or a queue-value, also a sysex binary string
@@ -427,8 +427,12 @@ module RRTS
     end
   end
 
+  # convenience class for filtering
+  class NoteOnOffEvent < VoiceEvent
+  end
+
   # A NOTEON event
-  class NoteOnEvent < VoiceEvent
+  class NoteOnEvent < NoteOnOffEvent
 
     private
     # new(sequencer, event)
@@ -461,7 +465,7 @@ module RRTS
   end
 
   # Keypress or aftertouch event
-  class KeypressEvent < VoiceEvent
+  class KeypressEvent < NoteOnOffEvent
     private
     # new sequencer, event
     # new channel, note, pressure[,...]
@@ -492,14 +496,14 @@ module RRTS
   KeyPressEvent = KeypressEvent
 
   # noteoff event
-  class NoteOffEvent < VoiceEvent
+  class NoteOffEvent < NoteOnOffEvent
     private
     # new(sequencer, event)
     # new(channel, note [,...])
 
     # It is allowed to use strings like 'C4' or 'd5' or 'Eb6' for 'note' (arg1)
     def initialize channel, note = nil, params = nil
-      @off_velocity = 0
+      @off_velocity = 0 # as default
       case note when AlsaMidiEvent_i then super(channel, note)
       else
         super :noteoff, channel, note, params
@@ -523,8 +527,10 @@ module RRTS
     end
   end
 
-  # an Alsa hack.
-  class NoteEvent < VoiceEvent
+  # an Alsa hack. NoteEvents can never be received on realtime input, since it
+  # would require blocking the NoteOnEvents. Currently the only node producing
+  # them is Chunk.
+  class NoteEvent < NoteOnOffEvent
     private
     # new(channel, note, velocity [, ...])
     # It is allowed to use strings like 'C4' or 'd5' or 'Eb6' for 'note' (arg1)
@@ -532,8 +538,8 @@ module RRTS
       @off_velocity = 0
       case arg1 when AlsaMidiEvent_i then super(arg0, arg1)
       else
-        (params ||= {})[:velocity] = velocity
         super :note, arg0, arg1, params
+        @velocity = velocity
       end
     end
 

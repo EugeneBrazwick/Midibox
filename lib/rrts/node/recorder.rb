@@ -1,10 +1,9 @@
 #!/usr/bin/ruby -w
 
+require_relative 'node'
+
 module RRTS
   module Node
-
-    require_relative 'node'
-    require_relative '../rrts'  # for RRTSError
 
     # this class is related to MidiIOReader and YamlIOReader.
     # But now we read from one port (or several).
@@ -38,7 +37,7 @@ More options as for Producer#new
         @ticks = @smpte_timing ? 40 : 384 unless @ticks
         @ticks = 255 if @smpte_timing && @ticks > 255
         @spam = true #  override, since false will cannot possibly what you intended
-#         tag "new Recorder, ticks=#@ticks, smpte_timing=#@smpte_timing, options=#{options.inspect}"
+#         tag "new Recorder, ticks=#@ticks, spam=#@spam, beats=#@beats, smpte_timing=#@smpte_timing, options=#{options.inspect}"
       end
 
       #override

@@ -35,8 +35,8 @@ Anything else is treated as a portidentifier.
 =end
     class Identity < Node::Filter
       private
-      def initialize *options, &condition
-        super(&condition)
+      def initialize *options
+        super()
         require_relative '../lib/rrts/node/defoptions'
 #         tag "Parsing options #{options.inspect}"
         unless options.empty?
@@ -91,8 +91,8 @@ if __FILE__ == $0
 #   GC.stress = true                    THE END OF EVERYTHING....
   include RRTS
   include Nodes
-  require_relative '../lib/rrts/node/defoptions'
 =begin
+  require_relative '../lib/rrts/node/defoptions'
   I.new(Node::DefaultOptions.new(['-i', '../fixtures/eurodance.midi',
                                   '-o', '/tmp/eurodance.ygz'])).run
   I.new(Node::DefaultOptions.new(['-i', '/tmp/eurodance.ygz', '-o', '20:1'])).run

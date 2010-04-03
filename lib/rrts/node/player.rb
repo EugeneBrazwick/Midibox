@@ -25,7 +25,10 @@ module RRTS
 =begin rdoc
 Create a new player
 If _input_node_ is not nil it immediately serve as input. The constructor will then not
-return until the input is exhausted
+return until the input is exhausted.
+The +producer+ can be nil (default) or a single inputnode, or an array of inputnodes.
+
+*important*: I noticed delays if a Recorder node is present with a different client_name.
 Valid options are:
   [ name ]  Name of the client, default is 'rplayer'
   [ clientname ] Alias for _name_.
@@ -40,6 +43,7 @@ Valid options are:
 =end
       def initialize dest_port_specifier, producer = nil, options = nil
         (options, producer = producer, nil) if Hash === producer
+#         tag "Player.new, options=#{options.inspect}"
         # candidate option:
         # [ threaded ] Create the sequencer in a thread.
         @dest_port_specifier = dest_port_specifier
@@ -47,7 +51,7 @@ Valid options are:
         @end_delay = nil
         @blockingmode = Blocking
         super(options)
-        producer >> self if producer
+        connect_from(producer) if producer
       end
 
       def parse_option k, v
@@ -153,7 +157,7 @@ Valid options are:
           when NoteOffEvent
             (noteons[event.channel] ||= {})[event.note] = nil
           end
-#           tag "calling event_output"
+#           tag "seq << #{event}"
           seq << event
 #           tag "calling flush"
           # producers always send ahead,
@@ -175,5 +179,8 @@ if __FILE__ == $0
   producer = MidiFileReader.new('../../../fixtures/eurodance.midi', threads: true)
       # threads: true locks up in 'event_output()'
   Player.new('20:1', producer, blockingmode: Player::NonBlocking, client_name: 'test')
-  producer.run
+  begin
+    producer.run
+  rescue Interrupt
+  end
 end

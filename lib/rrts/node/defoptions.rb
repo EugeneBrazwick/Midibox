@@ -115,11 +115,11 @@ module RRTS #namespace
 
       def escape_shell_single_word token
         begin
-          require 'escape'
+          require 'shellwords'
         rescue LoadError
-          raise RTTSError.new("could not load 'escape', try 'sudo gem install escape'")
+          raise RTTSError, "could not load 'escape', try 'sudo gem install escape'"
         end
-        Escape.shell_single_word(token)
+        Shellwords.shellescape token
       end
 
       public

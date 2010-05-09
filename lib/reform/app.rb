@@ -2,7 +2,7 @@
 require 'Qt'
 
 # for debugging purposes only
-# if $DEBUG             would be neat if qtruby did not 1_000_000 warnings....
+# if $DEBUG             would be neat if qtruby did not give 1_000_000 warnings....
   module Kernel
     def tag msg
       # avoid puts for threading problems
@@ -22,7 +22,7 @@ Requirements:
   - kdebindings_4.4.2
   - ruby1.9.1
 
-Recepy for Ubuntu (of the Blood Sweat and Tears Kind -- but in the end it was 'simply' this:)
+Recepy for Ubuntu (of the Blood, Sweat and Tears Kind -- but in the end it was 'simply' this:)
 
 Preliminaries:
   I hacked my ruby install on ubuntu (since 1.9.1 works fine and should be the default!),
@@ -88,9 +88,23 @@ obviously a model.
 module Reform
   private
 
+  # delegator. see App::registerControlClassProxy
+  def self.registerControlClassProxy id, path
+    require_relative 'panel'
+    Panel::registerControlClassProxy_i id, path
+    App::registerControlClassProxy_i id, path
+  end
+
+  # delegator. See App::createInstantiator
+  def self.createInstantiator name, qt_implementor_class, reform_class = Widget
+    require_relative 'panel'
+    Panel::createInstantiator_i name, qt_implementor_class, reform_class
+    App::createInstantiator_i name
+  end
+
 =begin rdoc
   the App is a basic Qt::Application extension. So see the qt docs as well.
-  I use 'exec' from Reform::app
+  I use 'exec_i' from Reform::app
 =end
   class App < Qt::Application
       private
@@ -109,8 +123,42 @@ The idea is that it is a singleton.
       @title = nil
     end
 
+    # this class just stores a name with the arguments to a widget constructor
+    class MacroConstructor
+      private
+        def initialize name, quickylabel, block
+          @name, @quickylabel, @block = name, quickylabel, block
+        end
+      public
+        attr_reader :name, :quickylabel, :block
+      end # class MacroConstructor
+#
     public
-    # override called from Reform::app
+
+=begin
+  registerControlClassProxy_i(string name, string relativepath)
+  create a method 'theName' within the caller class, the implementor
+  must be located in the file with the designated path (which must be relative).
+  If the method already exists, this is silenty ignored and nothing is done.
+  The method will have an optional argument 'label', and a block for initialization.
+  It basically delegates to the application, using send.
+
+  Use through Reform::registerControlClassProxy
+=end
+    def self.registerControlClassProxy_i theName, thePath
+#       tag "registerControlClassProxy_i(#{theName}, #{thePath})"
+      return if private_method_defined?(theName)
+      define_method theName do |quickylabel = nil, &block|
+        # Remove ourselves, so if we accidentally come back here we cause no stack overflow
+        App.send :undef_method, theName
+        require_relative thePath
+        send(theName, quickylabel, &block)
+      end
+      # make the method private:
+      private theName
+    end
+
+    # override! called from Reform::app
     def exec
 #       tag "exec"
       # without any forms it loops, waiting until we quit.
@@ -129,7 +177,35 @@ The idea is that it is a singleton.
         hello.show
       end
       super
+    end # App#exec
+
+=begin
+  Use Reform::createInstantiator
+
+  createInstantiator_i(string name)
+
+  Create a private method within the application, with the given name, through
+  which the class
+=end
+    def self.createInstantiator_i name
+      define_method name do |quickylabel = nil, &block|
+#         puts "creating implementor_class #{implementor_class}, rf_class=#{rf_class}"
+        require_relative 'form'
+        require_relative 'mainwindow'
+        @firstform ||= ReForm.new(QMainWindow.new)  # this is just form { }, the first time called
+        @firstform.macros! << MacroConstructor.new(name, quickylabel, block)
+      end
+      private name
+    end # App::createInstantiator_i
+
+    # return or set the title
+    def title title = nil
+      @title = title if title
+      @title
     end
+
+    # set when the first form is defined. This serves as the main window.
+    attr :firstform
 
   end # class App
 
@@ -139,22 +215,25 @@ The idea is that it is a singleton.
     App.new ARGV
     # extend the Form class with the proper contributed widgets
     for file in Dir[File.dirname(__FILE__) + '/controls/*.rb']
-      registerControlClassProxy File.basename(file, '.rb'), 'controls/' + file
+      basename = File.basename(file, '.rb')
+      registerControlClassProxy basename, 'controls/' + basename
     end
     for file in Dir[File.dirname(__FILE__) + '/contrib_widgets/*.rb']
-      registerControlClassProxy File.basename(file, '.rb'), 'contrib_widgets/' + file
+      basename = File.basename(file, '.rb')
+      registerControlClassProxy basename, 'contrib_widgets/' + basename
     end
   #IMPORTANT, if any of the files loaded by these instantiators does not redefine the
   # instantiator this will cause a stack failure since we keep loading for ever...
     require_relative 'graphics'         # Scene must be known, Panel already is
     for file in Dir[File.dirname(__FILE__) + '/graphics/*.rb']
-      registerGraphicsControlClassProxy File.basename(file, '.rb'), 'graphics/' + file
+      basename = File.basename(file, '.rb')
+      registerGraphicsControlClassProxy basename, 'graphics/' + basename
     end
 #     puts "#{File.basename(__FILE__)}:#{__LINE__}: registered proxies"
     $qApp.instance_eval(&block) if block
     $qApp.exec
-  end
-end
+  end # app
+end # module Reform
 
 if __FILE__ == $0
   Reform::app

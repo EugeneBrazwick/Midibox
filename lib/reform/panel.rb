@@ -93,6 +93,7 @@ a Panel is a widget that may contain others.
       # the loaded module should call registerControlClass !
       # so we can all ourselves anyway
       klass = self
+      tag "define_method #{self}::#{theName}"
       define_method theName do |quickylabel = nil, &block|
         klass.send :undef_method, theName
         require_relative thePath

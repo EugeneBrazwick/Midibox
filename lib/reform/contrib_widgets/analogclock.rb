@@ -15,6 +15,8 @@ module Reform
       windowTitle = tr('Analog Clock')
     end
 
+    Size = 500.0
+
     protected
      # causes misbehavior in paintEvent....
 #     def showEvent *args
@@ -32,9 +34,10 @@ module Reform
       painter = Qt::Painter.new self
       begin
         painter.renderHint = Qt::Painter::Antialiasing
+        # set up the screen so topleft = -100,-100 and bottomright = 100,100
         painter.translate width / 2, height / 2
         painter.scale side / 200.0, side / 200.0
-        painter.pen = Qt::NoPen
+        painter.pen = Qt::NoPen # with no outline
         painter.brush = Qt::Brush.new(hourColor)
         painter.save
         begin
@@ -70,7 +73,7 @@ module Reform
     public
     # This is the way to go here!!! to ignore return Qt::Size.new(-1, -1)
     def sizeHint
-      Qt::Size.new(400, 400)
+      Qt::Size.new(Size.to_i, Size.to_i)
     end
   end # class QAnalogClock
 

@@ -95,11 +95,21 @@ module Reform
     App::registerControlClassProxy_i id, path
   end
 
+  def self.registerGraphicsControlClassProxy id, path
+    require_relative 'scene'
+    Scene::registerControlClassProxy_i id, path
+  end
+
   # delegator. See App::createInstantiator
   def self.createInstantiator name, qt_implementor_class, reform_class = Widget
-    require_relative 'panel'
-    Panel::createInstantiator_i name, qt_implementor_class, reform_class
-    App::createInstantiator_i name
+    if reform_class < Widget
+      require_relative 'panel'
+      Panel::createInstantiator_i name, qt_implementor_class, reform_class
+      App::createInstantiator_i name
+    else
+      require_relative 'scene'
+      Scene::createInstantiator_i name, qt_implementor_class, reform_class
+    end
   end
 
 =begin rdoc

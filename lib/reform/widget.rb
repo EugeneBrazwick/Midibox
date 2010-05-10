@@ -11,7 +11,9 @@ module Reform
 
   public
     # override
-    def widget?; true end
+    def widget?
+      true
+    end
   end # class Widget
 
 end # Reform

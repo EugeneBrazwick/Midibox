@@ -18,8 +18,10 @@ module Reform
     def size w = nil, h = nil
       return parent_qtc_to_use.size unless w
       if h
+        @requested_size = w, h
         parent_qtc_to_use.resize w, h
       else
+        @requested_size = w, w
         parent_qtc_to_use.resize w, w
       end
     end
@@ -27,11 +29,21 @@ module Reform
     # geometry, set geo or return it.
     def geometry x = nil, y = nil, w = nil, h = nil
       return parent_qtc_to_use.geometry unless x or w
+      @requested_size = w, h
       if x or y
         @has_pos = true
         parent_qtc_to_use.setGeometry x, y, w, h
       else
         parent_qtc_to_use.resize w, h
+      end
+    end
+
+    # define a simple set method for each element passed, forwarding it to qtc.
+    def self.define_simple_setter *list
+      list.each do |name|
+        define_method name do |value|
+          @qtc.send(name.to_s + '=', value)
+        end
       end
     end
 
@@ -45,8 +57,16 @@ module Reform
     # Qt control that is wrapped
     attr :qtc
 
+    # tuple w,h   as set in last call of setSize/setGeometry
+    attr :requested_size
+
     def has_pos?
       @has_pos
+    end
+
+    def when_resized &block
+      return @when_resized unless block
+      @when_resized = block
     end
 
     # normally the Qt implementor, but for layouts we add subcontrols to the

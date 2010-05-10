@@ -116,7 +116,7 @@ module Reform
       end
       if self == $qApp.firstform
         # if unambigous center widget... Set it to tell application there is some window
-        tag "assigning activeWindow"
+#         tag "assigning activeWindow"
         $qApp.activeWindow = @qtc
       end
       # note: originally BEFORE the assign to activeWindow...

@@ -15,11 +15,8 @@ module Reform
   public
 
     # KLUDGE ALERT: the rectangle argument is required, even though Qt says it is not.
-    def self.new_qt_implementor(qt_implementor_class, parent)
-      # q =
+    def self.new_qt_implementor(qt_implementor_class, qparent)
       qt_implementor_class.new(0.0, 0.0, 100.0, 100.0)
-#       q.brush = defaultBrush
-#       q
     end
 
   end # Circle

@@ -1,6 +1,8 @@
 module Reform
 
-  class Canvas < Panel
+  require_relative 'frame'
+
+  class Canvas < Frame
     require_relative '../graphical'
     include Graphical
   private
@@ -33,10 +35,10 @@ module Reform
 
     def scene id = nil, &block
       if id
-        newqtc = (if id.respond_to?(:qtc) then id else @form.send(id) end).qtc
+        newqtc = (if id.respond_to?(:qtc) then id else @owner.send(id) end).qtc
       else
-        newqtc = Qt::GraphicsScene.new @panel.qtc
-        require_relative '../scene'
+        newqtc = Qt::GraphicsScene.new @containing_frame.qtc
+        require_relative 'scene'
         c = Scene.new self, newqtc
         addControl(c, &block)
       end

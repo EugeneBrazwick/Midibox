@@ -6,7 +6,7 @@ module Reform
   private
     # make it the central widget
     def central
-      @form.qcentralWidget = @form.qtc.centralWidget = @qtc
+      @owner.qcentralWidget = @owner.qtc.centralWidget = @qtc
     end
 
   public
@@ -16,4 +16,5 @@ module Reform
     end
   end # class Widget
 
+  QWidget = Qt::Widget # may change
 end # Reform

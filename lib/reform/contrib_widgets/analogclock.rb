@@ -77,5 +77,6 @@ module Reform
     end
   end # class QAnalogClock
 
+#   tag "createInstantiator"
   createInstantiator File.basename(__FILE__, '.rb'), QAnalogClock
 end # Reform

@@ -5,16 +5,16 @@ module Reform
   public
     # override, call ifCanceled RForm callback and probably onClose as well.
     def closeEvent event
-      if @_rform_hack.whenCanceled != false
+      if @_reform_hack.whenCanceled != false
         # this includes a nil return
         event.accept
-        @_rform_hack.whenClosed
+        @_reform_hack.whenClosed
       else
         event.ignore
       end
     end
 
-    attr_reader :_rform_hack # set by ReForm constructor
+    attr_reader :_reform_hack # set by ReForm constructor
   end
 
   class QMainWindow < Qt::MainWindow

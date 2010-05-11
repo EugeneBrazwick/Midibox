@@ -8,10 +8,11 @@ module Reform
   class Control < Qt::Object
     private
 
-    # create a new Control, using the panel as 'owner', and qtc as the wrapped Qt::Widget
-    def initialize panel, qtc
+    # create a new Control, using the frame as 'owner', and qtc as the wrapped Qt::Widget
+    def initialize frame, qtc
+#       tag "#{self}::initialize, caller=#{caller.join("\n")}"
       super()
-      @panel, @form, @qtc, @has_pos = panel, panel.form, qtc, false
+      @containing_frame, @containing_form, @qtc, @has_pos = frame, frame.containing_form, qtc, false
     end
 
      # size QSize or size w,h, without args it returns qtc.size
@@ -47,12 +48,17 @@ module Reform
       end
     end
 
+    # default.
+    def executeMacros
+      @macros and @macros.each { |macro| macro.exec }
+    end
+
     public
-    # the owner == parent widget (a Reform::Panel)
-    attr :panel
+    # the parent widget (a Reform::Frame)
+    attr :containing_frame
 
     # the owner form.
-    attr :form
+    attr :containing_form
 
     # Qt control that is wrapped
     attr :qtc
@@ -60,10 +66,18 @@ module Reform
     # tuple w,h   as set in last call of setSize/setGeometry
     attr :requested_size
 
+    # return macros array, creating it if it was undefined
+    # Macros are executed right after the setup block (if present)
+    def macros!
+      @macros ||= []
+    end
+
+    # was a position given
     def has_pos?
       @has_pos
     end
 
+    # default resize callback setter/getter
     def when_resized &block
       return @when_resized unless block
       @when_resized = block
@@ -83,7 +97,11 @@ module Reform
     # when the control is added to the parent and should have been setup.
     # can be used for postProc. Example: initialization parameters are stored and
     # executed in one go.  Note that postSetup should return self!
+    # the default executes any gathered macro.
     def postSetup
+#       tag "#{self}::postSetup"
+      executeMacros
+#       tag "DONE #{self}::postSetup"
       self
     end
 

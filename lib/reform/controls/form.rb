@@ -1,16 +1,18 @@
 
 module Reform
 
+  require_relative 'frame'
+
 =begin rdoc
- a ReForm is a basic form. It inherits Panel
+ a ReForm is a basic form. It inherits Frame
  but is meant as a complete window.
 =end
-  class ReForm < Panel
+  class ReForm < Frame
     private
     def initialize qtc
       super self, qtc
       # store a ref to ourselves in the Qt::Widget
-      qtc.instance_variable_set :@_rform_hack, self
+      @qtc.instance_variable_set :@_reform_hack, self
       # block to call for lazy initialization. After done so it becomes nil
       @setup = nil #setupblock
       # the menubar implementor:
@@ -29,17 +31,24 @@ module Reform
       @whenCommitted = nil
       # a form may have a single 'central' widget, together with border widgets like bars
       @qcentralWidget = nil
+      $qApp.registerForm self
+    end
+
+    # IMPORTANT: the name becomes a method of $qApp, if and only if it ends
+    # with the text 'Form' (not 'form'). Also $qApp.forms[name] be
+    # used in all cases or even $qApp[name].
+    # So you are encouraged to use names like myForm, mainForm, voiceForm etc..
+    # It should also be possible to clone a registered form, for instance for
+    # recursive structures. Only one of them can be registered within the application.
+    def name aName
+      @qtc.name = aName
+      $qApp.registerForm self, aName
     end
 
     public
     # override. The containing form. We contain ourselves.
-    def form
+    def containing_form
       self
-    end
-
-    # return macros array, creating it if it was undefined
-    def macros!
-      @macros ||= []
     end
 
     # returns a hash of form-local Actions, indexed by name
@@ -82,11 +91,8 @@ module Reform
         title = $qApp.title
         @qtc.windowTitle = title if title
         instance_eval(&@setup) if @setup
-        if @macros
-          for macro in @macros do
-            send(macro.name, macro.quickylabel, &macro.block)
-          end
-        end
+#         tag "calling Form.postSetup"
+        postSetup
         # menubar without a centralwidget would remain invisible. That is confusing
         if @qtc.inherits('QMainWindow') &&
            (!@qcentralWidget && @all_widgets.length == 1 || @qmenuBar && @all_widgets.empty?)
@@ -101,7 +107,7 @@ module Reform
     to always add a groupbox in a mainwindow, but that would not be logical if there was actually
     exactly one element...
 =end
-          ctrl = if @all_widgets.empty? then button("It Just Works!") else @all_widgets[0] end
+          ctrl = if @all_widgets.empty? then button(tr('It Just Works!')) else @all_widgets[0] end
           wrapper = Reform::Widget === ctrl && ctrl.qtc.inherits('QWidget')
           if wrapper || ctrl.inherits('QWidget')
             @qtc.centralWidget = if wrapper then ctrl.qtc else ctrl end
@@ -125,5 +131,7 @@ module Reform
     end # ReForm#run
 
   end # class ReForm
+
+  createInstantiator :form, QWidget, ReForm
 
 end # Reform

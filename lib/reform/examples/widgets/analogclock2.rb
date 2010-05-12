@@ -14,9 +14,11 @@ Reform::app {
           # Must be: circle {fill red; ...}; circle {fill blue; ...};
 #       tag "calling Scene::duplicate()"
 # trace do
-      duplicate {
+      circle { position 0, 0; radius 20 }
+      replicate {
         rotation 20 # degrees, rotation around 0,0
-        fillhue 90 # degrees
+        translation 10.0, 0
+        fillhue_rotation 0.25 # 90 degrees
         count 10
         # the resulting matrices are now applied count times on the contained objects
         circle {

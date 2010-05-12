@@ -27,7 +27,7 @@ Even more, a QDialog can be stored in the view as well!
 =end
   class Scene < Frame
     require_relative '../graphical'
-    # note that PanelContext is already included in Panel.
+    # note that FrameContext is already included in Frame.
     include Graphical, SceneContext
   private
     # set the topleft and size of the scene. These can be floats and

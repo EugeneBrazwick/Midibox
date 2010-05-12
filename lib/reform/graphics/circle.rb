@@ -22,5 +22,7 @@ module Reform
   end # Circle
 
   createInstantiator File.basename(__FILE__, '.rb'), Qt::GraphicsEllipseItem, Circle
+#   tag "test for Scene#circle"
+#   raise ReformError, 'oh no' unless Scene.private_method_defined?(:circle)
 
 end # Reform

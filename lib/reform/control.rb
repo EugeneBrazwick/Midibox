@@ -109,6 +109,7 @@ module Reform
     # example, according to qt4 manual 'new Qt::GraphicsEllipseItem()' should be legal.
     # But qtruby thinks otherwise!
     def self.new_qt_implementor qt_implementor_class, qt_parent
+#       tag "#{qt_implementor_class}.new(#{qt_parent})"
       qt_implementor_class.new qt_parent
     end
 

@@ -8,7 +8,7 @@ module Reform
 a Panel is a widget that may contain others.
 =end
   class Frame < Widget
-    include PanelContext
+    include FrameContext
 
     private
 

@@ -120,12 +120,12 @@ module Reform
   end
 
 =begin rdoc
-  baseclass for PanelContext and SceneContext
+  baseclass for FrameContext and SceneContext
   As such it has a big impact on all Frame and Scene derivates, which are most container classes.
 
   First we have instantiators for each file/class in the controls or graphics directory.
   For example, since canvas.rb is in controls/ we have an instantiator 'canvas' in all
-  panels and its subclasses.
+  frames (widgetcontainers) and its subclasses.
   This instantiator accepts an optional string and a setup block.
   When called we decide to what parent to add the control, associated with the class involved,
   in this case a 'Canvas', which is a Qt::GraphicsView wrapper (see canvas.rb).
@@ -135,7 +135,7 @@ module Reform
 =end
   module Instantiator
     def createInstantiator_i name, qt_implementor_class, reform_class
-#       tag "define_method #{self}::#{name}"
+#       tag "define_method #{self}::#{name}."
       define_method name do |quickylabel = nil, &block|
 #         tag "arrived in #{self}::#{name}()"
         # It's important to use parent_qtc_to_use, since it must be a true widget.
@@ -155,7 +155,7 @@ module Reform
 #  BAD respond_to is USELESS!!        if qparent.respond_to?(:layout) && qparent.layout && reform_class <= Layout  # smart!!
         if qparent
           if reform_class <= Layout && (qparent.inherits('QWidget') && qparent.layout || qparent.inherits('QGraphicsScene'))
-            # insert an additional generic panel (say Qt::GroupBox)
+            # insert an additional generic frame (say Qt::GroupBox)
             # you cannot store a layout in a layout, nor can you store a layout in a graphicsscene.
             if qparent.inherits('QGraphicsScene') # even if a GraphicsItem, you cannot pass the scene as a qparent! && !(reform_class <= GraphicsItem)
               qparent = nil
@@ -219,11 +219,11 @@ module Reform
     end
   end # module Instantiator
 
-  # PanelContext means we get the instantiators in the 'controls' directory.
-  # So things EXTENDING PanelContext can contain other widgets
-  module PanelContext
+  # FrameContext means we get the instantiators in the 'controls' directory.
+  # So things including FrameContext can contain other widgets
+  module FrameContext
     extend Instantiator
-  end # module PanelContext
+  end # module FrameContext
 
   # SceneContext means we get the instantiators in the 'graphics' directory.
   module SceneContext
@@ -249,7 +249,7 @@ module Reform
 #
 
   # experimental. 'Cans' both widgets and graphicitem setups
-  module ScenePanelMacroContext
+  module SceneFrameMacroContext
     def self.createInstantiator_i name
 #       tag "define_method #{self}::#{name} MACRO recorder"
       define_method name do |quickylabel = nil, &block|
@@ -276,28 +276,29 @@ module Reform
 
   # delegator. see App::registerControlClassProxy
   def self.registerControlClassProxy id, path
-    PanelContext::registerControlClassProxy_i id, path
+    FrameContext::registerControlClassProxy_i id, path
     App::registerControlClassProxy_i id, path
   end
 
   def self.registerGraphicsControlClassProxy id, path
+#     tag "registerGraphicsControlClassProxy(#{id}, #{path})"
     SceneContext::registerControlClassProxy_i id, path
-    ScenePanelMacroContext::registerControlClassProxy_i id, path
+#     SceneFrameMacroContext::registerControlClassProxy_i id, path
   end
 
   require_relative 'widget'
 
   # delegator. See App::createInstantiator
   def self.createInstantiator name, qt_implementor_class, reform_class = Widget
-#     tag "createInstantiator"
+#     tag "createInstantiator '#{name}'"
     if reform_class <= Widget
-      PanelContext::createInstantiator_i name, qt_implementor_class, reform_class
+      FrameContext::createInstantiator_i name, qt_implementor_class, reform_class
       App::createInstantiator_i name
-      ScenePanelMacroContext::createInstantiator_i name
+#       SceneFrameMacroContext::createInstantiator_i name
     else
-      # note: since a Scene is a Panel it also receives the Widget instantiators.
+      # note: since a Scene is a Frame it also receives the Widget instantiators.
       SceneContext::createInstantiator_i name, qt_implementor_class, reform_class
-      ScenePanelMacroContext::createInstantiator_i name
+#       SceneFrameMacroContext::createInstantiator_i name
     end
   end
 

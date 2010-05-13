@@ -8,6 +8,10 @@ module Reform
   private
     define_simple_setter :renderHint, :cacheMode, :dragMode
 
+    def autoscale
+      @qtc.autoscale = 1.0
+    end
+
     def antialiasing b = nil
       return renderHints & Qt::Painter::Antialiasing if b.nil?
       setRenderHint(Qt::Painter::Antialiasing, b)
@@ -33,6 +37,7 @@ module Reform
       @qtc.backgroundBrush = brush
     end
 
+    # override since we must set the scene here (setScene)
     def scene id = nil, &block
       if id
         newqtc = (if id.respond_to?(:qtc) then id else @owner.send(id) end).qtc
@@ -49,13 +54,31 @@ module Reform
 
   end # class Canvas
 
-
+  # The implementor:
   class QGraphicsView < Qt::GraphicsView
+    private
+
     public
+
+     def autoscale= value
+       policy = (@autoscale = value) ? Qt::ScrollBarAlwaysOff : Qt::ScrollBarAsNeeded
+       setHorizontalScrollBarPolicy policy
+       setVerticalScrollBarPolicy policy
+     end
+
      # override Qt virtual method. Unfortunately there is no slot/signal for this.
      def resizeEvent event
+       w, h = event.size.width, event.size.height
        b = @_canvas_hack.when_resized and
-         b.call(event.size.width, event.size.height)
+         b.call(w, h)
+       if @autoscale && w > 4 && h > 4
+#          fitInView(sceneRect, Qt::KeepAspectRatio)
+         srect = sceneRect
+         requested_scale = [w / srect.width, h / srect.height].min
+#          tag "winsz=#{w}x#{h}, srect=#{srect.width}x#{srect.height} -> reqsc=#{requested_scale}"
+         s, @autoscale = requested_scale / @autoscale, requested_scale
+         scale(s, s) if (s - 1.0).abs > 0.001
+       end
      end
 
      def sizeHint

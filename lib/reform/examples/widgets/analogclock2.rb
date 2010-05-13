@@ -5,7 +5,7 @@ require_relative '../../app'
 Reform::app {
   canvas {
     scene {
-      area -100.0, -100.0, 100.0, 100.0 # topleft - rightbottom
+      area -110.0, -110.0, 220.0, 220.0 # topleft + size(!) NOT rightbottom !!
       line { stroke red
         from -100, 0
         to 100, 0
@@ -22,24 +22,32 @@ Reform::app {
           # Must be: circle {fill red; ...}; circle {fill blue; ...};
 #       tag "calling Scene::duplicate()"
 # trace do
-      circle { position 0, 0; radius 20; fill blue }
+#       circle { position 0, 0; radius 20; fill blue }
       replicate {
-        rotation 20 # degrees, rotation around 0,0
-        translation 10.0, 0
-        fillhue_rotation 0.25 # 90 degrees
-        count 10
+        rotation 1.0/60.0 # degrees, rotation around 0,0
+#         translation 10.0, 0
+        fillhue_rotation 1.0/60.0
+#         count 10
         # the resulting matrices are now applied count times on the contained objects
         circle {
-          position -50, -50
-          radius 25
+          position 0, -100
+          radius 5
           # setting a fill here would override the fillhue in duplicate and the fill in scene.
         }
         # it should be possible to nest duplicates properly.
+      } # replicate
+      polygon { #hourHand
+        points [7, 8], [-7, 8], [0, -40]
+        fill 127, 0, 127
+      }
+      polygon { #minuteHand
+        points [7, 8], [-7, 8], [0, -70]
+        fill 127, 127, 191
       }
 # end
     } # scene
     #antialiasing true   this is the default
-    # autofullscale: TODO. View must rescale on resize to the area is in full view (but keep aspectratio)
+    autoscale # : TODO. View must rescale on resize so the area is in full view (but keep aspectratio)
     title tr('Analog Clock')
     size 400, 400
   }

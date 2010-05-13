@@ -3,6 +3,28 @@ module Reform
 # this module contains generated and other 'brush' and 'pen' constructors.
 # these will be used when rendering shapes on a graphicsitem, canvas or scene.
 module Graphical
+  private
+  def self.generateColorConverter name, klass, cache
+    define_method name do |colorsym, g = nil, b = nil, a = nil|
+  #     tag "red = Qt::Color #{red.red} #{red.green} #{red.blue}" -> 255, 0, 0
+#       tag "color2pen #{colorsym.inspect}"
+      case colorsym
+      when Qt::Color then klass.new(colorsym)
+      when String then klass.new(Qt::Color.new(colorsym))
+      when Array then klass.new(Qt::Color.new(*colorsym))
+      else case b
+        when Integer then klass.new(Qt::Color.new(colorsym, g, b, a || 255))
+        when Float then klass.new(Qt::Color.new(colorsym, (g * 255.0).floor, (b * 255.0).floor,
+                                                ((a || 1.0) * 255.0).floor))
+        else
+#           tag "caching pen #{colorsym} with Qt color #{@@color[colorsym].inspect}"
+  #       raise ReformError unless Qt::Color === @@color[colorsym]
+          cache[colorsym] ||= klass.new(@@color[colorsym])
+        end
+      end
+    end #def meth
+  end # generateColorConverter
+
 public
   # index: colorsymbol, value: Qt::Brush
   @@solidbrush = {}
@@ -23,9 +45,9 @@ public
   # so pens and brushes can be given a (basic) color easily.
   # IMPORTANT: do not use 'for' here since it will tie all 'sym' instances into 1 knot.
   @@color.keys.each do |sym|
-    tag "Mapping #{@@color[sym]}"
+#     tag "Mapping #{@@color[sym]}"
     @@color[sym] = Qt::Color.new(@@color[sym])
-    tag "result = Qt::Color #{@@color[sym].red} #{@@color[sym].green} #{@@color[sym].blue}"
+#     tag "result = Qt::Color #{@@color[sym].red} #{@@color[sym].green} #{@@color[sym].blue}"
     define_method(sym) do
       @@color[sym]
     end
@@ -41,19 +63,8 @@ public
     end
   end
 
-  def color2pen colorsym
-#     tag "red = Qt::Color #{red.red} #{red.green} #{red.blue}" -> 255, 0, 0
-#     tag "color2pen #{colorsym}"
-    case colorsym
-    when Qt::Color then Qt::Pen.new(colorsym)
-    when String, Integer then Qt::Pen.new(Qt::Color.new(colorsym))
-    when Array then Qt::Pen.new(Qt::Color.new(*colorsym))
-    else
-#       tag "creating pen #{colorsym} with Qt color #{@@color[colorsym].inspect}"
-      raise ReformError unless Qt::Color === @@color[colorsym]
-      @@pen[colorsym] ||= Qt::Pen.new(@@color[colorsym])
-    end
-  end
+  generateColorConverter :color2pen, Qt::Pen, @@pen
+  generateColorConverter :color2brush, Qt::Brush, @@solidbrush
 
   # horizontal gradient, with a linear pattern of brushes
   # if no brushes are given it is white to black (left to right)

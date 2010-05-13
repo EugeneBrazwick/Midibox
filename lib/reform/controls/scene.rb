@@ -34,6 +34,7 @@ Even more, a QDialog can be stored in the view as well!
     # can be freely chosen. Zoom, offset and aspectratio can be changed
     # for a specific view (and even rotation etc)
     def area x, y, w, h
+#       tag "sceneRect := #{x}, #{y}, #{w}x#{h}"
       @qtc.setSceneRect x, y, w, h
     end
 
@@ -99,7 +100,7 @@ Even more, a QDialog can be stored in the view as well!
 
   #override
     def addControl control, &block
-      tag "addControl, control #{control} is added to SCENE"
+#       tag "addControl, control #{control} is added to SCENE"
       qc = if control.respond_to?(:qtc) then control.qtc else control end
       require_relative '../graphicsitem'
       if control.is_a?(GraphicsItem)

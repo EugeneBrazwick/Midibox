@@ -173,7 +173,7 @@ module Reform
           end
         end  # if qparent
         # we create the implementor first, then the wrapper
-        tag "reform_class=#{reform_class}, calling new_qt_implementor"
+#         tag "reform_class=#{reform_class}, calling new_qt_implementor"
         newqtc = qt_implementor_class &&
                  ctrl.instantiate_child(reform_class, qt_implementor_class, qparent)
         c = reform_class.new ctrl, newqtc

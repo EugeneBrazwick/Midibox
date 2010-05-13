@@ -13,21 +13,21 @@ module Reform
 
     public
 
-    def fill brush = nil
+    def fill brush = nil, g = nil, b = nil, a = nil
       return @qtc.brush unless brush
       case brush
       when Qt::Brush then @qtc.brush = brush
-      else @qtc.brush = color2brush(brush)
+      else @qtc.brush = color2brush(brush, g, b, a)
       end
     end
 
     alias :background :fill
 
-    def stroke pen = nil
+    def stroke pen = nil, g = nil, b = nil, a = nil
       return @qtc.pen unless pen
-      tag "stroke #{pen.inspect}"
-      @qtc.pen = case pen when Qt::Pen then pen else color2pen(pen) end
-      tag "qtc.pen=#{@qtc.pen.inspect}, color.red=#{@qtc.pen.color.red}"
+#       tag "stroke #{pen.inspect}"
+      @qtc.pen = case pen when Qt::Pen then pen else color2pen(pen, g, b, a) end
+#       tag "qtc.pen=#{@qtc.pen.inspect}, color.red=#{@qtc.pen.color.red}"
     end
 
     alias :brush :fill

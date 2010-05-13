@@ -10,7 +10,7 @@ module Reform
     def initialize parent, init_brush
       super(parent)
       @init_brush = init_brush
-      tag "init_brush.color=#{@init_brush.color.inspect}"
+#       tag "init_brush.color=#{@init_brush.color.inspect}"
       # this is too simplistic, both scale and rotation require a pivot point to
       # be really usefull.
       @boundingrect = @count = @rotation = @scale = @translation = nil
@@ -64,12 +64,13 @@ module Reform
 #       painter.pen = Qt::Pen.new(Qt::black)
 #       painter.drawRect(boundingRect)
       @myChildItems.each do |i|
-        tag "#{i}.respond_to?(:setBrush) -> #{i.respond_to?(:setBrush)}"
+        # important 'respond_to?' will NOT work!!
+#         tag "#{i}.respond_to?(:setBrush) -> #{i.respond_to?(:setBrush)}"
         i.brush = @init_brush if @fillhue_rotation #&& i.respond_to?(:setBrush)
         i.paint(painter, option, widget)
       end
       @hue = @fillhue_rotation ? Qt::Brush.new(@init_brush) : nil
-      tag "hue = #{@hue && @hue.color.inspect}"
+#       tag "hue = #{@hue && @hue.color.inspect}"
       if @count && @count > 0
         painter.save
         begin
@@ -82,10 +83,10 @@ module Reform
             if @fillhue_rotation
               color = @hue.color
               hsv = color.hue, color.saturation, color.value, color.alpha
-              tag "orgcolor = #{color.inspect}, orghsv = #{hsv.inspect}"
+#               tag "orgcolor = #{color.inspect}, orghsv = #{hsv.inspect}"
               hsv[0] = (hsv[0] + @fillhue_rotation) % 360
               color.setHsv(*hsv)
-              tag "changing hsv to #{hsv.inspect}"
+#               tag "changing hsv to #{hsv.inspect}"
               @hue.color = color
             end
 #             tag "alter transform and repaint , t= #{t}" OK
@@ -186,7 +187,7 @@ module Reform
     end
 
     def self.new_qt_implementor(qt_implementor_class, parent, qparent)
-      tag "replicate: instantiate a #{qt_implementor_class}"
+#       tag "replicate: instantiate a #{qt_implementor_class}"
       q = QReplicate.new(qparent, parent.brush)
     end
 

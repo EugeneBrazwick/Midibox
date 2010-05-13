@@ -55,16 +55,6 @@ Even more, a QDialog can be stored in the view as well!
       @qtc.backgroundBrush = brush
     end
 
-    # Set the default fill for elements
-    def fill brush
-      @brush = brush
-    end
-
-    # Set the default stroke for elements
-    def stroke pen
-      @pen = pen
-    end
-
 =begin rdoc
     specific for scenes. This is a matrix operator. You can specify
     rotate, translate, scale, fillhue and strokehue currently.
@@ -81,8 +71,35 @@ Even more, a QDialog can be stored in the view as well!
 
   public
 
-    #override
+    # Set the default fill for elements.
+    def fill brush = nil
+      return (@brush || defaultBrush) unless brush
+      case brush
+      when Qt::Brush
+        @brush = brush
+      else
+        @brush = color2brush(brush)
+      end
+    end
+
+
+    # Set the default stroke for elements
+    def stroke pen = nil
+      return (@pen || defaultPen) unless pen
+      case pen
+      when Qt::Pen
+        @pen = pen
+      else
+        @pen = color2pen(pen)
+      end
+    end
+
+    alias :brush :fill
+    alias :pen :stroke
+
+  #override
     def addControl control, &block
+      tag "addControl, control #{control} is added to SCENE"
       qc = if control.respond_to?(:qtc) then control.qtc else control end
       require_relative '../graphicsitem'
       if control.is_a?(GraphicsItem)
@@ -92,12 +109,6 @@ Even more, a QDialog can be stored in the view as well!
       end
       super
     end
-
-    # Q: how the hell do we get these in our controls?
-    # A: the general rule will be that any graphics item uses containing_frame.brush and
-    # containing_frame.pen if it has none defined.
-    attr :pen
-    attr :brush
 
     # override. Panel is a widget, but I am not...
     def widget?

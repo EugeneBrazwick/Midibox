@@ -6,6 +6,14 @@ Reform::app {
   canvas {
     scene {
       area -100.0, -100.0, 100.0, 100.0 # topleft - rightbottom
+      line { stroke red
+        from -100, 0
+        to 100, 0
+      }
+      line { stroke 'steelblue'
+        from 0, -100
+        to 0, 100
+      }
       fill red # changes the default fill of all contained object, even before this
           # declaration (or at least, that is supposed to happen)
           # It is not the 'current' fill, but the 'default' fill.
@@ -14,7 +22,7 @@ Reform::app {
           # Must be: circle {fill red; ...}; circle {fill blue; ...};
 #       tag "calling Scene::duplicate()"
 # trace do
-      circle { position 0, 0; radius 20 }
+      circle { position 0, 0; radius 20; fill blue }
       replicate {
         rotation 20 # degrees, rotation around 0,0
         translation 10.0, 0

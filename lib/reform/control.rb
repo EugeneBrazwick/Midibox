@@ -105,12 +105,20 @@ module Reform
       self
     end
 
-    # parent can be nil, but even then....
+    # qt_parent can be nil, but even then....
     # example, according to qt4 manual 'new Qt::GraphicsEllipseItem()' should be legal.
     # But qtruby thinks otherwise!
-    def self.new_qt_implementor qt_implementor_class, qt_parent
+    # parent is never nil, and may very well be unfinised, later components may follow
+    # called from instantiate_child
+    def self.new_qt_implementor qt_implementor_class, parent, qt_parent
 #       tag "#{qt_implementor_class}.new(#{qt_parent})"
       qt_implementor_class.new qt_parent
+    end
+
+    # called to instantiate a child, qparent is basicly the effective qtc.
+    # this method can be overriden if child control has to be altered
+    def instantiate_child(reform_class, qt_implementor_class, qparent)
+      reform_class.new_qt_implementor(qt_implementor_class, self, qparent)
     end
 
     # widget -> bool.  Returns true if the control is a widget

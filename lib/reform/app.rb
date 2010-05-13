@@ -54,7 +54,7 @@ Recepy for Ubuntu (of the Blood, Sweat and Tears Kind -- but in the end it was '
 
 Preliminaries:
   I hacked my ruby install on ubuntu (since 1.9.1 works fine),
-  with a bunch of links:
+  with a bunch of links (does not work with ruby1.8 installed as well):
   - cd /usr/bin
   - sudo ln -s {erb,rake,ruby,irb,rdoc,ri}1.9.1 .
   - cd /usr/lib
@@ -66,14 +66,15 @@ Preliminaries:
       vm for this.
 
   - download source from ubuntu (lucid)
+  - the following does not need the links above, accept the config.h one
   - tar zxf tarballs/kdebindings_4.4.2.orig.tar.gz
   - gunzip tarballs/kdebindings_4.4.2-0ubuntu2.diff.gz
   - patch < tarballs/kdebindings_4.4.2-0ubuntu2.diff
   - cd kdebindings-4.4.2/
   - cmake -DCMAKE_INSTALL_PREFIX=/usr/local \
-      -DRUBY_EXECUTABLE=/usr/bin/ruby \
+      -DRUBY_EXECUTABLE=/usr/bin/ruby1.9.1 \
       -DRUBY_INCLUDE_PATH=/usr/include/ruby-1.9.1 \
-      -DRUBY_LIBRARY=/usr/lib/libruby-1.9.so \
+      -DRUBY_LIBRARY=/usr/lib/libruby-1.9.1.so \
       -DENABLE_QIMAGEBLITZ_SMOKE=off -DENABLE_ATTICA_SMOKE=off -DENABLE_KROSSRUBY=off -Wno-dev
   - make
   - sudo make install
@@ -171,7 +172,10 @@ module Reform
 =end
           end
         end  # if qparent
-        newqtc = qt_implementor_class && reform_class.new_qt_implementor(qt_implementor_class, qparent)
+        # we create the implementor first, then the wrapper
+        tag "reform_class=#{reform_class}, calling new_qt_implementor"
+        newqtc = qt_implementor_class &&
+                 ctrl.instantiate_child(reform_class, qt_implementor_class, qparent)
         c = reform_class.new ctrl, newqtc
         c.text = quickylabel if quickylabel
         # addControl will execute block, and then also call postSetup

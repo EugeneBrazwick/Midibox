@@ -5,39 +5,49 @@ module Reform
 
   require_relative '../graphicsitem'
 
-  class QReplicate < Qt::GraphicsItemGroup
+  class QReplicate < Qt::GraphicsItem #Group
     private
-    def initialize parent = nil
-      super
+    def initialize parent, init_brush
+      super(parent)
+      @init_brush = init_brush
+      tag "init_brush.color=#{@init_brush.color.inspect}"
+      # this is too simplistic, both scale and rotation require a pivot point to
+      # be really usefull.
       @boundingrect = @count = @rotation = @scale = @translation = nil
       @fillhue_rotation = nil
+      @myChildItems = []
     end
 
     private
     def matrix!
       unless @matrix
-        tag "calc mat, tran=#{@translation}, rot=#@rotation, scale=#@scale, count=#@count"
+#         tag "calc mat, tran=#{@translation}, rot=#@rotation, scale=#@scale, count=#@count"
         @matrix = Qt::Transform.new
-        @matrix.translate(*@translation) if @translation
         @matrix.rotate(@rotation) if @rotation
         @matrix.scale(@scale) if @scale
-        tag "calced {#{@matrix.m11} #{@matrix.m12} #{@matrix.m13}|#{@matrix.m21} #{@matrix.m22} #{@matrix.m23}|#{@matrix.m31} #{@matrix.m32} #{@matrix.m33}}"
+        @matrix.translate(*@translation) if @translation
+#         tag "calced {#{@matrix.m11} #{@matrix.m12} #{@matrix.m13}|#{@matrix.m21} #{@matrix.m22} #{@matrix.m23}|#{@matrix.m31} #{@matrix.m32} #{@matrix.m33}}"
       end
       @matrix
     end
 
     public
     def boundingRect
-      b = super
+      b = Qt::RectF.new
+      @myChildItems.each { |i| b |= i.boundingRect }
+#       tag "org boundingRect = #{b.inspect}" # super -> 0,0,0,0  ???
       return b unless @count && @count > 0
       m = matrix!
       @count.times { b |= m.mapRect(b) }
+#       tag "resulting brect -> #{b.inspect}"
       b
     end
 
     #override
     def opaqueArea
-      o = super
+#       tag "opaqueArea called, this may be extremely slow, must cache..."
+      o = Qt::PainterPath.new
+      @myChildItems.each { |i| o |= i.opaqueArea }
       return o unless @count && @count > 0
       m = matrix!
       @count.times { o |= m.map(o) }
@@ -51,16 +61,33 @@ module Reform
     def paint painter, option, widget = nil
       # widget is the actual widget, but can be nil.
       # the method should paint to painter.
-      super
+#       painter.pen = Qt::Pen.new(Qt::black)
+#       painter.drawRect(boundingRect)
+      @myChildItems.each do |i|
+        tag "#{i}.respond_to?(:setBrush) -> #{i.respond_to?(:setBrush)}"
+        i.brush = @init_brush if @fillhue_rotation #&& i.respond_to?(:setBrush)
+        i.paint(painter, option, widget)
+      end
+      @hue = @fillhue_rotation ? Qt::Brush.new(@init_brush) : nil
+      tag "hue = #{@hue && @hue.color.inspect}"
       if @count && @count > 0
         painter.save
         begin
-          painter.worldMatrixEnabled = true # ?
+#           painter.worldMatrixEnabled = true # ? doesn't matter
           m = matrix!
 #           tran = Qt::Transform.new
 #           tran *= m
           # we also have the changing hue ..... arghh
           @count.times do # |t| OK
+            if @fillhue_rotation
+              color = @hue.color
+              hsv = color.hue, color.saturation, color.value, color.alpha
+              tag "orgcolor = #{color.inspect}, orghsv = #{hsv.inspect}"
+              hsv[0] = (hsv[0] + @fillhue_rotation) % 360
+              color.setHsv(*hsv)
+              tag "changing hsv to #{hsv.inspect}"
+              @hue.color = color
+            end
 #             tag "alter transform and repaint , t= #{t}" OK
 #             painter.translate(5.0, 5.0)
             painter.setWorldTransform(m, true) # combine with current matrix
@@ -70,10 +97,12 @@ module Reform
             # and if I change the matrix for all components?
             # Or for myself???
 #             super(painter, option, widget)
-            childItems.each do |i|
+            @myChildItems.each do |i|
+#               painter.drawRect(i.boundingRect)
+              i.brush = @hue if @hue #&& i.respond_to?(:'setBrush')
               i.paint(painter, option, widget)
+              # sleep 1  HANG!!
             end
-#             tran *= m
           end
         ensure
           setTransform(Qt::Transform.new) # restore to I
@@ -87,7 +116,7 @@ module Reform
     # The rotation is clockwise. passing 0 or 0.0 is illegal.
     def rotation= degrees
       degrees *= 360.0 unless Integer === degrees || degrees.abs > 1.00000001
-      tag "rotation := #{degrees}"
+#       tag "rotation := #{degrees}"
       @rotation = degrees
       unless @count
         @count = (360.000001 / @rotation.abs).floor - 1
@@ -95,10 +124,16 @@ module Reform
       end
     end
 
-    attr_accessor :count, :scale, :fillhue_rotation
+    def fillhue_rotation= degrees
+      degrees *= 360.0 unless Integer === degrees || degrees.abs > 1.00000001
+      @fillhue_rotation = degrees.floor
+    end
+
+    attr_accessor :count, :scale
+    attr :myChildItems
 
     def translation=(x = nil, y = nil)
-      tag "translation"
+#       tag "translation"
       @translation = if y then [x, y] else x end
     end
 
@@ -129,16 +164,42 @@ module Reform
 
     public
 
+    def pen
+      containing_frame.pen
+    end
+
+    def brush
+      containing_frame.brush
+    end
+
     # override. it returns the added control
     def addControl control, &block
 #       tag "addControl to qtc=#@qtc, to add = #{control.qtc}"
 #       @qtc.addToGroup(control.qtc)
-      control.qtc.parentItem = @qtc
+#       control.qtc.parentItem = @qtc
+      @qtc.myChildItems << control.qtc
       control.instance_eval(&block) if block
 #       tag "calling postSetup on #{control}"
       control.postSetup
 #       tag "did postSetup"
 #       control
+    end
+
+    def self.new_qt_implementor(qt_implementor_class, parent, qparent)
+      tag "replicate: instantiate a #{qt_implementor_class}"
+      q = QReplicate.new(qparent, parent.brush)
+    end
+
+    # override
+    def instantiate_child(reform_class, qt_implementor_class, qparent)
+      # add the child to the tree (and hence to the scene) but make it invisible
+      # otherwise we might create a dangling pointer (at least in the C++ version,
+      # may qtruby has something that protects us from memoryleaks??)
+      # All replicators elements are virtual. They do not respond to events.
+      # use 'realize' to make them real.
+      child = reform_class.new_qt_implementor(qt_implementor_class, self, qparent)
+      child.hide
+      child
     end
 
   end # class Replicate

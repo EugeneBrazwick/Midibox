@@ -28,9 +28,20 @@ a Panel is a widget that may contain others.
         @all_widgets << control
       elsif control.layout?
         @qtc.layout = control.qtc
+#       else
+#         case control
+#         when Timer then control.qtc.start
+#         end
       end
       control.instance_eval(&block) if block
       control.postSetup
+    end
+
+    def registerName aName, aControl
+      define_singleton_method(aName) { aControl }
+      unless @containing_form == self
+        @form.define_singleton_method(aName) { aControl }
+      end
     end
 
   end # class Frame

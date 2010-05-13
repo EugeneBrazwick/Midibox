@@ -53,6 +53,29 @@ module Reform
       @macros and @macros.each { |macro| macro.exec }
     end
 
+    def name aName
+      @containing_frame.registerName aName, self
+    end
+
+    # shortcut
+    def timer_interval timeout_in_ms, &block
+      start_timer(timeout_in_ms)
+      whenTimeout(&block) if block
+    end
+
+    # default timeout event handler
+    def whenTimeout &block
+      @whenTimeout = block
+    end
+
+    protected
+    #override
+    def timerEvent event
+#       tag "timerEvent"
+      return unless @whenTimeout
+      @whenTimeout.call
+    end
+
     public
     # the parent widget (a Reform::Frame)
     attr :containing_frame
@@ -78,10 +101,11 @@ module Reform
     end
 
     # default resize callback setter/getter
-    def when_resized &block
-      return @when_resized unless block
-      @when_resized = block
+    def whenResized &block
+      return @whenResized unless block
+      @whenResized = block
     end
+
 
     # normally the Qt implementor, but for layouts we add subcontrols to the
     # layouts owner. In other words, the result must be a Qt::Widget in all cases
@@ -128,5 +152,15 @@ module Reform
     # layout -> bool. Returns true if the control is a layout
     def layout?
     end
+
+    def timer?
+    end
+
+    def graphic?
+    end
+  end # class Control
+
+  # forward
+  class Timer < Control
   end
 end # Reform

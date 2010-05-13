@@ -32,6 +32,22 @@ module Reform
 
     alias :brush :fill
     alias :pen :stroke
+
+    # Important, angles less than 1.0 degree are taken to be a factor of the
+    # circles length (1.0 == 360 degr = 2*pi rad)
+    def rotation degrees, around_xy = nil
+      degrees *= 360.0 unless Integer === degrees || degrees.abs > 1.00000001
+      if around_xy
+        @qtc.setTransformOriginPoint(*around_xy)
+      else
+        @qtc.setTransformOriginPoint(0.0, 0.0)
+      end
+      @qtc.rotation = degrees
+    end
+
+    def graphic?
+      true
+    end
   end # GraphicsItem
 
 end # Reform

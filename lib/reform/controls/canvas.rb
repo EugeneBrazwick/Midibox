@@ -69,7 +69,7 @@ module Reform
      # override Qt virtual method. Unfortunately there is no slot/signal for this.
      def resizeEvent event
        w, h = event.size.width, event.size.height
-       b = @_canvas_hack.when_resized and
+       b = @_canvas_hack.whenResized and
          b.call(w, h)
        if @autoscale && w > 4 && h > 4
 #          fitInView(sceneRect, Qt::KeepAspectRatio)

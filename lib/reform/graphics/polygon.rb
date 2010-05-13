@@ -8,10 +8,14 @@ module Reform
 
     # every element should be a tuple.
     def points *pts
-      poly = Qt::PolygonF.new(pts)
+#       tag "pts=#{pts.inspect}"
+      poly = Qt::PolygonF.new(pts.map {|x, y| Qt::PointF.new(x, y) })
 #       for x, y in pts do
-#         poly << Qt::PointF.new(x, y)
+#         p = Qt::PointF.new(x, y)
+#         tag "p=#{p.inspect}"
+#         poly.append p
 #       end
+#       tag "#poly = #{poly.count}"           # STACK OVERFLOW?
       @qtc.polygon = poly
     end
 

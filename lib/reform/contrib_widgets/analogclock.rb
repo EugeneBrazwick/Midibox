@@ -1,4 +1,6 @@
 
+# Copyright (c) 2010 Eugene Brazwick
+
 # qtruby version of the AnalogClock example widget
 
 module Reform

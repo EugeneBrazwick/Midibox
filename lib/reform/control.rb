@@ -50,10 +50,12 @@ module Reform
 
     # default.
     def executeMacros
-      @macros and @macros.each { |macro| macro.exec }
+      instance_variable_defined?(:@macros) and @macros.each { |macro| macro.exec }
     end
 
-    def name aName
+    def name aName = nil
+      return name unless aName
+      @name = aName
       @containing_frame.registerName aName, self
     end
 
@@ -68,12 +70,34 @@ module Reform
       @whenTimeout = block
     end
 
+    def connect_id
+      instance_variable_defined?(:@connect_id) ? @connect_id :
+                                                 instance_variable_defined?(:@name) ? @name : nil
+    end
+
     protected
     #override
     def timerEvent event
 #       tag "timerEvent"
       return unless @whenTimeout
       @whenTimeout.call
+    end
+
+    # use this to wrap a rescue clause around any user-callback. Also
+    # it calls the callback not in the object's context, but in that of the
+    # form (MVC controller)
+    def rfCallBlockBack *args, &block
+      begin
+        return containing_form.instance_exec(*args, &block)
+      rescue LocalJumpError
+         # ignore
+      rescue IOError, RuntimeError => exception
+        msg = "#{exception.message}\n"
+      rescue StandardError => exception
+        msg = "#{exception.class}: #{exception}\n" + exception.backtrace.join("\n")
+      end
+      # this must be fixed using an alert, but it may depend on the kind of exception...
+      $stderr << msg
     end
 
     public
@@ -88,6 +112,10 @@ module Reform
 
     # tuple w,h   as set in last call of setSize/setGeometry
     attr :requested_size
+
+    def addWidget control, q
+      @qtc.addWidget q
+    end
 
     # return macros array, creating it if it was undefined
     # Macros are executed right after the setup block (if present)
@@ -105,7 +133,6 @@ module Reform
       return @whenResized unless block
       @whenResized = block
     end
-
 
     # normally the Qt implementor, but for layouts we add subcontrols to the
     # layouts owner. In other words, the result must be a Qt::Widget in all cases
@@ -158,6 +185,41 @@ module Reform
 
     def graphic?
     end
+
+    def model?
+    end
+
+=begin rdoc
+    connect a model (may be nil) to the control
+    The rules are as follows:
+        - if the control has a connect_id (defaults to name) and that name is also
+          a public method of model,
+          with no arguments (a getter therefore) and if model is not nil, then we
+          apply the method and use the result to set the value of the control.
+        - otherwise if the control has no name, nor a connect_id set, it is left untouched,
+          but the connect may propagate
+        - otherwise the value of the control is cleared. The result must be 'clean'
+        but validation may trigger if the user tries to 'commit' the formdata (clicks 'Update').
+        - the specific value of nil stands for a nonset value. This could be automatically
+        converted to 0 or an empty string, but the control must not treat the value as
+        valid by default and validation must be triggered if the user attempts to 'commit'
+        the formdata.
+        - controls that can be changed should be protected if the accompanying setter is
+        not available.
+        - controls can set a @connect_id, that overrides @name.
+        - if :initializing is set in 'options' the control must keep or set its 'clean'
+        state, and must
+        treat the field as being untouched by the user. In particular no triggers should be
+        applied, and no validation should take place.
+        - controls that have components must propagate the connection, even if they have no
+        name.
+        - if the value of a control does not change by the connect operation, no triggers must
+        be called (at least not now).
+   See Frame#connect
+=end
+    def connectModel model, options = nil
+    end
+
   end # class Control
 
   # forward

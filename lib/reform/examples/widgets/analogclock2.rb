@@ -1,6 +1,6 @@
 #!/usr/bin/ruby
 
-require_relative '../../app'
+require 'reform/app'
 
 Reform::app {
   canvas {

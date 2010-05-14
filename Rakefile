@@ -63,6 +63,11 @@ task :play_rminiarp do
   sh "#{RUBY} bin/rminiarp --bpm=120 --wrap=UM-2 fixtures/miniarp.dat"
 end
 
+desc 'as an example to run gui examples: calculator'
+task :run_calculator_example do
+  `#{RUBY} -I lib lib/reform/examples/widgets/calculator.rb`
+end
+
 desc 'panic'
 task :panic do
   sh "#{RUBY} bin/panic 20:1"

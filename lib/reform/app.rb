@@ -137,6 +137,7 @@ module Reform
   module Instantiator
     def createInstantiator_i name, qt_implementor_class, reform_class
 #       tag "define_method #{self}::#{name}."
+      remove_method name if private_method_defined?(name)
       define_method name do |quickylabel = nil, &block|
 #         tag "arrived in #{self}::#{name}()"
         # It's important to use parent_qtc_to_use, since it must be a true widget.
@@ -155,7 +156,7 @@ module Reform
 # NOT GOING TO WORK.
 #  BAD respond_to is USELESS!!        if qparent.respond_to?(:layout) && qparent.layout && reform_class <= Layout  # smart!!
         if qparent
-          if reform_class <= Layout && (qparent.inherits('QWidget') && qparent.layout || qparent.inherits('QGraphicsScene'))
+          if reform_class <= Layout && (qparent.widgetType? && qparent.layout || qparent.inherits('QGraphicsScene'))
             # insert an additional generic frame (say Qt::GroupBox)
             # you cannot store a layout in a layout, nor can you store a layout in a graphicsscene.
             if qparent.inherits('QGraphicsScene') # even if a GraphicsItem, you cannot pass the scene as a qparent! && !(reform_class <= GraphicsItem)
@@ -176,10 +177,15 @@ module Reform
 #         tag "reform_class=#{reform_class}, calling new_qt_implementor"
         newqtc = qt_implementor_class &&
                  ctrl.instantiate_child(reform_class, qt_implementor_class, qparent)
-        c = reform_class.new ctrl, newqtc
-        c.text = quickylabel if quickylabel
-        # addControl will execute block, and then also call postSetup
-        ctrl.addControl(c, &block)
+#         tag "#{reform_class}.new"
+        if reform_class <= Model
+          ctrl.setModel(reform_class.new, &block)
+        else
+          c = reform_class.new ctrl, newqtc
+          c.text(quickylabel) if quickylabel
+          # addControl will execute block, and then also call postSetup
+          ctrl.addControl(c, &block)
+        end
       end  # define_method name
       # make the method private:
       private name
@@ -211,7 +217,7 @@ module Reform
       define_method name do |quickylabel = nil, &block|
 #         tag "arrived in #{self}::#{name}() PROXY"
         # when called the method is removed to prevent loops
-        klass.send :undef_method, name
+        klass.send :remove_method, name
 #         tag "require_relative '#{thePath}'"
         require_relative thePath
         # the loaded module should call registerControlClass which recreates the method
@@ -231,6 +237,10 @@ module Reform
 
   # SceneContext means we get the instantiators in the 'graphics' directory.
   module SceneContext
+    extend Instantiator
+  end # module SceneContext
+
+  module FormContext
     extend Instantiator
   end # module SceneContext
 
@@ -267,7 +277,7 @@ module Reform
       return if private_method_defined?(name)
       klass = self
       define_method name do |quickylabel = nil, &block|
-        klass.send :undef_method, name
+        klass.send :remove_method, name
         require_relative thePath
         send(name, quickylabel, &block)
       end
@@ -290,15 +300,40 @@ module Reform
 #     SceneFrameMacroContext::registerControlClassProxy_i id, path
   end
 
-  require_relative 'widget'
+  def self.registerModelClassProxy id, path
+    FormContext::registerControlClassProxy_i id, path
+  end
+
+#   require_relative 'widget'
+
+  # some forwards, for the ultimate lazy programming:
+  class Control < Qt::Object
+  end
+
+  class Widget < Control
+  end
+
+  class Frame < Widget
+  end
+
+  class Layout < Frame
+  end
+
+  module Model
+  end
 
   # delegator. See App::createInstantiator
-  def self.createInstantiator name, qt_implementor_class, reform_class = Widget
+  def self.createInstantiator name, qt_implementor_class, reform_class = Widget, options = {}
 #     tag "createInstantiator '#{name}'"
     if reform_class <= Widget
-      FrameContext::createInstantiator_i name, qt_implementor_class, reform_class
-      App::createInstantiator_i name
+      unless options[:form]
+        FrameContext::createInstantiator_i name, qt_implementor_class, reform_class
+      end
+      App::createInstantiator_i name, qt_implementor_class, reform_class, options
 #       SceneFrameMacroContext::createInstantiator_i name
+    elsif reform_class <= Model
+#       tag "creating instantiator #{name} in FormContext"
+      FormContext::createInstantiator_i name, qt_implementor_class, reform_class
     else
       # note: since a Scene is a Frame it also receives the Widget instantiators.
       SceneContext::createInstantiator_i name, qt_implementor_class, reform_class
@@ -347,7 +382,7 @@ The idea is that it is a singleton.
 #       tag "define_method #{self}::#{name}"
       define_method name do |quickylabel = nil, &block|
         # Remove ourselves, so if we accidentally come back here we cause no stack overflow
-        App.send :undef_method, name
+        App.send :remove_method, name
         require_relative thePath
         send(name, quickylabel, &block)
       end
@@ -385,16 +420,27 @@ The idea is that it is a singleton.
   which the class can be instantiated. In the app space all implementors
   generate a macro that is added to the implicit QMainWindow
 =end
-    def self.createInstantiator_i name
-      define_method name do |quickylabel = nil, &block|
-        raise ReformError, 'put controls in forms' unless @all_forms.length <= 1
-#         puts "creating implementor_class #{implementor_class}, rf_class=#{rf_class}"
-        require_relative 'controls/form'
-        require_relative 'mainwindow'
-        @firstform ||= ReForm.new(QMainWindow.new)  # this is just form { }, the first time called
-        # we delay creating the elements until form.run is called.
-        Macro.new(@firstform, name, quickylabel, block)
+    def self.createInstantiator_i name, qt_implementor_class, reform_class, options
+      remove_method name if private_method_defined?(name)
+      if options[:form]
+        define_method name do |quicky = nil, &block|
+          qform = qt_implementor_class.new
+          form = reform_class.new qform
+          @firstform ||= form   # it looks the same, but is completely different
+          form.windowTitle = quicky if quicky
+          form.setup = block
+          # and now we wait for 'run'
+        end
+      else
+        define_method name do |quickylabel = nil, &block|
+          raise ReformError, 'put controls in forms' unless @all_forms.length <= 1
+  #         puts "creating implementor_class #{implementor_class}, rf_class=#{rf_class}"
+          @firstform ||= form
+          # we delay creating the elements until form.run is called.
+          Macro.new(@firstform, name, quickylabel, block)
+        end
       end
+      # make it private:
       private name
     end # App::createInstantiator_i
 
@@ -445,6 +491,10 @@ The idea is that it is a singleton.
     for file in Dir[File.dirname(__FILE__) + '/graphics/*.rb']
       basename = File.basename(file, '.rb')
       registerGraphicsControlClassProxy basename, 'graphics/' + basename
+    end
+    for file in Dir[File.dirname(__FILE__) + '/models/*.rb']
+      basename = File.basename(file, '.rb')
+      registerModelClassProxy basename, 'models/' + basename
     end
     $qApp.instance_eval(&block) if block
     $qApp.exec

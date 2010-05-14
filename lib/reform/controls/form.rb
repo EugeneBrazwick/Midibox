@@ -1,4 +1,6 @@
 
+# Copyright (c) 2010 Eugene Brazwick
+
 module Reform
 
   require_relative 'frame'
@@ -8,8 +10,10 @@ module Reform
  but is meant as a complete window.
 =end
   class ReForm < Frame
+    include FormContext
     private
     def initialize qtc
+#       tag "new ReForm, stacktrace=#{caller.join("\n")}"
       super self, qtc
       # store a ref to ourselves in the Qt::Widget
       @qtc.instance_variable_set :@_reform_hack, self
@@ -108,8 +112,9 @@ module Reform
     exactly one element...
 =end
           ctrl = if @all_widgets.empty? then button(tr('It Just Works!')) else @all_widgets[0] end
-          wrapper = Reform::Widget === ctrl && ctrl.qtc.inherits('QWidget')
-          if wrapper || ctrl.inherits('QWidget')
+#           tag "ctrl=#{ctrl}"
+          wrapper = Reform::Widget === ctrl && ctrl.qtc.widgetType?
+          if wrapper || ctrl.qtc.widgetType?
             @qtc.centralWidget = if wrapper then ctrl.qtc else ctrl end
           end
 #         puts "postprocessing setting of menuBar due to Qt bugs"
@@ -130,8 +135,22 @@ module Reform
       @qtc.raise
     end # ReForm#run
 
+    # initial connection for a model. Automatically called when model is instantiated
+    # with a form as parent
+    # the form becomes an observer
+    def setModel model, &block
+      @model.removeObserver_i(self) if instance_variable_defined?(:@model)
+      @model = model
+      if @model
+        @model.containing_form = self
+        @model.instance_eval(&block) if block
+        @model.postSetup
+        @model.addObserver_i self
+      end
+      connectModel @model, initialize: true
+    end
   end # class ReForm
 
-  createInstantiator :form, QWidget, ReForm
+  createInstantiator File.basename(__FILE__, '.rb'), Qt::MainWindow, ReForm, form: true
 
 end # Reform

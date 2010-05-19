@@ -7,13 +7,13 @@ module Reform
     private
     define_simple_setter :text
 
+    public
+
     # with a block associate the block with the 'clicked' signal.
     # Without a block we emit 'clicked'
     def whenClicked &block
       if block
-        connect(@qtc, SIGNAL('clicked()'), self) do
-          rfCallBlockBack(&block)
-        end
+        connect(@qtc, SIGNAL('clicked()'), self) { rfCallBlockBack(&block) }
       else
         @qtc.clicked
       end

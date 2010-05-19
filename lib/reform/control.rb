@@ -13,36 +13,42 @@ module Reform
 #       tag "#{self}::initialize, caller=#{caller.join("\n")}"
       super()
       @containing_frame, @containing_form, @qtc, @has_pos = frame, frame.containing_form, qtc, false
+      # to be set to true when signals are connected to module-setters.
+      # however, it should be possible to do this when :initialize is set in options of
+      # connectModel.
+#       @connected = false
     end
 
      # size QSize or size w,h, without args it returns qtc.size
     def size w = nil, h = nil
-      return parent_qtc_to_use.size unless w
+      q = effective_qtc
+      return q.size unless w
       if h
         @requested_size = w, h
-        parent_qtc_to_use.resize w, h
+        q.resize w, h
       else
         @requested_size = w, w
-        parent_qtc_to_use.resize w, w
+        q.resize w, w
       end
     end
 
     # geometry, set geo or return it.
     def geometry x = nil, y = nil, w = nil, h = nil
-      return parent_qtc_to_use.geometry unless x or w
+      q = effective_qtc
+      return q.geometry unless x or w
       @requested_size = w, h
       if x or y
         @has_pos = true
-        parent_qtc_to_use.setGeometry x, y, w, h
+        q.setGeometry x, y, w, h
       else
-        parent_qtc_to_use.resize w, h
+        q.resize w, h
       end
     end
 
     # define a simple set method for each element passed, forwarding it to qtc.
     def self.define_simple_setter *list
       list.each do |name|
-        define_method name do |value|
+        define_method name do |value = nil|
           @qtc.send(name.to_s + '=', value)
         end
       end
@@ -50,13 +56,10 @@ module Reform
 
     # default.
     def executeMacros
-      instance_variable_defined?(:@macros) and @macros.each { |macro| macro.exec }
-    end
-
-    def name aName = nil
-      return name unless aName
-      @name = aName
-      @containing_frame.registerName aName, self
+      instance_variable_defined?(:@macros) and @macros.each do |macro|
+#         tag "#{self}::Executing MACRO #{macro}"
+        macro.exec
+      end
     end
 
     # shortcut
@@ -70,9 +73,10 @@ module Reform
       @whenTimeout = block
     end
 
-    def connect_id
-      instance_variable_defined?(:@connect_id) ? @connect_id :
-                                                 instance_variable_defined?(:@name) ? @name : nil
+    # you should be able to set it too, and it can even be a block/proc(!!)
+    def connector value = nil
+      return instance_variable_defined?(:@connector) ? @connector : @qtc.objectName if value.nil?
+      @connector = value
     end
 
     protected
@@ -88,6 +92,7 @@ module Reform
     # form (MVC controller)
     def rfCallBlockBack *args, &block
       begin
+#         tag "rfCallBlockBack, block=#{block.inspect}"
         return containing_form.instance_exec(*args, &block)
       rescue LocalJumpError
          # ignore
@@ -100,9 +105,18 @@ module Reform
       $stderr << msg
     end
 
+    def whenConnected model = nil, &block
+#       tag "whenConnected, model=#{model}, block=#{block}, @whenConnected=#@whenConnected"
+      if block
+        @whenConnected = block
+      else
+        rfCallBlockBack(model, &@whenConnected) if instance_variable_defined?(:@whenConnected)
+      end
+    end
+
     public
-    # the parent widget (a Reform::Frame)
-    attr :containing_frame
+    # the parent frame (a Reform::Frame), can be widget or layout
+    attr_accessor :containing_frame
 
     # the owner form.
     attr :containing_form
@@ -114,7 +128,9 @@ module Reform
     attr :requested_size
 
     def addWidget control, q
+#       tag "#{self.class}::addWidget(#{control.class}) -> DELEGATE to #{@qtc.class}"
       @qtc.addWidget q
+#       tag "added widget"
     end
 
     # return macros array, creating it if it was undefined
@@ -128,32 +144,45 @@ module Reform
       @has_pos
     end
 
+    def name aName = nil
+      return @qtc.objectName unless aName
+#       tag "#{self}::assigning objectname #{aName}"
+      @qtc.objectName = aName
+      # there is a slight duplication but the qt windowtree differs.
+      # for example, a layout can have named children in 'reform' but not in Qt.
+      @containing_frame.registerName aName, self
+    end
+
     # default resize callback setter/getter
     def whenResized &block
-      return @whenResized unless block
+      return rfCallBlockBack(&@whenResized) unless block
       @whenResized = block
     end
 
-    # normally the Qt implementor, but for layouts we add subcontrols to the
-    # layouts owner. In other words, the result must be a Qt::Widget in all cases
-    # which does not hold for all Controls.@qtc values.
-    # Examples are Layout, Action and RSignalMapper.
-    # Also, some subcontrols need 'nil' is their parent and this can be arranged
-    # like this as well
-    def parent_qtc_to_use
+    # If we are going to parent a 'reform_class' which qtc to use.
+    # The result must be a Qt::Widget in all cases
+    # Also, some subcontrols need 'nil' as their parent and this can be arranged
+    # like this as well. By default we use effective_qtc, since it it about the same thing.
+    def parent_qtc_to_use_for(reform_class)
+      reform_class <= Layout ? nil : effective_qtc
+    end
+
+    # The result must be a Qt::Widget in all cases.
+    #
+    def effective_qtc
       @qtc
     end
 
     # this callback is called after the 'block' initialization. Or even without a block,
     # when the control is added to the parent and should have been setup.
     # can be used for postProc. Example: initialization parameters are stored and
-    # executed in one go.  Note that postSetup should return self!
+    # executed in one go.
     # the default executes any gathered macro.
     def postSetup
 #       tag "#{self}::postSetup"
       executeMacros
 #       tag "DONE #{self}::postSetup"
-      self
+#       self  BOGO CODE
     end
 
     # qt_parent can be nil, but even then....
@@ -169,6 +198,7 @@ module Reform
     # called to instantiate a child, qparent is basicly the effective qtc.
     # this method can be overriden if child control has to be altered
     def instantiate_child(reform_class, qt_implementor_class, qparent)
+# #       tag "#{self}::instantiate_child(impl=#{qt_implementor_class}, qparent=#{qparent})"
       reform_class.new_qt_implementor(qt_implementor_class, self, qparent)
     end
 
@@ -192,11 +222,11 @@ module Reform
 =begin rdoc
     connect a model (may be nil) to the control
     The rules are as follows:
-        - if the control has a connect_id (defaults to name) and that name is also
+        - if the control has a connector (defaults to name) and that name is also
           a public method of model,
           with no arguments (a getter therefore) and if model is not nil, then we
           apply the method and use the result to set the value of the control.
-        - otherwise if the control has no name, nor a connect_id set, it is left untouched,
+        - otherwise if the control has no name, nor a connector set, it is left untouched,
           but the connect may propagate
         - otherwise the value of the control is cleared. The result must be 'clean'
         but validation may trigger if the user tries to 'commit' the formdata (clicks 'Update').
@@ -206,7 +236,7 @@ module Reform
         the formdata.
         - controls that can be changed should be protected if the accompanying setter is
         not available.
-        - controls can set a @connect_id, that overrides @name.
+        - controls can set a @connector, that overrides @name.
         - if :initializing is set in 'options' the control must keep or set its 'clean'
         state, and must
         treat the field as being untouched by the user. In particular no triggers should be
@@ -218,6 +248,8 @@ module Reform
    See Frame#connect
 =end
     def connectModel model, options = nil
+#       @connected = true BAD IDEA
+      whenConnected(model)
     end
 
   end # class Control

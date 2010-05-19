@@ -22,9 +22,13 @@ However it must be in postSetup.
     end
 
   public
-    #override. A layout cannot be a parent for any widget
-    def parent_qtc_to_use
-      @containing_frame.qtc
+
+    # override
+    def effective_qtc
+#       tag "#{self}::parent_qtc_to_use_for -> containing_frame*"
+      frame = @containing_frame
+      frame = frame.containing_frame until frame.widget?
+      frame.qtc
     end
 
     def setLayoutposHack x, y, w, h
@@ -32,10 +36,28 @@ However it must be in postSetup.
     end
 
     # override for layouts, returns added control
+    # note that the Qt relationship for parents is already OK.
     def addControl control, &block
+#       tag "#{self}::addControl(#{control})"
+# require_relative 'controls/checkbox' # FIXME
+#       tag "stack:#{caller.join("\n")}" if self.is_a?(FormLayout) && control.is_a?(CheckBox)
       q = if control.respond_to?(:qtc) then control.qtc else control end
-      addWidget control, q
-      @containing_frame.addControl control, &block
+      @all_widgets << control
+#       tag "calling addWidget(#{control.class})"
+      addWidget control, q  # see addWidget
+#       tag "#{control.class}.layout? -> #{control.layout?}"
+#       if control.layout?
+#         tag "setup the layout and done with it"
+        control.instance_eval(&block) if block
+        control.postSetup
+#       else
+         # WHY THEN????
+#         frame = @containing_frame
+#         frame = frame.containing_frame until frame.widget?
+#         tag "#{self}::addControl add #{control.class} to containing_frame #{frame.class}"
+#         frame.addControl(control, &block)   UNHEALTHY
+#       end
+#       tag "Added control"
     end
 
     def stretch v = 1
@@ -46,6 +68,9 @@ However it must be in postSetup.
       true
     end
 
+    # override.
+    def widget?
+    end
   end # Layout
 
 end # Reform

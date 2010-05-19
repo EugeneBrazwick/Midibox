@@ -1,8 +1,12 @@
 
+# Copyright (c) 2010 Eugene Brazwick
+
+verb, $VERBOSE = $VERBOSE, false
 require 'Qt'
+$VERBOSE = verb
 
 # for debugging purposes only
-# if $DEBUG             would be neat if qtruby did not give 1_000_000 warnings....
+# if $DEBUG
 module Kernel
 
   def trace onoff = true
@@ -24,7 +28,12 @@ module Kernel
 
   def tag msg
     # avoid puts for threading problems
-    STDERR.print "#{caller[0]} #{msg}\n"
+    STDERR.print "#{File.basename(caller[0])} #{msg}\n"
+  end
+
+  # this is the ugly way to make 'with' in ruby. CURRENT STATE: unused
+  def with arg, &block
+    arg.instance_eval(&block)
   end
 end
 
@@ -115,7 +124,45 @@ obviously a model.
 
 =end
 
+# FIXME
+=begin
+to_variant is LETAL
+because the object may well be no longer referenced.
+Then it is disposed off.
+BAD IDEA
+
+class Object
+  def to_variant
+#= begin DOES NOT WORK
+#    Reform::Variant.new self
+# =e nd
+    Qt::Variant.new object_id
+  end
+end
+
+class Qt::Variant
+  def to_object
+    ObjectSpace._id2ref(to_int)
+  end
+end
+=end
+
 module Reform
+
+=begin DOES NOT WORK AT ALL
+  # taken from kde qtruby introduction page:
+  # http://techbase.kde.org/Development/Languages/Ruby#QtRuby
+  class Variant < Qt::Variant
+    private
+    def initialize(value)
+        super()
+        @value = value
+    end
+    public
+    # I feel rather cheap about this:
+    attr_accessor :value
+  end
+=end
 
   class ReformError < StandardError
   end
@@ -142,7 +189,7 @@ module Reform
 #         tag "arrived in #{self}::#{name}()"
         # It's important to use parent_qtc_to_use, since it must be a true widget.
         # Normally, 'qparent' would be '@qtc' itself
-        qparent = parent_qtc_to_use
+        qparent = parent_qtc_to_use_for(reform_class)
 =begin
     Severe problem:     sometimes the parenting must change but how can this be done before
                         even the instance exists?
@@ -155,35 +202,45 @@ module Reform
 # Oh my GOD!!
 # NOT GOING TO WORK.
 #  BAD respond_to is USELESS!!        if qparent.respond_to?(:layout) && qparent.layout && reform_class <= Layout  # smart!!
+=begin
         if qparent
-          if reform_class <= Layout && (qparent.widgetType? && qparent.layout || qparent.inherits('QGraphicsScene'))
+          graphic_parent = qparent.inherits('QGraphicsScene')
+          if reform_class <= Layout
+            # assuming that qt_implementor_class <= QLayout, and layout is
+            # constructed with parent == 0 (see for example widgets/calendar/window.cpp )
+            #             && #(qparent.widgetType? && qparent.layout ||
             # insert an additional generic frame (say Qt::GroupBox)
             # you cannot store a layout in a layout, nor can you store a layout in a graphicsscene.
-            if qparent.inherits('QGraphicsScene') # even if a GraphicsItem, you cannot pass the scene as a qparent! && !(reform_class <= GraphicsItem)
-              qparent = nil
-              # but now we must later call orgparent.addWidget(qparent)
+            # See calendar.cpp in Nokia examples. layout.addLayout is OK.
+            if graphic_parent # storing layout in graphic, requires some widget in between:
+              qparent = Qt::GroupBox.new qparent
+              ctrl = addControl GroupBox.new(ctrl, qparent)
             end
-            qparent = Qt::GroupBox.new qparent
-            ctrl = addControl GroupBox.new(ctrl, qparent)
-          elsif qparent.inherits('QGraphicsScene') # see above && !(reform_class <= GraphicsItem)
             qparent = nil
-=begin
-    you cannot store a QWidget in a g-scene but since it accepts QGraphicsItems it is possible to
-    create a QGraphicsProxyWidget
-=end
+          elsif graphic_parent # see above && !(reform_class <= GraphicsItem)
+            qparent = nil
+#     you cannot store a QWidget in a g-scene but since it accepts QGraphicsItems it is possible to
+#     create a QGraphicsProxyWidget
           end
         end  # if qparent
         # we create the implementor first, then the wrapper
-#         tag "reform_class=#{reform_class}, calling new_qt_implementor"
+#         tag "reform_class=#{reform_class}, calling new_qt_implementor for #{qt_implementor_class}, parent=#{qparent}"
+
+THIS ALL NO LONGER APPLIES since parent_qtc_to_use_for returns nil for layouts...
+=end
+        qparent = nil if qparent && qparent.inherits('QGraphicsScene')
+#         tag "instantiate #{qt_implementor_class} with parent #{qparent}"
         newqtc = qt_implementor_class &&
                  ctrl.instantiate_child(reform_class, qt_implementor_class, qparent)
-#         tag "#{reform_class}.new"
+#         tag "#{reform_class}.new, ctrl=#{ctrl} self=#{ctrl}, func=#{name}"
         if reform_class <= Model
           ctrl.setModel(reform_class.new, &block)
         else
           c = reform_class.new ctrl, newqtc
+#           tag "instantiated c=#{c}, parent is a #{ctrl.class}"
           c.text(quickylabel) if quickylabel
           # addControl will execute block, and then also call postSetup
+#           tag "APP -> #{ctrl.class}.addControl(#{c.class})"
           ctrl.addControl(c, &block)
         end
       end  # define_method name
@@ -240,9 +297,9 @@ module Reform
     extend Instantiator
   end # module SceneContext
 
-  module FormContext
+  module ModelContext
     extend Instantiator
-  end # module SceneContext
+  end # module ModelContext
 
   # this class just stores a name with the arguments to a widget constructor
   class Macro
@@ -254,11 +311,17 @@ module Reform
     end
   public
     def exec receiver = nil
-#           tag "executing macro #{@control.class}::#@name"
-      (receiver ||= @control).send(@name, @quickylabel, &@block)
+#       tag "executing macro #{@control.class}::#@name"
+      (receiver ||= @control).send(@name, @quickylabel, &@block) #.tap do |t|
+#         tag "macroresult is #{t}"
+#       end
     end
 #         attr :quickylabel, :block
     attr :name
+
+    def to_s
+      "#{@control.class}::#@name(#{@quickylabel}) BLOCK #{@block.inspect}"
+    end
   end # class Macro
 #
 
@@ -284,7 +347,7 @@ module Reform
       private name
     end
 
-  end # module MacroContext
+  end # module SceneFrameMacroContext
 
   private
 
@@ -301,7 +364,7 @@ module Reform
   end
 
   def self.registerModelClassProxy id, path
-    FormContext::registerControlClassProxy_i id, path
+    ModelContext::registerControlClassProxy_i id, path
   end
 
 #   require_relative 'widget'
@@ -332,8 +395,8 @@ module Reform
       App::createInstantiator_i name, qt_implementor_class, reform_class, options
 #       SceneFrameMacroContext::createInstantiator_i name
     elsif reform_class <= Model
-#       tag "creating instantiator #{name} in FormContext"
-      FormContext::createInstantiator_i name, qt_implementor_class, reform_class
+#       tag "creating instantiator #{name} in ModelContext"
+      ModelContext::createInstantiator_i name, qt_implementor_class, reform_class
     else
       # note: since a Scene is a Frame it also receives the Widget instantiators.
       SceneContext::createInstantiator_i name, qt_implementor_class, reform_class
@@ -434,9 +497,12 @@ The idea is that it is a singleton.
       else
         define_method name do |quickylabel = nil, &block|
           raise ReformError, 'put controls in forms' unless @all_forms.length <= 1
-  #         puts "creating implementor_class #{implementor_class}, rf_class=#{rf_class}"
-          @firstform ||= form
+          # it seems that 'form' is not the instantiator here??
+#           tag "form=#{form.inspect}"  -> NIL
+          require_relative 'controls/form'
+          @firstform ||= ReForm.new(Qt::Widget.new)
           # we delay creating the elements until form.run is called.
+#           tag "create macro for #{name}"
           Macro.new(@firstform, name, quickylabel, block)
         end
       end

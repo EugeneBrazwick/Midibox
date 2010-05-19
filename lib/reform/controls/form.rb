@@ -10,7 +10,7 @@ module Reform
  but is meant as a complete window.
 =end
   class ReForm < Frame
-    include FormContext
+    include ModelContext
     private
     def initialize qtc
 #       tag "new ReForm, stacktrace=#{caller.join("\n")}"
@@ -35,6 +35,7 @@ module Reform
       @whenCommitted = nil
       # a form may have a single 'central' widget, together with border widgets like bars
       @qcentralWidget = nil
+      @widget_index = {} # hash name=>widget
       $qApp.registerForm self
     end
 
@@ -130,6 +131,8 @@ module Reform
 #         tag "assigning activeWindow"
         $qApp.activeWindow = @qtc
       end
+      # connecting the model is cheaper when the form is still invisible
+      connectModel(@model, initialize: true) if @model
       # note: originally BEFORE the assign to activeWindow...
       @qtc.show
       @qtc.raise
@@ -147,10 +150,27 @@ module Reform
         @model.postSetup
         @model.addObserver_i self
       end
-      connectModel @model, initialize: true
+      #  TOO SOON ! connectModel @model, initialize: true
     end
+
+    #override
+    def registerName aName, aControl
+      aName = aName.to_sym
+      define_singleton_method(aName) { aControl }
+      (@widget_index ||= {})[aName] = aControl
+    end
+
+    def [](i)
+      @widget_index[i] or raise ReformError, tr("control '#{i}' does not exist")
+    end
+
   end # class ReForm
 
-  createInstantiator File.basename(__FILE__, '.rb'), Qt::MainWindow, ReForm, form: true
+  # using Qt::MainWindow is tempting, but MainWindow is rather stubborn.
+  # you cannot add a layout for instance.
+  # So form == generic toplevel widget
+  #    mainwindow = mainwindow of application
+  #    dialog == fixed size toplevel widget
+  createInstantiator File.basename(__FILE__, '.rb'), Qt::Widget, ReForm, form: true
 
 end # Reform

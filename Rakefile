@@ -68,6 +68,11 @@ task :run_calculator_example do
   `#{RUBY} -I lib lib/reform/examples/widgets/calculator.rb`
 end
 
+desc 'as an example to run gui examples: calendar'
+task :run_calendar_example do
+  `#{RUBY} -I lib lib/reform/examples/widgets/calendar.rb`
+end
+
 desc 'panic'
 task :panic do
   sh "#{RUBY} bin/panic 20:1"

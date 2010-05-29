@@ -40,6 +40,7 @@ module Reform
 #         Label.new(self, @qtc.labelForField(control.qtc))
         # NEVER MIND, it can never have a name unless explicit!
       end
+      remove_instance_variable :@collection
     end
 
   end # class GridLayout

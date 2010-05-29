@@ -174,12 +174,13 @@ module Reform
     end
 
     # override. it returns the added control
-    def addControl control, &block
+    def addControl control, quickyhash = nil, &block
 #       tag "addControl to qtc=#@qtc, to add = #{control.qtc}"
 #       @qtc.addToGroup(control.qtc)
 #       control.qtc.parentItem = @qtc
       @qtc.myChildItems << control.qtc
       control.instance_eval(&block) if block
+      control.setupQuickyhash(quickyhash) if quickyhash
 #       tag "calling postSetup on #{control}"
       control.postSetup
 #       tag "did postSetup"

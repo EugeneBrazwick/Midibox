@@ -92,6 +92,7 @@ gridlayout {
         @qtc.setRowMinimumHeight(0, @collection[0].qtc.sizeHint.height)
         @qtc.setColumnMinimumWidth(0, @collection[0].qtc.sizeHint.width)
       end
+      remove_instance_variable :@collection
     end
 
   end # class GridLayout

@@ -1,4 +1,6 @@
 
+#  Copyright (c) 2010 Eugene Brazwick
+
 module Reform
 
 =begin rdoc
@@ -18,6 +20,10 @@ module Reform
       # connectModel.
 #       @connected = false
     end
+
+#     def blockSignals val = true
+#       @qtc.blockSignals = val
+#     end
 
      # size QSize or size w,h, without args it returns qtc.size
     def size w = nil, h = nil
@@ -49,6 +55,7 @@ module Reform
     def self.define_simple_setter *list
       list.each do |name|
         define_method name do |value = nil|
+	  return @qtc.send(name) if value.nil?
           @qtc.send(name.to_s + '=', value)
         end
       end
@@ -59,6 +66,15 @@ module Reform
       instance_variable_defined?(:@macros) and @macros.each do |macro|
 #         tag "#{self}::Executing MACRO #{macro}"
         macro.exec
+      end
+    end
+
+    def no_signals
+      old_blockSig = @qtc.blockSignals true
+      begin
+        yield
+      ensure
+        @qtc.blockSignals old_blockSig
       end
     end
 
@@ -75,7 +91,13 @@ module Reform
 
     # you should be able to set it too, and it can even be a block/proc(!!)
     def connector value = nil
-      return instance_variable_defined?(:@connector) ? @connector : @qtc.objectName if value.nil?
+      if value.nil?
+        return @connector if instance_variable_defined?(:@connector)
+	@connector = @qtc.objectName
+	case @connector
+	when /Edit$|Combo$|Form$|Button$|Label$|List$|Table$/ then @connector = $`
+	end
+      end
       @connector = value
     end
 
@@ -114,6 +136,10 @@ module Reform
       end
     end
 
+    # basemethod, called from connectModel (from setModel)
+    def model *data
+    end
+
     public
     # the parent frame (a Reform::Frame), can be widget or layout
     attr_accessor :containing_frame
@@ -128,9 +154,17 @@ module Reform
     attr :requested_size
 
     def addWidget control, q
-#       tag "#{self.class}::addWidget(#{control.class}) -> DELEGATE to #{@qtc.class}"
-      @qtc.addWidget q
+#       tag "#{self.class}::addWidget(#{control.class}, #{q.class}) -> DELEGATE to #{@qtc.class}"
+      if control.layout?
+        @qtc.addLayout q
+      else
+        @qtc.addWidget q
+      end
 #       tag "added widget"
+    end
+
+    def setupQuickyhash hash
+      hash.each { |k, v| send(k, v) }
     end
 
     # return macros array, creating it if it was undefined
@@ -145,12 +179,16 @@ module Reform
     end
 
     def name aName = nil
-      return @qtc.objectName unless aName
+      if aName
 #       tag "#{self}::assigning objectname #{aName}"
-      @qtc.objectName = aName
+        @qtc.objectName = aName
       # there is a slight duplication but the qt windowtree differs.
       # for example, a layout can have named children in 'reform' but not in Qt.
-      @containing_frame.registerName aName, self
+        @containing_frame.registerName aName, self
+      else
+#         raise "#{self} has no @qtc. SHINE!" unless @qtc               Spacer has no Qt complement, maybe more
+        @qtc && @qtc.objectName
+      end
     end
 
     # default resize callback setter/getter
@@ -247,9 +285,35 @@ module Reform
         be called (at least not now).
    See Frame#connect
 =end
-    def connectModel model, options = nil
-#       @connected = true BAD IDEA
-      whenConnected(model)
+    def connectModel aModel, options = nil
+#       tag "#{self}, aModel=#{aModel}, should be propagated!"
+#       @model ||= nil
+#       unless @model.equal?(aModel)
+#         @model.removeObserver_i(self) if @model
+  #         @model.containing_form = @containing_form
+#         aModel.addObserver_i(self) if aModel
+  #         model aModel ?????????
+#         @model = aModel
+#       end
+      whenConnected aModel
+    end
+
+    def effectiveModel
+      @containing_frame.effectiveModel
+    end
+
+    # true if model is set on this control. Can only be true for forms or frames
+    def effectiveModel?
+    end
+
+     # set a new model
+    def setModel aModel, quickyhash = nil, &initblock
+#       tag "#{self}::setModel(#{aModel}, quickargs=#{quickyhash.inspect})"
+      aModel.instance_eval(&initblock) if initblock
+      aModel.setupQuickyhash(quickyhash) if quickyhash
+      aModel.postSetup
+#       tag "Calling connectModel"
+      connectModel(aModel, initialize: true) # if instance_variable_defined?(:@model)
     end
 
   end # class Control

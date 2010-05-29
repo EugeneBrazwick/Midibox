@@ -64,18 +64,21 @@ Recepy for Ubuntu (of the Blood, Sweat and Tears Kind -- but in the end it was '
 Preliminaries:
   I hacked my ruby install on ubuntu (since 1.9.1 works fine),
   with a bunch of links (does not work with ruby1.8 installed as well):
-  - cd /usr/bin
-  - sudo ln -s {erb,rake,ruby,irb,rdoc,ri}1.9.1 .
-  - cd /usr/lib
-  - sudo ln -s libruby-1.9.1.so libruby-1.9.so
-  - cd /usr/include/ruby-1.9.1/ruby
-  - sudo ln -s ../x86_64-linux/ruby/config.h
-  - sudo apt-get install ????  # Hm... I installed kde-devel and smoke-dev-tools and
-      God knows what more. These may be required but I do not yet know this. Need to build
-      vm for this.
-
+    for i in erb rake ruby irb rdoc ri
+    do
+      sudo ln -s /usr/bin/${i}1.9.1 /etc/alternatives/$i
+      sudo ln -s /etc/alternatives/$i /usr/bin/$i
+    done
+    cd /usr/lib
+    sudo ln -s libruby-1.9.1.so libruby-1.9.so
+    cd /usr/include/ruby-1.9.1/ruby
+    sudo ln -s ../x86_64-linux/ruby/config.h
+    sudo apt-get install libqt4-dev libasound2-dev rubygems1.9.1 subversion cmake autoconf
+    sudo apt-get install kde-devel
   - download source from ubuntu (lucid)
+  https://launchpad.net/ubuntu/lucid/+source/kdebindings/4:4.4.2-0ubuntu2
   - the following does not need the links above, accept the config.h one
+  - cd /loadsofspace
   - tar zxf tarballs/kdebindings_4.4.2.orig.tar.gz
   - gunzip tarballs/kdebindings_4.4.2-0ubuntu2.diff.gz
   - patch < tarballs/kdebindings_4.4.2-0ubuntu2.diff
@@ -87,6 +90,12 @@ Preliminaries:
       -DENABLE_QIMAGEBLITZ_SMOKE=off -DENABLE_ATTICA_SMOKE=off -DENABLE_KROSSRUBY=off -Wno-dev
   - make
   - sudo make install
+
+DIAGNOSTICS:
+ Q: ERROR: cmake/modules/FindKDE4Internal.cmake not found in ...
+ A: kde-devel kdelibs5-dev  (presumably???)  NOT kdelibs4-dev!
+ Q: on any failure?
+ A: cd ..; rm -rf kdebingins-4.4.2  # and repeat from start after fixing!
 
 Note: it builds far too much... So takes an hour. Feel free to skip more by disabling more
     modules. For your convenience:
@@ -103,8 +112,8 @@ Note: it builds far too much... So takes an hour. Feel free to skip more by disa
 However, this is uncharted territory. The modules I disabled had to be disabled because the
 compile failed.
 
-About qt4-qtruby.  This package is for ruby1.8. You can download the source and compile it for
-ruby1.9.1 but it will never work (it did for karmic though).
+About the 'qt4-qtruby' package. This package is for ruby1.8. You can download the source and compile
+it for ruby1.9.1 but it will never work (it did for karmic though).
 qtruby is now officially part of kdebindings, I guess.
 
 CONCEPTS
@@ -185,7 +194,8 @@ module Reform
     def createInstantiator_i name, qt_implementor_class, reform_class
 #       tag "define_method #{self}::#{name}."
       remove_method name if private_method_defined?(name)
-      define_method name do |quickylabel = nil, &block|
+      define_method name do |quickyhash = nil, &block|
+        raise 'cannot use both argument AND a block' if quickyhash && block
 #         tag "arrived in #{self}::#{name}()"
         # It's important to use parent_qtc_to_use, since it must be a true widget.
         # Normally, 'qparent' would be '@qtc' itself
@@ -234,14 +244,15 @@ THIS ALL NO LONGER APPLIES since parent_qtc_to_use_for returns nil for layouts..
                  ctrl.instantiate_child(reform_class, qt_implementor_class, qparent)
 #         tag "#{reform_class}.new, ctrl=#{ctrl} self=#{ctrl}, func=#{name}"
         if reform_class <= Model
-          ctrl.setModel(reform_class.new, &block)
+#           tag "CALLING setModel!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+          ctrl.setModel(reform_class.new, quickyhash, &block)
         else
           c = reform_class.new ctrl, newqtc
 #           tag "instantiated c=#{c}, parent is a #{ctrl.class}"
-          c.text(quickylabel) if quickylabel
+#           c.text(quickylabel) if quickylabel
           # addControl will execute block, and then also call postSetup
 #           tag "APP -> #{ctrl.class}.addControl(#{c.class})"
-          ctrl.addControl(c, &block)
+          ctrl.addControl(c, quickyhash, &block)
         end
       end  # define_method name
       # make the method private:
@@ -304,15 +315,15 @@ THIS ALL NO LONGER APPLIES since parent_qtc_to_use_for returns nil for layouts..
   # this class just stores a name with the arguments to a widget constructor
   class Macro
   private
-    def initialize control, name, quickylabel, block
+    def initialize control, name, quicky, block
 #           tag "Macro.new(#{control}, #{name})"
-      @control, @name, @quickylabel, @block = control, name, quickylabel, block
+      @control, @name, @quicky, @block = control, name, quicky, block
       control.macros! << self
     end
   public
     def exec receiver = nil
-#       tag "executing macro #{@control.class}::#@name"
-      (receiver ||= @control).send(@name, @quickylabel, &@block) #.tap do |t|
+      tag "executing macro #{@control.class}::#@name, args=#@quicky"
+      (receiver ||= @control).send(@name, @quicky, &@block) #.tap do |t|
 #         tag "macroresult is #{t}"
 #       end
     end
@@ -387,7 +398,7 @@ THIS ALL NO LONGER APPLIES since parent_qtc_to_use_for returns nil for layouts..
 
   # delegator. See App::createInstantiator
   def self.createInstantiator name, qt_implementor_class, reform_class = Widget, options = {}
-#     tag "createInstantiator '#{name}'"
+#     tag "createInstantiator '#{name}' implementor=#{qt_implementor_class}, klass=#{reform_class}"
     if reform_class <= Widget
       unless options[:form]
         FrameContext::createInstantiator_i name, qt_implementor_class, reform_class
@@ -495,7 +506,7 @@ The idea is that it is a singleton.
           # and now we wait for 'run'
         end
       else
-        define_method name do |quickylabel = nil, &block|
+        define_method name do |quicky = nil, &block|
           raise ReformError, 'put controls in forms' unless @all_forms.length <= 1
           # it seems that 'form' is not the instantiator here??
 #           tag "form=#{form.inspect}"  -> NIL
@@ -503,7 +514,7 @@ The idea is that it is a singleton.
           @firstform ||= ReForm.new(Qt::Widget.new)
           # we delay creating the elements until form.run is called.
 #           tag "create macro for #{name}"
-          Macro.new(@firstform, name, quickylabel, block)
+          Macro.new(@firstform, name, quicky, block)
         end
       end
       # make it private:
@@ -542,6 +553,7 @@ The idea is that it is a singleton.
   # create an application, passing ARGV to it, then run it
   # Any block passed is executed in the constructor redirecting self to $qApp.
   def self.app &block
+#     tag "Creating Qt::Application!!"
     App.new ARGV
     # extend the Form class with the proper contributed widgets
     for file in Dir[File.dirname(__FILE__) + '/controls/*.rb']
@@ -563,6 +575,7 @@ The idea is that it is a singleton.
       registerModelClassProxy basename, 'models/' + basename
     end
     $qApp.instance_eval(&block) if block
+#     tag "CALLING app.exec"
     $qApp.exec
   end # app
 end # module Reform

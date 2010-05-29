@@ -1,11 +1,11 @@
 
 module Reform
 
-  require_relative '../widget'
+  require_relative 'widget'
 
 =begin rdoc
 
-a Panel is a widget that may contain others.
+a Frame is a widget that may contain others.
 =end
   class Frame < Widget
     include FrameContext
@@ -55,20 +55,47 @@ a Panel is a widget that may contain others.
           it will take no action by itself,
           but the connect propagates to each control that is a direct child
 =end
-    def connectModel model, options = nil
+    def connectModel aModel, options = nil
 #       tag "#{self}::connecting model, delegate to children, @all_widgets=#{@all_widgets.inspect}"
-      if cid = connector && model && model.getter?(cid)
-        model = model.send(cid)
+      if cid = connector && aModel && aModel.getter?(cid)
+        aModel = aModel.send(cid)
       end
       for widget in @all_widgets
-        widget.connectModel model, options
+        unless widget.effectiveModel?
+#           tag "WIDGET #{widget} '#{widget.name}' REFUSES model!!!!!!!!!!!!!"
+#         else
+#           tag "propagate to #{widget} '#{widget.name}'"
+          widget.connectModel aModel, options
+        end
       end
       super
     end
 
+    # override
+    def setModel aModel, quickyhash = nil, &initblock
+      @model ||= nil
+      unless @model.equal?(aModel)
+        @model.removeObserver_i(self) if @model
+        @model = aModel
+        @model.addObserver_i(self) if @model
+      end
+      super
+    end
+
+    # override
+    def effectiveModel
+      return @model if instance_variable_defined?(:@model)
+      @containing_frame.effectiveModel
+    end
+
+    # override
+    def effectiveModel?
+      instance_variable_defined?(:@model)
+    end
+
     # does NOT add the control for Qt !!!, but it does so for layouts ??
     # it returns the added control
-    def addControl control, &block
+    def addControl control, quickyhash = nil, &block
 #       tag "#{self.class}::addControl(#{control}), layout?->#{control.layout?}, widget?->#{control.widget?}"
       raise 'assert failure, self cannot be a layout here' if layout?
       if control.widget?
@@ -93,6 +120,7 @@ a Panel is a widget that may contain others.
 #         end
       end
       control.instance_eval(&block) if block
+      control.setupQuickyhash(quickyhash) if quickyhash
       control.postSetup
       control
     end
@@ -115,8 +143,6 @@ a Panel is a widget that may contain others.
     end
   end # class Frame
 
-  QForm = QWidget # good enough
-
-  createInstantiator File.basename(__FILE__, '.rb'), QForm, Frame
+  createInstantiator File.basename(__FILE__, '.rb'), QWidget, Frame
 
 end # Reform

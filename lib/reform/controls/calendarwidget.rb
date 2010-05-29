@@ -14,12 +14,20 @@ module Reform
   class CalendarWidget < Widget
     private
 
-#     def initialize parent, qtc
-#       super
-#     end
+    def initialize parent, qtc
+      super
+      connect(@qtc, SIGNAL('selectionChanged()'), self) do
+#            tag "SELCHANGE, date #{@qtc.selectedDate.inspect}"
+          # BEWARE FOR LOOP/STACKOVERFLOW. this will call connectModel
+          # which calls @qtc.selectedDate := X
+          # which MAY trigger selectionChanged(). However, it doesn't seem to do that
+          # to be safe I use options[:property]
+        model = effectiveModel and model.selectedDate = @qtc.selectedDate
+      end
+    end
 
     def minimumDate *value
-      tag "#{self}::minimumDate, qtc=#@qtc"
+#       tag "#{self}::minimumDate, qtc=#@qtc"
       return @qtc.minimumDate if value.empty?
       @qtc.minimumDate = CalendarModel::to_date(*value)
     end
@@ -85,21 +93,6 @@ module Reform
       lang = model.locale || 'C'
 #       tag "lang := #{lang}"
       @qtc.locale = Qt::Locale.new(lang)
-      if options && options[:initialize]
-#         tag "connect activated signal"
-#         connect(@qtc, SIGNAL('activated(const QDate &)'), self) do |date|
-#           tag "ACTIVATED, date #{date.inspect}"
-#           model.selectedDate = date
-#         end
-        connect(@qtc, SIGNAL('selectionChanged()'), self) do
-#           tag "SELCHANGE, date #{@qtc.selectedDate.inspect}"
-          # BEWARE FOR LOOP/STACKOVERFLOW. this will call connectModel
-          # which calls @qtc.selectedDate := X
-          # which MAY trigger selectionChanged(). However, it doesn't seem to do that
-          # to be safe I use options[:property]
-          model.selectedDate = @qtc.selectedDate
-        end
-      end
       super
     ensure
       @@connectingModelSem = false

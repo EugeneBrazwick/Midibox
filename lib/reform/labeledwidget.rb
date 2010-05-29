@@ -1,7 +1,7 @@
 
 # Copyright (c) 2010 Eugene Brazwick
 module Reform
-  require_relative 'widget'
+  require_relative 'controls/widget'
 
   # very specific kind of widget, that can be used as a small (1 row high) labeled
   # control in a form class.

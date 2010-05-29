@@ -8,6 +8,13 @@ module Reform
   class CheckBox < LabeledWidget
     private
 
+    def initialize parent, qtc
+      super
+      connect(@qtc, SIGNAL('clicked(bool)'), self) do |checked|
+        model.apply_setter(cid, checked) if cid = connector && model = effectiveModel
+      end
+    end # initialize
+
     define_simple_setter :text
 
     public
@@ -32,27 +39,31 @@ module Reform
         end
 #         @connected = true
       else
-        @qtc.clicked
+        @qtc.clicked(@qtc.checked?)
       end
     end #whenClicked
 
+    def whenToggled &block
+      if block
+        connect(@qtc, SIGNAL('toggled(bool)'), self) { |checked| rfCallBlockBack(checked, &block) }
+      else
+        @qtc.toggled(@qtc.checked?)
+      end
+    end #whenToggled
+
+
     # override
-    def connectModel model, options = nil
-#       tag "connectModel #{model}, cid=#{connector}"
+    def connectModel aModel, options = nil
+#       tag "@{self} connectModel #{aModel}, cid=#{connector}"
+      super
       cid = connector or return
-      if model && model.getter?(cid)
-        @qtc.checked = model.apply_getter(cid)
-#         tag "qtc.checked := model.#{cid}[?] == #{@qtc.checked}"
-        if options && options[:initialize]
-          cid = cid[0..-2] if cid[-1] == '?'
-          connect(@qtc, SIGNAL('clicked(bool)'), self) do |checked|
-            model.send(cid + '=', checked)
-          end
-        end
+      if @model && @model.getter?(cid)
+        @qtc.checked = @model.apply_getter(cid)
+        tag "qtc.checked := model.#{cid}[?] == #{@qtc.checked}, model=#{@model}"
+#         if options && options[:initialize]
       else
         @qtc.checked = false
       end
-      super
     end
 
 

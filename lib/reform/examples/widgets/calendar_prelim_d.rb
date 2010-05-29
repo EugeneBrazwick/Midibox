@@ -37,7 +37,7 @@ Reform::app {
           text tr('&Grid')
           name :gridVisible?
         }
-         stretch # stretchable open space in between
+        spacer stretch: 1 # stretchable open space in between
         checkbox { # navigationCheckBox
           text tr('&Navigation Bar')
           checked true

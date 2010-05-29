@@ -85,6 +85,6 @@ module Reform
      end
   end
 
-  createInstantiator :canvas, QGraphicsView, Canvas
+  createInstantiator File.basename(__FILE__, '.rb'), QGraphicsView, Canvas
 
 end # Reform

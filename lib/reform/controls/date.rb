@@ -8,6 +8,15 @@ module Reform
   # the gettes and setters should use a QDate.
   class Date < Edit
     private
+
+#     def initialize parent, qtc                Edit already does this
+#       super
+#       connect(@qtc, SIGNAL(changed_signal_signature), self) do |dat|
+#         model = effectiveModel and
+#           model.send(cid + '=', dat)
+#       end
+#     end
+
     define_simple_setter :displayFormat, :minimumDate, :maximumDate
 
     def dateRange from, to
@@ -30,14 +39,7 @@ module Reform
         @qtc.date = model.apply_getter(cid) || Qt::Date.currentDate
 #         tag "Qt::Date.new == #{Qt::Date.new} == today?? NO"
 #         tag "Date #{name}, date := #{@qtc.date.inspect}"
-        init = options && options[:initialize]
-        if model.setter?(cid) && init
-          connect(@qtc, SIGNAL(changed_signal_signature), self) do |dat|
-            model.send(cid + '=', dat)
-          end
-        elsif init
-          @qtc.readOnly = true
-        end
+        @qtc.readOnly = !model.setter?(cid)
       else
 #         tag "clear #{name}"
 #         @qtc.date = nil  SEGV

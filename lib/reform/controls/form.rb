@@ -36,6 +36,8 @@ module Reform
       # a form may have a single 'central' widget, together with border widgets like bars
       @qcentralWidget = nil
       @widget_index = {} # hash name=>widget
+      # main model in the form, frames can override this locally though
+      @model = nil
       $qApp.registerForm self
     end
 
@@ -48,6 +50,10 @@ module Reform
     def name aName
       @qtc.name = aName
       $qApp.registerForm self, aName
+    end
+
+    def central
+      raise "'central' is meaningless for forms"
     end
 
     public
@@ -91,7 +97,7 @@ module Reform
     # If this is the first form declared, it is assigned to the Qt ActiveWindow.
     def run &setup
       @setup = setup if setup
-      if @setup || @macros
+      if @setup || instance_variable_defined?(:@macros) && @macros
         # without a block windowTitle is never set. Nah...
         title = $qApp.title
         @qtc.windowTitle = title if title
@@ -132,32 +138,41 @@ module Reform
         $qApp.activeWindow = @qtc
       end
       # connecting the model is cheaper when the form is still invisible
-      connectModel(@model, initialize: true) if @model
+#       setModel(@model) if instance_variable_defined?(:@model) && @model ??
       # note: originally BEFORE the assign to activeWindow...
       @qtc.show
       @qtc.raise
     end # ReForm#run
 
+    # override
+    def connectModel aModel, options = nil
+      if aModel && name = aModel.name
+        registerName name, aModel
+      end
+      super
+    end
+
     # initial connection for a model. Automatically called when model is instantiated
     # with a form as parent
     # the form becomes an observer
-    def setModel model, &block
-      @model.removeObserver_i(self) if instance_variable_defined?(:@model)
-      @model = model
-      if @model
-        @model.containing_form = self
-        @model.instance_eval(&block) if block
-        @model.postSetup
-        @model.addObserver_i self
-      end
-      #  TOO SOON ! connectModel @model, initialize: true
+    # set a new model
+    def setModel aModel, quickyhash = nil, &initblock
+      # this is required so the 'name' can  be set on model and it becomes a property of this
+      # form. However it looks like a kludge, since models are basically shared between forms.
+      aModel.containing_form = self if aModel
+      super
     end
 
-    #override
+    def effectiveModel
+      @model
+    end
+
+    #override, can be used to reregister a name with a different control
     def registerName aName, aControl
       aName = aName.to_sym
+      remove_method(aName) if (@widget_index ||= {})[aName]
       define_singleton_method(aName) { aControl }
-      (@widget_index ||= {})[aName] = aControl
+      @widget_index[aName] = aControl
     end
 
     def [](i)

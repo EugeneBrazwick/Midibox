@@ -3,9 +3,9 @@
 
 module Reform
 
-  require_relative '../layout'
+  require_relative '../boxlayout'
 
-  class HBox < Layout
+  class HBox < BoxLayout
   end # HBox
 
   createInstantiator File.basename(__FILE__, '.rb'), Qt::HBoxLayout, HBox

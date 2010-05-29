@@ -65,12 +65,17 @@ end
 
 desc 'as an example to run gui examples: calculator'
 task :run_calculator_example do
-  `#{RUBY} -I lib lib/reform/examples/widgets/calculator.rb`
+  `#{RUBY}  lib/reform/examples/widgets/calculator.rb`
 end
 
 desc 'as an example to run gui examples: calendar'
 task :run_calendar_example do
-  `#{RUBY} -I lib lib/reform/examples/widgets/calendar.rb`
+  `#{RUBY} lib/reform/examples/widgets/calendar.rb`
+end
+
+desc 'as an example to run gui examples: charmap'
+task :run_charmap_example do
+  `#{RUBY} lib/reform/examples/widgets/charmap2.rb`
 end
 
 desc 'panic'

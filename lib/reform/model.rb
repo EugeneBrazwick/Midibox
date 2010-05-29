@@ -5,11 +5,6 @@ module Reform
 
   module Model
     private
-    # set the name of the model
-    def name aName
-#       tag "registerName in #{containing_form}"
-      containing_form.registerName aName, self
-    end
 
     module ClassMethods
       private
@@ -88,6 +83,14 @@ will work as expected
 
     public
 
+    # set or get the name of the model
+    def name aName = nil
+      return instance_variable_defined?(:@name) && @name if aName.nil?
+#       tag "registerName in #{containing_form}"
+      @name = aName
+      containing_form.registerName aName, self
+    end
+
     attr_accessor :containing_form
 
     # Control compatibility
@@ -114,10 +117,19 @@ will work as expected
 
     # note that the :property option is not yet implemented
     def dynamicPropertyChanged name
-#       tag "dynamicPropertyChanged #{name}" # may say boom, value = #{send(name)}"
-      (@observers ||= nil) and for o in @observers
+#       tag "#{self} name=#{name}, no_dynamics = #{@no_dynamics||=false}, observers=#{(@observers ||= {}).inspect}"
+      return if instance_variable_defined?(:@no_dynamics) && @no_dynamics
+      (@observers ||= nil) and @observers.each do |o|
+#         tag "Propagating model #{self} to observer #{o}"
         o.connectModel self, property: name
       end
+    end
+
+    def no_dynamics
+      @no_dynamics = true
+      yield
+    ensure
+      remove_instance_variable(:@no_dynamics)
     end
 
 =begin rdoc
@@ -128,6 +140,7 @@ will work as expected
     text or value to use in the gui, and not in the model.
 =end
     def getter?(name)
+      return true if name == :self
 #       tag "Does #{self.class}##{name} is a public method?"
       m = (public_method(name) rescue nil) or return
 #       tag "m.arity = #{m.arity}"
@@ -136,6 +149,7 @@ will work as expected
 
     # To apply the getter, this method must be used.
     def apply_getter name
+      return self if name == :self
 #       tag "apply_getter #{name} to self == 'send'"
 #       if respond_to?(name)
         send name
@@ -144,14 +158,30 @@ will work as expected
 #       end
     end
 
+    def apply_setter name, value
+      if name == :self
+        # as an unwanted feature it will call 'postSetup' on self!!!!! FIXME(?)
+        # setting the model will change the observers
+        Array.new(@observers || []).each do |o|
+#           tag "Resetting model #{self} to observer #{o}"
+          o.setModel value  # and not 'self'!!!
+        end
+      else
+        name = name.to_s
+        name = name[0...-1] if name[-1] == '?'
+        send(name + '=', value)
+      end
+    end
+
 =begin rdoc
     returns whether name may function as 'setter' on the model, if
     suffixed with an '=' char.
     names like 'setX' are currently not supported
 =end
     def setter?(name)
+      return true if name == :self
       n = name.to_s
-      n = n[0..-2] if n[-1] == '?'
+      n = n[0...-1] if n[-1] == '?'
       m = (public_method(n + '=') rescue nil) or return
       -2 <= m.arity && m.arity <= 1
     end
@@ -164,6 +194,13 @@ will work as expected
       __id__
 #       raise ReformError, tr("to be usefull, #{self.class} should have an override for 'key'")
     end
-  end
 
-end
+    def setupQuickyhash hash
+      hash.each do |k, v|
+        send(k, v)
+      end
+    end
+
+  end # module Model
+
+end # module Reform

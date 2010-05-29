@@ -77,7 +77,7 @@ Reform::app {
             text tr('&Grid')
             name :gridVisible?
           }
-           stretch # stretchable open space in between
+          spacer stretch: 1 # stretchable open space in between
           checkbox { # navigationCheckBox
             text tr('&Navigation Bar')
             name :navigationBarVisible?
@@ -187,7 +187,7 @@ solution 2) just ad hoc code it, similar to the example
             text tr('&First Friday in blue')
             whenClicked { |checked| connectModel(@model) }
           }
-          stretch
+          spacer stretch: 1
           checkbox {
             name :mayFirstCheckbox
             connector false

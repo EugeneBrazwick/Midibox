@@ -99,7 +99,7 @@ Even more, a QDialog can be stored in the view as well!
     alias :pen :stroke
 
   #override
-    def addControl control, &block
+    def addControl control, quickyhash = nil, &block
 #       tag "addControl, control #{control} is added to SCENE"
       qc = if control.respond_to?(:qtc) then control.qtc else control end
       require_relative '../graphicsitem'

@@ -1,18 +1,20 @@
 
+#  Copyright (c) 2010 Eugene Brazwick
+
 module Reform
-  require_relative 'control'
+  require_relative '../control'
 
   class Widget < Control
   private
     # make it the central widget
     def central
-      @owner.qcentralWidget = @owner.qtc.centralWidget = @qtc
+      @containing_form.qcentralWidget = @containing_form.qtc.centralWidget = @qtc
     end
 
     define_simple_setter :locale
 
     def check_grid_parent tocheck
-      require_relative 'controls/gridlayout' # needed anyway
+      require_relative 'gridlayout' # needed anyway
       if @containing_frame.layout?
         if !@containing_frame.is_a?(GridLayout)
           raise ReformError, tr("'#{tocheck}' only works with a gridlayout container!")
@@ -33,7 +35,13 @@ module Reform
       end
     end
 
-    # hint for parent layout
+    def check_boxparent tocheck
+      unless @containing_frame.layout? && @containing_frame.is_a?(BoxLayout)
+        raise ReformError, tr("'#{tocheck}' only works with a (h/v)box container!")
+      end
+    end
+
+    # hint for parent layout, do not confuse with 'central'
     def makecenter
 #       tag "makecenter called for #{self}"
       check_grid_parent :makecenter
@@ -87,7 +95,27 @@ module Reform
 
     attr :layout_alignment
 
+    # this only works if the widget is inside a boxlayout
+    def stretch v = nil
+      return (instance_variable_defined?(:@stretch) ? @stretch : nil) unless v
+      check_boxparent 'stretch'
+      @stretch = v
+    end
+
+#     # ignored
+#     def spacing v = nil
+#     end
+    
+    # this only works if the widget is inside a boxlayout
+#     def spacing v = nil
+#       return (instance_variable_defined?(:@spacing) ? @spacing : nil) unless v
+#       check_boxparent 'spacing'
+#       @spacing = v
+#     end
+
   end # class Widget
 
   QWidget = Qt::Widget # may change
+
+  createInstantiator File.basename(__FILE__, '.rb'), QWidget
 end # Reform

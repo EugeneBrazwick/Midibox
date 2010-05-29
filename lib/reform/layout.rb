@@ -37,7 +37,7 @@ However it must be in postSetup.
 
     # override for layouts, returns added control
     # note that the Qt relationship for parents is already OK.
-    def addControl control, &block
+    def addControl control, quickyhash = nil, &block
 #       tag "#{self}::addControl(#{control})"
 # require_relative 'controls/checkbox' # FIXME
 #       tag "stack:#{caller.join("\n")}" if self.is_a?(FormLayout) && control.is_a?(CheckBox)
@@ -48,8 +48,9 @@ However it must be in postSetup.
 #       tag "#{control.class}.layout? -> #{control.layout?}"
 #       if control.layout?
 #         tag "setup the layout and done with it"
-        control.instance_eval(&block) if block
-        control.postSetup
+      control.instance_eval(&block) if block
+      control.setupQuickyhash(quickyhash) if quickyhash
+      control.postSetup
 #       else
          # WHY THEN????
 #         frame = @containing_frame
@@ -60,8 +61,26 @@ However it must be in postSetup.
 #       tag "Added control"
     end
 
-    def stretch v = 1
-      @qtc.addStretch v
+=begin
+    defaults are ambigous since x.stretch is supposed to return stretch, not set it to 1.
+    also, defaults are unclear by design.
+    There is another ambiguity here. If a layout is within another layout, does
+    stretch 'add' a stretch or does it apply on the stretch added to the layout itself,
+    when added to its parent.
+
+    Since we actually add a kind of widget, let's make this explicit.
+    So 'stretch' becomes a control property and effects the current control, as it
+    is added to the parent layout.
+
+    And 'spacer stretch: 1' will be the syntax here.
+=end
+#     def stretch v
+#       @qtc.addStretch v
+#     end
+
+    # Alternative: 'spacer space: v'
+    def spacing v
+      @qtc.addSpacing v
     end
 
     def layout?

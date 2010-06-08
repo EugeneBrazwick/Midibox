@@ -113,6 +113,7 @@ This demonstrates that ANY ruby class can easily be a model in the 'reform' syst
         @waitingForOperand = false
       end
       # changed from example: how can Nokia example even work?
+      tag "calling display=()"
       self.display = f2s(@display == '0' ? val : @display + val)
     end
 

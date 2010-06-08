@@ -43,8 +43,11 @@ module Reform
       remove_instance_variable :@collection
     end
 
-  end # class GridLayout
+    def self.qtimplementor
+      Qt::FormLayout
+    end
+  end # class FormLayout
 
-  createInstantiator File.basename(__FILE__, '.rb'), Qt::FormLayout, FormLayout
+  createInstantiator File.basename(__FILE__, '.rb'), FormLayout.qtimplementor, FormLayout
 
 end # Reform

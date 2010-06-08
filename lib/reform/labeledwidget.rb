@@ -16,5 +16,10 @@ module Reform
       return (instance_variable_defined?(:@label) ? @label : nil) unless value
       @label = value
     end
+
+    def auto_layouthint
+      :formlayout
+    end
+
   end
 end

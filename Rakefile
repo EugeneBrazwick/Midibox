@@ -78,7 +78,12 @@ task :run_charmap_example do
   `#{RUBY} lib/reform/examples/widgets/charmap2.rb`
 end
 
-desc 'panic'
+desc 'as an example to run gui examples: codeeditor'
+task :run_codeeditor_example do
+  `#{RUBY} lib/reform/examples/widgets/codeeditor.rb`
+end
+
+desc 'panic, stop all notes on midipot 20:1'
 task :panic do
   sh "#{RUBY} bin/panic 20:1"
 end

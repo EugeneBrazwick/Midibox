@@ -13,6 +13,7 @@ a Frame is a widget that may contain others.
     private
 
     def initialize frame, qtc
+      tag "CREATING FRAME, qtc=#{qtc}"
       super
       # all immediate controls within this panel are in here
       # but also the controls added to Layouts, since Qt layouts do not own them.
@@ -24,14 +25,15 @@ a Frame is a widget that may contain others.
       @autolayout = true
     end
 
-    def check_formlayout control
+    def check_formlayout control, creator = :formlayout
 #       tag "check_formlayout for #{control.class}"
-      require_relative 'formlayout' # needed anyway
+#       require_relative 'formlayout' # needed anyway
       unless layout = infused_layout
 #         tag "instantiating formlayout!!!"
-        ql = Qt::FormLayout.new
-        layout = FormLayout.new(self, ql)
-        @qtc.layout = ql
+#         ql = Qt::FormLayout.new
+#         layout = FormLayout.new(self, ql)
+        layout = send(creator)
+        @qtc.layout = layout.qtc
         @infused_layout = layout
       end
 #       tag "addWidget #{control} to infused layout"
@@ -101,8 +103,8 @@ a Frame is a widget that may contain others.
       if control.widget?
         @all_widgets << control
           # similar to widget check_grid_parent
-#         tag "control=#{control.inspect}"
-        check_formlayout(control) if @autolayout && control.respond_to?(:labeltext)
+#         tag "control=#{control.inspect}, control.respond_to?(:labeltext)=#{control.respond_to?(:labeltext)}"
+        check_formlayout(control, layoutcreator) if @autolayout && layoutcreator = control.auto_layouthint
       elsif control.layout?
         @all_widgets << control
         if layout = infused_layout

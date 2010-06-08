@@ -49,7 +49,7 @@ Reform::app {
       }
       spacy_toolbutton {
         text tr('8')
-        whenClicked { calculator.enterDigit '8' }
+        whenClicked { tag "whenClicked 8 called"; calculator.enterDigit '8' }
       }
       spacy_toolbutton {
         text tr('9')

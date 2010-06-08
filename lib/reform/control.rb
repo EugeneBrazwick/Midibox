@@ -14,7 +14,7 @@ module Reform
     def initialize frame, qtc
 #       tag "#{self}::initialize, caller=#{caller.join("\n")}"
       super()
-      @containing_frame, @containing_form, @qtc, @has_pos = frame, frame.containing_form, qtc, false
+      @containing_frame, @containing_form, @qtc, @has_pos = frame, frame && frame.containing_form, qtc, false
       # to be set to true when signals are connected to module-setters.
       # however, it should be possible to do this when :initialize is set in options of
       # connectModel.
@@ -94,11 +94,17 @@ module Reform
       if value.nil?
         return @connector if instance_variable_defined?(:@connector)
 	@connector = @qtc.objectName
+#         tag "#{self}, default connector == 'name' -> #@connector"
 	case @connector
-	when /Edit$|Combo$|Form$|Button$|Label$|List$|Table$/ then @connector = $`
+	when /Edit$|Combo$|Form$|Button$|Label$|List$|Table$/
+          tag "'#@connector' matches standard ctrl name, fixing -> #{$`}"
+          @connector = $`
+        else
+          @connector
 	end
+      else
+        @connector = value
       end
-      @connector = value
     end
 
     protected
@@ -164,7 +170,10 @@ module Reform
     end
 
     def setupQuickyhash hash
-      hash.each { |k, v| send(k, v) }
+      hash.each do |k, v|
+        tag "#{k}(#{v})"
+        send(k, v)
+      end
     end
 
     # return macros array, creating it if it was undefined
@@ -255,6 +264,10 @@ module Reform
     end
 
     def model?
+    end
+
+    # may return nil or a layout instantiator symbol (like :formlayout, :hbox, :vbox)
+    def auto_layouthint
     end
 
 =begin rdoc

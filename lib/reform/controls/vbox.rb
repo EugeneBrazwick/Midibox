@@ -5,8 +5,12 @@ module Reform
 
   require_relative '../boxlayout'
 
-  VBox = BoxLayout
+  class VBox < BoxLayout
+    def self.qtimplementor
+      Qt::VBoxLayout
+    end
+  end
 
-  createInstantiator File.basename(__FILE__, '.rb'), Qt::VBoxLayout, VBox
+  createInstantiator File.basename(__FILE__, '.rb'), VBox.qtimplementor, VBox
 
 end # Reform

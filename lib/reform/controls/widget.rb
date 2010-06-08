@@ -1,13 +1,15 @@
 
 #  Copyright (c) 2010 Eugene Brazwick
 
+# tag "widget.rb is being read"
+
 module Reform
   require_relative '../control'
 
   class Widget < Control
   private
     # make it the central widget
-    def central
+    def central param = true
       @containing_form.qcentralWidget = @containing_form.qtc.centralWidget = @qtc
     end
 
@@ -105,7 +107,7 @@ module Reform
 #     # ignored
 #     def spacing v = nil
 #     end
-    
+
     # this only works if the widget is inside a boxlayout
 #     def spacing v = nil
 #       return (instance_variable_defined?(:@spacing) ? @spacing : nil) unless v
@@ -113,9 +115,32 @@ module Reform
 #       @spacing = v
 #     end
 
+    def run
+      $qApp.activeWindow = @qtc if self == $qApp.firstform
+      @qtc.show
+      @qtc.raise
+    end # run
+
   end # class Widget
 
   QWidget = Qt::Widget # may change
+
+=begin DESTRUCTION   destroys Qt
+  class Qt::Widget
+
+    protected
+#     alias :old_resizeEvent :resizeEvent               CANT DO THIS resizeEvent does NOT exist
+=begin
+    def resizeEvent event
+#       old_resizeEvent event
+      tag "emit Qt::Widget::resized"
+      resized event.size.width, event.size.height
+    end
+=en d
+    public
+    signals 'resized(int, int)'
+  end
+=end
 
   createInstantiator File.basename(__FILE__, '.rb'), QWidget
 end # Reform

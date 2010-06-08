@@ -17,7 +17,7 @@ module Reform
       super self, qtc
       # store a ref to ourselves in the Qt::Widget
       @qtc.instance_variable_set :@_reform_hack, self
-      # block to call for lazy initialization. After done so it becomes nil
+      # block to call for lazy initialization. After done so it becomes nil, can also be a 'quicky' hash
       @setup = nil #setupblock
       # the menubar implementor:
       @qmenuBar = nil
@@ -54,6 +54,15 @@ module Reform
 
     def central
       raise "'central' is meaningless for forms"
+    end
+
+        # override. PROBLEMATIC. Why is there no 'resized' signal ????
+    # Why not make it then ???  For the time being.... FIXME
+    # This can only be done if I change Qt::Widget#resizeEvent itself.
+    # Otherwise I could use QWidget but any other Qt derivation will still
+    # lack it!!!
+    def resizeEvent event
+      blk = @_reform_hack.whenResized and blk[event.size.width, event.size.height]
     end
 
     public
@@ -95,13 +104,17 @@ module Reform
     # Assigns the menuBar (provided a setup block was passed)
     # We call show + raise.
     # If this is the first form declared, it is assigned to the Qt ActiveWindow.
-    def run &setup
-      @setup = setup if setup
+    def run # &setup
+#       @setup = setup if setup
+      raise 'it seems setup is always nil???' if @setup
       if @setup || instance_variable_defined?(:@macros) && @macros
         # without a block windowTitle is never set. Nah...
         title = $qApp.title
         @qtc.windowTitle = title if title
-        instance_eval(&@setup) if @setup
+        case @setup
+        when Hash then setupQuickyhash(@setup)
+        when Proc then instance_eval(&@setup)
+        end
 #         tag "calling Form.postSetup"
         postSetup
         # menubar without a centralwidget would remain invisible. That is confusing
@@ -140,6 +153,7 @@ module Reform
       # connecting the model is cheaper when the form is still invisible
 #       setModel(@model) if instance_variable_defined?(:@model) && @model ??
       # note: originally BEFORE the assign to activeWindow...
+#       tag "qtc=#@qtc"
       @qtc.show
       @qtc.raise
     end # ReForm#run
@@ -170,7 +184,12 @@ module Reform
     #override, can be used to reregister a name with a different control
     def registerName aName, aControl
       aName = aName.to_sym
-      remove_method(aName) if (@widget_index ||= {})[aName]
+      if (@widget_index ||= {})[aName]
+#       tag "removing old method '#{aName}'"
+        (class << self; self; end).instance_eval do
+          remove_method(aName)
+        end
+      end
       define_singleton_method(aName) { aControl }
       @widget_index[aName] = aControl
     end

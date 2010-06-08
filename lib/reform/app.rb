@@ -322,7 +322,7 @@ THIS ALL NO LONGER APPLIES since parent_qtc_to_use_for returns nil for layouts..
     end
   public
     def exec receiver = nil
-      tag "executing macro #{@control.class}::#@name, args=#@quicky"
+#       tag "executing macro #{@control.class}::#@name, args=#@quicky"
       (receiver ||= @control).send(@name, @quicky, &@block) #.tap do |t|
 #         tag "macroresult is #{t}"
 #       end
@@ -436,6 +436,25 @@ The idea is that it is a singleton.
       @all_forms = []
       # title is used as caption
       @title = nil
+      # instantiate a 'autoform' if no form has been given, default true
+      @autoform = :form
+    end
+
+=begin rdoc
+    normally, value would be false so @autoform is switched of.
+Example:
+    Reform::app {
+      button
+   }
+will create a form, plus a hbox implicitely, but:
+    Reform::app {
+      autoform false
+      button
+    }
+will create a button as toplevel control
+=end
+    def autoform value
+      @autoform = value
     end
 
     public
@@ -501,20 +520,27 @@ The idea is that it is a singleton.
           qform = qt_implementor_class.new
           form = reform_class.new qform
           @firstform ||= form   # it looks the same, but is completely different
-          form.windowTitle = quicky if quicky
-          form.setup = block
+          form.setup = quicky ? quicky : block
           # and now we wait for 'run'
         end
       else
         define_method name do |quicky = nil, &block|
-          raise ReformError, 'put controls in forms' unless @all_forms.length <= 1
-          # it seems that 'form' is not the instantiator here??
-#           tag "form=#{form.inspect}"  -> NIL
-          require_relative 'controls/form'
-          @firstform ||= ReForm.new(Qt::Widget.new)
-          # we delay creating the elements until form.run is called.
-#           tag "create macro for #{name}"
-          Macro.new(@firstform, name, quicky, block)
+          if @autoform
+            raise ReformError, 'put controls in forms' unless @all_forms.length <= 1
+            # it seems that 'form' is not the instantiator here??
+  #           tag "form=#{form.inspect}"  -> NIL
+#             tag "Instantiating autoform '#@autoform', unless #@firstform"
+            @firstform ||= send(@autoform)
+            # we delay creating the elements until form.run is called.
+  #           tag "create macro for #{name}"
+            Macro.new(@firstform, name, quicky, block)
+          else
+            # is this a proper constraint?
+            raise ReformError, 'only 1 control can be on top' if @firstform
+            qctrl = qt_implementor_class.new
+#             tag "reform_class=#{reform_class}, qctrl=#{qctrl}"
+            @firstform = reform_class.new(nil, qctrl)
+          end
         end
       end
       # make it private:

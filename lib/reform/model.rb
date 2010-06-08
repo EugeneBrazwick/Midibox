@@ -117,7 +117,7 @@ will work as expected
 
     # note that the :property option is not yet implemented
     def dynamicPropertyChanged name
-#       tag "#{self} name=#{name}, no_dynamics = #{@no_dynamics||=false}, observers=#{(@observers ||= {}).inspect}"
+#       tag "#{self} name=#{name}, no_dynamics = #{@no_dynamics||=false}, observers=#{(@observers ||= []).inspect}"
       return if instance_variable_defined?(:@no_dynamics) && @no_dynamics
       (@observers ||= nil) and @observers.each do |o|
 #         tag "Propagating model #{self} to observer #{o}"

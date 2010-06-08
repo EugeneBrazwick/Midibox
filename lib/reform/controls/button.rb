@@ -3,6 +3,8 @@
 
 module Reform
 
+  require_relative 'widget'
+
   class Button < Widget
     private
     define_simple_setter :text
@@ -18,6 +20,10 @@ module Reform
         @qtc.clicked
       end
     end #whenClicked
+
+    def auto_layouthint
+      :hbox
+    end
 
   end
 

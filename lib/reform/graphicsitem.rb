@@ -48,6 +48,11 @@ module Reform
     def graphic?
       true
     end
+
+    def self.contextsToUse
+      GraphicContext
+    end
+
   end # GraphicsItem
 
 end # Reform

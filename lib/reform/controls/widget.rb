@@ -51,13 +51,8 @@ module Reform
     end
 
     # hint for parent layout
-    def colspan w
-      span 1, w
-    end
-
-    # hint for parent layout
     def rowspan h
-      span h, 1
+      span 1, h
     end
 
     # assign a font. Possible values ?? some Qt::Font
@@ -73,19 +68,22 @@ module Reform
     end
 
     # this only works if the widget is inside a gridlayout
-    def span rows = nil, cols = nil
+    def span cols = nil, rows = nil
       check_grid_parent :span
-      return (instance_variable_defined?(:@span) ? @span : nil) unless rows
-      cols ||= rows
+      return (instance_variable_defined?(:@span) ? @span : nil) unless cols
+      rows ||= 1
 #       tag "span := #{rows},#{cols}"
-      @span = rows, cols
+      @span = cols, rows
     end
 
+    # assuming you pass it a single arg:
+    alias :colspan :span
+
     # this only works if the widget is inside a gridlayout
-    def layoutpos row = nil, col = nil
+    def layoutpos col = nil, row = nil
       check_grid_parent :layoutpos
-      return (instance_variable_defined?(:@layoutpos) ? @layoutpos : nil) unless row
-      @layoutpos = row, col
+      return (instance_variable_defined?(:@layoutpos) ? @layoutpos : nil) unless col
+      @layoutpos = col, row || 1
     end
 
     define_simple_setter :windowTitle
@@ -124,6 +122,10 @@ module Reform
       @qtc.show
       @qtc.raise
     end # run
+
+    def self.contextsToUse
+      [ControlContext, App]
+    end
 
   end # class Widget
 

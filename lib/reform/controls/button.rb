@@ -6,8 +6,14 @@ module Reform
   require_relative 'widget'
 
   class Button < Widget
+    include MenuContext # can create a menu here
     private
-    define_simple_setter :text
+    define_simple_setter :text, :checkable, :flat
+
+    def checked value
+      @qtc.checkable = true
+      @qtc.checked = value
+    end
 
     public
 
@@ -23,6 +29,13 @@ module Reform
 
     def auto_layouthint
       :hbox
+    end
+
+    #override
+    def addControl control, quickyhash = nil, &block
+      raise unless control.menu?
+      @qtc.setMenu(control.qtc)
+      super
     end
 
   end

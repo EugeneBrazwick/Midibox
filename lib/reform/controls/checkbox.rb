@@ -15,7 +15,11 @@ module Reform
       end
     end # initialize
 
-    define_simple_setter :text
+    define_simple_setter :text, :tristate, :checkState
+
+    def partiallyChecked
+      checkState Qt::PartiallyChecked
+    end
 
     public
     # this will not call whenClicked

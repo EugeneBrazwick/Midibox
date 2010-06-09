@@ -12,7 +12,6 @@ Because when added their block has not yet been executed.
 However it must be in postSetup.
 =end
   class Layout < Frame
-#     include FrameContext
   private
 
     define_simple_setter :margin, :sizeConstraint
@@ -51,6 +50,7 @@ However it must be in postSetup.
       control.instance_eval(&block) if block
       control.setupQuickyhash(quickyhash) if quickyhash
       control.postSetup
+      control
 #       else
          # WHY THEN????
 #         frame = @containing_frame

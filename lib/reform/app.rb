@@ -177,7 +177,7 @@ module Reform
   end
 
 =begin rdoc
-  baseclass for FrameContext and SceneContext
+  baseclass for ControlContext, GraphicContext etc.
   As such it has a big impact on all Frame and Scene derivates, which are most container classes.
 
   First we have instantiators for each file/class in the controls or graphics directory.
@@ -191,7 +191,7 @@ module Reform
   This should execute the setupblock, and finally call postSetup on the canvas.
 =end
   module Instantiator
-    def createInstantiator_i name, qt_implementor_class, reform_class
+    def createInstantiator_i name, qt_implementor_class, reform_class, options = nil
 #       tag "define_method #{self}::#{name}."
       remove_method name if private_method_defined?(name)
       define_method name do |quickyhash = nil, &block|
@@ -299,20 +299,38 @@ THIS ALL NO LONGER APPLIES since parent_qtc_to_use_for returns nil for layouts..
     end
   end # module Instantiator
 
-  # FrameContext means we get the instantiators in the 'controls' directory.
-  # So things including FrameContext can contain other widgets
-  module FrameContext
+  # ControlContext means we get the instantiators in the 'controls' directory.
+  # So things including ControlContext can contain other widgets
+  module ControlContext
     extend Instantiator
-  end # module FrameContext
+  end # module ControlContext
 
-  # SceneContext means we get the instantiators in the 'graphics' directory.
-  module SceneContext
+  # GraphicContext means we get the instantiators in the 'graphics' directory.
+  module GraphicContext
     extend Instantiator
-  end # module SceneContext
+  end # module GraphicContext
 
+  # ModelContext means we can create models for the control that includes it
+  # These are all in the 'models' subdirectory
   module ModelContext
     extend Instantiator
   end # module ModelContext
+
+  # MenuContext means we can create menus for the control that includes it
+  # These are all in the 'menus' subdirectory
+  module MenuContext
+    extend Instantiator
+  end
+
+  # ActionContext means we can create actions for the control that includes it
+  # These are all in the 'actions' subdirectory
+  module ActionContext
+    extend Instantiator
+  end
+
+#   module ToplevelContext
+#     extend Instantiator
+#   end
 
   # this class just stores a name with the arguments to a widget constructor
   class Macro
@@ -367,19 +385,28 @@ THIS ALL NO LONGER APPLIES since parent_qtc_to_use_for returns nil for layouts..
 
   # delegator. see App::registerControlClassProxy
   def self.registerControlClassProxy id, path
-    FrameContext::registerControlClassProxy_i id, path
+    ControlContext::registerControlClassProxy_i id, path
     App::registerControlClassProxy_i id, path
   end
 
   def self.registerGraphicsControlClassProxy id, path
 #     tag "registerGraphicsControlClassProxy(#{id}, #{path})"
-    SceneContext::registerControlClassProxy_i id, path
+    GraphicContext::registerControlClassProxy_i id, path
 #     SceneFrameMacroContext::registerControlClassProxy_i id, path
   end
 
   def self.registerModelClassProxy id, path
     ModelContext::registerControlClassProxy_i id, path
     App::registerModelClassProxy_i id, path
+  end
+
+  def self.registerMenuClassProxy id, path
+#     tag "Adding method '#{id}' to MenuContext"
+    MenuContext::registerControlClassProxy_i id, path
+  end
+
+  def self.registerActionClassProxy id, path
+    ActionContext::registerControlClassProxy_i id, path
   end
 
 #   require_relative 'widget'
@@ -391,6 +418,12 @@ THIS ALL NO LONGER APPLIES since parent_qtc_to_use_for returns nil for layouts..
   class Widget < Control
   end
 
+#   class Menu < Control
+#   end
+#
+#   class Action < Control
+#   end
+#
   class Frame < Widget
   end
 
@@ -403,20 +436,15 @@ THIS ALL NO LONGER APPLIES since parent_qtc_to_use_for returns nil for layouts..
   # delegator. See App::createInstantiator
   def self.createInstantiator name, qt_implementor_class, reform_class = Widget, options = {}
 #     tag "createInstantiator '#{name}' implementor=#{qt_implementor_class}, klass=#{reform_class}"
-    if reform_class <= Widget
-      unless options[:form]
-        FrameContext::createInstantiator_i name, qt_implementor_class, reform_class
+    # this can be done using classmethods in reform_class.
+    # Also we can have ToplevelContext, included by App itself
+    contextsToUse = reform_class.contextsToUse
+    if contextsToUse.respond_to?(:each)
+      contextsToUse.each do |ctxt|
+        ctxt::createInstantiator_i name, qt_implementor_class, reform_class, options
       end
-      App::createInstantiator_i name, qt_implementor_class, reform_class, options
-#       SceneFrameMacroContext::createInstantiator_i name
-    elsif reform_class <= Model
-#       tag "creating instantiator #{name} in ModelContext AND App"
-      ModelContext::createInstantiator_i name, qt_implementor_class, reform_class
-      App::createInstantiator_i name, qt_implementor_class, reform_class
     else
-      # note: since a Scene is a Frame it also receives the Widget instantiators.
-      SceneContext::createInstantiator_i name, qt_implementor_class, reform_class
-#       SceneFrameMacroContext::createInstantiator_i name
+      contextsToUse::createInstantiator_i name, qt_implementor_class, reform_class, options
     end
   end
 
@@ -425,7 +453,8 @@ THIS ALL NO LONGER APPLIES since parent_qtc_to_use_for returns nil for layouts..
   I use 'exec_i' from Reform::app
 =end
   class App < Qt::Application
-      private
+#     include ToplevelContext
+    private
 
 =begin rdoc
 the application constructor is passed the commandline. Or any splat for that matter.
@@ -602,6 +631,14 @@ will create a button as toplevel control
     for file in Dir[File.dirname(__FILE__) + '/controls/*.rb']
       basename = File.basename(file, '.rb')
       registerControlClassProxy basename, 'controls/' + basename
+    end
+    for file in Dir[File.dirname(__FILE__) + '/menus/*.rb']
+      basename = File.basename(file, '.rb')
+      registerMenuClassProxy basename, 'menus/' + basename
+    end
+    for file in Dir[File.dirname(__FILE__) + '/actions/*.rb']
+      basename = File.basename(file, '.rb')
+      registerActionClassProxy basename, 'actions/' + basename
     end
     for file in Dir[File.dirname(__FILE__) + '/contrib_widgets/*.rb']
       basename = File.basename(file, '.rb')

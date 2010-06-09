@@ -201,6 +201,10 @@ will work as expected
       end
     end
 
+    def self.contextsToUse
+      [ModelContext, ToplevelContext]
+    end
+
   end # module Model
 
 end # module Reform

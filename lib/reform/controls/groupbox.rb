@@ -6,7 +6,7 @@ module Reform
 
   class GroupBox < Frame
     private
-    define_simple_setter :title
+    define_simple_setter :title, :checkable, :checked, :flat
   end
 
   createInstantiator File.basename(__FILE__, '.rb'), Qt::GroupBox, GroupBox

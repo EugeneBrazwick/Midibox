@@ -47,7 +47,7 @@ Reform::app {
       } # groupbox
       # general options group box  UR
       groupbox { # generalOptionsGroupBox
-        layoutpos 0, 1 # by default it goes down, we want to add a column here
+        layoutpos 1 # by default it goes down, we want to add a column here
         title tr('General Options')
         combobox { # localeCombo
           # use Qt locale languagelist, and for each locale add the

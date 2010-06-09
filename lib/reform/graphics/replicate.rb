@@ -144,7 +144,7 @@ module Reform
   # using transformations
   class Replicate < GraphicsItem
     # make it possible to add both widgets and graphicitems
-    include FrameContext, SceneContext
+    include ControlContext, GraphicContext
   private
     def initialize frame, qtc
 #       tag "new GraphicsItem"

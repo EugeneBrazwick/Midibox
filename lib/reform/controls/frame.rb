@@ -8,7 +8,7 @@ module Reform
 a Frame is a widget that may contain others.
 =end
   class Frame < Widget
-    include FrameContext
+    include ControlContext
 
     private
 
@@ -104,7 +104,12 @@ a Frame is a widget that may contain others.
         @all_widgets << control
           # similar to widget check_grid_parent
 #         tag "control=#{control.inspect}, control.respond_to?(:labeltext)=#{control.respond_to?(:labeltext)}"
-        check_formlayout(control, layoutcreator) if @autolayout && layoutcreator = control.auto_layouthint
+        if layout = infused_layout
+          control.containing_frame = layout
+          layout.addWidget control, control.qtc
+        else
+          check_formlayout(control, layoutcreator) if @autolayout && layoutcreator = control.auto_layouthint
+        end
       elsif control.layout?
         @all_widgets << control
         if layout = infused_layout
@@ -121,10 +126,7 @@ a Frame is a widget that may contain others.
 #         when Timer then control.qtc.start
 #         end
       end
-      control.instance_eval(&block) if block
-      control.setupQuickyhash(quickyhash) if quickyhash
-      control.postSetup
-      control
+      super
     end
 
     # note that form has an override. Frames collect immediate controls.

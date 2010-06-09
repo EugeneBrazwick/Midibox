@@ -159,6 +159,8 @@ module Reform
     # tuple w,h   as set in last call of setSize/setGeometry
     attr :requested_size
 
+    # BAD name and not OO either. FIXME.  Why not make provision for menus, actions etc. as well?
+    # also this only does something with the qt hierarchie
     def addWidget control, q
 #       tag "#{self.class}::addWidget(#{control.class}, #{q.class}) -> DELEGATE to #{@qtc.class}"
       if control.layout?
@@ -266,6 +268,12 @@ module Reform
     def model?
     end
 
+    def menu?
+    end
+
+    def action?
+    end
+
     # may return nil or a layout instantiator symbol (like :formlayout, :hbox, :vbox)
     def auto_layouthint
     end
@@ -327,6 +335,14 @@ module Reform
       aModel.postSetup
 #       tag "Calling connectModel"
       connectModel(aModel, initialize: true) # if instance_variable_defined?(:@model)
+    end
+
+        # adding any control to any parent.  The default makes no relationships. It just initializes the control properly
+    def addControl control, quickyhash = nil, &block
+      control.instance_eval(&block) if block
+      control.setupQuickyhash(quickyhash) if quickyhash
+      control.postSetup
+      control
     end
 
   end # class Control

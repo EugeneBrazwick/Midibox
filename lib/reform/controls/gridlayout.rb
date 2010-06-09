@@ -69,10 +69,10 @@ gridlayout {
 #       tag "#{self}::postSetup"
       curcol, currow = 0, 0
       for control in @collection
-        r, c = control.layoutpos
-        r, c = currow, curcol if r.nil?
-        spanr, spanc = control.span
-        spanr, spanc = 1, 1 if spanr.nil?
+        c, r = control.layoutpos
+        c, r = curcol, currow if c.nil?
+        spanc, spanr = control.span
+        spanc, spanr = 1, 1 if spanc.nil?
 #         tag "qtc.addWidget(#{control}, r:#{r}, c:#{c}, #{spanr}, #{spanc}), layout?->#{control.layout?}"
         if control.layout?
           @qtc.addLayout(control.qtc, r, c, spanr, spanc)

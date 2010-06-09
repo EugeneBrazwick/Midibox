@@ -106,7 +106,7 @@ module Reform
     # If this is the first form declared, it is assigned to the Qt ActiveWindow.
     def run # &setup
 #       @setup = setup if setup
-      raise 'it seems setup is always nil???' if @setup
+#             raise 'it seems setup is always nil???' if @setup   # BS
       if @setup || instance_variable_defined?(:@macros) && @macros
         # without a block windowTitle is never set. Nah...
         title = $qApp.title

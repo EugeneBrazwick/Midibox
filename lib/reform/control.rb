@@ -171,7 +171,7 @@ module Reform
 
     def setupQuickyhash hash
       hash.each do |k, v|
-        tag "#{k}(#{v})"
+#         tag "#{k}(#{v})"
         send(k, v)
       end
     end

@@ -44,7 +44,7 @@ module Reform
     end
 
     # hint for parent layout, do not confuse with 'central'
-    def makecenter
+    def makecenter v = true
 #       tag "makecenter called for #{self}"
       check_grid_parent :makecenter
       @layout_alignment = Qt::AlignCenter
@@ -90,9 +90,13 @@ module Reform
 
     define_simple_setter :windowTitle
 
+#     def resize x, y
+#       @qtc.resize x, y
+#     end
+
     def sizeHint x = nil, y = nil
       return @qtc.sizeHint if y.nil?
-      @qtc.setSizeHint(x, y)
+      @qtc.setSizeHint(x, y)  # this hardly works at all
     end
 
     attr :layout_alignment

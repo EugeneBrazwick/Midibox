@@ -13,7 +13,7 @@ a Frame is a widget that may contain others.
     private
 
     def initialize frame, qtc
-      tag "CREATING FRAME, qtc=#{qtc}"
+#       tag "CREATING FRAME, qtc=#{qtc}"
       super
       # all immediate controls within this panel are in here
       # but also the controls added to Layouts, since Qt layouts do not own them.

@@ -254,6 +254,8 @@ THIS ALL NO LONGER APPLIES since parent_qtc_to_use_for returns nil for layouts..
 #           tag "APP -> #{ctrl.class}.addControl(#{c.class})"
           ctrl.addControl(c, quickyhash, &block)
         end
+        # IMPORTANT: return the control
+        ctrl
       end  # define_method name
       # make the method private:
       private name
@@ -316,6 +318,7 @@ THIS ALL NO LONGER APPLIES since parent_qtc_to_use_for returns nil for layouts..
   class Macro
   private
     def initialize control, name, quicky, block
+      raise unless control
 #           tag "Macro.new(#{control}, #{name})"
       @control, @name, @quicky, @block = control, name, quicky, block
       control.macros! << self
@@ -376,6 +379,7 @@ THIS ALL NO LONGER APPLIES since parent_qtc_to_use_for returns nil for layouts..
 
   def self.registerModelClassProxy id, path
     ModelContext::registerControlClassProxy_i id, path
+    App::registerModelClassProxy_i id, path
   end
 
 #   require_relative 'widget'
@@ -406,8 +410,9 @@ THIS ALL NO LONGER APPLIES since parent_qtc_to_use_for returns nil for layouts..
       App::createInstantiator_i name, qt_implementor_class, reform_class, options
 #       SceneFrameMacroContext::createInstantiator_i name
     elsif reform_class <= Model
-#       tag "creating instantiator #{name} in ModelContext"
+#       tag "creating instantiator #{name} in ModelContext AND App"
       ModelContext::createInstantiator_i name, qt_implementor_class, reform_class
+      App::createInstantiator_i name, qt_implementor_class, reform_class
     else
       # note: since a Scene is a Frame it also receives the Widget instantiators.
       SceneContext::createInstantiator_i name, qt_implementor_class, reform_class
@@ -483,6 +488,17 @@ will create a button as toplevel control
       private name
     end
 
+    def self.registerModelClassProxy_i name, thePath
+      self.registerControlClassProxy_i name, thePath
+#       return if private_method_defined?(name)
+#       define_method name do |quickylabel = nil, &block|
+#         App.send :remove_method, name
+#         require_relative thePath
+#         send(name, quickylabel, &block)
+#       end
+#       private name
+    end
+
     # override! called from Reform::app
     def exec
 #       tag "exec"
@@ -513,7 +529,7 @@ will create a button as toplevel control
   which the class can be instantiated. In the app space all implementors
   generate a macro that is added to the implicit QMainWindow
 =end
-    def self.createInstantiator_i name, qt_implementor_class, reform_class, options
+    def self.createInstantiator_i name, qt_implementor_class, reform_class, options = {}
       remove_method name if private_method_defined?(name)
       if options[:form]
         define_method name do |quicky = nil, &block|
@@ -522,6 +538,7 @@ will create a button as toplevel control
           @firstform ||= form   # it looks the same, but is completely different
           form.setup = quicky ? quicky : block
           # and now we wait for 'run'
+          form
         end
       else
         define_method name do |quicky = nil, &block|
@@ -581,7 +598,7 @@ will create a button as toplevel control
   def self.app &block
 #     tag "Creating Qt::Application!!"
     App.new ARGV
-    # extend the Form class with the proper contributed widgets
+#     tag "extend the Form class with the proper contributed widgets"
     for file in Dir[File.dirname(__FILE__) + '/controls/*.rb']
       basename = File.basename(file, '.rb')
       registerControlClassProxy basename, 'controls/' + basename
@@ -598,6 +615,7 @@ will create a button as toplevel control
     end
     for file in Dir[File.dirname(__FILE__) + '/models/*.rb']
       basename = File.basename(file, '.rb')
+#       tag "registerModelClassProxy #{basename} -> models/#{basename}.rb"
       registerModelClassProxy basename, 'models/' + basename
     end
     $qApp.instance_eval(&block) if block

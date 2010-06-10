@@ -163,18 +163,17 @@ module Reform
     # also this only does something with the qt hierarchie
     def addWidget control, q
 #       tag "#{self.class}::addWidget(#{control.class}, #{q.class}) -> DELEGATE to #{@qtc.class}"
-      if control.layout?
-        @qtc.addLayout q
-      else
-        @qtc.addWidget q
-      end
-#       tag "added widget"
+      control.addWidget2Parent(@qtc, q) # parent_qtc, child_qtc
+    end
+
+    def addWidget2Parent parent_qtc, child_qtc
+      parent_qtc.addWidget child_qtc
     end
 
     def setupQuickyhash hash
       hash.each do |k, v|
 #         tag "#{k}(#{v})"
-        send(k, v)
+        send(k, v) unless k == :postSetup # and other hacks!!
       end
     end
 
@@ -341,7 +340,7 @@ module Reform
     def addControl control, quickyhash = nil, &block
       control.instance_eval(&block) if block
       control.setupQuickyhash(quickyhash) if quickyhash
-      control.postSetup
+      control.postSetup unless quickyhash && quickyhash[:postSetup] == false
       control
     end
 

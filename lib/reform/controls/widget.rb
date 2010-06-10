@@ -79,11 +79,15 @@ module Reform
     # assuming you pass it a single arg:
     alias :colspan :span
 
-    # this only works if the widget is inside a gridlayout
+    # this only works if the widget is inside a gridlayout. Leaving out row will make it 0
+    # which is usefull for defining the first row of widgets. After that the gridlayout
+    # will automatically add them one by one in the proper order.
+    # This should be used for exceptional positions, since it is better to specify
+    # columnCount within the grid.
     def layoutpos col = nil, row = nil
       check_grid_parent :layoutpos
       return (instance_variable_defined?(:@layoutpos) ? @layoutpos : nil) unless col
-      @layoutpos = col, row || 1
+      @layoutpos = col, row || 0
     end
 
     define_simple_setter :windowTitle

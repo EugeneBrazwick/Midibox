@@ -34,16 +34,30 @@ gridlayout {
   class GridLayout < Layout
   private
     def initialize parent, qtc
+#       tag "#{self}::new(parent=#{parent}, qtc=#{qtc})"
       super
 #       tag "#{self.class}.new, qtc=#{qtc}" # ???? caller=#{caller.join("\n")}"
 #       @fill = [] # array of rows where each row is a bool array
       # an item in a grid can set col, row and colspan and rowspan
-      @currow, @curcol = 0, 0
+      @columnCount = nil
       @collection = []
+#       tag "initialized 'collection'"
     end
 
-    def columnstretch ar
-      ar.each_with_index { |v, i| @qtc.setColumnStretch(i, v) }
+    def rowStretch ar
+      case ar
+      when Integer then @qtc.setRowStretch(ar, 1)
+      when Hash then ar.each { |k, v| @qtc.setRowStretch(k, v) }
+      else ar.each_with_index { |v, i| @qtc.setRowStretch(i, v) }
+      end
+    end
+
+    def columnStretch ar
+      case ar
+      when Integer then @qtc.setColumnStretch(ar, 1)
+      when Hash then ar.eachg { |k, v| @qtc.setColumnStretch(k, v) }
+      else ar.each_with_index { |v, i| @qtc.setColumnStretch(i, v) }
+      end
     end
 
     def setRowMinimumHeight row, h
@@ -55,8 +69,15 @@ gridlayout {
     end
 
     public
+
+    def columnCount value = nil?
+      return (@columnCount || @qtc.columnCount) if value.nil?
+      @columnCount = value
+    end
+
     #override
     def addWidget control, qt_widget = nil
+#       tag "#{self}::addWidget, collection=#{@collection}"
       @collection << control
 #       tag "addWidget to grid"
 # #       @qtc.addWidget qt_widget, @currow, @curcol, @currowspan, @curcolspan
@@ -84,7 +105,7 @@ gridlayout {
           @qtc.addWidget(control.qtc, r, c, spanr, spanc)
         end
         currow, curcol = r, c + spanc
-        curcol, currow = 0, currow + 1if curcol >= @qtc.columnCount
+        curcol, currow = 0, currow + 1 if curcol >= (@columnCount || @qtc.columnCount)
       end
       # a bit of a hack, but probably what you want:
       if @collection.length == 1 && @collection[0].layout_alignment == Qt::AlignCenter

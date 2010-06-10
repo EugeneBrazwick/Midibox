@@ -73,6 +73,12 @@ will work as expected
         alias :dynamic :attr
         alias :dynamic_reader :attr_reader
       end
+
+      public
+      def contextsToUse
+        [ModelContext, App]
+      end
+
     end # ClassMethods
 
     # override
@@ -202,9 +208,12 @@ will work as expected
     end
 
     def self.contextsToUse
-      [ModelContext, ToplevelContext]
+      [ModelContext, App]
     end
 
+#     def self.new_qt_implementor qt_implementor_class, parent, qt_parent
+#       qt_implementor_class.new qt_parent
+#     end
   end # module Model
 
 end # module Reform

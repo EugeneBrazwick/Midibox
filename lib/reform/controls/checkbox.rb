@@ -8,10 +8,12 @@ module Reform
   class CheckBox < LabeledWidget
     private
 
-    def initialize parent, qtc
-      super
-      connect(@qtc, SIGNAL('clicked(bool)'), self) do |checked|
-        model.apply_setter(cid, checked) if cid = connector && model = effectiveModel
+    def initialize parent, qtc, connectit = true
+      super(parent, qtc)
+      if connectit
+        connect(@qtc, SIGNAL('clicked(bool)'), self) do |checked|
+          model.apply_setter(cid, checked) if cid = connector && model = effectiveModel
+        end
       end
     end # initialize
 
@@ -59,17 +61,16 @@ module Reform
     # override
     def connectModel aModel, options = nil
 #       tag "@{self} connectModel #{aModel}, cid=#{connector}"
-      super
       cid = connector or return
       if @model && @model.getter?(cid)
         @qtc.checked = @model.apply_getter(cid)
-        tag "qtc.checked := model.#{cid}[?] == #{@qtc.checked}, model=#{@model}"
+#         tag "qtc.checked := model.#{cid}[?] == #{@qtc.checked}, model=#{@model}"
 #         if options && options[:initialize]
       else
         @qtc.checked = false
       end
+      super
     end
-
 
   end # class CheckBox
 

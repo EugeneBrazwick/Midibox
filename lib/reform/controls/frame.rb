@@ -26,19 +26,19 @@ a Frame is a widget that may contain others.
     end
 
     def check_formlayout control, creator = :formlayout
-#       tag "check_formlayout for #{control.class}"
-#       require_relative 'formlayout' # needed anyway
       unless layout = infused_layout
-#         tag "instantiating formlayout!!!"
-#         ql = Qt::FormLayout.new
-#         layout = FormLayout.new(self, ql)
-        layout = send(creator)
+        # problematic: the creator tends to call postSetup, but it must be delayed
+        layout = send(creator, postSetup: false)
+#         tag "layout=#{layout}, qtc=#{layout.qtc}, creator='#{creator}'"
         @qtc.layout = layout.qtc
         @infused_layout = layout
       end
+      if control
 #       tag "addWidget #{control} to infused layout"
-      control.containing_frame = layout
-      layout.addWidget control, control.qtc
+        control.containing_frame = layout
+        layout.addWidget control, control.qtc
+      end
+      layout
     end
 
     public
@@ -71,6 +71,10 @@ a Frame is a widget that may contain others.
         end
       end
       super
+    end
+
+    def columnCount value
+      check_formlayout(nil, :gridlayout).columnCount value
     end
 
     # override

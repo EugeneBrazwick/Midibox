@@ -245,7 +245,7 @@ THIS ALL NO LONGER APPLIES since parent_qtc_to_use_for returns nil for layouts..
 #         tag "#{reform_class}.new, ctrl=#{ctrl} self=#{ctrl}, func=#{name}"
         if reform_class <= Model
 #           tag "CALLING setModel!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
-          ctrl.setModel(reform_class.new, quickyhash, &block)
+          ctrl.setModel(c = reform_class.new, quickyhash, &block)
         else
           c = reform_class.new ctrl, newqtc
 #           tag "instantiated c=#{c}, parent is a #{ctrl.class}"
@@ -254,8 +254,8 @@ THIS ALL NO LONGER APPLIES since parent_qtc_to_use_for returns nil for layouts..
 #           tag "APP -> #{ctrl.class}.addControl(#{c.class})"
           ctrl.addControl(c, quickyhash, &block)
         end
-        # IMPORTANT: return the control
-        ctrl
+#         tag "IMPORTANT: method '#{name}' return the control #{c}"
+        c
       end  # define_method name
       # make the method private:
       private name
@@ -292,8 +292,8 @@ THIS ALL NO LONGER APPLIES since parent_qtc_to_use_for returns nil for layouts..
         require_relative thePath
         # the loaded module should call registerControlClass which recreates the method
         # and we call it immediately
-#         tag "calling the new #{name} method"
-        send(name, quickylabel, &block)
+#         tag "calling the new #{name} method, and returning ?"
+        send(name, quickylabel, &block) #.tap { |t| tag "and returning #{t}" }
       end
       private name
     end
@@ -328,6 +328,10 @@ THIS ALL NO LONGER APPLIES since parent_qtc_to_use_for returns nil for layouts..
     extend Instantiator
   end
 
+#   module DelegateContext
+#     extend Instantiator
+#   end
+#
 #   module ToplevelContext
 #     extend Instantiator
 #   end
@@ -408,6 +412,10 @@ THIS ALL NO LONGER APPLIES since parent_qtc_to_use_for returns nil for layouts..
   def self.registerActionClassProxy id, path
     ActionContext::registerControlClassProxy_i id, path
   end
+
+#   def self.registerDelegateClassProxy id, path
+#     DelegateContext::registerControlClassProxy_i id, path
+#   end
 
 #   require_relative 'widget'
 
@@ -655,6 +663,10 @@ will create a button as toplevel control
 #       tag "registerModelClassProxy #{basename} -> models/#{basename}.rb"
       registerModelClassProxy basename, 'models/' + basename
     end
+#     for file in Dir[File.dirname(__FILE__) + '/delegates/*.rb']
+#       basename = File.basename(file, '.rb')
+#       registerModelClassProxy basename, 'delegates/' + basename
+#     end
     $qApp.instance_eval(&block) if block
 #     tag "CALLING app.exec"
     $qApp.exec

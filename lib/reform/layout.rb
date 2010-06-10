@@ -23,6 +23,11 @@ However it must be in postSetup.
   public
 
     # override
+    def addWidget2Parent parent_qtc, child_qtc
+      parent_qtc.addLayout child_qtc
+    end
+
+    # override
     def effective_qtc
 #       tag "#{self}::parent_qtc_to_use_for -> containing_frame*"
       frame = @containing_frame

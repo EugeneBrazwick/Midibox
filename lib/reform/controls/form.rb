@@ -73,6 +73,9 @@ module Reform
 
     # returns a hash of form-local Actions, indexed by name
     attr_reader :actions
+
+    alias :action :actions
+
     # returns a proc that has to setup the context menu
     attr_reader :contextMenuProc
     # set or return the central widget, if available

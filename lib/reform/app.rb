@@ -326,6 +326,15 @@ THIS ALL NO LONGER APPLIES since parent_qtc_to_use_for returns nil for layouts..
   # These are all in the 'actions' subdirectory
   module ActionContext
     extend Instantiator
+    private
+    # add given action symbols to the menu
+    def actions *list
+      list = list[0] if list && Array === list
+      list.each do |action|
+        act = containing_form.action[action] or raise ReformError, tr("No such action: '%s'" % action)
+        addAction act
+      end
+    end
   end
 
 #   module DelegateContext

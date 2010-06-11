@@ -61,6 +61,40 @@ module Reform
       @qtc.font = f
     end
 
+    class ContextMenuRef < Qt::Object
+      include ActionContext
+      private
+      def initialize widget, qtc
+        super()
+        @widget, @qtc = widget, qtc
+      end
+
+      def containing_form
+        @widget.containing_form
+      end
+
+      public
+      def setupQuickyhash hash
+        return unless h0 = hash[0]
+        case h0
+        when Array then actions(h0)
+        when Hash then h0.each { |k, v| send(k, v) }
+        else actions(hash)
+        end
+      end
+
+      def addAction action
+        @widget.contextMenuPolicy = Qt::ActionsContextMenu
+        @qtc.addAction action.qtc
+      end
+    end
+
+    def contextMenu *quickyhash, &initblock
+      ref = ContextMenuRef.new(self, @qtc)
+      ref.setupQuickyhash(quickyhash) if quickyhash
+      ref.instance_eval(&initblock) if initblock
+    end
+
   public
     # override
     def widget?

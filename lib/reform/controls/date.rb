@@ -9,14 +9,6 @@ module Reform
   class Date < Edit
     private
 
-#     def initialize parent, qtc                Edit already does this
-#       super
-#       connect(@qtc, SIGNAL(changed_signal_signature), self) do |dat|
-#         model = effectiveModel and
-#           model.send(cid + '=', dat)
-#       end
-#     end
-
     define_simple_setter :displayFormat, :minimumDate, :maximumDate
 
     def dateRange from, to

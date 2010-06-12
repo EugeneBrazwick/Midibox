@@ -21,8 +21,6 @@ module Reform
       @setup = nil #setupblock
       # the menubar implementor:
       @qmenuBar = nil
-      # hash of Action objects, defined to be shared between menus
-      @actions = {}
       # Proc to execute to setup the menu dynamically
       @contextMenuProc = nil
       # unpositioned forms should be centered (but only if size is set)
@@ -72,9 +70,17 @@ module Reform
     end
 
     # returns a hash of form-local Actions, indexed by name
-    attr_reader :actions
+#     attr_reader :actions
+#
+#     alias :action :actions
 
-    alias :action :actions
+    def action name
+      r = self[name] or raise ReformError, tr("No such action: '%s'") % name.to_s
+      unless r.action?
+        raise ReformError, tr("Type mismatch '%s' is no action (but a %s)") % [name.to_s, r.class]
+      end
+      r
+    end
 
     # returns a proc that has to setup the context menu
     attr_reader :contextMenuProc

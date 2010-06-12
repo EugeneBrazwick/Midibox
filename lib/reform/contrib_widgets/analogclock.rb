@@ -12,7 +12,7 @@ module Reform
 #       resize 400, 400
 #       tag "resize is UTTERLY ignored!!??"
       timer = Qt::Timer.new self
-      connect(timer, SIGNAL('timeout()'), self) { update }
+      connect(timer, SIGNAL('timeout()'), self) { rfRescue { update } }
       timer.start 1000
       windowTitle = tr('Analog Clock')
     end

@@ -119,18 +119,10 @@ module Reform
     # it calls the callback not in the object's context, but in that of the
     # form (MVC controller)
     def rfCallBlockBack *args, &block
-      begin
+      rfRescue do
 #         tag "rfCallBlockBack, block=#{block.inspect}"
         return containing_form.instance_exec(*args, &block)
-      rescue LocalJumpError
-         # ignore
-      rescue IOError, RuntimeError => exception
-        msg = "#{exception.message}\n"
-      rescue StandardError => exception
-        msg = "#{exception.class}: #{exception}\n" + exception.backtrace.join("\n")
       end
-      # this must be fixed using an alert, but it may depend on the kind of exception...
-      $stderr << msg
     end
 
     def whenConnected model = nil, &block
@@ -161,6 +153,7 @@ module Reform
 
     # BAD name and not OO either. FIXME.  Why not make provision for menus, actions etc. as well?
     # also this only does something with the qt hierarchie
+    # Normally 'q' will be control.qtc
     def addWidget control, q
 #       tag "#{self.class}::addWidget(#{control.class}, #{q.class}) -> DELEGATE to #{@qtc.class}"
       control.addWidget2Parent(@qtc, q) # parent_qtc, child_qtc
@@ -211,8 +204,18 @@ module Reform
     # The result must be a Qt::Widget in all cases
     # Also, some subcontrols need 'nil' as their parent and this can be arranged
     # like this as well. By default we use effective_qtc, since it it about the same thing.
-    def parent_qtc_to_use_for(reform_class)
-      reform_class <= Layout ? nil : effective_qtc
+    def parent_qtc_to_use_for reform_class
+      reform_class.parent_qtc self, effective_qtc
+    end
+
+    # If self is the class of the child, which qtc to use as parent
+    def self.parent_qtc parent_control, parent_effective_qtc
+      parent_effective_qtc
+    end
+
+    # specific case if we are to parent an action
+    def effective_qtc_for_action
+      containing_form.qtc
     end
 
     # The result must be a Qt::Widget in all cases.

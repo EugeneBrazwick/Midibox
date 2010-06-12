@@ -35,6 +35,22 @@ module Kernel
   def with arg, &block
     arg.instance_eval(&block)
   end
+
+  # use this to wrap a rescue clause around any block
+  def rfRescue
+    begin
+      return yield
+#       rescue LocalJumpError
+      # ignore
+    rescue IOError, RuntimeError => exception
+      msg = "#{exception.message}\n"
+    rescue StandardError => exception
+      msg = "#{exception.class}: #{exception}\n" + exception.backtrace.join("\n")
+    end
+    # this must be fixed using an alert, but it may depend on the kind of exception...
+    $stderr << msg
+  end
+
 end
 
 class Numeric
@@ -330,10 +346,7 @@ THIS ALL NO LONGER APPLIES since parent_qtc_to_use_for returns nil for layouts..
     # add given action symbols to the menu
     def actions *list
       list = list[0] if list && Array === list
-      list.each do |action|
-        act = containing_form.action[action] or raise ReformError, tr("No such action: '%s'" % action)
-        addAction act
-      end
+      list.each { |action| addAction containing_form.action(action) }
     end
   end
 

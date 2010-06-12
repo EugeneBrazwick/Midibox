@@ -22,7 +22,7 @@ module Reform
           # which calls @qtc.selectedDate := X
           # which MAY trigger selectionChanged(). However, it doesn't seem to do that
           # to be safe I use options[:property]
-        model = effectiveModel and model.selectedDate = @qtc.selectedDate
+        rfRescue { model = effectiveModel and model.selectedDate = @qtc.selectedDate }
       end
     end
 

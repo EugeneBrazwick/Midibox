@@ -12,24 +12,25 @@ module Reform
   class MainWindow < ReForm
     private
 
-    class MenuBarRef < Qt::Object
-      # the bar can not contain actions
-      include MenuContext
+    class MenuBarRef < Control
+      # the bar can not contain actions, but it can contain a separator
+      include MenuContext, ActionContext
       private
-      def initialize mw, qtc
-        super()
-        @mw, @qtc = mw, qtc
-      end
+#       def initialize mw, qtc
+#         super()
+#         @mw, @qtc = mw, qtc
+#       end
 
       public
       def setupQuickyhash hash
         hash.each { |k, v| send(k, v) }
       end
+
     end
 
     # I noticed this did not work correctly, but this still the case ?
     def menuBar quickyhash = nil, &initblock
-      tag "#{self}::menuBar, qtc=#@qtc"
+#       tag "#{self}::menuBar, qtc=#@qtc"
       m = MenuBarRef.new(self, @qtc.menuBar)
       m.setupQuickyhash(quickyhash) if quickyhash
       m.instance_eval(&initblock) if initblock

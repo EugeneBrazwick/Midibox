@@ -84,7 +84,7 @@ module Reform
       end
 
       def addAction action
-        @widget.contextMenuPolicy = Qt::ActionsContextMenu
+        @qtc.contextMenuPolicy = Qt::ActionsContextMenu
         @qtc.addAction action.qtc
       end
     end

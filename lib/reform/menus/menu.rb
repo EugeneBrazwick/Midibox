@@ -20,13 +20,20 @@ module Reform
     # override
     def addControl control, quickyhash = nil, &block
       raise unless control.action?
-      @qtc.addAction(control.qtc)
+      addWidget control, control.qtc
       super
     end
 
     # ignore the parent
     def self.new_qt_implementor qt_implementor_class, parent, qt_parent
       qt_implementor_class.new
+    end
+
+    def registerName aName, aControl
+      containing_form.registerName(aName, aControl)
+    end
+
+    def self.parent_qtc control, qtc
     end
 
   end

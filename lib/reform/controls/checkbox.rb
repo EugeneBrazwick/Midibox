@@ -12,7 +12,7 @@ module Reform
       super(parent, qtc)
       if connectit
         connect(@qtc, SIGNAL('clicked(bool)'), self) do |checked|
-          model.apply_setter(cid, checked) if cid = connector && model = effectiveModel
+          rfRescue { model.apply_setter(cid, checked) if cid = connector && model = effectiveModel }
         end
       end
     end # initialize

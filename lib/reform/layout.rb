@@ -95,6 +95,11 @@ However it must be in postSetup.
     # override.
     def widget?
     end
+
+    # override.
+    def self.parent_qtc control, qtc
+    end
+
   end # Layout
 
 end # Reform

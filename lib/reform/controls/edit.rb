@@ -12,7 +12,7 @@ module Reform
       super
       connect(@qtc, SIGNAL(changed_signal_signature), self) do |txt|
 #             tag "assign '#{text}' to models property #{cid}"
-        model = effectiveModel and cid = connector and model.apply_setter(cid, txt)
+        rfRescue { model = effectiveModel and cid = connector and model.apply_setter(cid, txt) }
       end
     end
 

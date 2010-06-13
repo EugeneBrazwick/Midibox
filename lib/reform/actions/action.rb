@@ -42,6 +42,10 @@ module Reform
       @value = v
     end
 
+    public
+    def checked?
+      @qtc.checked?
+    end
   end
 
   createInstantiator File.basename(__FILE__, '.rb'), Qt::Action, Action

@@ -32,6 +32,7 @@ module Kernel
   end
 
   # this is the ugly way to make 'with' in ruby. CURRENT STATE: unused
+  # also this will not work 'with x do attrib = 3'
   def with arg, &block
     arg.instance_eval(&block)
   end

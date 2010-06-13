@@ -6,6 +6,28 @@ require 'reform/app'
 Reform::app {
   title tr('Icons')
   mainwindow { # optional
+    def changeIcon
+      icon = Qt::Icon.new
+      (0...imagesTable.rowCount).each do |row|
+        item0 = imagesTable.item(row, 0)
+        item1 = imagesTable.item(row, 1)
+        item2 = imagesTable.item(row, 2)
+        if item0.checkState == Qt::Checked
+          mode = case item1.text
+                 when tr('Normal') then Qt::Icon::Normal
+                 when tr('Active') then Qt::Icon::Active
+                 when tr('Disabled') then Qt::Icon::Disabled
+                 else Qt::Icon::Selected
+                 end
+          state = item2.text == tr("On") ? Qt::Icon::On : Qt::Icon::Off
+          fileName = item0.data(Qt::UserRole).toString
+          image = Qt::Image.new(fileName)
+          icon.addPixmap(QPixmap::fromImage(image), mode, state) unless image.null?
+        end
+      end
+      previewArea.icon = icon
+    end
+
     menuBar { # not a constructor but a reference
       menu { #   fileMenu = menuBar()->addMenu(tr("&File"));
         title tr('&File')
@@ -21,7 +43,7 @@ Reform::app {
               imagesTable.rowCount = row + 1
               imageName = File.basename(fileName)
               item0 = Qt::TableWidgetItem.new(imageName)
-              item0.setData(Qt::UserRole, fileName)
+              item0.setData(Qt::UserRole, Qt::Variant.new(fileName))
               item0.flags &= ~Qt::ItemIsEditable
               item1 = Qt::TableWidgetItem.new(tr('Normal'))
               item2 = Qt::TableWidgetItem.new(tr('Off'))
@@ -60,7 +82,7 @@ Reform::app {
       }
       menu { # viewMenu = menuBar()->addMenu(tr("&View"));
         title tr('&View')
-        actiongroup {
+        actiongroup {           # FIXME:  THIS IS UTTERLY MISSING !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 #           foreach (QAction *action, styleActionGroup->actions())
 #          viewMenu->addAction(action);
           Qt::StyleFactory::keys.each do |styleName|
@@ -105,8 +127,7 @@ Reform::app {
         title tr('Preview')
         colspan 2
         vbox {
-          iconpreviewarea { # previewArea
-          }
+          iconpreviewarea name: :previewArea
         }
       }
       groupbox { # imagesGroupBox

@@ -8,7 +8,7 @@ module Reform
   class Table < Widget
     include ModelContext
     private
-    define_simple_setter :selectionMode
+    define_simple_setter :selectionMode, :rowCount
 
     def noSelection
       selectionMode Qt::AbstractItemView::NoSelection
@@ -105,8 +105,23 @@ module Reform
       ref.postSetup
     end
 
+    public
+
     def whenItemChanged &block
-      tag "FIXME, NIY"
+      connect(@qtc, SIGNAL('itemChanged(QTableWidgetItem *)')) { |item| rfCallBlockBack(item, &block) }
+    end
+
+    def rowCount= value
+      @qtc.rowCount = value
+    end
+
+    # tables are truly row oriented
+    def setItem row, col, item
+      @qtc.setItem row, col, item
+    end
+
+    def openPersistentEditor item
+      @qtc.openPersistentEditor item
     end
   end
 

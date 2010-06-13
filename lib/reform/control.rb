@@ -54,6 +54,7 @@ module Reform
     end
 
     # define a simple set method for each element passed, forwarding it to qtc.
+    # in fact it also adds the getter... urm...
     def self.define_simple_setter *list
       list.each do |name|
         define_method name do |value = nil|

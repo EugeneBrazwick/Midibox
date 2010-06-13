@@ -103,7 +103,7 @@ module Reform
         end
         (0...NumStates).each do |j|
           state = j == 0 ? Qt::Icon::Off : Qt::Icon::On
-          pixmap = icon.pixmap(size, mode, state)
+          pixmap = @icon.pixmap(@size, mode, state)
           @pixmapLabels[i][j].pixmap = pixmap
           @pixmapLabels[i][j].enabled = !pixmap.null?
         end
@@ -127,6 +127,16 @@ module Reform
 
   end
 
-  createInstantiator File.basename(__FILE__, '.rb'), QIconPreviewArea
+  class IconPreviewAra < Widget
+    def icon= icon
+      @qtc.icon = icon
+    end
+
+    def size= size
+      @qtc.size = size
+    end
+  end
+
+  createInstantiator File.basename(__FILE__, '.rb'), QIconPreviewArea, IconPreviewAra
 
 end

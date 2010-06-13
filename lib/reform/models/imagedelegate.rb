@@ -53,9 +53,9 @@ module Reform
 =end
 
     public
-    # override
+    # override. These are typically two 'models'
     def createEditor parent, option, index
-      # this will be the editor:
+      # this will be the 'editor':
       comboBox = Qt::ComboBox.new(parent)
       case index.column
       when 1
@@ -69,17 +69,17 @@ module Reform
       end
       # commitData: This signal must be emitted when the editor widget has completed
       # editing the data, and wants to write it back into the model.
-      connect comboBox, SIGNAL('activated(int)') { commitData(comboBox) }
+      connect(comboBox, SIGNAL('activated(int)')) { commitData(comboBox) }
     end
 
-    # override
+    # override. Outside change, reflect by setting currentIndex in combo
     def setEditorData comboBox, index
       return unless comboBox.inherits('QComboBox')
       pos = comboBox.findText(index.model.data(index).toString, Qt::MatchExactly)
       comboBox.currentIndex = pos
     end
 
-    #override
+    #override. Picked an item in the combo (through commitData slot)
     def setModelData comboBox, model, index
       return unless comboBox.inherits('QComboBox')
       model.setData index, comboBox.currentText

@@ -5,7 +5,7 @@ require 'reform/app'
 
 Reform::app {
   title tr('Icons')
-  mainwindow {
+  mainwindow { # optional
     menuBar { # not a constructor but a reference
       menu { #   fileMenu = menuBar()->addMenu(tr("&File"));
         title tr('&File')
@@ -80,13 +80,13 @@ Reform::app {
           checked true
         }
       }
-      separator
+      separator # ignored in lucid. But it is added correctly
       menu { #  helpMenu = menuBar()->addMenu(tr("&Help"));
         title tr('&Help')
         action { # lpMenu->addAction(aboutAct);
           text tr('&About')
           whenTriggered do
-            Qt::MessageBox::about(self, tr('About Icons'),
+            Qt::MessageBox::about(@qtc, tr('About Icons'),
                                   tr('The <b>Icons</b> example illustrates how Qt renders an icon in ' +
                                      'different modes (active, normal, disabled, and selected) and ' +
                                      'states (on and off) based on a set of images.'))

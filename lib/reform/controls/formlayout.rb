@@ -8,16 +8,16 @@ module Reform
 
   class FormLayout < Layout
     #override
-    def addWidget control, qt_widget
-#       tag "FormLayout::addWidget(#{control})"
-      (@collection ||= []) << control
-    end
+#     def added control
+# #       tag "FormLayout::addWidget(#{control})"
+#       (@collection ||= []) << control
+#     end
 
     # override
     def postSetup
 #       tag "#{self}::postSetup"
       # we must wait until all children are setup.
-      for control in (@collection ||= [])
+      for control in @all_children
         # note that labels without a buddy are ignored... (all labels are ignored)
         next if control.is_a?(Label)
         if control.respond_to?(:labeltext) && (label = control.labeltext) # may be a string, may have been converted to a Label reference
@@ -40,7 +40,7 @@ module Reform
 #         Label.new(self, @qtc.labelForField(control.qtc))
         # NEVER MIND, it can never have a name unless explicit!
       end
-      remove_instance_variable :@collection
+#       remove_instance_variable :@collection
     end
 
     def self.qtimplementor

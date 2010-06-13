@@ -111,6 +111,9 @@ Even more, a QDialog can be stored in the view as well!
       super
     end
 
+    def parent_qtc_to_use_for reform_class
+    end
+
     # override. Panel is a widget, but I am not...
     def widget?
     end

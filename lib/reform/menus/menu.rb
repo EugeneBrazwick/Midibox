@@ -17,11 +17,8 @@ module Reform
       true
     end
 
-    # override
-    def addControl control, quickyhash = nil, &block
-      raise unless control.action?
-      addWidget control, control.qtc
-      super
+    def addTo parent, hash, &block
+      parent.addMenu self, hash, &block
     end
 
     # ignore the parent
@@ -29,6 +26,7 @@ module Reform
       qt_implementor_class.new
     end
 
+    # Frame compat
     def registerName aName, aControl
       containing_form.registerName(aName, aControl)
     end

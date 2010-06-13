@@ -1,6 +1,7 @@
 
 require 'rake/clean'
 require 'rake/rdoctask'
+require 'spec/rake/spectask'
 
 ALSALIB='lib/rrts/driver/alsa_midi.so'
 MIDI_IN_PORT = '20:0'
@@ -19,8 +20,12 @@ Rake::RDocTask.new do |rd|
     #ALTERNATIVES: --inline-source --fileboxes --diagram
 end
 
-# there aren't yet....
-task :test do
+desc "Run all rspec_test"
+Spec::Rake::SpecTask.new(:rspec_tests) do |t|
+  t.spec_files = FileList['test/**/*_spec.rb']
+end
+
+task :test=>:rspec_tests do
   require 'rake/runtest'
   Rake.run_tests 'test/ts_*.rb'
 end
@@ -87,3 +92,4 @@ desc 'panic, stop all notes on midipot 20:1'
 task :panic do
   sh "#{RUBY} bin/panic 20:1"
 end
+

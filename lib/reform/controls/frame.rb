@@ -12,31 +12,33 @@ a Frame is a widget that may contain others.
 
     private
 
-    def initialize frame, qtc
+    def initialize frame, qtc, autolayout = true
 #       tag "CREATING FRAME, qtc=#{qtc}"
-      super
+      super(frame, qtc)
       # all immediate controls within this panel are in here
       # but also the controls added to Layouts, since Qt layouts do not own them.
-      @all_widgets = []
+      @all_children = []
       # generate layouts automatically.
       # A layout can also be forced if a widget use a method only valid if its parent
       # is a layout, and the frame is not a layout.
       # in both cases @infused_layout is set.
-      @autolayout = true
+      @autolayout = autolayout
     end
 
-    def check_formlayout control, creator = :formlayout
+    # note hash and block are setups for 'control'
+    def check_layout control, creator = :formlayout, hash = nil, &block
       unless layout = infused_layout
         # problematic: the creator tends to call postSetup, but it must be delayed
+#         tag "missing layout, create a '#{creator}'"
         layout = send(creator, postSetup: false)
-#         tag "layout=#{layout}, qtc=#{layout.qtc}, creator='#{creator}'"
+#         tag "#{self}, qtc=#@qtc, layout=#{layout}, layout.qtc=#{layout.qtc}, creator='#{creator}'"
         @qtc.layout = layout.qtc
         @infused_layout = layout
       end
       if control
-#       tag "addWidget #{control} to infused layout"
+#         tag "addWidget #{control} to infused layout + SETUP"
         control.containing_frame = layout
-        layout.addWidget control, control.qtc
+        layout.add control, hash, &block
       end
       layout
     end
@@ -44,6 +46,9 @@ a Frame is a widget that may contain others.
     public
 
     attr_accessor :infused_layout
+
+    # array of all controls, widgets, layouts, menus, actions, models etc..
+    attr :all_children
 #     attr :autolayout
 
 =begin rdoc
@@ -59,22 +64,14 @@ a Frame is a widget that may contain others.
 =end
     def connectModel aModel, options = nil
 #       tag "#{self}::connecting model, delegate to children, @all_widgets=#{@all_widgets.inspect}"
-      if cid = connector && aModel && aModel.getter?(cid)
-        aModel = aModel.send(cid)
-      end
-      for widget in @all_widgets
-        unless widget.effectiveModel?
-#           tag "WIDGET #{widget} '#{widget.name}' REFUSES model!!!!!!!!!!!!!"
-#         else
-#           tag "propagate to #{widget} '#{widget.name}'"
-          widget.connectModel aModel, options
-        end
-      end
+      aModel = aModel.send(cid) if cid = connector && aModel && aModel.getter?(cid)
+      @all_children.each { |child| child.connectModel(aModel, options) unless child.effectiveModel? }
       super
     end
 
     def columnCount value
-      check_formlayout(nil, :gridlayout).columnCount value
+#       tag "#{self}, value=#{value}, induce 'gridlayout'"
+      check_layout(nil, :gridlayout).columnCount value
     end
 
     # override
@@ -99,45 +96,44 @@ a Frame is a widget that may contain others.
       instance_variable_defined?(:@model)
     end
 
-    # does NOT add the control for Qt !!!, but it does so for layouts ??
-    # it returns the added control
-    def addControl control, quickyhash = nil, &block
-#       tag "#{self.class}::addControl(#{control}), layout?->#{control.layout?}, widget?->#{control.widget?}"
-      raise 'assert failure, self cannot be a layout here' if layout?
-      if control.widget?
-        @all_widgets << control
-          # similar to widget check_grid_parent
-#         tag "control=#{control.inspect}, control.respond_to?(:labeltext)=#{control.respond_to?(:labeltext)}"
-        if layout = infused_layout
-          control.containing_frame = layout
-          layout.addWidget control, control.qtc
+    def added control
+      @all_children << control
+      control.containing_frame = self
+    end
+
+    # override
+    def addWidget control, hash, &block
+#       tag "#{self}, adding widget #{control}"
+      if layout = infused_layout
+#         tag "infused layout"
+        control.containing_frame = layout
+        layout.addWidget(control, hash, &block)
+      else
+        if @autolayout && layoutcreator = control.auto_layouthint
+#           tag "create proper layout"
+          check_layout(control, layoutcreator,  hash, &block)
         else
-          check_formlayout(control, layoutcreator) if @autolayout && layoutcreator = control.auto_layouthint
+          super
         end
-      elsif control.layout?
-        @all_widgets << control
-        if layout = infused_layout
-          control.containing_frame = layout
-          layout.addWidget control, control.qtc
-        else
-#           tag "#{self.class}::addControl. SETTING layout of #@qtc to #{control.qtc}"
-          raise "#{self} '#{name}' already has #{@qtc.layout} '#{@qtc.layout.objectName}'!" if @qtc.layout
-          # Qt says the same but it's only a warning
-          @qtc.layout = control.qtc
-        end
-  #       else
-#         case control
-#         when Timer then control.qtc.start
-#         end
       end
-      super
+    end
+
+    def addLayout control, hash, &block
+      if layout = infused_layout
+        control.containing_frame = layout
+        layout.addLayout(control, hash, &block)
+      else
+#           tag "#{self.class}::addControl. SETTING layout of #@qtc to #{control.qtc}"
+        # Qt says the same but it's only a warning
+        super # @qtc.layout = control.qtc
+      end
     end
 
     # note that form has an override. Frames collect immediate controls.
     # Forms collect all controls, and they have an index too.
     def registerName aName, aControl
-      aName = aName.to_sym
-      define_singleton_method(aName) { aControl }
+#       aName = aName.to_sym
+#       define_singleton_method(aName) { aControl }  not really used anyway
       containing_form.registerName(aName, aControl)
     end
 

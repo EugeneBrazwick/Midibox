@@ -3,17 +3,20 @@ module Reform
 
   require_relative 'model'
 
-  class DelegateModel
+  class DelegateModel < Control
     include Model
+    private
+
+    public
 
     def self.new_qt_implementor qt_implementor_class, parent, qt_parent
-      qt_implementor_class.new(parent.containing_form)
+      qt_implementor_class.new(parent.containing_form.qtc)
     end
 
-        # 'override'
-    def addWidget2Parent parent_qtc, child_qtc
-#       tag "#{parent_qtc}.itemDelegate := #{child_qtc}"
-      parent_qtc.itemDelegate = child_qtc
+    def addTo parent, hash, &block
+      parent.qtc.itemDelegate = @qtc
+      setup(hash, &block)
+      parent.added self
     end
 
      # If self is the class of the child, which qtc to use as parent

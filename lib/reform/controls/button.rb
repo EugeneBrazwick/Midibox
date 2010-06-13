@@ -33,7 +33,8 @@ module Reform
 
     #override
     def addControl control, quickyhash = nil, &block
-      raise unless control.menu?
+      raise 'DEPRECATED'
+#       raise unless control.menu?
       @qtc.setMenu(control.qtc)
       super
     end

@@ -7,17 +7,17 @@ module Reform
 
   class Spacer < Widget
   end
-  
+
   class BoxLayout < Layout
-    def addWidget control, qt_widget = nil
-      (@collection ||= []) << control
+#     def addWidget control, qt_widget = nil
+#       (@collection ||= []) << control
       # we must delay until we are sure the children are setup
-    end
+#     end
 
     # override
     def postSetup
       # now all controls are setup, add them to the layout with the proper 'stretch'
-      for control in (@collection ||= [])
+      for control in @all_children
 	case control
 	when Layout then @qtc.addLayout(control.qtc, control.stretch || 0)
 	when Spacer
@@ -31,7 +31,7 @@ module Reform
 	  @qtc.addWidget(control.qtc, control.stretch || 0)
         end
       end
-      remove_instance_variable :@collection
+#       remove_instance_variable :@collection
     end
   end # class BoxLayout
 end

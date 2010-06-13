@@ -207,6 +207,10 @@ will work as expected
       end
     end
 
+    def addTo parent, hash, &block
+      parent.addModel self, hash, &block
+    end
+
     def self.contextsToUse
       [ModelContext, App]
     end

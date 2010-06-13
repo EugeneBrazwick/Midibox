@@ -53,6 +53,10 @@ module Reform
       GraphicContext
     end
 
+    def addTo parent, hash, &block
+      parent.addGraphicsItem self, hash, &block
+    end
+
   end # GraphicsItem
 
 end # Reform

@@ -212,10 +212,11 @@ module Reform
       remove_method name if private_method_defined?(name)
       define_method name do |quickyhash = nil, &block|
         raise 'cannot use both argument AND a block' if quickyhash && block
-#         tag "arrived in #{self}::#{name}()"
+#         tag "arrived in #{self}::#{name}(), hash=#{quickyhash}, block=#{block}"
         # It's important to use parent_qtc_to_use, since it must be a true widget.
         # Normally, 'qparent' would be '@qtc' itself
         qparent = parent_qtc_to_use_for(reform_class)
+
 =begin
     Severe problem:     sometimes the parenting must change but how can this be done before
                         even the instance exists?
@@ -254,22 +255,25 @@ module Reform
 
 THIS ALL NO LONGER APPLIES since parent_qtc_to_use_for returns nil for layouts...
 =end
-        qparent = nil if qparent && qparent.inherits('QGraphicsScene')
+        raise 'CANTHAPPEN' if qparent && qparent.inherits('QGraphicsScene')
 #         tag "instantiate #{qt_implementor_class} with parent #{qparent}"
         newqtc = qt_implementor_class &&
                  ctrl.instantiate_child(reform_class, qt_implementor_class, qparent)
 #         tag "#{reform_class}.new, ctrl=#{ctrl} self=#{ctrl}, func=#{name}"
-        if reform_class <= Model
+#         if reform_class <= Model
 #           tag "CALLING setModel!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
-          ctrl.setModel(c = reform_class.new, quickyhash, &block)
-        else
-          c = reform_class.new ctrl, newqtc
+#           ctrl.setModel(c = reform_class.new, quickyhash, &block)
+#         else
+#         tag "#{reform_class}.new"
+        c = reform_class.new ctrl, newqtc
 #           tag "instantiated c=#{c}, parent is a #{ctrl.class}"
 #           c.text(quickylabel) if quickylabel
           # addControl will execute block, and then also call postSetup
-#           tag "APP -> #{ctrl.class}.addControl(#{c.class})"
-          ctrl.addControl(c, quickyhash, &block)
-        end
+#         tag "APP -> #{c.class}.addTo(#{self.class}) + SETUP"
+        rfRescue { ctrl.add(c, quickyhash, &block) }
+#         ctrl.added c  # do not move this to 'add', it will make it more difficult to override 'add'
+        # NO. I really want c.containing_frame.all_children to contain c
+#         end
 #         tag "IMPORTANT: method '#{name}' return the control #{c}"
         c
       end  # define_method name
@@ -363,13 +367,13 @@ THIS ALL NO LONGER APPLIES since parent_qtc_to_use_for returns nil for layouts..
   private
     def initialize control, name, quicky, block
       raise unless control
-#           tag "Macro.new(#{control}, #{name})"
+#       tag "Macro.new(#{control}, #{name})"
       @control, @name, @quicky, @block = control, name, quicky, block
       control.macros! << self
     end
   public
     def exec receiver = nil
-#       tag "executing macro #{@control.class}::#@name, args=#@quicky"
+#       tag "executing macro #{@control.class}::#@name, args=#@quicky, block=#@block"
       (receiver ||= @control).send(@name, @quicky, &@block) #.tap do |t|
 #         tag "macroresult is #{t}"
 #       end
@@ -502,6 +506,7 @@ The idea is that it is a singleton.
       @title = nil
       # instantiate a 'autoform' if no form has been given, default true
       @autoform = :form
+      @doNotRun = false
     end
 
 =begin rdoc
@@ -522,6 +527,20 @@ will create a button as toplevel control
     end
 
     public
+
+    # hash of all named(!!!) forms.
+    attr :forms
+
+    # array of all forms, named or not
+    attr :all_forms
+
+    # set when the first form is defined. This serves as the main window.
+    attr :firstform
+
+    def doNotRun v = nil
+      return @doNotRun if v.nil?
+      @doNotRun = v
+    end
 
 =begin
   registerControlClassProxy_i(string name, string relativepath)
@@ -558,9 +577,9 @@ will create a button as toplevel control
 #       private name
     end
 
-    # override! called from Reform::app
-    def exec
-#       tag "exec"
+    # called from Reform::app
+    def setupForms
+#       tag "here"
       # without any forms it loops, waiting until we quit.
       @firstform.run if @firstform
   #     puts "activeWindow = #{activeWindow.inspect}"
@@ -576,8 +595,15 @@ will create a button as toplevel control
         hello.geometry = geometry
         hello.show
       end
-      super
-    end # App#exec
+    end
+
+      # this is a hack
+    def menuBar quicky = nil, &block
+      @firstform ||= mainwindow
+            # we delay creating the elements until form.run is called.
+  #           tag "create macro for #{name}"
+      Macro.new(@firstform, :menuBar, quicky, block)
+    end
 
 =begin
   Use Reform::createInstantiator
@@ -628,9 +654,6 @@ will create a button as toplevel control
       @title = title if title
       @title
     end
-
-    # set when the first form is defined. This serves as the main window.
-    attr :firstform
 
     # called without 'name' by ReForm::initialize, and with 'name'
     # by ReForm::name
@@ -685,13 +708,10 @@ will create a button as toplevel control
 #       tag "registerModelClassProxy #{basename} -> models/#{basename}.rb"
       registerModelClassProxy basename, 'models/' + basename
     end
-#     for file in Dir[File.dirname(__FILE__) + '/delegates/*.rb']
-#       basename = File.basename(file, '.rb')
-#       registerModelClassProxy basename, 'delegates/' + basename
-#     end
     $qApp.instance_eval(&block) if block
 #     tag "CALLING app.exec"
-    $qApp.exec
+    $qApp.setupForms
+    $qApp.exec unless $qApp.doNotRun
   end # app
 end # module Reform
 

@@ -40,7 +40,7 @@ gridlayout {
 #       @fill = [] # array of rows where each row is a bool array
       # an item in a grid can set col, row and colspan and rowspan
       @columnCount = nil
-      @collection = []
+#       @collection = []
 #       tag "initialized 'collection'"
     end
 
@@ -76,26 +76,26 @@ gridlayout {
     end
 
     #override
-    def addWidget control, qt_widget = nil
+#     def addWidget control, qt_widget = nil
 #       tag "#{self}::addWidget, collection=#{@collection}"
-      @collection << control
+#       @collection << control
 #       tag "addWidget to grid"
 # #       @qtc.addWidget qt_widget, @currow, @curcol, @currowspan, @curcolspan
 # #       skip
 #       span
-    end
+#     end
 
     # override
     def postSetup
 #       tag "#{self}::postSetup"
       curcol, currow = 0, 0
-      for control in @collection
+      for control in @all_children
         c, r = control.layoutpos
         c, r = curcol, currow if c.nil?
         spanc, spanr = control.span
         spanc, spanr = 1, 1 if spanc.nil?
 #         tag "qtc.addWidget(#{control}, r:#{r}, c:#{c}, #{spanr}, #{spanc}), layout?->#{control.layout?}"
-        if control.layout?
+        if Layout === control
           @qtc.addLayout(control.qtc, r, c, spanr, spanc)
         elsif alignment = control.layout_alignment
 #           tag "applying alignment: #{alignment}, ignoring span"
@@ -108,12 +108,11 @@ gridlayout {
         curcol, currow = 0, currow + 1 if curcol >= (@columnCount || @qtc.columnCount)
       end
       # a bit of a hack, but probably what you want:
-      if @collection.length == 1 && @collection[0].layout_alignment == Qt::AlignCenter
+      if @all_children.length == 1 && @all_children[0].layout_alignment == Qt::AlignCenter
 #         tag "APPLYING sizehint to single centered widget in a grid"
-        @qtc.setRowMinimumHeight(0, @collection[0].qtc.sizeHint.height)
-        @qtc.setColumnMinimumWidth(0, @collection[0].qtc.sizeHint.width)
+        @qtc.setRowMinimumHeight(0, @all_children[0].qtc.sizeHint.height)
+        @qtc.setColumnMinimumWidth(0, @all_children[0].qtc.sizeHint.width)
       end
-      remove_instance_variable :@collection
     end
 
   end # class GridLayout

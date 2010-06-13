@@ -20,7 +20,7 @@ module Reform
       # block to call for lazy initialization. After done so it becomes nil, can also be a 'quicky' hash
       @setup = nil #setupblock
       # the menubar implementor:
-      @qmenuBar = nil
+#       @qmenuBar = nil
       # Proc to execute to setup the menu dynamically
       @contextMenuProc = nil
       # unpositioned forms should be centered (but only if size is set)
@@ -88,7 +88,7 @@ module Reform
     attr_writer :qcentralWidget
     # setup is the proc passed to the RForm#run method
     attr_writer :setup
-    attr_writer :qmenuBar
+#     attr_writer :qmenuBar
 
     # default
     def whenClosed &block
@@ -120,6 +120,7 @@ module Reform
         # without a block windowTitle is never set. Nah...
         title = $qApp.title
         @qtc.windowTitle = title if title
+#         tag "setup=#@setup"
         case @setup
         when Hash then setupQuickyhash(@setup)
         when Proc then instance_eval(&@setup)
@@ -127,32 +128,11 @@ module Reform
 #         tag "calling Form.postSetup"
         postSetup
         # menubar without a centralwidget would remain invisible. That is confusing
-        if @qtc.inherits('QMainWindow') &&
-           (!@qcentralWidget && @all_widgets.length == 1 || @qmenuBar && @all_widgets.empty?)
-=begin
-  what to do if all_widgets is empty but you did put a control in there....
-  it could be that it's widget? method returns false...
-=end
-=begin
-    What if more than one control is stored in a main window?
-    At this point we should probably insert a group and a layout??
-    The least we can do is to warn that widgets will not be visible! It would probably be a solution
-    to always add a groupbox in a mainwindow, but that would not be logical if there was actually
-    exactly one element...
-=end
-          ctrl = if @all_widgets.empty? then button(tr('It Just Works!')) else @all_widgets[0] end
-#           tag "ctrl=#{ctrl}"
-          wrapper = Reform::Widget === ctrl && ctrl.qtc.widgetType?
-          if wrapper || ctrl.qtc.widgetType?
-            @qtc.centralWidget = if wrapper then ctrl.qtc else ctrl end
-          end
-#         puts "postprocessing setting of menuBar due to Qt bugs"
-          # it must be AFTER centralWidget is set or else....
-        end
-        if @qmenuBar
-          @qtc.layout = Qt::VBoxLayout.new(@qtc) unless @qtc.layout
-          @qtc.layout.menuBar = @qmenuBar     # might just work for main windows as well? yes!
-        end
+
+#         if @qmenuBar
+#           @qtc.layout = Qt::VBoxLayout.new(@qtc) unless @qtc.layout
+#           @qtc.layout.menuBar = @qmenuBar     # might just work for main windows as well? yes!
+#         end
       end
       if self == $qApp.firstform
         # if unambigous center widget... Set it to tell application there is some window

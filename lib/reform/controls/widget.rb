@@ -8,6 +8,11 @@ module Reform
 
   class Widget < Control
   private
+
+    def close
+      @qtc.close
+    end
+
     # make it the central widget
     def central param = true
       @containing_form.qcentralWidget = @containing_form.qtc.centralWidget = @qtc
@@ -61,31 +66,34 @@ module Reform
       @qtc.font = f
     end
 
-    class ContextMenuRef < Qt::Object
+    # qtc of the menu is in fact the qwidget
+    class ContextMenuRef < Control
       include ActionContext
       private
-      def initialize widget, qtc
-        super()
-        @widget, @qtc = widget, qtc
-      end
+#       def initialize widget, qtc
+#         super()
+#         @widget, @qtc = widget, qtc
+#       end
 
-      def containing_form
-        @widget.containing_form
-      end
+#       def containing_form
+#         @widget.containing_form
+#       end
 
       public
+      # override to support an array of actions iso of a real hash
       def setupQuickyhash hash
         return unless h0 = hash[0]
         case h0
         when Array then actions(h0)
-        when Hash then h0.each { |k, v| send(k, v) }
+        when Hash then super(h0)
         else actions(hash)
         end
       end
 
-      def addAction action
+      def addAction action, hash = nil, &block
+#         tag "#{self} action=#{action}"
         @qtc.contextMenuPolicy = Qt::ActionsContextMenu
-        @qtc.addAction action.qtc
+        super
       end
     end
 
@@ -165,6 +173,11 @@ module Reform
       [ControlContext, App]
     end
 
+    #override
+    def addTo parent, hash, &block
+#       tag "#{self}: calling #{parent}.addWidget + SETUP"
+      parent.addWidget self, hash, &block
+    end
   end # class Widget
 
   QWidget = Qt::Widget # may change

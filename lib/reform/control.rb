@@ -15,6 +15,8 @@ module Reform
 #       tag "#{self}::initialize, caller=#{caller.join("\n")}"
       super()
       @containing_frame, @containing_form, @qtc, @has_pos = frame, frame && frame.containing_form, qtc, false
+      # NOTE: containing_frame may change to its definite value using 'added' See Frame::added
+      # in all cases: c.containing_frame.all_children.contains?(c)
       # to be set to true when signals are connected to module-setters.
       # however, it should be possible to do this when :initialize is set in options of
       # connectModel.
@@ -138,6 +140,10 @@ module Reform
     def model *data
     end
 
+    def added control
+#       control.containing_frame = self
+    end
+
     public
     # the parent frame (a Reform::Frame), can be widget or layout
     attr_accessor :containing_frame
@@ -151,16 +157,99 @@ module Reform
     # tuple w,h   as set in last call of setSize/setGeometry
     attr :requested_size
 
+=begin  **************** PARENTING SYSTEM *********************************
+
+    1) a single method 'addTo'. This calls the proper 'addition' callback
+          addWidget
+          addLayout
+          addMenu
+          addAction
+          addModel
+      these methods must setup the control too as the order differs sometimes
+
+    2) which parent_qtc to use? This also depends on the child to be added and on the parent
+
+=end
+
+    def addTo parent, quickyhash = nil, &initblock
+      raise ReformError, tr("Don't know how to add a %s") % self.class
+    end
+
+        # If we are going to parent a 'reform_class' which qtc to use.
+    # The result must be a Qt::Widget in all cases
+    # Also, some subcontrols need 'nil' as their parent and this can be arranged
+    # like this as well. By default we use effective_qtc, since it it about the same thing.
+    def parent_qtc_to_use_for reform_class
+      reform_class.parent_qtc self, effective_qtc
+    end
+
+    # If self is the class of the child, which qtc to use as parent
+    def self.parent_qtc parent_control, parent_effective_qtc
+      parent_effective_qtc
+    end
+
+    # specific case if we are to parent an action
+    def effective_qtc_for_action
+      containing_form.qtc
+    end
+
+    # The result must be a Qt::Widget in all cases.
+    def effective_qtc
+      @qtc
+    end
+
+    # called when control was added to parent, except for models
+    def setup hash, &initblock
+      instance_eval(&initblock) if initblock
+      setupQuickyhash(hash) if hash
+      postSetup
+    end
+
+    def add child, quickyhash, &block
+      child.addTo(self, quickyhash, &block)
+#       added child
+    end
+
     # BAD name and not OO either. FIXME.  Why not make provision for menus, actions etc. as well?
     # also this only does something with the qt hierarchie
     # Normally 'q' will be control.qtc
-    def addWidget control, q
-#       tag "#{self.class}::addWidget(#{control.class}, #{q.class}) -> DELEGATE to #{@qtc.class}"
-      control.addWidget2Parent(@qtc, q) # parent_qtc, child_qtc
+    def addWidget control, hash, &block
+#       tag "#@qtc.addWidget(#{control.qtc})"
+      @qtc.addWidget control.qtc
+      control.setup hash, &block
+      added control
     end
 
-    def addWidget2Parent parent_qtc, child_qtc
-      parent_qtc.addWidget child_qtc
+    def addLayout control, hash, &block
+      raise "#{self} '#{name}' already has #{@qtc.layout} '#{@qtc.layout.objectName}'!" if @qtc.layout
+      @qtc.layout = control.qtc
+      control.setup hash, &block
+      added control
+    end
+
+    def addMenu control, hash, &block
+      raise "#{self} '#{name}' already has #{@qtc.menu} '#{@qtc.menu.objectName}'!" if @qtc.menu
+      @qtc.menu = control.qtc
+      control.setup hash, &block
+      added control
+    end
+
+    def addAction control, hash = nil, &block
+#       tag "#@qtc.addAction(#{control.qtc})"
+      @qtc.addAction control.qtc
+      control.setup hash, &block
+      added control
+    end
+
+#     def addSeparator control, hash, &block
+#       @qtc.addSeparator
+#           # added control  not usefull
+#     end
+
+    def addModel control, hash, &block
+      control.setup hash, &block
+      connectModel control, initialize: true
+      added control
     end
 
     def setupQuickyhash hash
@@ -187,6 +276,7 @@ module Reform
         @qtc.objectName = aName
       # there is a slight duplication but the qt windowtree differs.
       # for example, a layout can have named children in 'reform' but not in Qt.
+#         tag "calling #@containing_frame.registerName(#{aName})"
         @containing_frame.registerName aName, self
       else
 #         raise "#{self} has no @qtc. SHINE!" unless @qtc               Spacer has no Qt complement, maybe more
@@ -198,30 +288,6 @@ module Reform
     def whenResized &block
       return rfCallBlockBack(&@whenResized) unless block
       @whenResized = block
-    end
-
-    # If we are going to parent a 'reform_class' which qtc to use.
-    # The result must be a Qt::Widget in all cases
-    # Also, some subcontrols need 'nil' as their parent and this can be arranged
-    # like this as well. By default we use effective_qtc, since it it about the same thing.
-    def parent_qtc_to_use_for reform_class
-      reform_class.parent_qtc self, effective_qtc
-    end
-
-    # If self is the class of the child, which qtc to use as parent
-    def self.parent_qtc parent_control, parent_effective_qtc
-      parent_effective_qtc
-    end
-
-    # specific case if we are to parent an action
-    def effective_qtc_for_action
-      containing_form.qtc
-    end
-
-    # The result must be a Qt::Widget in all cases.
-    #
-    def effective_qtc
-      @qtc
     end
 
     # this callback is called after the 'block' initialization. Or even without a block,
@@ -327,24 +393,6 @@ module Reform
 
     # true if model is set on this control. Can only be true for forms or frames
     def effectiveModel?
-    end
-
-     # set a new model
-    def setModel aModel, quickyhash = nil, &initblock
-#       tag "#{self}::setModel(#{aModel}, quickargs=#{quickyhash.inspect})"
-      aModel.instance_eval(&initblock) if initblock
-      aModel.setupQuickyhash(quickyhash) if quickyhash
-      aModel.postSetup
-#       tag "Calling connectModel"
-      connectModel(aModel, initialize: true) # if instance_variable_defined?(:@model)
-    end
-
-        # adding any control to any parent.  The default makes no relationships. It just initializes the control properly
-    def addControl control, quickyhash = nil, &block
-      control.instance_eval(&block) if block
-      control.setupQuickyhash(quickyhash) if quickyhash
-      control.postSetup unless quickyhash && quickyhash[:postSetup] == false
-      control
     end
 
   end # class Control

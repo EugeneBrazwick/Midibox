@@ -271,7 +271,10 @@ THIS ALL NO LONGER APPLIES since parent_qtc_to_use_for returns nil for layouts..
 #           c.text(quickylabel) if quickylabel
           # addControl will execute block, and then also call postSetup
 #         tag "APP -> #{c.class}.addTo(#{self.class}) + SETUP"
-        rfRescue { ctrl.add(c, quickyhash, &block) }
+        rfRescue do
+#           tag "CALLING #{ctrl}.add(#{c})"
+          ctrl.add(c, quickyhash, &block)
+        end
 #         ctrl.added c  # do not move this to 'add', it will make it more difficult to override 'add'
         # NO. I really want c.containing_frame.all_children to contain c
 #         end
@@ -311,10 +314,17 @@ THIS ALL NO LONGER APPLIES since parent_qtc_to_use_for returns nil for layouts..
         klass.send :remove_method, name
 #         tag "require_relative '#{thePath}'"
         require_relative thePath
-        # the loaded module should call registerControlClass which recreates the method
+        # the loaded module should call createInstantiator (and so registerControlClass) which recreates the method
         # and we call it immediately
 #         tag "calling the new #{name} method, and returning ?"
-        send(name, quickylabel, &block) #.tap { |t| tag "and returning #{t}" }
+        begin
+          send(name, quickylabel, &block) #.tap { |t| tag "and returning #{t}" }
+        rescue NoMethodError => exception
+          if exception.to_s.include?(name)
+            raise NoMethodError, tr("it seems %s.rb did not call 'Reform::createInstantiator()'!") % name.to_s
+          end
+          raise
+        end
       end
       private name
     end
@@ -351,7 +361,7 @@ THIS ALL NO LONGER APPLIES since parent_qtc_to_use_for returns nil for layouts..
     # add given action symbols to the menu
     def actions *list
       list = list[0] if list && Array === list
-      list.each { |action| addAction containing_form.action(action) }
+      list.each { |action| add(containing_form.action(action), nil) }
     end
   end
 

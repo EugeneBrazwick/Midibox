@@ -43,6 +43,11 @@ a Frame is a widget that may contain others.
       layout
     end
 
+    def added control
+      @all_children << control
+      control.containing_frame = self
+    end
+
     public
 
     attr_accessor :infused_layout
@@ -67,22 +72,12 @@ a Frame is a widget that may contain others.
       aModel = aModel.send(cid) if cid = connector && aModel && aModel.getter?(cid)
       @all_children.each { |child| child.connectModel(aModel, options) unless child.effectiveModel? }
       super
+#       tag "DONE"
     end
 
     def columnCount value
 #       tag "#{self}, value=#{value}, induce 'gridlayout'"
       check_layout(nil, :gridlayout).columnCount value
-    end
-
-    # override
-    def setModel aModel, quickyhash = nil, &initblock
-      @model ||= nil
-      unless @model.equal?(aModel)
-        @model.removeObserver_i(self) if @model
-        @model = aModel
-        @model.addObserver_i(self) if @model
-      end
-      super
     end
 
     # override
@@ -94,11 +89,6 @@ a Frame is a widget that may contain others.
     # override
     def effectiveModel?
       instance_variable_defined?(:@model)
-    end
-
-    def added control
-      @all_children << control
-      control.containing_frame = self
     end
 
     # override

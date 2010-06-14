@@ -12,23 +12,18 @@ module Reform
       super(parent, qtc, false)
       @value = 0
       connect(@qtc, SIGNAL('clicked(bool)'), self) do |checked|
-        rfRescue { model.apply_setter(cid, @value) if cid = connector && model = effectiveModel }
+        rfRescue do
+          if (cid = connector) && (model = effectiveModel)
+            model.apply_setter(cid, @value)
+          end
+        end
       end
     end
 
-    def value v
+    # override
+    def value v = nil
+      return @value if v.nil?
       @value = v
-    end
-
-    public
-    def connectModel aModel, options = nil
-      cid = connector or return
-      if @model && @model.getter?(cid)
-        @qtc.checked = @value == @model.apply_getter(cid)
-      else
-        @qtc.checked = false
-      end
-      whenConnected aModel
     end
 
   end

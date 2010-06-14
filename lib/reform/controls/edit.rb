@@ -34,14 +34,14 @@ module Reform
 
     def connectModel model, options = nil
 #       tag "connectModel #{model.inspect}, cid=#{connector}"
-      cid = connector or return
-      if model && model.getter?(cid)
-#         tag "getter located"
-        @qtc.text = model.apply_getter(cid)
-        @qtc.readOnly = !model.setter?(cid)
-      else
-        @qtc.clear
-      end
+      cid = connector and
+        if model && model.getter?(cid)
+  #         tag "getter located"
+          @qtc.text = model.apply_getter(cid)
+          @qtc.readOnly = !model.setter?(cid)
+        else
+          @qtc.clear
+        end
       super
     end
 

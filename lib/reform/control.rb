@@ -93,20 +93,20 @@ module Reform
     end
 
     # you should be able to set it too, and it can even be a block/proc(!!)
-    def connector value = nil
-      if value.nil?
+    def connector value = nil, &block
+      if value.nil? && !block
         return @connector if instance_variable_defined?(:@connector)
 	@connector = @qtc.objectName
 #         tag "#{self}, default connector == 'name' -> #@connector"
 	case @connector
-	when /Edit$|Combo$|Form$|Button$|Label$|List$|Table$/
-          tag "'#@connector' matches standard ctrl name, fixing -> #{$`}"
+	when /Edit$|Combo$|Form$|Button$|Label$|List$|Table$|Box$|Action$|Menu$|Group$/
+#           tag "'#@connector' matches standard ctrl name, fixing -> #{$`}"
           @connector = $`
         else
           @connector
 	end
       else
-        @connector = value
+        @connector = block ? block : value
       end
     end
 
@@ -122,7 +122,10 @@ module Reform
     # it calls the callback not in the object's context, but in that of the
     # form (MVC controller)
     def rfCallBlockBack *args, &block
+#       tag "rfCallBlockBack #{block}, caller=#{caller.join("\n")}"
+#       raise unless block
       rfRescue do
+          # RETURN is deadly!!!!!??????????
 #         tag "rfCallBlockBack, block=#{block.inspect}"
         return containing_form.instance_exec(*args, &block)
       end
@@ -133,7 +136,7 @@ module Reform
       if block
         @whenConnected = block
       else
-        rfCallBlockBack(model, &@whenConnected) if instance_variable_defined?(:@whenConnected)
+        rfCallBlockBack(model, &@whenConnected) if instance_variable_defined?(:@whenConnected) && @whenConnected
       end
     end
 
@@ -181,7 +184,8 @@ module Reform
     # Also, some subcontrols need 'nil' as their parent and this can be arranged
     # like this as well. By default we use effective_qtc, since it it about the same thing.
     def parent_qtc_to_use_for reform_class
-      reform_class.parent_qtc self, effective_qtc
+      #reform_class.respond_to?(:parent_qtc) &&
+      reform_class.parent_qtc(self, effective_qtc)
     end
 
     # If self is the class of the child, which qtc to use as parent
@@ -239,6 +243,7 @@ module Reform
 #       tag "#@qtc.addAction(#{control.qtc})"
       @qtc.addAction control.qtc
       control.setup hash, &block
+#       tag "added action #{control} to parent #{parent}"
       added control
     end
 
@@ -248,8 +253,13 @@ module Reform
 #     end
 
     def addModel control, hash, &block
+      @model ||= nil
       control.setup hash, &block
-      connectModel control, initialize: true
+      unless @model.equal? control
+        @model.removeObserver_i(self) if @model
+        @model = control
+        @model.addObserver_i(self) if @model
+      end
       added control
     end
 
@@ -297,10 +307,9 @@ module Reform
     # executed in one go.
     # the default executes any gathered macro.
     def postSetup
-#       tag "#{self}::postSetup"
+#       tag "#{self}::postSetup, model=#@model"
       executeMacros
-#       tag "DONE #{self}::postSetup"
-#       self  BOGO CODE
+      connectModel @model, initialize: true if @model
     end
 
     # qt_parent can be nil, but even then....
@@ -385,7 +394,7 @@ module Reform
   #         model aModel ?????????
 #         @model = aModel
 #       end
-      whenConnected aModel
+      whenConnected aModel # if connector
     end
 
     def effectiveModel

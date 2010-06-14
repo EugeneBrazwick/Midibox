@@ -145,8 +145,8 @@ will work as expected
     passed as an argument.  This makes it possible to code the
     text or value to use in the gui, and not in the model.
 =end
-    def getter?(name)
-      return true if name == :self
+    def getter? name
+      return true if name == :self || Proc === name
 #       tag "Does #{self.class}##{name} is a public method?"
       m = (public_method(name) rescue nil) or return
 #       tag "m.arity = #{m.arity}"
@@ -156,9 +156,10 @@ will work as expected
     # To apply the getter, this method must be used.
     def apply_getter name
       return self if name == :self
+      name.call(self) if Proc === name
 #       tag "apply_getter #{name} to self == 'send'"
 #       if respond_to?(name)
-        send name
+      send name
 #       else
 #         send(name.to_s + '?')
 #       end

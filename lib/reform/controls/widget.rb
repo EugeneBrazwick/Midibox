@@ -103,6 +103,16 @@ module Reform
       ref.instance_eval(&initblock) if initblock
     end
 
+    def enabler value = nil, &block
+      return instance_variable_defined?(:@enabler) && @enabler if value.nil? && !block
+      @enabler = block ? block : value
+    end
+
+    def disabler value = nil, &block
+      return instance_variable_defined?(:@disabler) && @disabler if value.nil? && !block
+      @disabler = block ? block : value
+    end
+
   public
     # override
     def widget?
@@ -178,6 +188,18 @@ module Reform
 #       tag "#{self}: calling #{parent}.addWidget + SETUP"
       parent.addWidget self, hash, &block
     end
+
+    def connectModel model, options = nil
+      if (e = enabler) && model.getter?(e)
+        @qtc.enabled = model.apply_getter(e)
+      end
+      if (d = disabler) && model.getter?(d)
+        @qtc.enabled = !model.apply_getter(d)
+      end
+      super
+    end
+
+
   end # class Widget
 
   QWidget = Qt::Widget # may change

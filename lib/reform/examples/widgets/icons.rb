@@ -5,7 +5,7 @@ require 'reform/app'
 
 Reform::app {
   title tr('Icons')
-  mainwindow { # optional
+  mainwindow { # optional (?)
     def changeIcon
       icon = Qt::Icon.new
       (0...imagesTable.rowCount).each do |row|
@@ -82,9 +82,7 @@ Reform::app {
       }
       menu { # viewMenu = menuBar()->addMenu(tr("&View"));
         title tr('&View')
-        actiongroup {           # FIXME:  THIS IS UTTERLY MISSING !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-#           foreach (QAction *action, styleActionGroup->actions())
-#          viewMenu->addAction(action);
+        actiongroup {
           Qt::StyleFactory::keys.each do |styleName|
             action {
               connector :style  # supposedly a stylefactory key
@@ -120,8 +118,8 @@ Reform::app {
         }
       } # helpmenu
     } # menuBar
+    icon_example_model
     frame {  # centralWidget
-      central # FIXME: if a mainwindow has only 1 child, make that the central widget
       columnCount 2 # implicit grid...
       groupbox { # previewGroupBox
         title tr('Preview')
@@ -130,6 +128,7 @@ Reform::app {
           iconpreviewarea name: :previewArea
         }
       }
+#       tag "HERE"
       groupbox { # imagesGroupBox
         title tr('Images')
         vbox {
@@ -168,30 +167,45 @@ Reform::app {
 #             layoutpos: 0 # small
             value Qt::Style::PM_SmallIconSize
             connector :metric
+            text_connector { |style| tr('Small (%d x %d)') % [m = style.metric, m] }
           }
           radio {
 #             layoutpos: 1 # large
             value Qt::Style::PM_LargeIconSize
             connector :metric
+            text_connector { |style| tr('Large (%d x %d)') % [m = style.metric, m] }
           }
           radio {
 #             layoutpos: 2 # toolBar
             value Qt::Style::PM_ToolBarIconSize
             connector :metric
+            text_connector { |style| tr('Toolbars (%d x %d)') % [m = style.metric, m] }
           }
-          radio value: Qt::Style::PM_ListViewIconSize, connector: :metric
-          radio value: Qt::Style::PM_IconViewIconSize, connector: :metric
-          radio value: Qt::Style::PM_TabBarIconSize, connector: :metric
+          radio {
+            value Qt::Style::PM_ListViewIconSize
+            connector :metric
+            text_connector { |style| tr('List views (%d x %d)') % [m = style.metric, m] }
+          }
+          radio {
+            value Qt::Style::PM_IconViewIconSize
+            connector :metric
+            text_connector { |style| tr('Icon views (%d x %d)') % [m = style.metric, m] }
+          }
+          radio {
+            value Qt::Style::PM_TabBarIconSize
+            connector :metric
+            text_connector { |style| tr('Tab bars (%d x %d)') % [m = style.metric, m] }
+          }
           hbox { # otherSizeLayout
             colspan 3
             radio {
               text tr('Other:') # other
               # This is very interesting. We must now use the value of the spingbox as 'extent'
-              # if checked then iconsizespinbox must be enabled and vice versa. FIXME HOW????
+              # if checked then iconsizespinbox must be enabled and vice versa.
               value nil
               connector :metric
             }
-            iconsizespinbox range: [8, 128], value: 64, connector: :extent
+            iconsizespinbox range: [8, 128], value: 64, connector: :extent, disabler: :metric
           } # hbox
           # ugly? way to add stretching row nr 4:
           rowStretch 4=>1

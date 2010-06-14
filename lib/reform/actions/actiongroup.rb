@@ -9,6 +9,17 @@ module Reform
     include ActionContext
     private
 
+    def initialize parent, qtc
+      super
+      @all_children = []
+    end
+
+    # similar to Frame
+    def added control
+      @all_children << control
+      control.containing_frame = self
+    end
+
     public
 
     def self.parent_qtc control, qtc
@@ -24,6 +35,11 @@ module Reform
       @qtc
     end
 
+    def postSetup
+      @all_children.each do |action|
+        @containing_frame.qtc.addAction(action.qtc)
+      end
+    end
   end
 
   createInstantiator File.basename(__FILE__, '.rb'), Qt::ActionGroup, ActionGroup

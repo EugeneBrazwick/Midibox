@@ -160,30 +160,32 @@ module Reform
 #           raise if @data.empty?
 	end
       end
-      cid = connector or return
+      cid = connector
 #       tag "check for getter?(#{cid}) in #{model.class}"
-      if aModel && aModel.getter?(cid)
-#         tag "getter '#{cid}' located"
-        # it's not entirely clear when the events are triggered
-        # - currentIndexChanged(int)
-        # - currentIndexChanged(string)
-        # - editTextChanged(string). Must 'editable' be true for this??
-        # It should be possible to make a combobox with immediate 'add' and 'delete'
-        # capabilities that operate on the local model.
-        # Note that the setter is supposed to accept the VALUE at the given index
-        # and the getter receives the VALUE too.
-        value = aModel.apply_getter(cid)
-# 	tag "GOT value #{value.class} #{value}"
-        key = enum2i(if value.respond_to?(:key) then value.key else value end)
-#         key = key.to_i if key.respond_to?(:to_i)
-#         tag "#{model}.#{cid} => value = #{value.class} #{value.inspect}, key=#{key}, index=#{@index.inspect}"
-        index = @index[key]
-        setCurrentIndex(index, value)
-# 	tag "Check whether cid '#{cid}' is a setter (init=#{options && options[:initialize]})"
+      if cid
+        if aModel && aModel.getter?(cid)
+  #         tag "getter '#{cid}' located"
+          # it's not entirely clear when the events are triggered
+          # - currentIndexChanged(int)
+          # - currentIndexChanged(string)
+          # - editTextChanged(string). Must 'editable' be true for this??
+          # It should be possible to make a combobox with immediate 'add' and 'delete'
+          # capabilities that operate on the local model.
+          # Note that the setter is supposed to accept the VALUE at the given index
+          # and the getter receives the VALUE too.
+          value = aModel.apply_getter(cid)
+  # 	tag "GOT value #{value.class} #{value}"
+          key = enum2i(if value.respond_to?(:key) then value.key else value end)
+  #         key = key.to_i if key.respond_to?(:to_i)
+  #         tag "#{model}.#{cid} => value = #{value.class} #{value.inspect}, key=#{key}, index=#{@index.inspect}"
+          index = @index[key]
+          setCurrentIndex(index, value)
+  # 	tag "Check whether cid '#{cid}' is a setter (init=#{options && options[:initialize]})"
 
-      else
-#         tag "connection failure, clear the selection"
-        setCurrentIndex(-1, nil)
+        else
+  #         tag "connection failure, clear the selection"
+          setCurrentIndex(-1, nil)
+        end
       end
       super
     end # def connectModel

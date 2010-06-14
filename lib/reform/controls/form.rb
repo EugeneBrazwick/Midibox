@@ -27,7 +27,9 @@ module Reform
       @has_pos = false
       # callback blocks. The whenCanceled block can return 'false' to prevent
       # the cancel from closing the form (and false != nil in this case)
-      @whenClosed = @whenCanceled = @whenInitialized = @whenShown = @whenConnected = nil
+      @whenClosed = @whenCanceled = @whenInitialized = @whenShown = nil
+      @whenConnected = nil
+        # DO NOT SET whenConnected to nil!! ????
       # whenCommitted is called when the form is 'committed' ie, the changes
       # set are committed within the program
       @whenCommitted = nil
@@ -159,12 +161,12 @@ module Reform
     # with a form as parent
     # the form becomes an observer
     # set a new model
-    def setModel aModel, quickyhash = nil, &initblock
+#     def setModel aModel, quickyhash = nil, &initblock
       # this is required so the 'name' can  be set on model and it becomes a property of this
       # form. However it looks like a kludge, since models are basically shared between forms.
-      aModel.containing_form = self if aModel
-      super
-    end
+#       aModel.containing_form = self if aModel
+#       super
+#     end
 
     def effectiveModel
       @model

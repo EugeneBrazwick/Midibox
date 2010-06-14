@@ -12,15 +12,27 @@ module Reform
       super(parent, qtc)
       if connectit
         connect(@qtc, SIGNAL('clicked(bool)'), self) do |checked|
-          rfRescue { model.apply_setter(cid, checked) if cid = connector && model = effectiveModel }
+          rfRescue do
+            if (cid = connector) && (model = effectiveModel)
+              model.apply_setter(cid, checked)
+            end
+          end
         end
       end
     end # initialize
 
     define_simple_setter :text, :tristate, :checkState
 
+    def text_connector connector = nil, &block
+      @text_connector = block ? block : connector
+    end
+
     def partiallyChecked
       checkState Qt::PartiallyChecked
+    end
+
+    def value
+      true
     end
 
     public
@@ -57,17 +69,20 @@ module Reform
       end
     end #whenToggled
 
-
-    # override
-    def connectModel aModel, options = nil
+    # override, also used for radiobutton
+    def connectModel model, options = nil
 #       tag "@{self} connectModel #{aModel}, cid=#{connector}"
-      cid = connector or return
-      if @model && @model.getter?(cid)
-        @qtc.checked = @model.apply_getter(cid)
+      if model
+        if (cid = connector) && model.getter?(cid)
+          @qtc.checked = model.apply_getter(cid) == value
+        end
+        if (tcid = text_connector) && model.getter?(tcid)
+          @qtc.text = model.apply_getter(tcid)
+        end
 #         tag "qtc.checked := model.#{cid}[?] == #{@qtc.checked}, model=#{@model}"
 #         if options && options[:initialize]
       else
-        @qtc.checked = false
+        @qtc.checked = false if connector
       end
       super
     end

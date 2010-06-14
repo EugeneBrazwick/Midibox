@@ -15,6 +15,10 @@ module Reform
       @qtc.checked = value
     end
 
+    def text_connector connector
+      @text_connector = connector
+    end
+
     public
 
     # with a block associate the block with the 'clicked' signal.
@@ -36,6 +40,12 @@ module Reform
       raise 'DEPRECATED'
 #       raise unless control.menu?
       @qtc.setMenu(control.qtc)
+      super
+    end
+
+    def connectModel aModel, options = nil
+#       tag "@{self} connectModel #{aModel}, cid=#{connector}"
+      @qtc.text = model.apply_getter(tcid) if (model = effective_model) && (tcid = text_connector) && model.getter?(tcid)
       super
     end
 

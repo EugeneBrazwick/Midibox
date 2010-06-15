@@ -84,7 +84,7 @@ module Reform
       return unless comboBox.inherits('QComboBox')
       model.setData index, comboBox.currentText
     end
-  end
+  end # class QImageDelegate
 
   createInstantiator File.basename(__FILE__, '.rb'), QImageDelegate, DelegateModel
 

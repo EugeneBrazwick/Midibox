@@ -95,7 +95,7 @@ module Reform
         @qtc.contextMenuPolicy = Qt::ActionsContextMenu
         super
       end
-    end
+    end # class ContextMenuRef
 
     def contextMenu *quickyhash, &initblock
       ref = ContextMenuRef.new(self, @qtc)
@@ -199,6 +199,11 @@ module Reform
       super
     end
 
+    def addWidget control, hash, &block
+      control.qtc.parent = @qtc
+      control.setup hash, &block
+      added control
+    end
 
   end # class Widget
 

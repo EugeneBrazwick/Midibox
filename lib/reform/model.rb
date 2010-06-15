@@ -131,6 +131,8 @@ will work as expected
       end
     end
 
+    alias :dynamic_property_changed :dynamicPropertyChanged
+
     def no_dynamics
       @no_dynamics = true
       yield

@@ -36,12 +36,18 @@ Reform::app {
           name :addImagesAct
           shortcut tr('Ctrl+A')
           whenTriggered do
-            fileNames = Qt::FileDialog::getOpenFileNames(@qtc, tr('Open Images'), '',
+#             tag "__FILE__ = '#{__FILE__}', $0=#$0"
+            f = File.dirname(__FILE__) + '/images'
+            tag "f='#{f}'"
+            f = Dir.getwd + '/' + f unless f[0] == '/'
+            tag "f='#{f}'"
+            fileNames = Qt::FileDialog::getOpenFileNames(@qtc, tr('Open Images'), f,
                                                          tr('Images (*.png *.xpm *.gif *.jpg);;All Files (*)'))
             fileNames.each do |fileName|
               row = imagesTable.rowCount
               imagesTable.rowCount = row + 1
               imageName = File.basename(fileName)
+              tag "creating items 0, 1 and 2"
               item0 = Qt::TableWidgetItem.new(imageName)
               item0.setData(Qt::UserRole, Qt::Variant.new(fileName))
               item0.flags &= ~Qt::ItemIsEditable
@@ -55,9 +61,11 @@ Reform::app {
                 end
                 item2.text = tr('On') if fileName =~ /_on/
               end
+              tag "adding items to table, row=#{row}"
               imagesTable.setItem(row, 0, item0)
               imagesTable.setItem(row, 1, item1)
               imagesTable.setItem(row, 2, item2)
+              tag "create 'editors'"
               imagesTable.openPersistentEditor(item1)
               imagesTable.openPersistentEditor(item2)
               item0.checkState = Qt::Checked
@@ -147,7 +155,7 @@ Reform::app {
                 # delegate. However the view does NOT take ownership.
             horizontalHeader { # this is not a constructor, but a reference
               defaultSectionSize 90
-              column label: tr('Image'), stretchMode: true
+              column label: tr('Image'), stretchMode: true #, editable: false FOLLOWS FROM model
               column label: tr('Mode'), fixedMode: true
               column label: tr('State'), fixedMode: true
             }

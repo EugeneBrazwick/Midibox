@@ -141,8 +141,8 @@ module Reform
     end
 
     # basemethod, called from connectModel (from setModel)
-    def model *data
-    end
+#     def model *data
+#     end  ARGH
 
     def added control
 #       control.containing_frame = self

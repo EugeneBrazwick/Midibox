@@ -206,6 +206,7 @@ will work as expected
 
     def setupQuickyhash hash
       hash.each do |k, v|
+        tag "send(#{k.inspect}, #{v.class} #{v})"
         send(k, v)
       end
     end
@@ -216,6 +217,9 @@ will work as expected
 
     def self.contextsToUse
       [ModelContext, App]
+    end
+
+    def self.parent_qtc parent_control, parent_effective_qtc
     end
 
 #     def self.new_qt_implementor qt_implementor_class, parent, qt_parent

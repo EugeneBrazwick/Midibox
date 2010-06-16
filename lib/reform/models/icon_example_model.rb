@@ -24,12 +24,14 @@ module Reform
     end
 
     def available_modes
-      [tr("Normal"), tr("Active"), tr("Disabled"), tr("Selected")]
+      [tr('Normal'), tr('Active'), tr('Disabled'), tr('Selected')]
     end
 
     def available_states
       [tr('Off'), tr('On')]
     end
+
+    public
 
     dynamic_accessor :mode, :state, :checked?
     attr :filename, :name
@@ -67,6 +69,10 @@ module Reform
 
     def each &block
       @icons.each(&block)
+    end
+
+    def length
+      @icons.length
     end
   end
 

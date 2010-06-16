@@ -95,14 +95,6 @@ module Reform
         resizeMode Qt::HeaderView::Fixed
       end
 
-      def connector con = nil, &block
-        @connector = block ? block : con
-      end
-
-      def model_connector con = nil, &block
-        @model_connector = block ? block : con
-      end
-
       # sets the 'creator' like :combobox or :edit. Unset means :edit
       # unless there is a @model_connector, then we use :combobox as default
       def editor value
@@ -110,6 +102,17 @@ module Reform
       end
 
       public
+
+      def connector con = nil, &block
+        return @connector unless con || block
+        @connector = block ? block : con
+      end
+
+      def model_connector con = nil, &block
+        return @model_connector unless con || block
+        @model_connector = block ? block : con
+      end
+
       def setupQuickyhash hash
         hash.each { |k, v| send(k, v) }
       end
@@ -166,8 +169,32 @@ module Reform
     end
 
     def connectModel aModel, options = nil
+      tag "connectModel #{aModel}, len=#{aModel.length}"
+      @data = aModel
+      @qtc.clearContents
+      if aModel then
+        @qtc.rowCount = aModel.length
+        @data.each_with_index do |entry, row|
+          tag "There are #{@columns.length} columns, entry = #{entry.class} #{entry}"
+          @columns.each_with_index do |col, n|
+            tag "n=#{n}, cid = '#{col.connector}'"
+            if cid = col.connector then
+              if entry.getter?(cid) then
+                value = entry.apply_getter(cid)
+                tag "cid=#{cid}, colno=#{n}, row=#{row}, value = #{value.class} #{value}"
+                item = Qt::TableWidgetItem.new(value.to_s)
+                @qtc.setItem(row, n, item)
+              else
+                tag "Not a getter: #{entry.class}::#{cid}"
+              end
+            end
+          end
+        end
+      else
+        @qtc.rowCount = 0
+      end
       super
-    end
+    end  # connectModel
 
     attr :columns
   end # class Table

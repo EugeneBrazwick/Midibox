@@ -4,12 +4,14 @@ require 'reform/app'
 
 Reform::app {
   mainwindow {
+    tag "self=#{self}, calling model??"
+    require_relative '../../models/icon_example_model'
+    dir = Dir.getwd + File.dirname(__FILE__) + '/images/'
+    ruby_model value: [IconExampleEntry.new(dir + 'designer.png'),
+                       IconExampleEntry.new(dir + 'qtopia_48x48.png')]
     table {
-      dir = Dir.getwd + File.dirname(__FILE__) + '/images/'
-      require_relative '../../models/icon_example_model'
-      model [IconExampleEntry.new(dir + 'designer.png'),
-             IconExampleEntry.new(dir + 'qtopia_48x48.png')]
 #       colCount 3
+      noSelection
       horizontalHeader defaultSectionSize: 90 # this is not a constructor, but a reference
       column label: tr('Image'), connector: :name, stretchMode: true #, editable: false FOLLOWS FROM model
       column {

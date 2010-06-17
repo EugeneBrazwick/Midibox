@@ -19,7 +19,7 @@ module Reform
       # in all cases: c.containing_frame.all_children.contains?(c)
       # to be set to true when signals are connected to module-setters.
       # however, it should be possible to do this when :initialize is set in options of
-      # connectModel.
+      # updateModel.
 #       @connected = false
     end
 
@@ -139,10 +139,6 @@ module Reform
         rfCallBlockBack(model, &@whenConnected) if instance_variable_defined?(:@whenConnected) && @whenConnected
       end
     end
-
-    # basemethod, called from connectModel (from setModel)
-#     def model *data
-#     end  ARGH
 
     def added control
 #       control.containing_frame = self
@@ -309,7 +305,7 @@ module Reform
     def postSetup
 #       tag "#{self}::postSetup, model=#@model"
       executeMacros
-      connectModel @model, initialize: true if @model
+      updateModel @model, initialize: true if @model
     end
 
     # qt_parent can be nil, but even then....
@@ -384,7 +380,7 @@ module Reform
         be called (at least not now).
    See Frame#connect
 =end
-    def connectModel aModel, options = nil
+    def updateModel aModel, options = nil
 #       tag "#{self}, aModel=#{aModel}, should be propagated!"
 #       @model ||= nil
 #       unless @model.equal?(aModel)

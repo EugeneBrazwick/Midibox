@@ -23,8 +23,8 @@ module Reform
 
     public
     #override. Same as Edit except for a single 'text'->'date' conversion.
-    def connectModel model, options = nil
-#       tag "#{self}::connectModel, cid=#{connector}"
+    def updateModel model, options = nil
+#       tag "#{self}::updateModel, cid=#{connector}"
       cid = connector and
         if model && model.getter?(cid)
   #         tag "apply getter -> #{model.apply_getter(cid)}"

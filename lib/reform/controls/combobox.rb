@@ -145,8 +145,8 @@ module Reform
 
     #override. Select the correct index in the combobox based on the single value
     # that we connect to.
-    def connectModel aModel, options = nil
-#       tag "connectModel #{aModel}, cid='#{connector}',options=#{options.inspect}"
+    def updateModel aModel, options = nil
+#       tag "updateModel #{aModel}, cid='#{connector}',options=#{options.inspect}"
       if instance_variable_defined?(:@model_connector)
 	# change the contents first
 #  	tag "applying model_connector #@model_connector"
@@ -188,7 +188,7 @@ module Reform
         end
       end
       super
-    end # def connectModel
+    end # def updateModel
   end # class ComboBox
 
   createInstantiator File.basename(__FILE__, '.rb'), Qt::ComboBox, ComboBox

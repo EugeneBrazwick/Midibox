@@ -70,8 +70,8 @@ module Reform
     end #whenToggled
 
     # override, also used for radiobutton
-    def connectModel model, options = nil
-#       tag "@{self} connectModel #{aModel}, cid=#{connector}"
+    def updateModel model, options = nil
+#       tag "@{self} updateModel #{aModel}, cid=#{connector}"
       if model
         if (cid = connector) && model.getter?(cid)
           @qtc.checked = model.apply_getter(cid) == value

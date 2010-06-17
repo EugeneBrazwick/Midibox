@@ -3,6 +3,14 @@ module Reform
 
 require_relative '../model'
 
+=begin
+
+Assuming we have a simple mapped array, how do we apply changes to the model using
+insert delete and update of a single row?
+
+It seems more appropriate to call connectModel 'updateModel' instead. Were we pass in
+'options' what we actually changed since last time.
+=end
   class SimpleModel < Control
     include Model, Enumerable
 

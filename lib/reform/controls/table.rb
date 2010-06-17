@@ -14,6 +14,14 @@ module Reform
       @horizontalHeader = nil
       @qtc.verticalHeader.hide
       @columns = []
+      connect(@qtc, SIGNAL('itemChanged(QTableWidgetItem *)') do |item|
+        row, col = item.row, item.column
+        column = @columns[col]
+        model = effectiveModel or next
+        cid = column.connector or next
+        next unless model.setter?(cid)
+        model.row(row).apply_setter(cid, column.var2data(item.data(Qt::UserRole)))
+      end
     end
 
     define_simple_setter :selectionMode, :rowCount
@@ -81,6 +89,7 @@ module Reform
         @header, @table, @qhdr, @n = header, table, header.qtc, table.columns.length
         @connector = nil
         @label = ''
+        @type = String
       end
 
       def resizeMode mode
@@ -102,6 +111,21 @@ module Reform
       end
 
       public
+
+      def type value = nil
+        return @type if value.nil?
+        @type = value
+      end
+
+      def var2data variant
+        case @type
+        when String then variant.to_string
+        when TrueClass, FalseClass then variant.toBool
+        when Integer then variant.toInt
+        when Float then variant.toFloat
+        else raise ReformError, "Missing method to convert Qt::Variant to a '#@type'. Please complain."
+        end
+      end
 
       def connector con = nil, &block
         return @connector unless con || block
@@ -168,33 +192,36 @@ module Reform
       @qtc.openPersistentEditor item
     end
 
-    def connectModel aModel, options = nil
-      tag "connectModel #{aModel}, len=#{aModel.length}"
+    def updateModel aModel, options = nil
+      tag "updateModel #{aModel}, len=#{aModel.length}"
       @data = aModel
+      if cid = connector && aModel.getter?(cid)
+        @data = aModel.apply_getter(cid)
+      end
       @qtc.clearContents
-      if aModel then
-        @qtc.rowCount = aModel.length
-        @data.each_with_index do |entry, row|
-          tag "There are #{@columns.length} columns, entry = #{entry.class} #{entry}"
-          @columns.each_with_index do |col, n|
-            tag "n=#{n}, cid = '#{col.connector}'"
-            if cid = col.connector then
-              if entry.getter?(cid) then
-                value = entry.apply_getter(cid)
-                tag "cid=#{cid}, colno=#{n}, row=#{row}, value = #{value.class} #{value}"
-                item = Qt::TableWidgetItem.new(value.to_s)
-                @qtc.setItem(row, n, item)
-              else
-                tag "Not a getter: #{entry.class}::#{cid}"
+      if @data then
+        if options[:initialize]
+          @qtc.rowCount = @data.length
+          @data.each_with_index do |entry, row|
+            tag "There are #{@columns.length} columns, entry = #{entry.class} #{entry}"
+            @columns.each_with_index do |col, n|
+              tag "n=#{n}, cid = '#{col.connector}'"
+              if cid = col.connector then
+                if entry.getter?(cid) then
+                  value = entry.apply_getter(cid)
+                  tag "cid=#{cid}, colno=#{n}, row=#{row}, value = #{value.class} #{value}"
+                  item = Qt::TableWidgetItem.new(value.respond_to?(:to_str) ? value.to_str : value.to_s)
+                  @qtc.setItem(row, n, item)
+                else
+                  tag "Not a getter: #{entry.class}::#{cid}"
+                end
               end
             end
           end
         end
-      else
-        @qtc.rowCount = 0
       end
       super
-    end  # connectModel
+    end  # updateModel
 
     attr :columns
   end # class Table

@@ -26,8 +26,8 @@ module Reform
    public
 
     #override
-    def connectModel model, options = nil
-#       tag "connectModel #{model.inspect}, cid=#{connector}"
+    def updateModel model, options = nil
+#       tag "updateModel #{model.inspect}, cid=#{connector}"
       cid = connector or return
       if model && model.getter?(cid)
 #         tag "getter located"

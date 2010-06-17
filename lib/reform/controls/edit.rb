@@ -32,7 +32,7 @@ module Reform
       @qtc.insert(*args)
     end
 
-    def connectModel model, options = nil
+    def updateModel model, options = nil
 #       tag "connectModel #{model.inspect}, cid=#{connector}"
       cid = connector and
         if model && model.getter?(cid)

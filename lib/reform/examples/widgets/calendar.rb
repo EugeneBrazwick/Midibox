@@ -185,7 +185,7 @@ solution 2) just ad hoc code it, similar to the example
             name :firstFridayCheckbox
             connector false
             text tr('&First Friday in blue')
-            whenClicked { |checked| connectModel(@model) }
+            whenClicked { |checked| updateModel(@model) }
           }
           spacer stretch: 1
           checkbox {
@@ -194,7 +194,7 @@ solution 2) just ad hoc code it, similar to the example
             text tr('May &1 in red')
             whenClicked do |checked|
 #               tag "whenClicked, self=#{self}, calling whenCon"
-              connectModel(@model)
+              updateModel(@model)
             end
           }
         } # hbox

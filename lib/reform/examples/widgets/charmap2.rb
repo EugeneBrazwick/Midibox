@@ -25,10 +25,6 @@ Reform::app {
             name :fontCombo
             connector :self    #good idea ????
             stretch 1
-#             whenActivated do |font, idx|
-#               tag "connectModel #{font.class} #{font} to centralWidget"
-#               centralWidget.connectModel(font)
-#             end
           }
           label text: tr('Size:') #sizeLabel);
           combobox {

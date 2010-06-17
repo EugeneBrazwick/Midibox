@@ -189,7 +189,7 @@ module Reform
       parent.addWidget self, hash, &block
     end
 
-    def connectModel model, options = nil
+    def updateModel model, options = nil
       if (e = enabler) && model.getter?(e)
         @qtc.enabled = model.apply_getter(e)
       end

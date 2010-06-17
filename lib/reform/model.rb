@@ -127,7 +127,7 @@ will work as expected
       return if instance_variable_defined?(:@no_dynamics) && @no_dynamics
       (@observers ||= nil) and @observers.each do |o|
 #         tag "Propagating model #{self} to observer #{o}"
-        o.connectModel self, property: name
+        o.updateModel self, property: name
       end
     end
 

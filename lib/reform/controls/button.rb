@@ -43,7 +43,8 @@ module Reform
       super
     end
 
-    def connectModel aModel, options = nil
+    #override
+    def updateModel aModel, options = nil
 #       tag "@{self} connectModel #{aModel}, cid=#{connector}"
       @qtc.text = model.apply_getter(tcid) if (model = effective_model) && (tcid = text_connector) && model.getter?(tcid)
       super

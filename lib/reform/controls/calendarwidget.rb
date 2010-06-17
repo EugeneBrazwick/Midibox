@@ -18,7 +18,7 @@ module Reform
       super
       connect(@qtc, SIGNAL('selectionChanged()'), self) do
 #            tag "SELCHANGE, date #{@qtc.selectedDate.inspect}"
-          # BEWARE FOR LOOP/STACKOVERFLOW. this will call connectModel
+          # BEWARE FOR LOOP/STACKOVERFLOW. this will call updateModel
           # which calls @qtc.selectedDate := X
           # which MAY trigger selectionChanged(). However, it doesn't seem to do that
           # to be safe I use options[:property]
@@ -69,10 +69,10 @@ module Reform
     #override
     @@connectingModelSem = false
 
-    def connectModel model, options = nil
+    def updateModel model, options = nil
       return if @@connectingModelSem
       @@connectingModelSem = true
-#       tag "#{self}::connectModel, qtc=#@qtc, caller=#{caller.join("\n")}, options=#{options.inspect}"
+#       tag "#{self}::updateModel, qtc=#@qtc, caller=#{caller.join("\n")}, options=#{options.inspect}"
 #       with model do
         # this is crude code. It simply assumes that model is the right one.
       #it also assumes model is not nil

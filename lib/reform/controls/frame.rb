@@ -67,10 +67,10 @@ a Frame is a widget that may contain others.
           it will take no action by itself,
           but the connect propagates to each control that is a direct child
 =end
-    def connectModel aModel, options = nil
+    def updateModel aModel, options = nil
 #       tag "#{self}::connecting model, delegate to children, @all_widgets=#{@all_widgets.inspect}"
       aModel = aModel.send(cid) if cid = connector && aModel && aModel.getter?(cid)
-      @all_children.each { |child| child.connectModel(aModel, options) unless child.effectiveModel? }
+      @all_children.each { |child| child.updateModel(aModel, options) unless child.effectiveModel? }
       super
 #       tag "DONE"
     end

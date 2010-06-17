@@ -150,7 +150,7 @@ module Reform
     end # ReForm#run
 
     # override
-    def connectModel aModel, options = nil
+    def updateModel aModel, options = nil
       if aModel && name = aModel.name
         registerName name, aModel
       end

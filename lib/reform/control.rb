@@ -11,7 +11,7 @@ module Reform
     private
 
     # create a new Control, using the frame as 'owner', and qtc as the wrapped Qt::Widget
-    def initialize frame, qtc
+    def initialize frame, qtc = nil
 #       tag "#{self}::initialize, caller=#{caller.join("\n")}"
       super()
       @containing_frame, @containing_form, @qtc, @has_pos = frame, frame && frame.containing_form, qtc, false
@@ -211,12 +211,11 @@ module Reform
 #       added child
     end
 
-    # BAD name and not OO either. FIXME.  Why not make provision for menus, actions etc. as well?
     # also this only does something with the qt hierarchie
     # Normally 'q' will be control.qtc
     def addWidget control, hash, &block
 #       tag "#@qtc.addWidget(#{control.qtc})"
-      @qtc.addWidget control.qtc
+      @qtc.addWidget control.qtc if @qtc
       control.setup hash, &block
       added control
     end
@@ -262,7 +261,7 @@ module Reform
     def setupQuickyhash hash
       hash.each do |k, v|
 #         tag "#{k}(#{v})"
-        send(k, v) unless k == :postSetup # and other hacks!!
+        send(k, v) unless k == :postSetup || k == :qtparent # and other hacks!!
       end
     end
 

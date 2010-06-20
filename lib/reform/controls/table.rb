@@ -14,7 +14,7 @@ module Reform
       @horizontalHeader = nil
       @qtc.verticalHeader.hide
       @columns = []
-      connect(@qtc, SIGNAL('itemChanged(QTableWidgetItem *)') do |item|
+      connect(@qtc, SIGNAL('itemChanged(QTableWidgetItem *)')) do |item|
         row, col = item.row, item.column
         column = @columns[col]
         model = effectiveModel or next
@@ -22,6 +22,9 @@ module Reform
         next unless model.setter?(cid)
         model.row(row).apply_setter(cid, column.var2data(item.data(Qt::UserRole)))
       end
+      tag "Calling RubyDelegate.new RubyDelegate=#{RubyDelegate}"
+      d = RubyDelegate.new(self, @qtc)
+      @qtc.itemDelegate = d
     end
 
     define_simple_setter :selectionMode, :rowCount
@@ -81,15 +84,18 @@ module Reform
       ref
     end
 
-    class ColumnRef < Qt::Object
+    class ColumnRef < Control
+      include WidgetContext
       private
       def initialize header, table
-        super()
+        super(table, nil)
 #         tag "new ColumnRef(#{header})"
         @header, @table, @qhdr, @n = header, table, header.qtc, table.columns.length
         @connector = nil
         @label = ''
         @type = String
+        @persistent_editor = false
+        @editor = nil
       end
 
       def resizeMode mode
@@ -104,13 +110,48 @@ module Reform
         resizeMode Qt::HeaderView::Fixed
       end
 
+      class ColumnEditor
+        private
+
+        def initialize quickyhash, block
+          @klass, @quickyhash, @initblock = nil, quickyhash, block
+        end
+
+        public
+
+        def klass value = nil
+          return (@klass || :edit) if value.nil?
+          @klass = value
+        end
+
+        attr :quickyhash, :initblock
+      end
+
       # sets the 'creator' like :combobox or :edit. Unset means :edit
       # unless there is a @model_connector, then we use :combobox as default
-      def editor value
-        @editor = value
+      def editor quickyhash = nil, &block
+        @editor = ColumnEditor.new(quickyhash, block)
+#         @qtc.itemDelegate = @editor
       end
 
       public
+
+      def persistent_editor value = nil
+        return @persistent_editor if value.nil?
+        @persistent_editor = value
+      end
+
+      def createEditor qtparent
+        if ed = @editor
+          quickyhash, initblock = ed.quickyhash, ed.initblock
+          (quickyhash ||= {})[:qtparent] = qtparent
+        else
+          quickyhash = { qtparent: qtparent }
+          initblock = nil
+        end
+        tag "calling #{self}::#{ed && ed.klass}"
+        send(ed && ed.klass || :edit, quickyhash, &initblock).qtc
+      end
 
       def type value = nil
         return @type if value.nil?
@@ -148,6 +189,24 @@ module Reform
 
     end # class ColumnRef
 
+    class RubyDelegate < Qt::ItemDelegate
+    private
+      def initialize table, qtable
+        tag "RubyDelegate.new"
+        super(table.containing_form.qtc)
+        @table, @qtc = table, qtable
+      end
+
+      public
+      # override.
+      def createEditor qparent, option, index
+        tag "createEditor #{qparent}, opt=#{option}, index=#{index}"
+        @table.col(index.column).createEditor(qparent)
+      end
+
+    end # class RubyDelegate
+
+
     def horizontalHeader!
       @horizontalHeader || horizontalHeader
     end
@@ -162,6 +221,10 @@ module Reform
     end
 
     public
+
+    def col n
+      @columns[n]
+    end
 
     def postSetup
       tag "here" #, caller=#{caller.join("\n")}"
@@ -212,6 +275,15 @@ module Reform
                   tag "cid=#{cid}, colno=#{n}, row=#{row}, value = #{value.class} #{value}"
                   item = Qt::TableWidgetItem.new(value.respond_to?(:to_str) ? value.to_str : value.to_s)
                   @qtc.setItem(row, n, item)
+                  if col.persistent_editor
+                    tag "create persistent_editor, n=#{n}, item=#{item}"
+                    @qtc.openPersistentEditor(item)
+                  end
+                  if entry.setter?(cid)
+                    item.flags |= Qt::ItemIsEditable.to_i
+                  else
+                    item.flags &= ~(Qt::ItemIsEditable.to_i)
+                  end
                 else
                   tag "Not a getter: #{entry.class}::#{cid}"
                 end

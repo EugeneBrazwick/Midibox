@@ -18,14 +18,20 @@ Reform::app {
         label tr('Mode')
         fixedMode true
         connector :mode
-        model_connector :available_modes
-        editor :combobox
+        persistent_editor true
+        editor { # it should take 'connector' from the column!
+#             persistent true  We cannot do this here, because the column must know the value
+              # before any editor is created
+          # klass :combobox             SAME THING HERE!!!
+          model_connector :available_modes
+        }
       }
       column {
         label tr('State')
         fixedMode true
         connector :state
         model_connector :available_states
+        persistent_editor true
         #editor :combobox         default when model_connector is applied
       }
       rowCount 4

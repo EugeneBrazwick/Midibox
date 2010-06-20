@@ -212,11 +212,11 @@ module Reform
 #       tag "define_method #{self}::#{name}."
       remove_method name if private_method_defined?(name)
       define_method name do |quickyhash = nil, &block|
-        raise 'cannot use both argument AND a block' if quickyhash && block
+#         raise 'cannot use both argument AND a block' if quickyhash && block           YES YOU CAN
 #         tag "arrived in #{self}::#{name}(), hash=#{quickyhash}, block=#{block}"
         # It's important to use parent_qtc_to_use, since it must be a true widget.
         # Normally, 'qparent' would be '@qtc' itself
-        qparent = parent_qtc_to_use_for(reform_class)
+        qparent = quickyhash && quickyhash[:qtparent] || parent_qtc_to_use_for(reform_class)
 
 =begin
     Severe problem:     sometimes the parenting must change but how can this be done before
@@ -335,6 +335,8 @@ THIS ALL NO LONGER APPLIES since parent_qtc_to_use_for returns nil for layouts..
   module ControlContext
     extend Instantiator
   end # module ControlContext
+
+  WidgetContext = ControlContext
 
   # GraphicContext means we get the instantiators in the 'graphics' directory.
   module GraphicContext

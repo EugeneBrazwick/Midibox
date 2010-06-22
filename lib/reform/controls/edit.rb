@@ -9,10 +9,13 @@ module Reform
     private
 
     def initialize parent, qtc
+      tag "new Edit(parent=#{parent}, qtc=#{qtc})"
       super
-      connect(@qtc, SIGNAL(changed_signal_signature), self) do |txt|
-#             tag "assign '#{text}' to models property #{cid}"
-        rfRescue { model = effectiveModel and cid = connector and model.apply_setter(cid, txt) }
+      connect(@qtc, SIGNAL('editingFinished()'), self) do
+        rfRescue do
+          tag "changed, assign '#{@qtc.text}' to models property cid=#{connector}, effectiveModel=#{effectiveModel}"
+          model = effectiveModel and cid = connector and model.apply_setter(cid, @qtc.text)
+        end
       end
     end
 
@@ -33,7 +36,7 @@ module Reform
     end
 
     def updateModel model, options = nil
-#       tag "connectModel #{model.inspect}, cid=#{connector}"
+      tag "connectModel #{model.inspect}, cid=#{connector}"
       cid = connector and
         if model && model.getter?(cid)
   #         tag "getter located"

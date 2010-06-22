@@ -5,6 +5,27 @@ module Reform
 
   require_relative 'widget'
 
+=begin
+
+TERRIBLE TRAGEDY
+
+How do we connect the proper row of the model to the correct edit?
+
+Apart from ColumnRef we also need a RowRef. Then updateModel can
+assign the proper data.  Next, when the edit is created the rownr
+is known so somehow we should be able to locate the Table itself,
+so we can get the proper RowRef.  Actually a RowRef is only required
+when the row is being edited. Assuming the model has a '[]' method that is.
+Then we can parent the edit to the row, so the effectiveModel becomes the
+record at that row!
+Catching itemChanged is no longer required since the editor will now take
+care of it.
+
+It seems our hack to assign a reference from the reform control inside each qt control
+becomes more important. We need to be able to step from Qt::TableWidget to Reform::Table.
+Note however that the Qt::Editor is parented to some unknown widget (Qt::Widget, not
+Qt::TableWidget)
+=end
   class Table < Widget
     include ModelContext
     private
@@ -15,6 +36,7 @@ module Reform
       @qtc.verticalHeader.hide
       @columns = []
       connect(@qtc, SIGNAL('itemChanged(QTableWidgetItem *)')) do |item|
+        tag "itemChanged row=#{item.row}, col=#{item.column}"
         row, col = item.row, item.column
         column = @columns[col]
         model = effectiveModel or next
@@ -125,7 +147,7 @@ module Reform
         end
 
         attr :quickyhash, :initblock
-      end
+      end # class ColumnEditor
 
       # sets the 'creator' like :combobox or :edit. Unset means :edit
       # unless there is a @model_connector, then we use :combobox as default
@@ -141,7 +163,12 @@ module Reform
         @persistent_editor = value
       end
 
-      def createEditor qtparent
+      def add child, quickyhash, &block
+        child.setup quickyhash, &block
+      end
+
+      # should return Qt::Widget
+      def createEditor qtparent, row
         if ed = @editor
           quickyhash, initblock = ed.quickyhash, ed.initblock
           (quickyhash ||= {})[:qtparent] = qtparent
@@ -150,7 +177,11 @@ module Reform
           initblock = nil
         end
         tag "calling #{self}::#{ed && ed.klass}"
-        send(ed && ed.klass || :edit, quickyhash, &initblock).qtc
+        ctrl = send(ed && ed.klass || :edit, quickyhash, &initblock)
+#       ctrl.connector = self.connector       NO. The table already responds and it knows the proper rowdata,
+        # or at least it knows it better than the edit.
+        # but when it is a combo????
+        ctrl.qtc
       end
 
       def type value = nil
@@ -201,7 +232,7 @@ module Reform
       # override.
       def createEditor qparent, option, index
         tag "createEditor #{qparent}, opt=#{option}, index=#{index}"
-        @table.col(index.column).createEditor(qparent)
+        @table.col(index.column).createEditor(qparent, index.row)
       end
 
     end # class RubyDelegate

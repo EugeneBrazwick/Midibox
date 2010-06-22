@@ -111,6 +111,7 @@ module Reform
     end
 
     protected
+
     #override
     def timerEvent event
 #       tag "timerEvent"
@@ -145,8 +146,11 @@ module Reform
     end
 
     public
+
     # the parent frame (a Reform::Frame), can be widget or layout
     attr_accessor :containing_frame
+
+    attr_writer :connector
 
     # the owner form.
     attr :containing_form
@@ -380,7 +384,7 @@ module Reform
    See Frame#connect
 =end
     def updateModel aModel, options = nil
-#       tag "#{self}, aModel=#{aModel}, should be propagated!"
+      tag "#{self}, aModel=#{aModel}, should be propagated!"
 #       @model ||= nil
 #       unless @model.equal?(aModel)
 #         @model.removeObserver_i(self) if @model

@@ -6,6 +6,10 @@ module Reform
 =begin rdoc
 
 a Frame is a widget that may contain others.
+
+Note I changed 'containing_frame to the Qt 'parent' of the object.
+And so 'all_children' becomes simply 'children'.
+However, in the previous version a form had 'containing_frame' being the form itself.
 =end
   class Frame < Widget
     include ControlContext
@@ -17,7 +21,6 @@ a Frame is a widget that may contain others.
       super(frame, qtc)
       # all immediate controls within this panel are in here
       # but also the controls added to Layouts, since Qt layouts do not own them.
-      @all_children = []
       # generate layouts automatically.
       # A layout can also be forced if a widget use a method only valid if its parent
       # is a layout, and the frame is not a layout.
@@ -37,15 +40,14 @@ a Frame is a widget that may contain others.
       end
       if control
 #         tag "addWidget #{control} to infused layout + SETUP"
-        control.containing_frame = layout
+        control.parent = layout
         layout.add control, hash, &block
       end
       layout
     end
 
     def added control
-      @all_children << control
-      control.containing_frame = self
+      control.parent = self
     end
 
     public
@@ -53,7 +55,6 @@ a Frame is a widget that may contain others.
     attr_accessor :infused_layout
 
     # array of all controls, widgets, layouts, menus, actions, models etc..
-    attr :all_children
 #     attr :autolayout
 
 =begin rdoc
@@ -70,7 +71,7 @@ a Frame is a widget that may contain others.
     def updateModel aModel, options = nil
 #       tag "#{self}::connecting model, delegate to children, @all_widgets=#{@all_widgets.inspect}"
       aModel = aModel.send(cid) if cid = connector && aModel && aModel.getter?(cid)
-      @all_children.each { |child| child.updateModel(aModel, options) unless child.effectiveModel? }
+      children.each { |child| child.updateModel(aModel, options) unless child.effectiveModel? }
       super
 #       tag "DONE"
     end
@@ -83,7 +84,7 @@ a Frame is a widget that may contain others.
     # override
     def effectiveModel
       return @model if instance_variable_defined?(:@model)
-      @containing_frame.effectiveModel
+      parent.effectiveModel
     end
 
     # override
@@ -96,7 +97,7 @@ a Frame is a widget that may contain others.
 #       tag "#{self}, adding widget #{control}"
       if layout = infused_layout
 #         tag "infused layout"
-        control.containing_frame = layout
+        control.parent = layout
         layout.addWidget(control, hash, &block)
       else
         if @autolayout && layoutcreator = control.auto_layouthint
@@ -110,7 +111,7 @@ a Frame is a widget that may contain others.
 
     def addLayout control, hash, &block
       if layout = infused_layout
-        control.containing_frame = layout
+        control.parent = layout
         layout.addLayout(control, hash, &block)
       else
 #           tag "#{self.class}::addControl. SETTING layout of #@qtc to #{control.qtc}"

@@ -275,9 +275,6 @@ THIS ALL NO LONGER APPLIES since parent_qtc_to_use_for returns nil for layouts..
 #           tag "CALLING #{ctrl}.add(#{c})"
           ctrl.add(c, quickyhash, &block)
         end
-#         ctrl.added c  # do not move this to 'add', it will make it more difficult to override 'add'
-        # NO. I really want c.containing_frame.all_children to contain c
-#         end
 #         tag "IMPORTANT: method '#{name}' return the control #{c}"
         c
       end  # define_method name
@@ -405,7 +402,7 @@ THIS ALL NO LONGER APPLIES since parent_qtc_to_use_for returns nil for layouts..
     def self.createInstantiator_i name
 #       tag "define_method #{self}::#{name} MACRO recorder"
       define_method name do |quickylabel = nil, &block|
-#         tag "Recording macro for #{self}::#{name}(), containing_frame=#{containing_frame}"
+#         tag "Recording macro for #{self}::#{name}(), parent=#{parent}"
         Macro.new(self, name, quickylabel, block)
       end
       private name
@@ -632,6 +629,7 @@ will create a button as toplevel control
       if options[:form]
         define_method name do |quicky = nil, &block|
           qform = qt_implementor_class.new
+          tag "calling #{reform_class}.new"
           form = reform_class.new qform
           @firstform ||= form   # it looks the same, but is completely different
           form.setup = quicky ? quicky : block
@@ -653,7 +651,7 @@ will create a button as toplevel control
             # is this a proper constraint?
             raise ReformError, 'only 1 control can be on top' if @firstform
             qctrl = qt_implementor_class.new
-#             tag "reform_class=#{reform_class}, qctrl=#{qctrl}"
+            tag "reform_class=#{reform_class}, qctrl=#{qctrl}"
             @firstform = reform_class.new(nil, qctrl)
           end
         end

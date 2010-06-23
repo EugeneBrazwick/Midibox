@@ -9,15 +9,9 @@ module Reform
     include ActionContext
     private
 
-    def initialize parent, qtc
-      super
-      @all_children = []
-    end
-
     # similar to Frame
     def added control
-      @all_children << control
-      control.containing_frame = self
+      control.parent = self
     end
 
     public
@@ -36,8 +30,8 @@ module Reform
     end
 
     def postSetup
-      @all_children.each do |action|
-        @containing_frame.qtc.addAction(action.qtc)
+      children.each do |action|
+        parent.qtc.addAction(action.qtc)
       end
     end
   end

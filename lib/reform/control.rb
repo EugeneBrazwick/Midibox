@@ -13,10 +13,15 @@ module Reform
     # create a new Control, using the frame as 'owner', and qtc as the wrapped Qt::Widget
     def initialize frame, qtc = nil
 #       tag "#{self}::initialize, caller=#{caller.join("\n")}"
-      super()
-      @containing_frame, @containing_form, @qtc, @has_pos = frame, frame && frame.containing_form, qtc, false
-      # NOTE: containing_frame may change to its definite value using 'added' See Frame::added
-      # in all cases: c.containing_frame.all_children.contains?(c)
+      if frame
+        super(frame)
+      else
+        super()
+      end
+      parent = frame
+      @containing_form, @qtc, @has_pos = frame && frame.containing_form, qtc, false
+      # NOTE: parent may change to its definite value using 'added' See Frame::added
+      # in all cases: c.parent.children.contains?(c)
       # to be set to true when signals are connected to module-setters.
       # however, it should be possible to do this when :initialize is set in options of
       # updateModel.
@@ -142,13 +147,9 @@ module Reform
     end
 
     def added control
-#       control.containing_frame = self
     end
 
     public
-
-    # the parent frame (a Reform::Frame), can be widget or layout
-    attr_accessor :containing_frame
 
     attr_writer :connector
 
@@ -286,8 +287,8 @@ module Reform
         @qtc.objectName = aName
       # there is a slight duplication but the qt windowtree differs.
       # for example, a layout can have named children in 'reform' but not in Qt.
-#         tag "calling #@containing_frame.registerName(#{aName})"
-        @containing_frame.registerName aName, self
+#         tag "calling #parent.registerName(#{aName})"
+        parent.registerName aName, self
       else
 #         raise "#{self} has no @qtc. SHINE!" unless @qtc               Spacer has no Qt complement, maybe more
         @qtc && @qtc.objectName
@@ -397,7 +398,7 @@ module Reform
     end
 
     def effectiveModel
-      @containing_frame.effectiveModel
+      parent.effectiveModel
     end
 
     # true if model is set on this control. Can only be true for forms or frames

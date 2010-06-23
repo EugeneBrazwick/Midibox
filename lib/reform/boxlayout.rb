@@ -17,7 +17,7 @@ module Reform
     # override
     def postSetup
       # now all controls are setup, add them to the layout with the proper 'stretch'
-      for control in @all_children
+      children.each do |control|
 	case control
 	when Layout then @qtc.addLayout(control.qtc, control.stretch || 0)
 	when Spacer

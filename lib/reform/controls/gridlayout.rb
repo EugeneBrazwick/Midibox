@@ -89,7 +89,7 @@ gridlayout {
     def postSetup
 #       tag "#{self}::postSetup"
       curcol, currow = 0, 0
-      for control in @all_children
+      children.each do |control|
         c, r = control.layoutpos
         c, r = curcol, currow if c.nil?
         spanc, spanr = control.span
@@ -108,10 +108,10 @@ gridlayout {
         curcol, currow = 0, currow + 1 if curcol >= (@columnCount || @qtc.columnCount)
       end
       # a bit of a hack, but probably what you want:
-      if @all_children.length == 1 && @all_children[0].layout_alignment == Qt::AlignCenter
+      if children.length == 1 && children[0].layout_alignment == Qt::AlignCenter
 #         tag "APPLYING sizehint to single centered widget in a grid"
-        @qtc.setRowMinimumHeight(0, @all_children[0].qtc.sizeHint.height)
-        @qtc.setColumnMinimumWidth(0, @all_children[0].qtc.sizeHint.width)
+        @qtc.setRowMinimumHeight(0, children[0].qtc.sizeHint.height)
+        @qtc.setColumnMinimumWidth(0, children[0].qtc.sizeHint.width)
       end
     end
 

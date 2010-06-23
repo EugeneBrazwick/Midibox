@@ -106,6 +106,16 @@ Qt::TableWidget)
       ref
     end
 
+    # a table will be made as an array of rowrefs, where each row basicly
+    # caches the model at that row. This way we only need an Enumerable model
+    # and not necessarily an array.
+    # However it is very costly in terms of objects to be instantiated.
+    class RowRef < Control
+      private
+      def initialize table, row
+      end
+    end
+
     class ColumnRef < Control
       include WidgetContext
       private

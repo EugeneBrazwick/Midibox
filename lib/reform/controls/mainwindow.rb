@@ -51,7 +51,7 @@ module Reform
     def postSetup
       super
       unless @qtc.centralWidget
-        suitable = @all_children.find {|c| c.widget? }
+        suitable = children.find {|c| c.widget? }
         ctrl = suitable || button(text: tr('It Just Works!'))
         ctrl = ctrl.qtc if ctrl.respond_to?(:qtc)
         @qtc.centralWidget = ctrl

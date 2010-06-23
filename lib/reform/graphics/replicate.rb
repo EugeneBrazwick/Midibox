@@ -166,11 +166,11 @@ module Reform
     public
 
     def pen
-      containing_frame.pen
+      parent.pen
     end
 
     def brush
-      containing_frame.brush
+      parent.brush
     end
 
     # override. it returns the added control

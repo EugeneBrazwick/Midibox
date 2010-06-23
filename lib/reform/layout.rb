@@ -28,9 +28,9 @@ However it must be in postSetup.
 
     # override
     def effective_qtc
-#       tag "#{self}::parent_qtc_to_use_for -> containing_frame*"
-      frame = @containing_frame
-      frame = frame.containing_frame until frame.widget?
+#       tag "#{self}::parent_qtc_to_use_for -> parent*"
+      frame = parent
+      frame = frame.parent until frame.widget?
       frame.qtc
     end
 

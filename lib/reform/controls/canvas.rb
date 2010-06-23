@@ -42,7 +42,7 @@ module Reform
       if id
         newqtc = (if id.respond_to?(:qtc) then id else @owner.send(id) end).qtc
       else
-        newqtc = Qt::GraphicsScene.new @containing_frame.qtc
+        newqtc = Qt::GraphicsScene.new parent.qtc
         require_relative 'scene'
         c = Scene.new self, newqtc
         addControl(c, &block)

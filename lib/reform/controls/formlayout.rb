@@ -17,7 +17,7 @@ module Reform
     def postSetup
 #       tag "#{self}::postSetup"
       # we must wait until all children are setup.
-      for control in @all_children
+      children.each do |control|
         # note that labels without a buddy are ignored... (all labels are ignored)
         next if control.is_a?(Label)
         if control.respond_to?(:labeltext) && (label = control.labeltext) # may be a string, may have been converted to a Label reference

@@ -22,28 +22,28 @@ module Reform
 
     def check_grid_parent tocheck
       require_relative 'gridlayout' # needed anyway
-      if @containing_frame.layout?
-        if !@containing_frame.is_a?(GridLayout)
+      if parent.layout?
+        if !parent.is_a?(GridLayout)
           raise ReformError, tr("'#{tocheck}' only works with a gridlayout container!")
         end
       else
-        unless layout = @containing_frame.infused_layout
+        unless layout = parent.infused_layout
   #         tag "Inducing a GridLayout!!!"
           ql = Qt::GridLayout.new
-          layout = GridLayout.new(@containing_frame, ql)
-  #         tag "setting #{@containing_frame.qtc}.layout to #{ql}"
-          raise 'already a layout!' if @containing_frame.qtc.layout
-          @containing_frame.qtc.layout = ql
-          @containing_frame.infused_layout = layout
+          layout = GridLayout.new(parent, ql)
+  #         tag "setting #{parent.qtc}.layout to #{ql}"
+          raise 'already a layout!' if parent.qtc.layout
+          parent.qtc.layout = ql
+          parent.infused_layout = layout
         end
-        @containing_frame = layout
+        parent = layout
 #         tag "adding widget to layout, waiting for its postSetup"
         layout.addWidget self
       end
     end
 
     def check_boxparent tocheck
-      unless @containing_frame.layout? && @containing_frame.is_a?(BoxLayout)
+      unless parent.layout? && parent.is_a?(BoxLayout)
         raise ReformError, tr("'#{tocheck}' only works with a (h/v)box container!")
       end
     end

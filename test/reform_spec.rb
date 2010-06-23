@@ -34,13 +34,14 @@ end # App
 
 describe Frame do
   before do
+    tag "calling app"
     Reform::app {
-#       tag "GIVE IT 200ms"
+      tag "GIVE IT 200ms"
       giveIt200ms
+      tag "calling edit"
       edit { name :myEdit }
     }
   end
-
   after { $qApp.exec }
 
   it 'should have a form' do
@@ -55,12 +56,12 @@ describe Frame do
   end
 
   it 'should have created a formlayout and reparented edit' do
-#     tag "children = #{$qApp.firstform.all_children.map {|c| c.class }.inspect}"
-    $qApp.firstform.all_children.length.should == 1
-    layout = $qApp.firstform.all_children[0]
+#     tag "children = #{$qApp.firstform.children.map {|c| c.class }.inspect}"
+    $qApp.firstform.children.length.should == 1
+    layout = $qApp.firstform.children[0]
     layout.class.should == FormLayout
-    layout.all_children.length.should == 1
-    layout.all_children[0].class.should == Edit
+    layout.children.length.should == 1
+    layout.children[0].class.should == Edit
   end
 end # Frame
 

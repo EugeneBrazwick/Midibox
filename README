@@ -25,5 +25,64 @@ Plan de campagne:
     - Chord support, including automatic harmonies
     - Support for building/constructing/supporting a song based on general layout
 
+===
+Postgres database.
+Requires postgres, presumably libpg-dev
 
+POSTGRESQL configuration on ubuntu
+=============================================================================
+See https://help.ubuntu.com/community/PostgreSQL
+> sudo -u postgres psql postgres
+postgres=# \password postgres
+postgres=# ^D
+> sudo -u postgres createdb tagdb
+# add yourself as plain user:
+> sudo -u postgres createuser $USER
+> sudo -u postgres psql
+postgres=# \password <yourlognamehere>
+# Nevertheless, connections will not require passwords in Ubuntu.
+# As long as the username in postgres is the same as the one in /etc/passwd
+# At this point pgadmin should work, but it DOES require a password.
+============================================================================
 
+> gem install pg
+> gem install rails --include-dependencies
+#in Midibox rootdir:
+> rails --database=postgresql --git tagdb
+
+# Generate first migration
+> cd tagdb
+> script/generate migration create_database
+> kate db/migrate/<timestamp>_create_database.rb
+
+================ MIGRATION =============================
+The 'create_table' method
+  Options: id: boolean, false to not add it
+           primary_key: name, default 'id'
+           options: SQL code to add at end
+           temporary
+           force: drop the table if it existed
+The 'column' method
+  Types: :primary_key, :string, :text, :integer, :float, :decimal,
+         :datetime, :timestamp, :time, :date, :binary, :boolean.
+  Options: limit for :string, :text, (both in chars) :binary and :integer (both in bytes)
+           default, default value 'nil' is NULL
+           null, true if it can be null
+           precision: for :decial, number of total sign. digts
+           scale: nr of digits after decimal point, also for :decimal type.
+  After a type a columnlist can follow, but the options are shared.
+
+The 'timestamps' method adds 'created_at' and 'updated_at' as columns
+The 'references <tbl>... ' method adds a tbl_id column, and a tbl_type column if polymorhic: true
+is supplied. Examples
+    t.references :other_table
+    t.references :other_table polymorhic: true
+    t.references :other_table polymorhic: { default: 'Device' }
+
+======================
+POSTGRESQL 101
+======================
+Executing sql script:   psql --dbname=tagdb --file=create.sql
+GRANTING: sudo -u postgres psql --dbname=tagdb --command="GRANT CREATE ON DATABASE tagdb TO $USER"
+table definitions: never use CHAR, use VARCHAR or TEXT, it is faster and more flexible.
+TODO: make these rake tasks

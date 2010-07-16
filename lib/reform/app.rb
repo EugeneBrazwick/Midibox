@@ -9,6 +9,12 @@ $VERBOSE = verb
 # if $DEBUG
 module Kernel
 
+private
+  def tag msg
+    # avoid puts for threading problems
+    STDERR.print "#{File.basename(caller[0])} #{msg}\n"
+  end
+
   def trace onoff = true
     if onoff
       set_trace_func -> event, file, line, id, binding, classname do
@@ -24,11 +30,6 @@ module Kernel
     else
       set_trace_func nil
     end
-  end
-
-  def tag msg
-    # avoid puts for threading problems
-    STDERR.print "#{File.basename(caller[0])} #{msg}\n"
   end
 
   # this is the ugly way to make 'with' in ruby. CURRENT STATE: unused

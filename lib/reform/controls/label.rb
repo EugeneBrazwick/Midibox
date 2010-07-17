@@ -16,11 +16,22 @@ module Reform
       buddy.labeltext self
     end
 
+    define_simple_setter :scaledContents
+
     public
+
+    def pixmap= val
+      @qtc.pixmap = val
+    end
+
     def text value = nil
       return @qtc.text unless value
 #       tag "Assigning labeltext '#{value}'"
       @qtc.text = value
+    end
+
+    def pixmap
+      @qtc.pixmap
     end
   end
 

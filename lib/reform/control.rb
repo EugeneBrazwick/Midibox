@@ -59,7 +59,7 @@ module Reform
     end
 
     # define a simple set method for each element passed, forwarding it to qtc.
-    # in fact it also adds the getter... urm...
+    # using the same name plus '=' as the setter.
     def self.define_simple_setter *list
       list.each do |name|
         define_method name do |value = nil|
@@ -284,7 +284,7 @@ module Reform
     def name aName = nil
       if aName
 #       tag "#{self}::assigning objectname #{aName}"
-        @qtc.objectName = aName
+        @qtc.objectName = aName.to_s
       # there is a slight duplication but the qt windowtree differs.
       # for example, a layout can have named children in 'reform' but not in Qt.
 #         tag "calling #parent.registerName(#{aName})"

@@ -20,6 +20,16 @@ module Reform
 
     define_simple_setter :locale
 
+    # special values: :base and :dark
+    def backgroundRole value = nil
+      return @qtc.backgroundRole unless value
+      case value
+      when :base then value = Qt::Palette::Base
+      when :dark then value = Qt::Palette::Dark
+      end
+      @qtc.backgroundRole = value
+    end
+
     def check_grid_parent tocheck
       require_relative 'gridlayout' # needed anyway
       if parent.layout?
@@ -144,13 +154,51 @@ module Reform
 
     define_simple_setter :windowTitle
 
+    alias :title :windowTitle
+
 #     def resize x, y
 #       @qtc.resize x, y
 #     end
 
+    Sym2SizePolicy = { ignored: Qt::SizePolicy::Ignored,
+                       fixed: Qt::SizePolicy::Fixed,
+                       minimum: Qt::SizePolicy::Minimum,
+                       mamimum: Qt::SizePolicy::Maximum,
+                       preferred: Qt::SizePolicy::Preferred,
+                       expanding: Qt::SizePolicy::Expanding,
+                       minimumExpanding: Qt::SizePolicy::MinimumExpanding
+              }
+
+    def sizePolicy x = nil, y = nil
+      return @qtc.sizePolicy if x.nil?
+      x = Sym2SizePolicy[x] if Symbol === x
+      y ||= x
+      y = Sym2SizePolicy[y] if Symbol === y
+#       tag "#@qtc.setSizePolicy(#{x}, #{y}), ignored==#{Qt::SizePolicy::Ignored}"
+      @qtc.setSizePolicy x, y
+    end
+
     def sizeHint x = nil, y = nil
-      return @qtc.sizeHint if y.nil?
-      @qtc.setSizeHint(x, y)  # this hardly works at all
+      if x.nil?
+        return instance_variable_get(:@sizeHint) ? @sizeHint : @qtc.sizeHint
+      end
+      @sizeHint = if y.nil? then x else Qt::Size.new(x, y) end # this currently only works for forms!!! Not other windows!!!
+#       @qtc.setSizeHint(x, y)  # this hardly works at all. Note there is a virtual method: QWidget 'sizeHint()'!!
+    end
+
+    alias :sizehint :sizeHint # BROKEN!!
+
+    def adjustSize
+#       tag "calling #@qtc.adjustSize"
+      @qtc.adjustSize
+    end
+
+    def resize x, y = nil
+      if y.nil?
+        @qtc.resize x
+      else
+        @qtc.resize x, y
+      end
     end
 
     attr :layout_alignment
@@ -207,7 +255,13 @@ module Reform
 
   end # class Widget
 
-  QWidget = Qt::Widget # may change
+  class QWidget < Qt::Widget # may change
+    public
+    # override
+    def sizeHint
+      instance_variable_get(:@_reform_hack) ? @_reform_hack.sizeHint : super
+    end
+  end # class QWidget
 
 =begin DESTRUCTION   destroys Qt
   class Qt::Widget

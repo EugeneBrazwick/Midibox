@@ -1,3 +1,8 @@
+-- to run: psql --file=create.sql --dbname=tagdb
+
+-- to prevent catastrophies:
+-- DROP SCHEMA tagdb CASCADE;
+
 CREATE SCHEMA tagdb;
 SET search_path TO tagdb, public;
 
@@ -33,10 +38,16 @@ CREATE TABLE connections
   PRIMARY KEY (reffingtag_id, reffedtag_id)
 );
 
+CREATE TABLE manufacturers
+(
+  id CHAR(8) NOT NULL PRIMARY KEY
+);
+
 -- a deviceclass is a specific model of some device
 CREATE TABLE deviceclasses
 (
-  tag_id INTEGER NOT NULL PRIMARY KEY REFERENCES tags
+  tag_id INTEGER NOT NULL PRIMARY KEY REFERENCES tags,
+  manufacturer_id CHAR(8) NOT NULL REFERENCES manufacturers
 );
 
 -- a device is one of 'your' specific devices

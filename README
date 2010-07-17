@@ -1,7 +1,7 @@
 alsa midi bindings:  finished
 
 requirements:
-    - ruby1.9.1 or higher, including rdoc, gem etc.
+    - ruby1.9.2 or higher, including rdoc, gem etc.
     - libasound2-dev (on Ubuntu at least), alsa development headers
     - shoulda, testing machinery (sudo gem install shoulda)
     - graphviz, for documentation (optional)

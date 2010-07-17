@@ -5,16 +5,24 @@ module Reform
 
   # a ScrollArea can contain only 1 widget
   class ScrollArea < Frame
-#     def addWidget control, qt_widget = nil
-#       tag "addWidget qt_widget=#{qt_widget}",
-#       @qtc.widget = qt_widget
-#     end
 
-    def addControl control, quickyhash = nil, &block
-#       tag "addControl"
-      raise 'only one widget!' unless @all_widgets.empty?
+    def addWidget control, quickyhash = nil, &block
+#       tag "ScrollArea::addControl, calling widget := ..."
+      raise 'only one widget!' if @qtc.widget
       super
       @qtc.widget = control.qtc
+    end
+
+    def horizontalScrollBar
+      @qtc.horizontalScrollBar
+    end
+
+    def verticalScrollBar
+      @qtc.verticalScrollBar
+    end
+
+    def widgetResizable= value
+      @qtc.widgetResizable = value
     end
   end
 

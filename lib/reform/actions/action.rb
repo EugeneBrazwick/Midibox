@@ -25,11 +25,20 @@ module Reform
     define_simple_setter :text, :checkable
 
     alias :label :text
-    #, :shortcut
+    alias :title :text
+
+    # sets 'enabled' to false
+    def disabled
+      @qtc.enabled = false
+    end
+
+    Sym2Shortcut = { quit: Qt::KeySequence::Quit }
 
     # it is possible that an Qt::Enum value is passed. pe: Qt::KeySequence::Quit
+    # understood symbols: :quit
     def shortcut x
 #       tag "setShortcut(#{x.class} #{x})"
+      x = Sym2Shortcut[x] if Symbol === x        # first !!
       x = Qt::KeySequence.new(x) if x.is_a?(Qt::Enum)
       @qtc.shortcut = x
     end
@@ -45,6 +54,11 @@ module Reform
     end
 
     public
+
+    def enabled= value
+      @qtc.enabled = value
+    end
+
     def checked?
       @qtc.checked?
     end

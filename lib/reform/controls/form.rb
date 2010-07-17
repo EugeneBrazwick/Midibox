@@ -196,6 +196,6 @@ module Reform
   # So form == generic toplevel widget
   #    mainwindow = mainwindow of application
   #    dialog == fixed size toplevel widget
-  createInstantiator File.basename(__FILE__, '.rb'), Qt::Widget, ReForm, form: true
+  createInstantiator File.basename(__FILE__, '.rb'), QWidget, ReForm, form: true
 
-end # Reform
+end # module Reform

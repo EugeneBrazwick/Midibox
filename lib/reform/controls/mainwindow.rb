@@ -54,12 +54,28 @@ module Reform
         suitable = children.find {|c| c.widget? }
         ctrl = suitable || button(text: tr('It Just Works!'))
         ctrl = ctrl.qtc if ctrl.respond_to?(:qtc)
+#         tag "setting centralWidget to #{ctrl}"
         @qtc.centralWidget = ctrl
       end
     end
 
   end
 
-  createInstantiator File.basename(__FILE__, '.rb'), Qt::MainWindow, MainWindow, form: true
+  class QMainWindow < Qt::MainWindow
+  private
+#     def initialize
+#       super
+#       tag "new QMainWindow, size=#{size.inspect}"
+#       resize 500, 400         does not help at all
+#     end
+
+  public
+    # override, almost same as QWindow's version
+    def sizeHint
+      @_reform_hack.sizeHint
+    end
+  end
+
+  createInstantiator File.basename(__FILE__, '.rb'), QMainWindow, MainWindow, form: true
 
 end # Reform

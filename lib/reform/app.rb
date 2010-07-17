@@ -75,7 +75,7 @@ Requirements:
 =========================================================
   - qt4.6
   - kdebindings_4.4.2
-  - ruby1.9.1
+  - ruby1.9.2rc
 
 Recepy for Ubuntu (of the Blood, Sweat and Tears Kind -- but in the end it was 'simply' this:)
 
@@ -109,6 +109,9 @@ Preliminaries:
   - make
   - sudo make install
 
+IMPORTANT: RUBYLIB should be ~/Midibox/lib:/usr/local/lib/site_ruby/1.9.1:/usr/local/lib/site_ruby/1.9.1/x86_64-linux
+But why?? It worked fine first...
+
 DIAGNOSTICS:
  Q: ERROR: cmake/modules/FindKDE4Internal.cmake not found in ...
  A: kde-devel kdelibs5-dev  (presumably???)  NOT kdelibs4-dev!
@@ -133,6 +136,13 @@ compile failed.
 About the 'qt4-qtruby' package. This package is for ruby1.8. You can download the source and compile
 it for ruby1.9.1 but it will never work (it did for karmic though).
 qtruby is now officially part of kdebindings, I guess.
+
+# with ruby 1.9.2rc1 compilation fails at 96% as STR2CSTR is missing: I added the following in
+  krubypluginfactory.cpp:
+#define STR2CSTR StringValueCStr
+    VALUE ara1 = rb_obj_as_string(info);        plus use this iso original...
+         .....   .arg( STR2CSTR(ara1) )
+....
 
 CONCEPTS
 ========================================
@@ -630,7 +640,7 @@ will create a button as toplevel control
       if options[:form]
         define_method name do |quicky = nil, &block|
           qform = qt_implementor_class.new
-          tag "calling #{reform_class}.new"
+#           tag "calling #{reform_class}.new"
           form = reform_class.new qform
           @firstform ||= form   # it looks the same, but is completely different
           form.setup = quicky ? quicky : block

@@ -178,15 +178,18 @@ module Reform
       @qtc.setSizePolicy x, y
     end
 
+    # should NOT call qtc.sizeHint, since that's our caller!!!!
+    def sizeHint_i
+      instance_variable_get(:@sizeHint) ? @sizeHint : nil
+    end
+
     def sizeHint x = nil, y = nil
-      if x.nil?
-        return instance_variable_get(:@sizeHint) ? @sizeHint : @qtc.sizeHint
-      end
+      return sizeHint_i || @qtc.sizeHint if x.nil?
       @sizeHint = if y.nil? then x else Qt::Size.new(x, y) end # this currently only works for forms!!! Not other windows!!!
 #       @qtc.setSizeHint(x, y)  # this hardly works at all. Note there is a virtual method: QWidget 'sizeHint()'!!
     end
 
-    alias :sizehint :sizeHint # BROKEN!!
+    alias :sizehint :sizeHint
 
     def adjustSize
 #       tag "calling #@qtc.adjustSize"
@@ -259,7 +262,7 @@ module Reform
     public
     # override
     def sizeHint
-      instance_variable_get(:@_reform_hack) ? @_reform_hack.sizeHint : super
+      instance_variable_get(:@_reform_hack) ? (@_reform_hack.sizeHint_i || super) : super
     end
   end # class QWidget
 

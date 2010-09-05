@@ -18,7 +18,8 @@ module Reform
       segmentStyle Qt::LCDNumber::Outline
     end
 
-    def sizeHint x, y = nil
+    def sizeHint x = nil, y = nil
+      return super if x.nil?
       @qtc.size = y ? Qt::Size.new(x, y) : Qt::Size.new(*x)
     end
 

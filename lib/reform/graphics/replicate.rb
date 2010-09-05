@@ -5,6 +5,7 @@ module Reform
 
   require_relative '../graphicsitem'
 
+  # IMPORTANT: these are NOT Qt::Objects!! So no parenting system!
   class QReplicate < Qt::GraphicsItem #Group
     private
     def initialize parent, init_brush
@@ -174,17 +175,12 @@ module Reform
     end
 
     # override. it returns the added control
-    def addControl control, quickyhash = nil, &block
+    def addGraphicsItem control, quickyhash = nil, &block
 #       tag "addControl to qtc=#@qtc, to add = #{control.qtc}"
 #       @qtc.addToGroup(control.qtc)
 #       control.qtc.parentItem = @qtc
       @qtc.myChildItems << control.qtc
-      control.instance_eval(&block) if block
-      control.setupQuickyhash(quickyhash) if quickyhash
-#       tag "calling postSetup on #{control}"
-      control.postSetup
-#       tag "did postSetup"
-#       control
+      control.setup quickyhash, &block
     end
 
     def self.new_qt_implementor(qt_implementor_class, parent, qparent)

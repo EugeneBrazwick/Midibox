@@ -15,6 +15,7 @@ However it must be in postSetup.
   private
 
     def initialize parent, qtc
+#       tag "new Layout #{self}"
       super(parent, qtc, false)
     end
 

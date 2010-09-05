@@ -490,6 +490,7 @@ THIS ALL NO LONGER APPLIES since parent_qtc_to_use_for returns nil for layouts..
 
   # delegator. See App::createInstantiator
   def self.createInstantiator name, qt_implementor_class, reform_class = Widget, options = {}
+    # STACK OVERFLOW ? require_relative 'controls/widget.rb' if reform_class == Widget
 #     tag "createInstantiator '#{name}' implementor=#{qt_implementor_class}, klass=#{reform_class}"
     # this can be done using classmethods in reform_class.
     # Also we can have ToplevelContext, included by App itself
@@ -643,6 +644,7 @@ will create a button as toplevel control
 #           tag "calling #{reform_class}.new"
           form = reform_class.new qform
           @firstform ||= form   # it looks the same, but is completely different
+#           tag "Assigning setup"
           form.setup = quicky ? quicky : block
           # and now we wait for 'run'
           form

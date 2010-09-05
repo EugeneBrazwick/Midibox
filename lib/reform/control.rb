@@ -14,11 +14,17 @@ module Reform
     def initialize frame, qtc = nil
 #       tag "#{self}::initialize, caller=#{caller.join("\n")}"
       if frame
+#         tag "calling Qt::Object.new(#{frame})"
         super(frame)
+#         tag "HERE"
+            # self.parent = frame               Qt::Object constructor should do this!
+        parent == frame or raise
       else
+#         tag "calling super without frame"
         super()
+#         tag "HERE"
       end
-      parent = frame
+#       tag "HERE"
       @containing_form, @qtc, @has_pos = frame && frame.containing_form, qtc, false
       # NOTE: parent may change to its definite value using 'added' See Frame::added
       # in all cases: c.parent.children.contains?(c)
@@ -26,6 +32,7 @@ module Reform
       # however, it should be possible to do this when :initialize is set in options of
       # updateModel.
 #       @connected = false
+#       tag "Control #{self}.initialize DONE"
     end
 
 #     def blockSignals val = true

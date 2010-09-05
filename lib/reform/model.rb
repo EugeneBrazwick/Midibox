@@ -79,6 +79,9 @@ will work as expected
         [ModelContext, App]
       end
 
+      def parent_qtc parent_control, parent_effective_qtc
+      end
+
     end # ClassMethods
 
     # override
@@ -215,12 +218,14 @@ will work as expected
       parent.addModel self, hash, &block
     end
 
+=begin DUPLICATED CODE>>> see  ClassMethods!
     def self.contextsToUse
       [ModelContext, App]
     end
 
     def self.parent_qtc parent_control, parent_effective_qtc
     end
+=end
 
 #     def self.new_qt_implementor qt_implementor_class, parent, qt_parent
 #       qt_implementor_class.new qt_parent

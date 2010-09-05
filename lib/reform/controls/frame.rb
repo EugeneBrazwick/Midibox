@@ -42,7 +42,9 @@ However, in the previous version a form had 'containing_frame' being the form it
 #         tag "addWidget #{control} to infused layout + SETUP"
         control.parent = layout
         layout.add control, hash, &block
+#         tag "add OK"
       end
+#       tag "returning layout #{layout}"
       layout
     end
 

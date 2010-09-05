@@ -27,6 +27,17 @@ module Reform
       poly
     end
 
+    # @qtc does NOT implement 'objectName'!!! This is rather onfortunate
+    def name aName = nil
+      if aName
+        @objectName = aName.to_s
+        parent.registerName aName, self
+      else
+        @objectName
+      end
+    end
+
+
   end # Polygon
 
   createInstantiator File.basename(__FILE__, '.rb'), Qt::GraphicsPolygonItem, Polygon

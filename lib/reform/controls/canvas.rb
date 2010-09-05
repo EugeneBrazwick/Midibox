@@ -45,7 +45,7 @@ module Reform
         newqtc = Qt::GraphicsScene.new parent.qtc
         require_relative 'scene'
         c = Scene.new self, newqtc
-        addControl(c, &block)
+        c.addTo(self, nil, &block)
       end
       @qtc.scene = newqtc
     end
@@ -80,10 +80,11 @@ module Reform
        end
      end
 
+     # override
      def sizeHint
        Qt::Size.new(*@_canvas_hack.requested_size)
      end
-  end
+  end # class QGraphicsView
 
   createInstantiator File.basename(__FILE__, '.rb'), QGraphicsView, Canvas
 

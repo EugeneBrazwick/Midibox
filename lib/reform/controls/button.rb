@@ -44,9 +44,13 @@ module Reform
     end
 
     #override
-    def updateModel aModel, options = nil
+    def updateModel model, options = nil
 #       tag "@{self} connectModel #{aModel}, cid=#{connector}"
-      @qtc.text = model.apply_getter(tcid) if (model = effective_model) && (tcid = text_connector) && model.getter?(tcid)
+      cid = connector and
+        if model && model.getter?(cid)
+          @qtc.text = model.apply_getter(tcid)
+        end
+       # ????? if (model = effective_model) && (tcid = text_connector) && model.getter?(tcid)
       super
     end
 

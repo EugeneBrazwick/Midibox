@@ -99,16 +99,16 @@ Even more, a QDialog can be stored in the view as well!
     alias :pen :stroke
 
   #override
-    def addControl control, quickyhash = nil, &block
+    def addGraphicsItem control, quickyhash = nil, &block
 #       tag "addControl, control #{control} is added to SCENE"
       qc = if control.respond_to?(:qtc) then control.qtc else control end
-      require_relative '../graphicsitem'
-      case control
-      when GraphicsItem then @qtc.addItem(qc)
-      when Timer, Qt::Timer #then tag "start timer"; qc.start(1000)
-      else @qtc.addWidget(qc)
-      end
-      super
+      @qtc.addItem(qc)
+      control.setup quickyhash, &block
+      added control
+#       when Timer, Qt::Timer #then tag "start timer"; qc.start(1000)
+#       else @qtc.addWidget(qc)
+#       end
+#       super
     end
 
     def parent_qtc_to_use_for reform_class

@@ -18,6 +18,20 @@ module Reform
 
     define_simple_setter :scaledContents
 
+  # slightly problematic and only for simplistic settings:
+    AlignmentMap = { left: Qt::AlignLeft, right: Qt::AlignRight,
+                     hcenter: Qt::AlignHCenter, justify: Qt::AlignJustify,
+                     top: Qt::AlignTop, bottom: Qt::AlignBottom,
+                     vcenter: Qt::AlignVCenter,
+                     center: Qt::AlignHCenter | Qt::AlignVCenter
+                     # topleft, ... etc. then we have :absolute etc.....
+                    }
+    def alignment value = nil
+      return @qtc.alignment if value.nil?
+      Symbol === value and value = AlignmentMap[value] || Qt::AlignLeft
+      @qtc.alignment = value
+    end
+
     public
 
     def pixmap= val

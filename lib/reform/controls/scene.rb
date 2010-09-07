@@ -33,13 +33,13 @@ Even more, a QDialog can be stored in the view as well!
     # set the topleft and size of the scene. These can be floats and
     # can be freely chosen. Zoom, offset and aspectratio can be changed
     # for a specific view (and even rotation etc)
-    def area x, y, w, h
+    def area x, y, w, h = w
 #       tag "sceneRect := #{x}, #{y}, #{w}x#{h}"
       @qtc.setSceneRect x, y, w, h
     end
 
     # same as area 0, 0, w, h
-    def size w, h
+    def size w, h = w
       @qtc.setSceneRect 0, 0, w, h
     end
 

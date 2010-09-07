@@ -18,7 +18,11 @@ module Reform
       @containing_form.qcentralWidget = @containing_form.qtc.centralWidget = @qtc
     end
 
-    define_simple_setter :locale
+    define_simple_setter :locale, :autoFillBackground
+
+    def fixedSize x, y = nil
+      @qtc.setFixedSize(x, y || x)
+    end
 
     # special values: :base and :dark
     def backgroundRole value = nil
@@ -258,7 +262,7 @@ module Reform
 
   end # class Widget
 
-  class QWidget < Qt::Widget # may change
+  class QWidget < Qt::Widget
     public
     # override
     def sizeHint

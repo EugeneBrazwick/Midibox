@@ -6,12 +6,14 @@ module Reform
   class Circle < GraphicsItem
   private
 
-    # override.
-    def position x, y
+    # override. Position of the center(!)
+    def position x, y = nil
+      x, y = x if y.nil?
       rect = @qtc.rect
-      r, center = rect.width, rect.center
-      r2 = r / 2.0
-      @qtc.rect = Qt::RectF.new(x - r2, y - r2, r, r)
+      w, center = rect.width, rect.center
+      radius = w / 2.0
+      @qtc.rect = Qt::RectF.new(x - radius, y - radius, w, w)
+#       tag "x=#{x}, y=#{y}, w=#{w} rect is now #{@qtc.rect.inspect}"
     end
 
     def radius r

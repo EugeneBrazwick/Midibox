@@ -12,15 +12,15 @@ module Reform
 
     # create a new Control, using the frame as 'owner', and qtc as the wrapped Qt::Widget
     def initialize frame, qtc = nil
-#       tag "#{self}::initialize, caller=#{caller.join("\n")}"
+#       tag "#{self}::initialize"
       if frame
-#         tag "calling Qt::Object.new(#{frame})"
+#         tag "calling Qt::Object.initialize(#{frame})"
         super(frame)
 #         tag "HERE"
             # self.parent = frame               Qt::Object constructor should do this!
         parent == frame or raise
       else
-#         tag "calling super without frame"
+#         tag "calling Qt::Object.initialize()"
         super()
 #         tag "HERE"
       end
@@ -32,7 +32,7 @@ module Reform
       # however, it should be possible to do this when :initialize is set in options of
       # updateModel.
 #       @connected = false
-#       tag "Control #{self}.initialize DONE"
+#       tag "#{self}.initialize DONE"
     end
 
 #     def blockSignals val = true
@@ -302,10 +302,17 @@ module Reform
       end
     end
 
-    # default resize callback setter/getter
-    def whenResized &block
-      return rfCallBlockBack(&@whenResized) unless block
-      @whenResized = block
+    # sets it if block is given, or calls it, if w,h is given, otherwise returns the handler itself
+    # that last feature is never used anymore.
+    def whenResized(w = nil, h = nil, &block)
+      if block
+        @whenResized = block
+      else
+        return @whenResized if w.nil?
+        if instance_variable_defined?(:@whenResized)
+          rfCallBlockBack(w, h, &@whenResized)
+        end
+      end
     end
 
     # this callback is called after the 'block' initialization. Or even without a block,
@@ -392,7 +399,7 @@ module Reform
    See Frame#connect
 =end
     def updateModel aModel, options = nil
-      tag "#{self}, aModel=#{aModel}, should be propagated!"
+#       tag "#{self}, aModel=#{aModel}, should be propagated!"
 #       @model ||= nil
 #       unless @model.equal?(aModel)
 #         @model.removeObserver_i(self) if @model

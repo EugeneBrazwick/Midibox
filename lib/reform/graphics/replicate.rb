@@ -6,6 +6,7 @@ module Reform
   require_relative '../graphicsitem'
 
   # IMPORTANT: these are NOT Qt::Objects!! So no parenting system!
+  # WRONG. But it is now setParentItem en ChildItems to do stuff...
   class QReplicate < Qt::GraphicsItem #Group
     private
     def initialize parent, init_brush
@@ -16,7 +17,6 @@ module Reform
       # be really usefull.
       @boundingrect = @count = @rotation = @scale = @translation = nil
       @fillhue_rotation = nil
-      @myChildItems = []
     end
 
     private
@@ -35,7 +35,7 @@ module Reform
     public
     def boundingRect
       b = Qt::RectF.new
-      @myChildItems.each { |i| b |= i.boundingRect }
+      childItems.each { |i| b |= i.boundingRect }
 #       tag "org boundingRect = #{b.inspect}" # super -> 0,0,0,0  ???
       return b unless @count && @count > 0
       m = matrix!
@@ -48,7 +48,7 @@ module Reform
     def opaqueArea
 #       tag "opaqueArea called, this may be extremely slow, must cache..."
       o = Qt::PainterPath.new
-      @myChildItems.each { |i| o |= i.opaqueArea }
+      childItems.each { |i| o |= i.opaqueArea }
       return o unless @count && @count > 0
       m = matrix!
       @count.times { o |= m.map(o) }
@@ -64,7 +64,7 @@ module Reform
       # the method should paint to painter.
 #       painter.pen = Qt::Pen.new(Qt::black)
 #       painter.drawRect(boundingRect)
-      @myChildItems.each do |i|
+      childItems.each do |i|
         # important 'respond_to?' will NOT work!!
 #         tag "#{i}.respond_to?(:setBrush) -> #{i.respond_to?(:setBrush)}"
         i.brush = @init_brush if @fillhue_rotation #&& i.respond_to?(:setBrush)
@@ -99,7 +99,7 @@ module Reform
             # and if I change the matrix for all components?
             # Or for myself???
 #             super(painter, option, widget)
-            @myChildItems.each do |i|
+            childItems.each do |i|
 #               painter.drawRect(i.boundingRect)
               i.brush = @hue if @hue #&& i.respond_to?(:'setBrush')
               i.paint(painter, option, widget)
@@ -132,7 +132,6 @@ module Reform
     end
 
     attr_accessor :count, :scale
-    attr :myChildItems
 
     def translation=(x = nil, y = nil)
 #       tag "translation"
@@ -179,7 +178,7 @@ module Reform
 #       tag "addControl to qtc=#@qtc, to add = #{control.qtc}"
 #       @qtc.addToGroup(control.qtc)
 #       control.qtc.parentItem = @qtc
-      @qtc.myChildItems << control.qtc
+      control.qtc.parentItem = @qtc
       control.setup quickyhash, &block
     end
 

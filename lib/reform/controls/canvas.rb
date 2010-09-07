@@ -1,11 +1,18 @@
 module Reform
 
   require_relative 'frame'
+  require_relative '../graphical'
 
+  # a Canvas is a frame that can contain graphic items like 'circle' etc.
   class Canvas < Frame
-    require_relative '../graphical'
     include Graphical
   private
+
+    def initialize p, qp, autolayout = true
+      super
+      @rotation = @scale = @translation = nil
+    end
+
     define_simple_setter :renderHint, :cacheMode, :dragMode
 
     def autoscale
@@ -13,8 +20,8 @@ module Reform
     end
 
     def antialiasing b = nil
-      return renderHints & Qt::Painter::Antialiasing if b.nil?
-      setRenderHint(Qt::Painter::Antialiasing, b)
+      return @qtc.renderHints & Qt::Painter::Antialiasing if b.nil?
+      @qtc.setRenderHint(Qt::Painter::Antialiasing, b)
     end
 
     def initialize panel, qtc
@@ -50,8 +57,33 @@ module Reform
       @qtc.scene = newqtc
     end
 
+    def calc_matrix
+      # avoid creating a lot of objects... Is this lame?
+      @@i ||= Qt::Transform.new
+      @@i.reset
+      @@i.rotate(@rotation) if @rotation
+      @@i.scale(@scale) if @scale
+      @@i.translate(*@translation) if @translation
+      @@i
+    end
+
   public
 
+    # rotate clockwise around center of the canvas.
+    def rotate deg
+      self.rotation = @rotation + deg
+    end
+
+    # change rotation only
+    def rotation= deg
+      @rotation = deg
+      @qtc.transform = calc_matrix
+    end
+
+    def rotation deg = nil
+      return @rotation || 0 if deg.nil?
+      self.rotation = deg
+    end
   end # class Canvas
 
   # The implementor:
@@ -69,7 +101,8 @@ module Reform
      # override Qt virtual method. Unfortunately there is no slot/signal for this.
      def resizeEvent event
        w, h = event.size.width, event.size.height
-       b = @_canvas_hack.whenResized and b[w, h]
+#        tag "calling #@_canvas_hack.whenResized(#{w}, #{h})"
+#        @_canvas_hack.whenResized(w, h)
        if @autoscale && w > 4 && h > 4
 #          fitInView(sceneRect, Qt::KeepAspectRatio)
          srect = sceneRect
@@ -86,6 +119,7 @@ module Reform
      end
   end # class QGraphicsView
 
-  createInstantiator File.basename(__FILE__, '.rb'), QGraphicsView, Canvas
+#   tag "CALLING createInstantiator #{File.basename(__FILE__, '.rb')}"
+  createInstantiator File.basename(__FILE__, '.rb').to_sym, QGraphicsView, Canvas
 
 end # Reform

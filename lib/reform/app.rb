@@ -219,16 +219,56 @@ module Reform
   This should execute the setupblock, and finally call postSetup on the canvas.
 =end
   module Instantiator
+
+#     tag "@@instantiator := {}"
+    @@instantiator = {}
+
+  public
+
     def createInstantiator_i name, qt_implementor_class, reform_class, options = nil
-#       tag "define_method #{self}::#{name}."
-      remove_method name if private_method_defined?(name)
-      define_method name do |quickyhash = nil, &block|
-#         raise 'cannot use both argument AND a block' if quickyhash && block           YES YOU CAN
-#         tag "arrived in #{self}::#{name}(), hash=#{quickyhash}, block=#{block}"
+      @@instantiator[name.to_sym] = { qt_implementor_class: qt_implementor_class, reform_class: reform_class,
+                                      options: options }
+    end # createInstantiator_i
+
+    # Example:
+    # ReForm::registerControlClassProxy 'mywidget' 'contrib_widgets/mywidget.rb'
+    # It will create a 'mywidget' method. to which the name and setupblock
+    # should be passed. So after this you can say
+    #           mywidget {
+    #              size 54, 123
+    #           }
+    # However, this is just a proxy.
+    # The unit is NOT opened here. Only if this code is executed will it.
+    # When called it performs 'require' and
+    # the unit loaded should call registerControlClass and so createInstantiator_i above
+    # It used to overwrite the 'name' method, but calling remove_method name from within 'name'
+    # itself caused sporadic SEGV's....
+    # And it was overly complicated as well.
+    # For internal use only (hence _i suffix)
+    def registerControlClassProxy_i name, thePath
+      name = name.to_sym
+#       tag "registerControlClassProxy_i(#{name}, #{thePath})"
+      # to avoid endless loops we must consider that by loading some classes it is possible
+      # that we already loaded the file.
+      return if private_method_defined?(name)
+      define_method name do |quicky = nil, &block|
+        # are we registered at this point?
+        # this is done by the require which executes createInstantiator_i.
+        # IMPORTANT ruby1.9.2 corrupts name2 somehow.  Using name3 does the trick however
+        unless @@instantiator[name]
+#           tag "arrived in #{self}::#{name3.inspect}() PROXY, selv=#{selv}, __method__=#{__method__.inspect}"
+          require_relative thePath
+          # the loaded module should call createInstantiator (and so registerControlClass) which alters
+          # @@instantiator
+          raise "'#{name}' did not register an instantiator!!!" unless @@instantiator[name]
+        end
+        instantiator = @@instantiator[name]
+        reform_class = instantiator[:reform_class]
+        options = instantiator[:options]
+        qt_implementor_class = instantiator[:qt_implementor_class]
         # It's important to use parent_qtc_to_use, since it must be a true widget.
         # Normally, 'qparent' would be '@qtc' itself
-        qparent = quickyhash && quickyhash[:qtparent] || parent_qtc_to_use_for(reform_class)
-
+        qparent = quicky && quicky[:qtparent] || parent_qtc_to_use_for(reform_class)
 =begin
     Severe problem:     sometimes the parenting must change but how can this be done before
                         even the instance exists?
@@ -242,99 +282,53 @@ module Reform
 # NOT GOING TO WORK.
 #  BAD respond_to is USELESS!!        if qparent.respond_to?(:layout) && qparent.layout && reform_class <= Layout  # smart!!
 =begin
-        if qparent
-          graphic_parent = qparent.inherits('QGraphicsScene')
-          if reform_class <= Layout
             # assuming that qt_implementor_class <= QLayout, and layout is
             # constructed with parent == 0 (see for example widgets/calendar/window.cpp )
             #             && #(qparent.widgetType? && qparent.layout ||
             # insert an additional generic frame (say Qt::GroupBox)
             # you cannot store a layout in a layout, nor can you store a layout in a graphicsscene.
             # See calendar.cpp in Nokia examples. layout.addLayout is OK.
-            if graphic_parent # storing layout in graphic, requires some widget in between:
-              qparent = Qt::GroupBox.new qparent
-              ctrl = addControl GroupBox.new(ctrl, qparent)
-            end
-            qparent = nil
-          elsif graphic_parent # see above && !(reform_class <= GraphicsItem)
-            qparent = nil
 #     you cannot store a QWidget in a g-scene but since it accepts QGraphicsItems it is possible to
 #     create a QGraphicsProxyWidget
-          end
-        end  # if qparent
-        # we create the implementor first, then the wrapper
-#         tag "reform_class=#{reform_class}, calling new_qt_implementor for #{qt_implementor_class}, parent=#{qparent}"
 
-THIS ALL NO LONGER APPLIES since parent_qtc_to_use_for returns nil for layouts...
+# we create the implementor first, then the wrapper
+#         tag "reform_class=#{reform_class}, calling new_qt_implementor for #{qt_implementor_class}, parent=#{qparent}"
 =end
-        raise 'CANTHAPPEN' if qparent && qparent.inherits('QGraphicsScene')
+#         raise 'CANTHAPPEN' if qparent && qparent.inherits('QGraphicsScene')
 #         tag "instantiate #{qt_implementor_class} with parent #{qparent}"
         newqtc = qt_implementor_class &&
                  ctrl.instantiate_child(reform_class, qt_implementor_class, qparent)
 #         tag "#{reform_class}.new, ctrl=#{ctrl} self=#{ctrl}, func=#{name}"
 #         if reform_class <= Model
 #           tag "CALLING setModel!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
-#           ctrl.setModel(c = reform_class.new, quickyhash, &block)
+#           ctrl.setModel(c = reform_class.new, quicky, &block)
 #         else
 #         tag "#{reform_class}.new"
         c = reform_class.new ctrl, newqtc
 #           tag "instantiated c=#{c}, parent is a #{ctrl.class}"
-#           c.text(quickylabel) if quickylabel
+#           c.text(quicky) if quicky
           # addControl will execute block, and then also call postSetup
 #         tag "APP -> #{c.class}.addTo(#{self.class}) + SETUP"
         rfRescue do
 #           tag "CALLING #{ctrl}.add(#{c})"
-          ctrl.add(c, quickyhash, &block)
+          ctrl.add(c, quicky, &block)
         end
 #         tag "IMPORTANT: method '#{name}' return the control #{c}"
         c
-      end  # define_method name
-      # make the method private:
-      private name
-    end # createInstantiator_i
+      end  # define_method
 
-    # Example:
-    # ReForm::registerControlClassProxy 'mywidget' 'contrib_widgets/mywidget.rb'
-    # It will create a 'mywidget' method. to which the name and setupblock
-    # should be passed. So after this you can say
-    #           mywidget {
-    #              size 54, 123
-    #           }
-    # However, this is just a proxy.
-    # The unit is NOT opened here. Only if this code is executed will it.
-    # When called it performs 'require' and
-    # the unit loaded should call registerControlClass which overwrites
-    # our method!
-    #
-    # For internal use only.
-    def registerControlClassProxy_i name, thePath
-      # to avoid endless loops we must consider that by loading some classes it is possible
-      # that we already loaded the file.
-      # even more it is possible that frame.rb was loaded before we ever got to registering the proxies
-      # in that case we would overwrite the correct method with the proxy. BAD.
-      # if the method already exists, then we may assume it is the right one!
-      return if private_method_defined?(name)
-      klass = self
-#       tag "define_method #{self}::#{name}"
-      define_method name do |quickylabel = nil, &block|
-#         tag "arrived in #{self}::#{name}() PROXY"
-        # when called the method is removed to prevent loops
-        klass.send :remove_method, name
-#         tag "require_relative '#{thePath}'"
-        require_relative thePath
-        # the loaded module should call createInstantiator (and so registerControlClass) which recreates the method
-        # and we call it immediately
-#         tag "calling the new #{name} method, and returning ?"
-        begin
-          send(name, quickylabel, &block) #.tap { |t| tag "and returning #{t}" }
-        rescue NoMethodError => exception
-          if exception.to_s.include?(name)
-            raise NoMethodError, tr("it seems %s.rb did not call 'Reform::createInstantiator()'!") % name.to_s
-          end
-          raise
-        end
-      end
+      # make it private to complete it:
       private name
+
+    end # registerControlClassProxy_i
+
+    def self.instantiator
+#       tag "instantiator -> #{@@instantiator}"
+      @@instantiator
+    end
+
+    def self.[] name
+      @@instantiator[name]
     end
   end # module Instantiator
 
@@ -403,7 +397,7 @@ THIS ALL NO LONGER APPLIES since parent_qtc_to_use_for returns nil for layouts..
     attr :name
 
     def to_s
-      "#{@control.class}::#@name(#{@quickylabel}) BLOCK #{@block.inspect}"
+      "#{@control.class}::#@name(#{@quicky}) BLOCK #{@block.inspect}"
     end
   end # class Macro
 #
@@ -411,21 +405,13 @@ THIS ALL NO LONGER APPLIES since parent_qtc_to_use_for returns nil for layouts..
   # experimental. 'Cans' both widgets and graphicitem setups
   module SceneFrameMacroContext
     def self.createInstantiator_i name
-#       tag "define_method #{self}::#{name} MACRO recorder"
-      define_method name do |quickylabel = nil, &block|
-#         tag "Recording macro for #{self}::#{name}(), parent=#{parent}"
-        Macro.new(self, name, quickylabel, block)
-      end
-      private name
     end
 
     def self.registerControlClassProxy_i name, thePath
+      name = name.to_sym
       return if private_method_defined?(name)
-      klass = self
-      define_method name do |quickylabel = nil, &block|
-        klass.send :remove_method, name
-        require_relative thePath
-        send(name, quickylabel, &block)
+      define_method name do |quicky = nil, &block|
+        Macro.new(self, name, quicky, block)
       end
       private name
     end
@@ -460,12 +446,6 @@ THIS ALL NO LONGER APPLIES since parent_qtc_to_use_for returns nil for layouts..
     ActionContext::registerControlClassProxy_i id, path
   end
 
-#   def self.registerDelegateClassProxy id, path
-#     DelegateContext::registerControlClassProxy_i id, path
-#   end
-
-#   require_relative 'widget'
-
   # some forwards, for the ultimate lazy programming:
   class Control < Qt::Object
   end
@@ -473,12 +453,6 @@ THIS ALL NO LONGER APPLIES since parent_qtc_to_use_for returns nil for layouts..
   class Widget < Control
   end
 
-#   class Menu < Control
-#   end
-#
-#   class Action < Control
-#   end
-#
   class Frame < Widget
   end
 
@@ -488,9 +462,13 @@ THIS ALL NO LONGER APPLIES since parent_qtc_to_use_for returns nil for layouts..
   module Model
   end
 
-  # delegator. See App::createInstantiator
+  # delegator.
+  # Called from all plugins, who in turn are loaded by a method created using register*Proxy_i
   def self.createInstantiator name, qt_implementor_class, reform_class = Widget, options = {}
-    # STACK OVERFLOW ? require_relative 'controls/widget.rb' if reform_class == Widget
+#     tag "createInstantiator(#{name.inspect})"
+    # 'Widget' is implicit (since the default), and this 'require' avoids having to load it, as the caller may
+    # be unaware of the fact that it is needed
+    require_relative 'controls/widget.rb' if reform_class == Widget
 #     tag "createInstantiator '#{name}' implementor=#{qt_implementor_class}, klass=#{reform_class}"
     # this can be done using classmethods in reform_class.
     # Also we can have ToplevelContext, included by App itself
@@ -574,29 +552,53 @@ will create a button as toplevel control
 
   Use through Reform::registerControlClassProxy
 =end
-    def self.registerControlClassProxy_i name , thePath
+    def self.registerControlClassProxy_i name, thePath
+      name = name.to_sym
 #       tag "registerControlClassProxy_i(#{name}, #{thePath})"
       return if private_method_defined?(name)
 #       tag "define_method #{self}::#{name}"
-      define_method name do |quickylabel = nil, &block|
-        # Remove ourselves, so if we accidentally come back here we cause no stack overflow
-        App.send :remove_method, name
-        require_relative thePath
-        send(name, quickylabel, &block)
+      define_method name do |quicky = nil, &block|
+        unless Instantiator[name]
+          require_relative thePath
+          raise "'#{name}' did not register an instantiator!!!" unless Instantiator[name]
+        end
+        instantiator = Instantiator[name]
+        reform_class = instantiator[:reform_class]
+        options = instantiator[:options]
+        qt_implementor_class = instantiator[:qt_implementor_class]
+        if options[:form]
+          qform = qt_implementor_class.new
+#           tag "app.#{name}, calling #{reform_class}.new to get a form"
+          form = reform_class.new qform
+#           tag "instantiated #{form}"
+          @firstform ||= form   # it looks the same, but is completely different
+#           tag "Assigning setup"
+          form.setup = quicky ? quicky : block
+#           tag "and now we wait for 'run'"
+          form
+        elsif @autoform
+          raise ReformError, 'put controls in forms' unless @all_forms.length <= 1
+          # it seems that 'form' is not the instantiator here??
+#           tag "form=#{form.inspect}"  -> NIL
+#             tag "Instantiating autoform '#@autoform', unless #@firstform"
+          @firstform ||= send(@autoform)
+          # we delay creating the elements until form.run is called.
+#           tag "create macro for #{name}"
+          Macro.new(@firstform, name, quicky, block)
+        else
+          # is this a proper constraint?
+          raise ReformError, 'only 1 control can be on top' if @firstform
+          qctrl = qt_implementor_class.new
+#           tag "reform_class=#{reform_class}, qctrl=#{qctrl}"
+          @firstform = reform_class.new(nil, qctrl)
+        end
       end
-      # make the method private:
+      # make it private:
       private name
-    end
+    end # registerControlClassProxy_i
 
     def self.registerModelClassProxy_i name, thePath
       self.registerControlClassProxy_i name, thePath
-#       return if private_method_defined?(name)
-#       define_method name do |quickylabel = nil, &block|
-#         App.send :remove_method, name
-#         require_relative thePath
-#         send(name, quickylabel, &block)
-#       end
-#       private name
     end
 
     # called from Reform::app
@@ -637,40 +639,9 @@ will create a button as toplevel control
   generate a macro that is added to the implicit QMainWindow
 =end
     def self.createInstantiator_i name, qt_implementor_class, reform_class, options = {}
-      remove_method name if private_method_defined?(name)
-      if options[:form]
-        define_method name do |quicky = nil, &block|
-          qform = qt_implementor_class.new
-#           tag "calling #{reform_class}.new"
-          form = reform_class.new qform
-          @firstform ||= form   # it looks the same, but is completely different
-#           tag "Assigning setup"
-          form.setup = quicky ? quicky : block
-          # and now we wait for 'run'
-          form
-        end
-      else
-        define_method name do |quicky = nil, &block|
-          if @autoform
-            raise ReformError, 'put controls in forms' unless @all_forms.length <= 1
-            # it seems that 'form' is not the instantiator here??
-  #           tag "form=#{form.inspect}"  -> NIL
-#             tag "Instantiating autoform '#@autoform', unless #@firstform"
-            @firstform ||= send(@autoform)
-            # we delay creating the elements until form.run is called.
-  #           tag "create macro for #{name}"
-            Macro.new(@firstform, name, quicky, block)
-          else
-            # is this a proper constraint?
-            raise ReformError, 'only 1 control can be on top' if @firstform
-            qctrl = qt_implementor_class.new
-            tag "reform_class=#{reform_class}, qctrl=#{qctrl}"
-            @firstform = reform_class.new(nil, qctrl)
-          end
-        end
-      end
-      # make it private:
-      private name
+      Instantiator.instantiator[name] = { qt_implementor_class: qt_implementor_class,
+                                          reform_class: reform_class,
+                                          options: options }
     end # App::createInstantiator_i
 
     # return or set the title

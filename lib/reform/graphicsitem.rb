@@ -3,15 +3,25 @@ module Reform
 
   class GraphicsItem < Control
     require_relative 'graphical'
-    include Graphical
+    # each item can contain arbitrary children. using parentItem and childItems (Qt methods)
+    include Graphical,  GraphicContext
   private
 
     # position in the Scene (not the view)
-    def position x, y
+    def position x, y = nil
+      x, y = x if y.nil?
       @qtc.setPos x ,y
     end
 
     public
+
+    # override
+    def addGraphicsItem control, quickyhash = nil, &block
+      qc = if control.respond_to?(:qtc) then control.qtc else control end
+      qc.parentItem = @qtc
+      control.setup quickyhash, &block
+      added control
+    end
 
     def fill brush = nil, g = nil, b = nil, a = nil
       return @qtc.brush unless brush
@@ -21,8 +31,6 @@ module Reform
       end
     end
 
-    alias :background :fill
-
     def stroke pen = nil, g = nil, b = nil, a = nil
       return @qtc.pen unless pen
 #       tag "stroke #{pen.inspect}"
@@ -30,7 +38,9 @@ module Reform
 #       tag "qtc.pen=#{@qtc.pen.inspect}, color.red=#{@qtc.pen.color.red}"
     end
 
+    alias :background :fill
     alias :brush :fill
+    alias :fillcolor :fill
     alias :pen :stroke
 
     # Important, angles less than 1.0 degree are taken to be a factor of the

@@ -26,6 +26,7 @@ However, in the previous version a form had 'containing_frame' being the form it
       # is a layout, and the frame is not a layout.
       # in both cases @infused_layout is set.
       @autolayout = autolayout
+#       tag "Frame.new EXECUTED"
     end
 
     # note hash and block are setups for 'control'
@@ -96,7 +97,7 @@ However, in the previous version a form had 'containing_frame' being the form it
 
     # override
     def addWidget control, hash, &block
-#       tag "#{self}, adding widget #{control}"
+#       tag "#{self}, adding widget #{control}, autolayout=#@autolayout"
       if layout = infused_layout
 #         tag "infused layout"
         control.parent = layout

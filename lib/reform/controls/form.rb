@@ -12,8 +12,10 @@ module Reform
   class ReForm < Frame
     include ModelContext
     private
+    # NOTE: due to a qtruby hack this is called twice per 'new'!!!
+    # But the first time it never goes beyond 'super'!
     def initialize qtc
-#       tag "new ReForm" #, stacktrace=#{caller.join("\n")}"
+#       tag "#{self}.initialize(#{qtc}), stacktrace=#{caller.join("\n")}"
       super nil, qtc
       # store a ref to ourselves in the Qt::Widget
       @qtc.instance_variable_set :@_reform_hack, self
@@ -38,7 +40,9 @@ module Reform
       @widget_index = {} # hash name=>widget
       # main model in the form, frames can override this locally though
       @model = nil
+#       tag "calling registerForm #{self}"
       $qApp.registerForm self
+#       tag "ReForm.new EXECUTED"
     end
 
     # IMPORTANT: the name becomes a method of $qApp, if and only if it ends
@@ -62,7 +66,7 @@ module Reform
     # Otherwise I could use QWidget but any other Qt derivation will still
     # lack it!!!
     def resizeEvent event
-      blk = @_reform_hack.whenResized and blk[event.size.width, event.size.height]
+      @_reform_hack.whenResized(event.size.width, event.size.height)
     end
 
     public

@@ -18,7 +18,6 @@ module Reform
 #       tag "#{self}.initialize(#{qtc}), stacktrace=#{caller.join("\n")}"
       super nil, qtc
       # store a ref to ourselves in the Qt::Widget
-      @qtc.instance_variable_set :@_reform_hack, self
       # block to call for lazy initialization. After done so it becomes nil, can also be a 'quicky' hash
       @setup = nil #setupblock
       # the menubar implementor:

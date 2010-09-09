@@ -18,7 +18,7 @@ module Reform
       @data = []
 #       @model_connector = nil
       connect(@qtc, SIGNAL('activated(int)'), self) do |idx|
-        rfRescueContext do
+        rfRescue do
           if (model = effectiveModel) && (cid = connector) && model.setter?(cid)
             activated(model, cid, idx)
           end

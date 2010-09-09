@@ -44,6 +44,68 @@ gridlayout {
 #       tag "initialized 'collection'"
     end
 
+    class RowRef
+    private
+      def initialize gl, idx
+        @qgl, @idx = gl.qtc, idx
+      end
+
+      def stretch val = 1
+        @qgl.setRowStretch @idx, val
+      end
+
+      def minimumHeight val
+        @qgl.setRowMinimumHeight @idx, val
+      end
+    end
+
+    class ColRef
+    private
+      def initialize gl, idx
+        @qgl, @idx = gl.qtc, idx
+      end
+
+      def stretch val = 1
+        @qgl.setColumnStretch @idx, val
+      end
+
+      def minimumWidth val
+        @qgl.setColumnMinimumWidth @idx, val
+      end
+    end
+
+#     class RowRowRef
+#     private
+#       def initialize gl
+#         @gl = gl
+#       end
+#     public
+#       def [](idx, &block)
+#         RowRef.new(@gl, idx).instance_eval(&block)
+#       end
+#     end
+#
+#     class ColColRef
+#     private
+#       def initialize gl
+#         @gl = gl
+#       end
+#     public
+#       def [](idx, &block)
+#         ColRef.new(@gl, idx).instance_eval(&block)
+#       end
+#     end
+
+    def row(index, &block)
+#       return RowRowRef.new(self) if index.nil?
+      RowRef.new(self, index).instance_eval(&block)
+    end
+
+    def col(index, &block)
+#       return ColColRef.new(self) if index.nil?
+      ColRef.new(self, index).instance_eval(&block)
+    end
+
     def rowStretch ar
       case ar
       when Integer then @qtc.setRowStretch(ar, 1)
@@ -55,7 +117,7 @@ gridlayout {
     def columnStretch ar
       case ar
       when Integer then @qtc.setColumnStretch(ar, 1)
-      when Hash then ar.eachg { |k, v| @qtc.setColumnStretch(k, v) }
+      when Hash then ar.each { |k, v| @qtc.setColumnStretch(k, v) }
       else ar.each_with_index { |v, i| @qtc.setColumnStretch(i, v) }
       end
     end
@@ -97,12 +159,24 @@ gridlayout {
 #         tag "qtc.addWidget(#{control}, r:#{r}, c:#{c}, #{spanr}, #{spanc}), layout?->#{control.layout?}"
         if Layout === control
           @qtc.addLayout(control.qtc, r, c, spanr, spanc)
-        elsif alignment = control.layout_alignment
-#           tag "applying alignment: #{alignment}, ignoring span"
-          @qtc.addWidget(control.qtc, r, c, alignment)
         else
-#           tag "addWidget(#{control.qtc}, r=#{r}, c=#{c}, spanr=#{spanr}, spanc=#{spanc})"
-          @qtc.addWidget(control.qtc, r, c, spanr, spanc)
+          # add a label after it or in front of it
+          label = nil
+          if control.respond_to?(:labeltext) && (labeltext = control.labeltext) # may be a string, may have been converted to a Label reference
+#           tag "#{control}.labeltext = #{label.inspect}"
+            label = if labeltext.respond_to?(:qtc) then labeltext.qtc else Qt::Label.new(labeltext) end
+            label.buddy = control.qtc
+#             tag "addLabel(, #{r}, #{c == 0 ? spanc : c - 1}, someAlign)"
+            @qtc.addWidget(label, r, c == 0 ? spanc : c - 1, c == 0 ? Qt::AlignLeft : Qt::AlignRight)
+          end
+          if alignment = control.layout_alignment
+#           tag "applying alignment: #{alignment}, ignoring span"
+            @qtc.addWidget(control.qtc, r, c, alignment)
+          else
+#             tag "addWidget(#{control.qtc}, r=#{r}, c=#{c}, spanr=#{spanr}, spanc=#{spanc})"
+            @qtc.addWidget(control.qtc, r, c, spanr, spanc)
+          end
+          spanc += 1 if label && c == 0  # since we need an extra column
         end
         currow, curcol = r, c + spanc
         curcol, currow = 0, currow + 1 if curcol >= (@columnCount || @qtc.columnCount)

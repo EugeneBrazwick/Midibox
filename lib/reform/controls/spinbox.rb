@@ -1,16 +1,16 @@
 
 module Reform
 
-  require_relative 'widget'
+  require_relative '../labeledwidget'
 
-  class SpinBox < Widget
+  class SpinBox < LabeledWidget
     private
 
     def range m, n = nil
       n ? @qtc.setRange(m, n) : @qtc.setRange(*m)
     end
 
-    define_simple_setter :value
+    define_simple_setter :value, :specialValueText
   end
 
   createInstantiator File.basename(__FILE__, '.rb'), Qt::SpinBox, SpinBox

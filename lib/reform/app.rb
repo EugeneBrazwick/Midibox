@@ -247,7 +247,7 @@ module Reform
     # For internal use only (hence _i suffix)
     def registerControlClassProxy_i name, thePath
       name = name.to_sym
-#       tag "registerControlClassProxy_i(#{name}, #{thePath})"
+#       tag "#{self}::registerControlClassProxy_i(#{name}, #{thePath})"
       # to avoid endless loops we must consider that by loading some classes it is possible
       # that we already loaded the file.
       return if private_method_defined?(name)
@@ -424,6 +424,12 @@ module Reform
   def self.registerControlClassProxy id, path
     ControlContext::registerControlClassProxy_i id, path
     App::registerControlClassProxy_i id, path
+  end
+
+  # two in one if you want to use a class already loaded
+  def self.registerControlClass id, qclass, klass = Widget
+    registerControlClassProxy id, nil
+    createInstantiator id, qclass, klass
   end
 
   def self.registerGraphicsControlClassProxy id, path

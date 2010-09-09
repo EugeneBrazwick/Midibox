@@ -9,6 +9,11 @@ module Reform
   class Widget < Control
   private
 
+    def initialize parent, qtc = nil
+      super
+      @qtc.instance_variable_set :@_reform_hack, self
+    end
+
     def close
       @qtc.close
     end
@@ -187,6 +192,10 @@ module Reform
       instance_variable_get(:@sizeHint) ? @sizeHint : nil
     end
 
+    def minimumSizeHint_i
+      instance_variable_get(:@minimumSizeHint) ? @minimumSizeHint : nil
+    end
+
     def sizeHint x = nil, y = nil
       return sizeHint_i || @qtc.sizeHint if x.nil?
       @sizeHint = if y.nil? then x else Qt::Size.new(x, y) end # this currently only works for forms!!! Not other windows!!!
@@ -194,6 +203,14 @@ module Reform
     end
 
     alias :sizehint :sizeHint
+
+    def minimumSizeHint x = nil, y = nil
+      return minimumSizeHint_i || @qtc.minimumSizeHint if x.nil?
+      @minimumSizeHint = if y.nil? then x else Qt::Size.new(x, y) end
+    end
+
+    alias :minimumSize :minimumSizeHint
+    alias :minimumSizehint :minimumSizeHint
 
     def adjustSize
 #       tag "calling #@qtc.adjustSize"
@@ -208,7 +225,13 @@ module Reform
       end
     end
 
-    attr :layout_alignment
+    LayoutAlignmentMap = { left: Qt::AlignLeft, right: Qt::AlignRight, center: Qt::AlignCenter }
+
+    def layout_alignment value = nil?
+      return @layout_alignment if value.nil?
+      value = LayoutAlignmentMap[value] || Qt::AlignLeft if Symbol === value
+      @layout_alignment = value
+    end
 
     # this only works if the widget is inside a boxlayout
     def stretch v = nil
@@ -266,7 +289,12 @@ module Reform
     public
     # override
     def sizeHint
-      instance_variable_get(:@_reform_hack) ? (@_reform_hack.sizeHint_i || super) : super
+      (instance_variable_get(:@_reform_hack) ? (@_reform_hack.sizeHint_i || super) : super) #.tap{|t|tag("sz:#{t.inspect}")}
+    end
+
+    # override
+    def minimumSizeHint
+      (instance_variable_get(:@_reform_hack) ? (@_reform_hack.minimumSizeHint_i || super) : super) #.tap{|t|tag("minsz:#{t.inspect}")}
     end
   end # class QWidget
 

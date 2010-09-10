@@ -268,11 +268,10 @@ module Reform
     end
 
     def updateModel model, options = nil
-      if (e = enabler) && model.getter?(e)
-        @qtc.enabled = model.apply_getter(e)
-      end
-      if (d = disabler) && model.getter?(d)
-        @qtc.enabled = !model.apply_getter(d)
+      if e = enabler
+        @qtc.enabled = model.apply_getter(e) if model.getter?(e)
+      elsif d = disabler
+        @qtc.enabled = !model.apply_getter(d) if model.getter?(d)
       end
       super
     end

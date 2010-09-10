@@ -42,65 +42,124 @@
 =end
 
 require 'reform/app'
+require_relative '../../controls/widget'
+require_relative '../../model'
+require_relative '../../graphical'
+
+# FAILING: penwidth and transformed properties.   Seem disconnected completely
+# FAILING SHAPES: drawPolyline, points
+# FAILING BRUSHSTYLES: all gradients, texture (missing image?)
+# NOTE: reform must warn about missing images. QT::Image doesn't seem to do this
+# SPECIFIC: Pixmap: no errors, no image either.
+# UNVERIFIED: penJoin.  Need bigger pen. See above
+# UGLYNESS: the whenConnected... This can be fixed using RenderArea iso Widget, and overriding updateModel
+# Apart from that it works pretty good.... :-)
 
 # let's patch it instead of polluting contrib_widgets...
 module Reform
 
-  require_relative '../../controls/widget'
+  class PaintData < Control
+    include Model, Graphical
+
+  private
+    def initialize parent, qtc
+      super
+      @shape = :Polygon;
+      @penWidth = 0.0; # cosmetic pen
+      @penStyle = Qt::SolidLine;
+      @penCap = Qt::SquareCap;
+      @penJoin = Qt::BevelJoin;
+      @brushStyle = Qt::SolidPattern
+#       tag "Calling penChanged from constructor"
+      penChanged
+      brushChanged
+      @antialiasing = true;
+      @transformed = false;
+      @pixmap = Qt::Pixmap.new();
+      @pixmap.load(File.dirname(__FILE__) + "/../images/qt-logo.png");
+    end
+
+    def penChanged
+#       tag "Qt::Pen.new(#{blue}, #{@penWidth}, #@penStyle, #@penCap, #@penJoin)? Qt::SolidLine=#{Qt::SolidLine}"
+      self.pen = Qt::Pen.new(color2brush(:blue), @penWidth, @penStyle, @penCap, @penJoin)
+#       tag "OK"
+    end
+
+    def brushChanged
+      case @brushStyle
+      when Qt::LinearGradientPattern
+        linearGradient = Qt::LinearGradient.new(0, 0, 100, 100);
+        linearGradient.setColorAt(0.0, white);
+        linearGradient.setColorAt(0.2, green);
+        linearGradient.setColorAt(1.0, black);
+        self.brush = linearGradient;
+      when Qt::RadialGradientPattern
+        radialGradient = Qt::RadialGradient.new(50, 50, 50, 70, 70);
+        radialGradient.setColorAt(0.0, white);
+        radialGradient.setColorAt(0.2, green);
+        radialGradient.setColorAt(1.0, black);
+        self.brush = radialGradient;
+      when Qt::ConicalGradientPattern
+        conicalGradient = Qt::ConicalGradient.new(50, 50, 150);
+        conicalGradient.setColorAt(0.0, white);
+        conicalGradient.setColorAt(0.2, green);
+        conicalGradient.setColorAt(1.0, black);
+        self.brush = conicalGradient;
+      when Qt::TexturePattern
+        self.brush = Qt::Brush.new(Qt::Pixmap.new(File.dirname(__FILE__) + "/../images/brick.png"));
+      else
+        self.brush = Qt::Brush.new(green, @brushStyle);
+      end
+    end
+
+    dynamic_accessor :pen, :brush        # for internal use
+
+  public
+
+    def self.penChanger *names
+      names.each do |name|
+        attr name
+        define_method "#{name}=" do |val|
+          instance_variable_set("@#{name}", val)
+          penChanged
+        end
+      end
+    end
+
+    dynamic_accessor :shape, :antialiasing, :transformed
+    attr :pixmap, :brushStyle
+    penChanger :penCap, :penJoin, :penStyle, :penWidth
+
+    def brushStyle= newStyle
+      @brushStyle = newStyle
+      brushChanged
+    end
+  end
+
   # using QWidget iso Qt;:Widget makes sizeHint work! (and nothing much more)
   # We now follow renderarea.cpp
   class QRenderArea < QWidget
   private
-    def initialize parent
-      super
-      @shape = :Polygon;
-      @pen = Qt::Pen.new
-      @brush = Qt::Brush.new
-      @antialiased = true;
-      @transformed = false;
-      @pixmap = Qt::Pixmap.new
-      @pixmap.load(File.dirname(__FILE__) + "/../images/qt-logo.png");
+    def initialize(parent)
+      super;
+      @data = nil
       setBackgroundRole(Qt::Palette::Base);
       setAutoFillBackground(true);
     end
   public
-    def shape= sym
-      @shape = sym
-      update
-    end
-
-    def pen= aPen
-      @pen = aPen
-      update
-    end
-
-    def brush= aBrush
-      @brush = aBrush
-      update
-    end
-
-    def antialiased= val
-      @antialiased = val
-      update
-    end
-
-    def transformed= val
-      @transformed = val
-      update
-    end
-
-    def paintEvent event
-      painter = nil
+    def paintEvent(event)
+      return unless @data
+      painter = nil;
       points = [ Qt::Point.new(10, 80), Qt::Point.new(20, 10), Qt::Point.new(80, 30),
                  Qt::Point.new(90, 70) ];
       rect = Qt::Rect.new(10, 20, 80, 60);
       startAngle = 20 * 16;
       arcLength = 120 * 16;
       painter = Qt::Painter.new(self);
-      painter.setPen(@pen);
-      painter.setBrush(@brush);
-      if (@antialiased)
-        tag "antialiased!!!"
+      painter.setPen(@data.pen);
+      painter.setBrush(@data.brush);
+      if (@data.antialiasing)
+#         tag "antialiased!!!"
         painter.setRenderHint(Qt::Painter::Antialiasing, true);
       end
       x = 0
@@ -116,7 +175,7 @@ module Reform
               painter.scale(0.6, 0.9);
               painter.translate(-50, -50);
             end
-            case @shape
+            case @data.shape
             when :Line
               painter.drawLine(rect.bottomLeft(), rect.topRight());
             when :Points
@@ -146,7 +205,7 @@ module Reform
             when :Text
               painter.drawText(rect, Qt::AlignCenter, tr("Qt by\nNokia"));
             when :Pixmap
-              painter.drawPixmap(10, 10, @pixmap);
+              painter.drawPixmap(10, 10, @data.pixmap);
             end
           ensure
             painter.restore();
@@ -160,32 +219,38 @@ module Reform
       painter.setBrush(Qt::NoBrush);
       painter.drawRect(Qt::Rect.new(0, 0, width() - 1, height() - 1));
     ensure
-      painter and painter.end
+      painter and painter.end;
     end
 
-    # setShape can no longer be a slot I fear, since it uses a symbol...
-    slots 'pen=(const QPen &pen)', 'brush=(const QBrush &brush)', 'antialiased=(bool antialiased)',
-          'transformed=(bool transformed)'
+    def data= d
+      @data = d
+      update
+    end
   end
 
 #   tag "createInstantiator render_area"
+  registerModelClass :paint_data, PaintData
   registerControlClass :render_area, QRenderArea
 end
 
 Reform::app {
   title tr('Basic Drawing')
+  paint_data
   gridlayout { # mainLayout
     col(0) { stretch }
     col(3) { stretch }
     row(1) { minimumHeight 6 }
     row(8) { minimumHeight 8 }
     render_area {
+      name :renderArea
       colspan 4
       sizeHint 400, 200
       minimumSize 100, 100
       # Now 'shape' is a simple switch that decides the visibility of the contents.
+      whenConnected { |data| renderArea.qtc.data = data }
     }
     combobox { # shapeComboBox
+      connector :shape
       layoutpos 2, 2
       model Polygon: tr('Polygon'), Rect: tr('Rectangle'), RoundedRect: tr('Rounded Rectangle'),
             Ellipse: tr('Ellipse'),
@@ -195,12 +260,14 @@ Reform::app {
       labeltext tr('&Shape:')
     }
     spinbox { # penWidthSpinBox
+      connector :penWidth
       layoutpos 2, 3
       range 0, 20
       specialValueText tr('0 (cosmetic pen)')
       labeltext tr('Pen &Width:')
     }
     combobox { # penStyleComboBox
+      connector :penStyle
       layoutpos 2, 4
       model Qt::SolidLine=>tr('Solid'), Qt::DashLine=>tr('Dash'), Qt::DotLine=>tr('Dot'),
             Qt::DashDotLine=>tr('Dash Dot'), Qt::DashDotDotLine=>tr('Dash Dot Dot'),
@@ -208,16 +275,19 @@ Reform::app {
       labeltext tr('&Pen Style:')
     }
     combobox { # penCapComboBox
+      connector :penCap
       layoutpos 2, 5
       model Qt::FlatCap=>tr('Flat'), Qt::SquareCap=>tr('Square'), Qt::RoundCap=>tr('Round')
       labeltext tr('Pen &Cap:')
     }
     combobox { # penJoinComboBox
+      connector :penJoin
       layoutpos 2, 6
       model Qt::MiterJoin=>tr('Miter'), Qt::BevelJoin=>tr('Bevel'), Qt::RoundJoin=>tr('Round')
       labeltext tr('Pen &Join:')
     }
     combobox { # brushStyleComboBox
+      connector :brushStyle
       layoutpos 2, 7
       model Qt::LinearGradientPattern=>tr('Linear Gradient'), Qt::RadialGradientPattern=>tr('Radial Gradient'),
             Qt::ConicalGradientPattern=>tr('Conical Gradient'), Qt::TexturePattern=>tr('Texture'),
@@ -240,10 +310,12 @@ Reform::app {
       text tr('Other Options:')
     }
     checkbox { # antialiasingCheckBox
+      connector :antialiasing
       text tr('&Antialiasing')
       checked true
     }
     checkbox { # transformationsCheckBox
+      connector :transformed
       layoutpos 2, 10
       text tr('&Transformations')
     }

@@ -70,7 +70,7 @@ will work as expected
       end
 
       class << self
-        alias :dynamic :attr
+        alias :dynamic :attr_reader
         alias :dynamic_reader :attr_reader
       end
 
@@ -209,7 +209,7 @@ will work as expected
 
     def setupQuickyhash hash
       hash.each do |k, v|
-        tag "send(#{k.inspect}, #{v.class} #{v})"
+#         tag "send(#{k.inspect}, #{v.class} #{v})"
         send(k, v)
       end
     end

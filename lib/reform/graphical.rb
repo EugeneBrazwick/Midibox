@@ -62,7 +62,7 @@ public
     case colorsym
     when Qt::Color then colorsym
     when Qt::Brush then colorsym.color
-    when String then Qt::Color.new(colorsym)
+    when String, Qt::Enum then Qt::Color.new(colorsym)
     when Array then Qt::Color.new(*colorsym)
     else
       case b

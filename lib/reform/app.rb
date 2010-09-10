@@ -432,6 +432,11 @@ module Reform
     createInstantiator id, qclass, klass
   end
 
+  def self.registerModelClass id, klass
+    registerModelClassProxy id, nil
+    createInstantiator id, nil, klass
+  end
+
   def self.registerGraphicsControlClassProxy id, path
 #     tag "registerGraphicsControlClassProxy(#{id}, #{path})"
     GraphicContext::registerControlClassProxy_i id, path

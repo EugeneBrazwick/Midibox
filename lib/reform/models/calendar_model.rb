@@ -51,8 +51,8 @@ before the CW, it would remain unset!
 
     # based on first three letters of locale converted monthnames.
     private
-    def initialize
-      super
+    def initialize parent, qtc
+      super()
       @minimumDate = CalendarModel::to_date 'Sep', 14, 1752 # start of modern calendar
           # (in the US!!!! the rest of the world had it two centuries sooner)
       @maximumDate = CalendarModel::to_date 'Dec', 31, 2999

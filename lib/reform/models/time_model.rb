@@ -14,6 +14,7 @@ module Reform
       super
       @timerid = @timer = nil
       @frequency = 1.0
+      @frameNr = 0
 #       tag "creating timer"
       # OK
       updatetime_ms 1000
@@ -37,7 +38,8 @@ module Reform
       end
       @timer = Qt::Timer.new self
       connect @timer, SIGNAL('timeout()') do
-        dynamicPropertyChanged :current
+        @frameNr += 1
+        dynamicPropertyChanged [:current, :frameNr]
       end
       @timerid = @timer.start value_ms
     end
@@ -62,6 +64,8 @@ module Reform
     def current
       Qt::Time::currentTime
     end
+
+    attr :frameNr
   end
 
 #   tag "calling createInstantiator"

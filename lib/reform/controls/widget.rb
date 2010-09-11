@@ -5,17 +5,15 @@
 
 module Reform
   require_relative '../control'
+  require 'forwardable'
 
   class Widget < Control
+    extend Forwardable
   private
 
     def initialize parent, qtc = nil
       super
       @qtc.instance_variable_set :@_reform_hack, self
-    end
-
-    def close
-      @qtc.close
     end
 
     # make it the central widget
@@ -84,6 +82,8 @@ module Reform
       return @qtc.font unless f
       @qtc.font = f
     end
+
+    def_delegators :@qtc, :close
 
     # qtc of the menu is in fact the qwidget
     class ContextMenuRef < Control
@@ -158,6 +158,7 @@ module Reform
     def layoutpos col = nil, row = nil
       check_grid_parent :layoutpos
       return (instance_variable_defined?(:@layoutpos) ? @layoutpos : nil) unless col
+      col, row = col if Array === col
       @layoutpos = col, row || 0
     end
 
@@ -212,10 +213,7 @@ module Reform
     alias :minimumSize :minimumSizeHint
     alias :minimumSizehint :minimumSizeHint
 
-    def adjustSize
-#       tag "calling #@qtc.adjustSize"
-      @qtc.adjustSize
-    end
+    def_delegators :@qtc, :adjustSize
 
     def resize x, y = nil
       if y.nil?

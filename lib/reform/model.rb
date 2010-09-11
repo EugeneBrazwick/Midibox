@@ -124,7 +124,7 @@ will work as expected
       @observers.delete observer
     end
 
-    # note that the :property option is not yet implemented
+    # note that the :property option is not yet implemented. This can also be an array with symbols
     def dynamicPropertyChanged name
 #       tag "#{self} name=#{name}, no_dynamics = #{@no_dynamics||=false}, observers=#{(@observers ||= []).inspect}"
       return if instance_variable_defined?(:@no_dynamics) && @no_dynamics

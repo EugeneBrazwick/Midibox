@@ -26,17 +26,18 @@ module Reform
                      center: Qt::AlignHCenter | Qt::AlignVCenter
                      # topleft, ... etc. then we have :absolute etc.....
                     }
+
     def alignment value = nil
       return @qtc.alignment if value.nil?
       Symbol === value and value = AlignmentMap[value] || Qt::AlignLeft
       @qtc.alignment = value
     end
 
-    public
+    define_simple_setter :margin, :frameStyle
 
-    def pixmap= val
-      @qtc.pixmap = val
-    end
+  public
+
+    def_delegators :@qtc, :pixmap=, :pixmap, :margin=
 
     def text value = nil
       return @qtc.text unless value
@@ -44,9 +45,6 @@ module Reform
       @qtc.text = value
     end
 
-    def pixmap
-      @qtc.pixmap
-    end
   end
 
   createInstantiator File.basename(__FILE__, '.rb'), Qt::Label, Label

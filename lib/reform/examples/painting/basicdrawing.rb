@@ -46,12 +46,12 @@ require_relative '../../controls/widget'
 require_relative '../../model'
 require_relative '../../graphical'
 
-# FAILING: penwidth and transformed properties.   Seem disconnected completely
-# FAILING SHAPES: drawPolyline, points
-# FAILING BRUSHSTYLES: all gradients, texture (missing image?)
-# NOTE: reform must warn about missing images. QT::Image doesn't seem to do this
-# SPECIFIC: Pixmap: no errors, no image either.
-# UNVERIFIED: penJoin.  Need bigger pen. See above
+# FAILING: penwidth and transformed properties.   Seem disconnected completely. FIXED
+# FAILING SHAPES: drawPolyline, points FIXED
+# FAILING BRUSHSTYLES: all gradients, texture (missing image?) FIXED
+# NOTE: reform must warn about missing images. QT::Image doesn't seem to do this Can't, since Qt::Pixmap is used 'as is'.
+# SPECIFIC: Pixmap: no errors, no image either. FIXED
+# UNVERIFIED: penJoin.  Need bigger pen. See above CHECKED OK
 # UGLYNESS: the whenConnected... This can be fixed using RenderArea iso Widget, and overriding updateModel
 # Apart from that it works pretty good.... :-)
 
@@ -76,11 +76,11 @@ module Reform
       @antialiasing = true;
       @transformed = false;
       @pixmap = Qt::Pixmap.new();
-      @pixmap.load(File.dirname(__FILE__) + "/../images/qt-logo.png");
+      @pixmap.load(File.dirname(__FILE__) + "/images/qt-logo.png");
     end
 
     def penChanged
-#       tag "Qt::Pen.new(#{blue}, #{@penWidth}, #@penStyle, #@penCap, #@penJoin)? Qt::SolidLine=#{Qt::SolidLine}"
+#       tag "Qt::Pen.new(blue, #{@penWidth}, #@penStyle, #@penCap, #@penJoin)? Qt::SolidLine=#{Qt::SolidLine}"
       self.pen = Qt::Pen.new(color2brush(:blue), @penWidth, @penStyle, @penCap, @penJoin)
 #       tag "OK"
     end
@@ -92,21 +92,21 @@ module Reform
         linearGradient.setColorAt(0.0, white);
         linearGradient.setColorAt(0.2, green);
         linearGradient.setColorAt(1.0, black);
-        self.brush = linearGradient;
+        self.brush = Qt::Brush.new(linearGradient);
       when Qt::RadialGradientPattern
         radialGradient = Qt::RadialGradient.new(50, 50, 50, 70, 70);
         radialGradient.setColorAt(0.0, white);
         radialGradient.setColorAt(0.2, green);
         radialGradient.setColorAt(1.0, black);
-        self.brush = radialGradient;
+        self.brush = Qt::Brush.new(radialGradient);
       when Qt::ConicalGradientPattern
         conicalGradient = Qt::ConicalGradient.new(50, 50, 150);
         conicalGradient.setColorAt(0.0, white);
         conicalGradient.setColorAt(0.2, green);
         conicalGradient.setColorAt(1.0, black);
-        self.brush = conicalGradient;
+        self.brush = Qt::Brush.new(conicalGradient);
       when Qt::TexturePattern
-        self.brush = Qt::Brush.new(Qt::Pixmap.new(File.dirname(__FILE__) + "/../images/brick.png"));
+        self.brush = Qt::Brush.new(Qt::Pixmap.new(File.dirname(__FILE__) + "/images/brick.png"));
       else
         self.brush = Qt::Brush.new(green, @brushStyle);
       end
@@ -145,17 +145,18 @@ module Reform
       @data = nil
       setBackgroundRole(Qt::Palette::Base);
       setAutoFillBackground(true);
+      @rect = Qt::Rect.new(10, 20, 80, 60);
+      @points = [ Qt::Point.new(10, 80), Qt::Point.new(20, 10), Qt::Point.new(80, 30),
+                 Qt::Point.new(90, 70) ];
+      @polygon = Qt::Polygon.new(@points)
     end
+
   public
     def paintEvent(event)
       return unless @data
-      painter = nil;
-      points = [ Qt::Point.new(10, 80), Qt::Point.new(20, 10), Qt::Point.new(80, 30),
-                 Qt::Point.new(90, 70) ];
-      rect = Qt::Rect.new(10, 20, 80, 60);
+      painter = Qt::Painter.new(self);
       startAngle = 20 * 16;
       arcLength = 120 * 16;
-      painter = Qt::Painter.new(self);
       painter.setPen(@data.pen);
       painter.setBrush(@data.brush);
       if (@data.antialiasing)
@@ -169,7 +170,7 @@ module Reform
           painter.save();
           begin
             painter.translate(x, y);
-            if (@transformed)
+            if (@data.transformed)
               painter.translate(50, 50);
               painter.rotate(60.0);
               painter.scale(0.6, 0.9);
@@ -177,25 +178,25 @@ module Reform
             end
             case @data.shape
             when :Line
-              painter.drawLine(rect.bottomLeft(), rect.topRight());
+              painter.drawLine(@rect.bottomLeft(), @rect.topRight());
             when :Points
-              painter.drawPoints(points, 4);
+              painter.drawPoints(@polygon);
             when :Polyline
-              painter.drawPolyline(points, 4);
+              painter.drawPolyline(@polygon);
             when :Polygon
-              painter.drawPolygon(Qt::Polygon.new(points));
+              painter.drawPolygon(@polygon);
             when :Rect
-              painter.drawRect(rect);
+              painter.drawRect(@rect);
             when :RoundedRect
-              painter.drawRoundedRect(rect, 25, 25, Qt::RelativeSize);
+              painter.drawRoundedRect(@rect, 25, 25, Qt::RelativeSize);
             when :Ellipse
-              painter.drawEllipse(rect);
+              painter.drawEllipse(@rect);
             when :Arc
-              painter.drawArc(rect, startAngle, arcLength);
+              painter.drawArc(@rect, startAngle, arcLength);
             when :Chord
-              painter.drawChord(rect, startAngle, arcLength);
+              painter.drawChord(@rect, startAngle, arcLength);
             when :Pie
-              painter.drawPie(rect, startAngle, arcLength);
+              painter.drawPie(@rect, startAngle, arcLength);
             when :Path
               path = Qt::PainterPath.new
               path.moveTo(20, 80);
@@ -203,7 +204,7 @@ module Reform
               path.cubicTo(80, 0, 50, 50, 80, 80);
               painter.drawPath(path);
             when :Text
-              painter.drawText(rect, Qt::AlignCenter, tr("Qt by\nNokia"));
+              painter.drawText(@rect, Qt::AlignCenter, tr("Qt by\nNokia"));
             when :Pixmap
               painter.drawPixmap(10, 10, @data.pixmap);
             end

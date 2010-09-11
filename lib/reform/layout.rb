@@ -21,9 +21,12 @@ However it must be in postSetup.
 
     define_simple_setter :margin, :sizeConstraint, :spacing
 
-    def fixedsize
+    # always pass 'true' or leave it out. You cannot unset 'fixedsize'...
+    def fixedsize val = true
       sizeConstraint Qt::Layout::SetFixedSize
     end
+
+    alias :fixedSize :fixedsize
 
   public
 

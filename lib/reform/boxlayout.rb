@@ -5,14 +5,11 @@ module Reform
 
   require_relative 'layout'
 
+  # forward!
   class Spacer < Widget
   end
 
   class BoxLayout < Layout
-#     def addWidget control, qt_widget = nil
-#       (@collection ||= []) << control
-      # we must delay until we are sure the children are setup
-#     end
 
     # override
     def postSetup

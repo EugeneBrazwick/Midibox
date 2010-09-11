@@ -10,6 +10,7 @@ module Reform
       @spacing = v
     end
 
+    alias :space :spacing
   end
 
   createInstantiator File.basename(__FILE__, '.rb'), nil, Spacer

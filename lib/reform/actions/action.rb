@@ -15,7 +15,7 @@ module Reform
       connect(@qtc, SIGNAL('triggered()')) do
         rfRescue do
           if instance_variable_defined?(:@value) && (cid = connector) && (model = effectiveModel)
-            tag "apply_setter #{cid} on model #{model}, connector=#{connector}"
+#             tag "apply_setter #{cid} on model #{model}, connector=#{connector}"
             model.apply_setter cid, @value
           end
         end

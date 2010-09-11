@@ -3,8 +3,9 @@
 
 module Reform
 
-  require_relative '../controls/widget'
+  require_relative 'widget'
 
+  # used for (possibly) bigger chunks of simple text.  For frame support and tables use TextEdit.
   class PlainTextEdit < Widget
   end # class PlainTextEdit
 

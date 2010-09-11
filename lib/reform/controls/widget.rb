@@ -238,17 +238,6 @@ module Reform
       @stretch = v
     end
 
-#     # ignored
-#     def spacing v = nil
-#     end
-
-    # this only works if the widget is inside a boxlayout
-#     def spacing v = nil
-#       return (instance_variable_defined?(:@spacing) ? @spacing : nil) unless v
-#       check_boxparent 'spacing'
-#       @spacing = v
-#     end
-
     def run
       $qApp.activeWindow = @qtc if self == $qApp.firstform
       @qtc.show

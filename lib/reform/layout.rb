@@ -19,7 +19,7 @@ However it must be in postSetup.
       super(parent, qtc, false)
     end
 
-    define_simple_setter :margin, :sizeConstraint
+    define_simple_setter :margin, :sizeConstraint, :spacing
 
     def fixedsize
       sizeConstraint Qt::Layout::SetFixedSize
@@ -64,10 +64,11 @@ However it must be in postSetup.
 #       @qtc.addStretch v
 #     end
 
-    # Alternative: 'spacer space: v'
-    def spacing v
-      @qtc.addSpacing v
-    end
+    # Alternative: 'spacer spacing: v'
+    # There is a cockup here.  There is also 'setSpacing'!!!! Do not confuse.  FIXME ???
+#     def spacing v
+#       @qtc.addSpacing v
+#     end
 
     def layout?
       true

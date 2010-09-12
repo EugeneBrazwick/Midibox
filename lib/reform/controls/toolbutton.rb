@@ -3,50 +3,27 @@
 
 module Reform
 
-  require_relative 'widget'
+  require_relative '../abstractbutton'
 
-  class ToolButton < Widget
-#     include MenuContext # can create a menu here
+  class ToolButton < AbstractButton
     private
-#     define_simple_setter :text, :checkable, :flat
 
       define_simple_setter :iconSize
 
-      def_delegator :@qtc, :icon=
-
-#     def checked value
-#       @qtc.checkable = true
-#       @qtc.checked = value
-#     end
-
-#     def text_connector connector
-#       @text_connector = connector
-#     end
+      def icon anIcon
+        self.icon = anIcon
+      end
 
     public
 
-    # with a block associate the block with the 'clicked' signal.
-    # Without a block we emit 'clicked'
-    def whenClicked &block
-      if block
-        connect(@qtc, SIGNAL('clicked()'), self) { rfCallBlockBack(&block) }
-      else
-        @qtc.clicked
+      # added support for qt images, files, an pixmaps
+      def icon= anIcon
+        anIcon = Qt::Icon.new(anIcon.to_str) if anIcon.respond_to?(:to_str)
+        anIcon = Qt::Pixmap::fromImage(anIcon) if Qt::Image === anIcon
+        anIcon = Qt::Icon.new(anIcon) if Qt::Pixmap === anIcon
+#         tag "#@qtc.icon := #{anIcon}"
+        @qtc.icon = anIcon
       end
-    end #whenClicked
-
-#     def auto_layouthint
-#       :hbox
-#     end
-
-    #override
-#     def updateModel model, options = nil
-#       cid = connector and
-#         if model && model.getter?(cid)
-#           @qtc.text = model.apply_getter(tcid)
-#         end
-#       super
-#     end
 
   end
 

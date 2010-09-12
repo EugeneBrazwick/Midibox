@@ -3,56 +3,14 @@
 
 module Reform
 
-  require_relative 'widget'
+  require_relative '../abstractbutton'
 
-  class Button < Widget
+  class Button < AbstractButton
     include MenuContext # can create a menu here
     private
-    define_simple_setter :text, :checkable, :flat
-
-    def checked value
-      @qtc.checkable = true
-      @qtc.checked = value
-    end
-
-    def text_connector connector
-      @text_connector = connector
-    end
+    define_simple_setter :flat
 
     public
-
-    # with a block associate the block with the 'clicked' signal.
-    # Without a block we emit 'clicked'
-    def whenClicked &block
-      if block
-        connect(@qtc, SIGNAL('clicked()'), self) { rfCallBlockBack(&block) }
-      else
-        @qtc.clicked
-      end
-    end #whenClicked
-
-    def auto_layouthint
-      :hbox
-    end
-
-    #override
-    def addControl control, quickyhash = nil, &block
-      raise 'DEPRECATED'
-#       raise unless control.menu?
-      @qtc.setMenu(control.qtc)
-      super
-    end
-
-    #override
-    def updateModel model, options = nil
-#       tag "@{self} connectModel #{aModel}, cid=#{connector}"
-      cid = connector and
-        if model && model.getter?(cid)
-          @qtc.text = model.apply_getter(tcid)
-        end
-       # ????? if (model = effective_model) && (tcid = text_connector) && model.getter?(tcid)
-      super
-    end
 
   end
 

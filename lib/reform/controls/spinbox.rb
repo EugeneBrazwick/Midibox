@@ -18,12 +18,20 @@ module Reform
     end
 
     def range m, n = nil
-      n ? @qtc.setRange(m, n) : @qtc.setRange(*m)
+      if n
+        @qtc.setRange(m, n)
+      else
+        if Range === m
+          @qtc.setRange(m.min, m.max)
+        else
+          @qtc.setRange(*m)
+        end
+      end
     end
 
     # specialValueText is the text for the 'minimum' value only.
     # Note that 'value' is an integer.
-    define_simple_setter :value, :specialValueText
+    define_simple_setter :value, :specialValueText, :prefix, :suffix, :wrapping
 
     public
 

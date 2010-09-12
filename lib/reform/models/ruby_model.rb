@@ -15,18 +15,40 @@ It seems more appropriate to call connectModel 'updateModel' instead. Were we pa
     include Model, Enumerable
 
     private
-    def initialize parent, qtc = nil, value = nil
+    def initialize parent, qtc = nil, val = nil
       super(parent, qtc)
-      @value = value
+      value val         # this is OK...
     end
 
-    # we accept hash or array with elements that are models: el.is_a?(Model) yields true.
-    # or any object. In all cases we behave like an Enumerable of Models.
-    def value v
-      @value = v
-    end
+    # MAKES A MESS!!
+#     def method_missing symbol, *args, &block
+#       return super unless Kernel::const_defined?(:OpenStruct) && OpenStruct === @value
+# #       tag "METHOD_MISSING #{symbol}"
+#       @value.send symbol, *args, &block
+#     end
 
     public
+
+=begin
+    we accept hash or array with elements that are models: el.is_a?(Model) yields true.
+    or any object. In all cases we behave like an Enumerable of Models.
+
+    However, a hash is an ambiguous thing.  Is it the list we are interested in,
+    or maybe it is meant as a single record!
+
+    So the new policy is to convert it to OpenStruct.
+    Nice thing about OpenStruct, public_method will work on it.
+    Maybe a special method like 'listvalue' could be used if a list is what you want
+=end
+    def value v = nil
+      return @value if v.nil?
+      if Hash === v
+        require 'ostruct'
+        @value = OpenStruct.new(v)
+      else
+        @value = v
+      end
+    end
 
     def length
       @value.respond_to?(:length) ? @value.length : 1
@@ -85,6 +107,7 @@ It seems more appropriate to call connectModel 'updateModel' instead. Were we pa
       else
         name = name.to_s
         name = name[0...-1] if name[-1] == '?'
+#         tag("Applying #{name}=() to #@value, using 'send'")
         @value.send(name + '=', value)
       end
     end

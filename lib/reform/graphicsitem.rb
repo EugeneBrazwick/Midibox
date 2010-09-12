@@ -15,7 +15,7 @@ module Reform
 
     public
 
-    # override
+    # override, graphic items may be nested
     def addGraphicsItem control, quickyhash = nil, &block
       qc = if control.respond_to?(:qtc) then control.qtc else control end
       qc.parentItem = @qtc

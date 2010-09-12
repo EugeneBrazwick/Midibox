@@ -74,28 +74,6 @@ gridlayout {
       end
     end
 
-#     class RowRowRef
-#     private
-#       def initialize gl
-#         @gl = gl
-#       end
-#     public
-#       def [](idx, &block)
-#         RowRef.new(@gl, idx).instance_eval(&block)
-#       end
-#     end
-#
-#     class ColColRef
-#     private
-#       def initialize gl
-#         @gl = gl
-#       end
-#     public
-#       def [](idx, &block)
-#         ColRef.new(@gl, idx).instance_eval(&block)
-#       end
-#     end
-
     def row(index, &block)
 #       return RowRowRef.new(self) if index.nil?
       RowRef.new(self, index).instance_eval(&block)
@@ -132,42 +110,46 @@ gridlayout {
 
     public
 
-    def columnCount value = nil?
-      return (@columnCount || @qtc.columnCount) if value.nil?
+    def columnCount value = nil
+      if value.nil?
+#         tag "columnCount, @columnCount=#@columnCount, qtc.columnCount=#{@qtc.columnCount}, ||=#{@columnCount || @qtc.columnCount}"
+        return @columnCount || @qtc.columnCount
+      end
       @columnCount = value
     end
 
-    #override
-#     def addWidget control, qt_widget = nil
-#       tag "#{self}::addWidget, collection=#{@collection}"
-#       @collection << control
-#       tag "addWidget to grid"
-# #       @qtc.addWidget qt_widget, @currow, @curcol, @currowspan, @curcolspan
-# #       skip
-#       span
-#     end
-
     # override
     def postSetup
-#       tag "#{self}::postSetup"
+#       tag "#{self}::postSetup, @colcount=#@columnCount, @qtc.colcount=#{@qtc.columnCount}"
       curcol, currow = 0, 0
       children.each do |control|
         c, r = control.layoutpos
-        c, r = curcol, currow if c.nil?
+        no_constraint = c.nil?
+        c, r = curcol, currow if no_constraint
         spanc, spanr = control.span
         spanc, spanr = 1, 1 if spanc.nil?
+        colCount = columnCount
+#         tag "colCount = #{colCount.inspect}"
+        spanc = [1, colCount - c].max if spanc == :all_remaining
 #         tag "qtc.addWidget(#{control}, r:#{r}, c:#{c}, #{spanr}, #{spanc}), layout?->#{control.layout?}"
         if Layout === control
           @qtc.addLayout(control.qtc, r, c, spanr, spanc)
         else
-          # add a label after it or in front of it
+          extra_span = false
+          # add a label after it or in front of it, if 'labeltext' was set
           label = nil
           if control.respond_to?(:labeltext) && (labeltext = control.labeltext) # may be a string, may have been converted to a Label reference
 #           tag "#{control}.labeltext = #{label.inspect}"
             label = if labeltext.respond_to?(:qtc) then labeltext.qtc else Qt::Label.new(labeltext) end
             label.buddy = control.qtc
-#             tag "addLabel(, #{r}, #{c == 0 ? spanc : c - 1}, someAlign)"
-            @qtc.addWidget(label, r, c == 0 ? spanc : c - 1, c == 0 ? Qt::AlignLeft : Qt::AlignRight)
+            # if no constraints were set, and if we have 1 column room available, shift 1
+            if no_constraint && c < colCount - 1
+              @qtc.addWidget(label, r, c, Qt::AlignRight)
+              c += 1
+            else
+              extra_span = c == 0
+              @qtc.addWidget(label, r, extra_span ? spanc : c - 1, extra_span ? Qt::AlignLeft : Qt::AlignRight)
+            end
           end
           if alignment = control.layout_alignment
 #           tag "applying alignment: #{alignment}, ignoring span"
@@ -176,10 +158,12 @@ gridlayout {
 #             tag "addWidget(#{control.qtc}, r=#{r}, c=#{c}, spanr=#{spanr}, spanc=#{spanc})"
             @qtc.addWidget(control.qtc, r, c, spanr, spanc)
           end
-          spanc += 1 if label && c == 0  # since we need an extra column
+          spanc += 1 if extra_span
         end
+        # we just added at column c, so colCount should be [colCount, c + 1].max
+        colCount = c + 1 if colCount <= c
         currow, curcol = r, c + spanc
-        curcol, currow = 0, currow + 1 if curcol >= (@columnCount || @qtc.columnCount)
+        curcol, currow = 0, currow + 1 if curcol >= colCount
       end
       # a bit of a hack, but probably what you want:
       if children.length == 1 && children[0].layout_alignment == Qt::AlignCenter

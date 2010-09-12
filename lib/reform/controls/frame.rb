@@ -73,7 +73,12 @@ However, in the previous version a form had 'containing_frame' being the form it
 =end
     def updateModel aModel, options = nil
 #       tag "#{self}::connecting model, delegate to children, @all_widgets=#{@all_widgets.inspect}"
-      aModel = aModel.send(cid) if cid = connector && aModel && aModel.getter?(cid)
+#       tag "connector=#{connector}(getter?:#{aModel.getter?(connector)}), aModel = #{aModel}"
+      if (cid = connector) && aModel && aModel.getter?(cid)
+#         tag "Applying getter #{cid} on model"
+        aModel = aModel.apply_getter(cid)
+      end
+#       tag "aModel = #{aModel}"
       children.each { |child| child.updateModel(aModel, options) unless child.effectiveModel? }
       super
 #       tag "DONE"

@@ -23,8 +23,14 @@ module Reform
 
     define_simple_setter :locale, :autoFillBackground
 
+    # if x is integer the size is meant, like fixedSize 200 == fixedSize 200, 200
+    # otherwise, if x MUST be 'true' and it sets the policy to :fixed (and 'y' is ignored as well)
     def fixedSize x, y = nil
-      @qtc.setFixedSize(x, y || x)
+      if x == true
+        self.sizePolicy :fixed
+      else
+        @qtc.setFixedSize(x, y || x)
+      end
     end
 
     # special values: :base and :dark
@@ -37,6 +43,7 @@ module Reform
       @qtc.backgroundRole = value
     end
 
+    # enforce that parent is a layout
     def check_grid_parent tocheck
       require_relative 'gridlayout' # needed anyway
       if parent.layout?
@@ -143,23 +150,24 @@ module Reform
       check_grid_parent :span
       return (instance_variable_defined?(:@span) ? @span : nil) unless cols
       rows ||= 1
-#       tag "span := #{rows},#{cols}"
       @span = cols, rows
     end
 
     # assuming you pass it a single arg:
     alias :colspan :span
 
-    # this only works if the widget is inside a gridlayout. Leaving out row will make it 0
-    # which is usefull for defining the first row of widgets. After that the gridlayout
-    # will automatically add them one by one in the proper order.
+    # this only works if the widget is inside a gridlayout. Leaving out row or passing nil
+    # will make it use the 'current' row.
+    # The gridlayout mechanism will automatically jump to the next column.
+    # It will respect colspan, and it will jump to the next row if the column is larger
+    # than the largest seen up till now, or columnCount (if it is set explicitely)
     # This should be used for exceptional positions, since it is better to specify
     # columnCount within the grid.
     def layoutpos col = nil, row = nil
       check_grid_parent :layoutpos
       return (instance_variable_defined?(:@layoutpos) ? @layoutpos : nil) unless col
       col, row = col if Array === col
-      @layoutpos = col, row || 0
+      @layoutpos = [col, row || 0]
     end
 
     define_simple_setter :windowTitle

@@ -170,6 +170,10 @@ will work as expected
 #       end
     end
 
+#     def method_missing symbol, *args, &block
+#       send name, *args, &block
+#     end
+
     def apply_setter name, value
       if name == :self
         # as an unwanted feature it will call 'postSetup' on self!!!!! FIXME(?)

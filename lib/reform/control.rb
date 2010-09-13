@@ -1,6 +1,8 @@
 
 #  Copyright (c) 2010 Eugene Brazwick
 
+require 'reform/app'
+
 module Reform
 
 =begin rdoc

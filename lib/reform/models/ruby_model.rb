@@ -20,13 +20,6 @@ It seems more appropriate to call connectModel 'updateModel' instead. Were we pa
       value val         # this is OK...
     end
 
-    # MAKES A MESS!!
-#     def method_missing symbol, *args, &block
-#       return super unless Kernel::const_defined?(:OpenStruct) && OpenStruct === @value
-# #       tag "METHOD_MISSING #{symbol}"
-#       @value.send symbol, *args, &block
-#     end
-
     public
 
 =begin
@@ -36,18 +29,11 @@ It seems more appropriate to call connectModel 'updateModel' instead. Were we pa
     However, a hash is an ambiguous thing.  Is it the list we are interested in,
     or maybe it is meant as a single record!
 
-    So the new policy is to convert it to OpenStruct.
-    Nice thing about OpenStruct, public_method will work on it.
-    Maybe a special method like 'listvalue' could be used if a list is what you want
+    So the new policy is to use 'structure' for simple non-list like hashes
 =end
     def value v = nil
       return @value if v.nil?
-      if Hash === v
-        require 'ostruct'
-        @value = OpenStruct.new(v)
-      else
-        @value = v
-      end
+      @value = v
     end
 
     def length
@@ -80,12 +66,7 @@ It seems more appropriate to call connectModel 'updateModel' instead. Were we pa
     def apply_getter name
       return self if name == :self
       name.call(@value) if Proc === name
-#       tag "apply_getter #{name} to self == 'send'"
-#       if respond_to?(name)
       @value.send name
-#       else
-#         send(name.to_s + '?')
-#       end
     end
 
     def setter?(name)
@@ -98,12 +79,7 @@ It seems more appropriate to call connectModel 'updateModel' instead. Were we pa
 
     def apply_setter name, value
       if name == :self
-        # as an unwanted feature it will call 'postSetup' on self!!!!! FIXME(?)
-        # setting the model will change the observers
-        Array.new(@observers || []).each do |o|
-#           tag "Resetting model #{self} to observer #{o}"
-          o.setModel value  # and not 'self'!!!
-        end
+        super
       else
         name = name.to_s
         name = name[0...-1] if name[-1] == '?'

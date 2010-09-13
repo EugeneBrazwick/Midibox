@@ -24,12 +24,12 @@ NumRenderAreas = 9  # 3x3
 Reform::app {
   form { # the example use 'widget' but 'widget' cannot be used for internal reasons.
     title tr('Painter Paths')
-    # allow the 'painterpath' instantiator method in the form itself. *FIXME* causes memoryleak
+    # allow the 'painterpath' instantiator method in the form itself. UGLY!
 #     extend Reform::GraphicContext
     # models follow the very same syntax rules as all other controls.
     # it is not 'ruby_model VALUE' but 'ruby_model value: VALUE' or 'ruby_model { value VALUE }'
-    ruby_model value: { fillRule: Qt::OddEvenFill, fillColor1: 'mediumslateblue', fillColor2: 'cornsilk',
-                        penColor: 'darkslateblue', penWidth: 1, rotationAngle: 0,
+    structure value: { fillRule: Qt::OddEvenFill, fillColor1: 'mediumslateblue', fillColor2: 'cornsilk',
+                       penColor: 'darkslateblue', penWidth: 1, rotationAngle: 0,
 =begin
   the next question is how to create the 3x3 painterpaths and how to assign them to the
   widget. To begin with, they could be stored in any array, 3x3 or simply 9 long.
@@ -141,7 +141,7 @@ Reform::app {
               # Oh man!!! All 'when' triggers run in the form!
               # So self is the form.  Fortunately they are also closures...
 #               tag "i=#{nr}"
-              selv.qtc.setData(model.value, model.value.painterpaths[nr])
+              selv.qtc.setData(model, model.painterpaths[nr])
             }
             backgroundRole :base
             minimumSizeHint 50, 50

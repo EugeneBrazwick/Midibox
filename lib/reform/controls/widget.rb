@@ -7,6 +7,12 @@ module Reform
   require_relative '../control'
   require 'forwardable'
 
+#   class Widget < Control; end
+#   class Frame < Widget; end
+#   class Layout < Frame; end
+#   class BoxLayout < Layout; end
+#   class GridLayout < Layout; end
+
   class Widget < Control
     extend Forwardable
   private
@@ -67,8 +73,9 @@ module Reform
     end
 
     def check_boxparent tocheck
-      unless parent.layout? && parent.is_a?(BoxLayout)
-        raise ReformError, tr("'#{tocheck}' only works with a (h/v)box container!")
+      unless parent.layout? && (Reform::const_defined?(:BoxLayout) && BoxLayout === parent ||
+                                Reform::const_defined?(:GridLayout) && GridLayout === parent)
+        raise ReformError, tr("'#{tocheck}' only works with a hbox, vbox or gridlayout container!")
       end
     end
 
@@ -90,7 +97,7 @@ module Reform
       @qtc.font = f
     end
 
-    def_delegators :@qtc, :close
+    def_delegators :@qtc, :close, :update
 
     # qtc of the menu is in fact the qwidget
     class ContextMenuRef < Control
@@ -144,6 +151,27 @@ module Reform
     def widget?
       true
     end
+
+    # iso event can also pass painter or QPaintDevice
+    def whenPainted event = nil, &block
+      if block # is a proc actually
+        @whenPainted = block
+      else
+        return false unless instance_variable_defined?(:@whenPainted)
+        require_relative '../painter'
+#         tag "event=#{event}, Qt::Event === event = #{Qt::PaintEvent === event}"
+        if Qt::PaintEvent === event then paintdev = @qtc else event, paintdev = nil, event end
+        painter = Painter.new(paintdev)
+        painter.event = event
+        painter.renderHint = Qt::Painter::Antialiasing;
+        begin
+          rfCallBlockBack(painter, &@whenPainted)
+        ensure
+          painter.end
+        end
+        true
+      end
+    end #whenPainted
 
     # this only works if the widget is inside a gridlayout
     def span cols = nil, rows = nil
@@ -207,7 +235,8 @@ module Reform
 
     def sizeHint x = nil, y = nil
       return sizeHint_i || @qtc.sizeHint if x.nil?
-      @sizeHint = if y.nil? then x else Qt::Size.new(x, y) end # this currently only works for forms!!! Not other windows!!!
+      x, y = x if Array === x
+      @sizeHint = if Qt::Size === x then x else Qt::Size.new(x, y || x) end # this currently only works for forms!!! Not other windows!!!
 #       @qtc.setSizeHint(x, y)  # this hardly works at all. Note there is a virtual method: QWidget 'sizeHint()'!!
     end
 
@@ -215,7 +244,8 @@ module Reform
 
     def minimumSizeHint x = nil, y = nil
       return minimumSizeHint_i || @qtc.minimumSizeHint if x.nil?
-      @minimumSizeHint = if y.nil? then x else Qt::Size.new(x, y) end
+      x, y = x if Array === x
+      @minimumSizeHint = if Qt::Size === x then x else Qt::Size.new(x, y || x) end # this currently only works for forms!!! Not other windows!!!
     end
 
     alias :minimumSize :minimumSizeHint
@@ -239,11 +269,17 @@ module Reform
       @layout_alignment = value
     end
 
-    # this only works if the widget is inside a boxlayout
-    def stretch v = nil
+    # this only works if the widget is inside a boxlayout or a gridlayout
+    # only in the latter case can you supply a horizontal and vertical value.
+    def stretch v = nil, w = nil
       return (instance_variable_defined?(:@stretch) ? @stretch : nil) unless v
-      check_boxparent 'stretch'
-      @stretch = v
+      if w
+        check_grid_parent 'stretch'
+        @stretch = v, w
+      else
+        check_boxparent 'stretch'
+        @stretch = v
+      end
     end
 
     def run
@@ -283,13 +319,18 @@ module Reform
     public
     # override
     def sizeHint
-      (instance_variable_get(:@_reform_hack) ? (@_reform_hack.sizeHint_i || super) : super) #.tap{|t|tag("sz:#{t.inspect}")}
+      (instance_variable_defined?(:@_reform_hack) ? (@_reform_hack.sizeHint_i || super) : super) #.tap{|t|tag("sz:#{t.inspect}")}
     end
 
     # override
     def minimumSizeHint
-      (instance_variable_get(:@_reform_hack) ? (@_reform_hack.minimumSizeHint_i || super) : super) #.tap{|t|tag("minsz:#{t.inspect}")}
+      (instance_variable_defined?(:@_reform_hack) ? (@_reform_hack.minimumSizeHint_i || super) : super) #.tap{|t|tag("minsz:#{t.inspect}")}
     end
+
+    def paintEvent event
+      super unless instance_variable_defined?(:@_reform_hack) && @_reform_hack.whenPainted(event)
+    end
+
   end # class QWidget
 
 =begin DESTRUCTION   destroys Qt

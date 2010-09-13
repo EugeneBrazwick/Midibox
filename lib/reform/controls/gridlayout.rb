@@ -5,6 +5,10 @@ module Reform
 
   require_relative '../layout'
 
+  # forward!
+  class Spacer < Widget
+  end
+
 =begin
 MAJOR HEADACHE CODE
 
@@ -40,8 +44,14 @@ gridlayout {
 #       @fill = [] # array of rows where each row is a bool array
       # an item in a grid can set col, row and colspan and rowspan
       @columnCount = nil
+      @align_labels = :narrow # I'm not sure about this default...
 #       @collection = []
 #       tag "initialized 'collection'"
+    end
+
+    # :narrow or :wide
+    def align_labels val
+      @align_labels = val
     end
 
     class RowRef
@@ -144,19 +154,34 @@ gridlayout {
             label.buddy = control.qtc
             # if no constraints were set, and if we have 1 column room available, shift 1
             if no_constraint && c < colCount - 1
-              @qtc.addWidget(label, r, c, Qt::AlignRight)
+              @qtc.addWidget(label, r, c, @align_labels == :narrow ?  Qt::AlignRight : Qt::AlignLeft)
               c += 1
             else
               extra_span = c == 0
-              @qtc.addWidget(label, r, extra_span ? spanc : c - 1, extra_span ? Qt::AlignLeft : Qt::AlignRight)
+              @qtc.addWidget(label, r, extra_span ? spanc : c - 1,
+                             extra_span == (@align_labels == :narrow) ? Qt::AlignLeft : Qt::AlignRight)
             end
           end
-          if alignment = control.layout_alignment
-#           tag "applying alignment: #{alignment}, ignoring span"
-            @qtc.addWidget(control.qtc, r, c, alignment)
+          if Spacer === control
+#             tag "adding spacer #{control.inspect} to the grid hsp=#{control.hor_spacing}, vsp=#{control.ver_spacing}"
+            val = control.hor_spacing and @qtc.setColumnMinimumWidth(c, val) #.tap{|x| tag "SET CMW to #{val}" }
+            val = control.ver_spacing and @qtc.setRowMinimumHeight(r, val)
+            val = control.hor_stretch and @qtc.setColumnStretch(c, val)
+            val = control.ver_stretch and @qtc.setRowStretch(r, val)
           else
-#             tag "addWidget(#{control.qtc}, r=#{r}, c=#{c}, spanr=#{spanr}, spanc=#{spanc})"
-            @qtc.addWidget(control.qtc, r, c, spanr, spanc)
+            if alignment = control.layout_alignment
+  #           tag "applying alignment: #{alignment}, ignoring span"
+              @qtc.addWidget(control.qtc, r, c, alignment)
+            else
+  #             tag "addWidget(#{control.qtc}, r=#{r}, c=#{c}, spanr=#{spanr}, spanc=#{spanc})"
+              @qtc.addWidget(control.qtc, r, c, spanr, spanc)
+            end
+            # still, a widget can have 'stretch' set.
+            if stretch = control.stretch
+              stretch = [stretch, stretch] unless Array === stretch
+              stretch[0] and @qtc.setColumnStretch(c, stretch[0])
+              stretch[1] and @qtc.setRowStretch(r, stretch[1])
+            end
           end
           spanc += 1 if extra_span
         end

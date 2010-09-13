@@ -3,11 +3,11 @@
 
 module Reform
 
-  require_relative 'controls/widget'
+  require_relative 'labeledwidget'
 
-  class AbstractButton < Widget
+  class AbstractButton < LabeledWidget
     private
-    define_simple_setter :flat
+    define_simple_setter :text
 
     public
 
@@ -30,7 +30,7 @@ module Reform
 #       tag "@{self} connectModel #{aModel}, cid=#{connector}"
       cid = connector and
         if model && model.getter?(cid)
-          @qtc.text = model.apply_getter(tcid)
+          @qtc.text = model.apply_getter(cid)
         end
        # ????? if (model = effective_model) && (tcid = text_connector) && model.getter?(tcid)
       super

@@ -236,8 +236,7 @@ module Reform
     def sizeHint x = nil, y = nil
       return sizeHint_i || @qtc.sizeHint if x.nil?
       x, y = x if Array === x
-      @sizeHint = if Qt::Size === x then x else Qt::Size.new(x, y || x) end # this currently only works for forms!!! Not other windows!!!
-#       @qtc.setSizeHint(x, y)  # this hardly works at all. Note there is a virtual method: QWidget 'sizeHint()'!!
+      @sizeHint = if Qt::Size === x then x else Qt::Size.new(x, y || x) end
     end
 
     alias :sizehint :sizeHint
@@ -245,10 +244,11 @@ module Reform
     def minimumSizeHint x = nil, y = nil
       return minimumSizeHint_i || @qtc.minimumSizeHint if x.nil?
       x, y = x if Array === x
-      @minimumSizeHint = if Qt::Size === x then x else Qt::Size.new(x, y || x) end # this currently only works for forms!!! Not other windows!!!
+      @minimumSizeHint = if Qt::Size === x then x else Qt::Size.new(x, y || x) end
     end
 
     alias :minimumSize :minimumSizeHint
+    alias :minSize :minimumSizeHint
     alias :minimumSizehint :minimumSizeHint
 
     def_delegators :@qtc, :adjustSize
@@ -315,8 +315,7 @@ module Reform
 
   end # class Widget
 
-  class QWidget < Qt::Widget
-    public
+  module QWidgetHackContext
     # override
     def sizeHint
       (instance_variable_defined?(:@_reform_hack) ? (@_reform_hack.sizeHint_i || super) : super) #.tap{|t|tag("sz:#{t.inspect}")}
@@ -324,13 +323,18 @@ module Reform
 
     # override
     def minimumSizeHint
-      (instance_variable_defined?(:@_reform_hack) ? (@_reform_hack.minimumSizeHint_i || super) : super) #.tap{|t|tag("minsz:#{t.inspect}")}
+      (instance_variable_defined?(:@_reform_hack) ? (@_reform_hack.minimumSizeHint_i || super) : super).tap{|t|tag("#{self}.minszhint:#{t.inspect}")}
     end
 
     def paintEvent event
       super unless instance_variable_defined?(:@_reform_hack) && @_reform_hack.whenPainted(event)
     end
 
+  end
+
+  class QWidget < Qt::Widget
+    include QWidgetHackContext
+    public
   end # class QWidget
 
 =begin DESTRUCTION   destroys Qt

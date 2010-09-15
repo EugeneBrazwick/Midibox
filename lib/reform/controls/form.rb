@@ -199,6 +199,7 @@ module Reform
   # So form == generic toplevel widget
   #    mainwindow = mainwindow of application
   #    dialog == fixed size toplevel widget
+  # Event though it is a QWidget, minimumSizeHint never seems to be called for the toplevel widget....(?)
   createInstantiator File.basename(__FILE__, '.rb'), QWidget, ReForm, form: true
 
 end # module Reform

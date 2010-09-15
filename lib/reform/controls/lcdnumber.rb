@@ -32,9 +32,12 @@ module Reform
       cid = connector or return
       if model && model.getter?(cid)
 #         tag "getter located"
-        time = model.apply_getter(cid)
-        # this should be a Qt::Time
-        @qtc.display time.toString(if time.second % 2 == 0 then 'hh mm' else 'hh:mm' end)
+        case data = model.apply_getter(cid)
+        when Qt::Time
+          @qtc.display data.toString(if data.second % 2 == 0 then 'hh mm' else 'hh:mm' end)
+        else
+          @qtc.display data
+        end
       else
         @qtc.display 0
       end
@@ -44,10 +47,11 @@ module Reform
   end # class LCDNumber
 
   class QLCDNumber < Qt::LCDNumber
-    attr_accessor :size
-    def sizeHint
-      size || super
-    end
+    include QWidgetHackContext
+#     attr_accessor :size
+#     def sizeHint
+#       size || super
+#     end
   end
 
   createInstantiator File.basename(__FILE__, '.rb'), QLCDNumber, LCDNumber

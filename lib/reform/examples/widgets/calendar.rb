@@ -203,7 +203,7 @@ solution 2) just ad hoc code it, similar to the example
 #     tag "setting whenConnected form callback"
        # FIXME: once set, this is never unset and I cannot find how the original
        # example does this.
-    whenConnected do |model|
+    whenConnected do |model, options|
       if firstFridayCheckbox.checked?
         firstFriday = Qt::Date.new(calendarWidget.yearShown, calendarWidget.monthShown, 1)
         firstFriday = firstFriday.addDays(1) while firstFriday.dayOfWeek != Qt::Friday

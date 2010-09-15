@@ -1,4 +1,4 @@
-
+#
 # Copyright (c) 2010 Eugene Brazwick
 
 verb, $VERBOSE = $VERBOSE, false
@@ -116,7 +116,7 @@ DIAGNOSTICS:
  Q: ERROR: cmake/modules/FindKDE4Internal.cmake not found in ...
  A: kde-devel kdelibs5-dev  (presumably???)  NOT kdelibs4-dev!
  Q: on any failure?
- A: cd ..; rm -rf kdebingins-4.4.2  # and repeat from start after fixing!
+ A: cd ..; rm -rf kdebindings-4.4.2  # and repeat from start after fixing!
 
 Note: it builds far too much... So takes an hour. Feel free to skip more by disabling more
     modules. For your convenience:
@@ -201,8 +201,10 @@ module Reform
   end
 =end
 
-  class ReformError < StandardError
+  class Error < StandardError
   end
+
+  ReformError = Error
 
 =begin rdoc
   baseclass for ControlContext, GraphicContext etc.
@@ -250,32 +252,41 @@ module Reform
 #       tag "#{self}::registerControlClassProxy_i(#{name}, #{thePath})"
       # to avoid endless loops we must consider that by loading some classes it is possible
       # that we already loaded the file.
+      if Symbol === thePath
+#         tag "Create alias :#{name} :#{thePath}"
+        module_eval("alias :#{name} :#{thePath}")
+        return
+      end
       return if private_method_defined?(name)
+#       tag "Defining method #{self}.#{name}"  It may return nil on exceptions... THis is by design
+# failing components do not stop the setup process.
       define_method name do |quicky = nil, &block|
-        # are we registered at this point?
-        # this is done by the require which executes createInstantiator_i.
-        # IMPORTANT ruby1.9.2 corrupts name2 somehow.  Using name3 does the trick however
-        unless @@instantiator[name]
-#           tag "arrived in #{self}::#{name3.inspect}() PROXY, selv=#{selv}, __method__=#{__method__.inspect}"
-          require_relative thePath
-          # the loaded module should call createInstantiator (and so registerControlClass) which alters
-          # @@instantiator
-          raise "'#{name}' did not register an instantiator!!!" unless @@instantiator[name]
-        end
-        instantiator = @@instantiator[name]
-        reform_class = instantiator[:reform_class]
-        options = instantiator[:options]
-        qt_implementor_class = instantiator[:qt_implementor_class]
-        # It's important to use parent_qtc_to_use, since it must be a true widget.
-        # Normally, 'qparent' would be '@qtc' itself
-        qparent = quicky && quicky[:qtparent] || parent_qtc_to_use_for(reform_class)
+        c = nil
+        rfRescue do
+          # are we registered at this point?
+          # this is done by the require which executes createInstantiator_i.
+          # IMPORTANT ruby1.9.2 corrupts name2 somehow.  Using name3 does the trick however
+          unless @@instantiator[name]
+  #           tag "arrived in #{self}##{name}"
+            require_relative thePath
+            # the loaded module should call createInstantiator (and so registerControlClass) which alters
+            # @@instantiator
+            raise "'#{name}' did not register an instantiator!!!" unless @@instantiator[name]
+          end
+          instantiator = @@instantiator[name]
+          reform_class = instantiator[:reform_class]
+          options = instantiator[:options]
+          qt_implementor_class = instantiator[:qt_implementor_class]
+          # It's important to use parent_qtc_to_use, since it must be a true widget.
+          # Normally, 'qparent' would be '@qtc' itself
+          qparent = quicky && quicky[:qtparent] || parent_qtc_to_use_for(reform_class)
 =begin
-    Severe problem:     sometimes the parenting must change but how can this be done before
-                        even the instance exists?
-    Example: creating a Qt::Layout with parent Qt::MainWindow will fail!
-    Answer: HACK IT!
+      Severe problem:     sometimes the parenting must change but how can this be done before
+                          even the instance exists?
+      Example: creating a Qt::Layout with parent Qt::MainWindow will fail!
+      Answer: HACK IT!
 =end
-        ctrl = self
+          ctrl = self
 #         graphicsproxy = false
   # the smoke hacks prevent this from working since internally Qt::VBoxLayout subclasses Qt::Base !!!
 # Oh my GOD!!
@@ -295,23 +306,16 @@ module Reform
 #         tag "reform_class=#{reform_class}, calling new_qt_implementor for #{qt_implementor_class}, parent=#{qparent}"
 =end
 #         raise 'CANTHAPPEN' if qparent && qparent.inherits('QGraphicsScene')
-#         tag "instantiate #{qt_implementor_class} with parent #{qparent}"
-        newqtc = qt_implementor_class &&
-                 ctrl.instantiate_child(reform_class, qt_implementor_class, qparent)
-#         tag "#{reform_class}.new, ctrl=#{ctrl} self=#{ctrl}, func=#{name}"
-#         if reform_class <= Model
-#           tag "CALLING setModel!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
-#           ctrl.setModel(c = reform_class.new, quicky, &block)
-#         else
-#         tag "#{reform_class}.new"
-        c = reform_class.new ctrl, newqtc
-#           tag "instantiated c=#{c}, parent is a #{ctrl.class}"
-#           c.text(quicky) if quicky
-          # addControl will execute block, and then also call postSetup
-#         tag "APP -> #{c.class}.addTo(#{self.class}) + SETUP"
-        rfRescue do
-#           tag "CALLING #{ctrl}.add(#{c})"
-          ctrl.add(c, quicky, &block)
+#         tag "instantiate #{qt_implementor_class} with parent #{ctrl}/#{qparent}"
+          newqtc = qt_implementor_class &&
+                  ctrl.instantiate_child(reform_class, qt_implementor_class, qparent)
+  #         tag "#{reform_class}.new(#{ctrl}, #{newqtc})"
+          c2 = reform_class.new ctrl, newqtc
+  #           tag "instantiated c=#{c}, parent is a #{ctrl.class}"
+            # add will execute block, and then also call postSetup
+  #           tag "CALLING #{ctrl}.add(#{c})"
+          ctrl.add(c2, quicky, &block)
+          c = c2
         end
 #         tag "IMPORTANT: method '#{name}' return the control #{c}"
         c
@@ -349,6 +353,16 @@ module Reform
   # These are all in the 'models' subdirectory
   module ModelContext
     extend Instantiator
+
+    private
+
+      # shortcut. You can then say simple_data 'hallo', 'world'
+      def simple_data *val
+        ruby_model value: if val.length == 1 then val[0] else val end
+      end
+
+      alias :simpledata :simple_data
+
   end # module ModelContext
 
   # MenuContext means we can create menus for the control that includes it
@@ -384,6 +398,7 @@ module Reform
       raise unless control
 #       tag "Macro.new(#{control}, #{name})"
       @control, @name, @quicky, @block = control, name, quicky, block
+      # WTF??? macros have not a name perse, so macros[name] = self DESTROYS macros!!!!
       control.macros! << self
     end
   public
@@ -402,7 +417,7 @@ module Reform
   end # class Macro
 #
 
-  # experimental. 'Cans' both widgets and graphicitem setups
+  # experimental. 'Cans' graphicitem setups
   module SceneFrameMacroContext
     def self.createInstantiator_i name
     end
@@ -419,6 +434,21 @@ module Reform
   end # module SceneFrameMacroContext
 
   private
+
+  def self.internalize hash
+    hash.each do |dir, klass|
+      symlinks = {}
+      for file in Dir["#{File.dirname(__FILE__)}/#{dir}/*.rb"]
+        basename = File.basename(file, '.rb')
+        if File.symlink?(file)
+          symlinks[basename.to_sym] = File.basename(File.readlink(file), '.rb').to_sym
+        else
+          send("register#{klass}ClassProxy", basename, dir + '/' + basename)
+        end
+      end
+      symlinks.each { |key, value| send("register#{klass}ClassProxy", key, value) }
+    end
+  end
 
   # delegator. see App::registerControlClassProxy
   def self.registerControlClassProxy id, path
@@ -440,7 +470,7 @@ module Reform
   def self.registerGraphicsControlClassProxy id, path
 #     tag "registerGraphicsControlClassProxy(#{id}, #{path})"
     GraphicContext::registerControlClassProxy_i id, path
-#     SceneFrameMacroContext::registerControlClassProxy_i id, path
+    SceneFrameMacroContext::registerControlClassProxy_i id, path
   end
 
   def self.registerModelClassProxy id, path
@@ -467,7 +497,7 @@ module Reform
   class Frame < Widget
   end
 
-  class Layout < Frame
+  class Layout < Control
   end
 
   module Model
@@ -479,7 +509,7 @@ module Reform
 #     tag "createInstantiator(#{name.inspect})"
     # 'Widget' is implicit (since the default), and this 'require' avoids having to load it, as the caller may
     # be unaware of the fact that it is needed
-    require_relative 'controls/widget.rb' if reform_class == Widget
+    require 'reform/widget.rb' if reform_class == Widget && !reform_class.method_defined?(:whenPainted)
 #     tag "createInstantiator '#{name}' implementor=#{qt_implementor_class}, klass=#{reform_class}"
     # this can be done using classmethods in reform_class.
     # Also we can have ToplevelContext, included by App itself
@@ -548,6 +578,7 @@ will create a button as toplevel control
     # set when the first form is defined. This serves as the main window.
     attr :firstform
 
+    # for use with rspec tests:
     def doNotRun v = nil
       return @doNotRun if v.nil?
       @doNotRun = v
@@ -565,10 +596,16 @@ will create a button as toplevel control
 =end
     def self.registerControlClassProxy_i name, thePath
       name = name.to_sym
+      if Symbol === thePath
+#         tag "Create alias :#{name} :#{thePath}"
+        module_eval "alias :#{name} :#{thePath}"                # 'alias' is an UTTER HACK!
+        return
+      end
 #       tag "registerControlClassProxy_i(#{name}, #{thePath})"
       return if private_method_defined?(name)
 #       tag "define_method #{self}::#{name}"
       define_method name do |quicky = nil, &block|
+#         tag "executing ControlClassProxy app##{name}"
         unless Instantiator[name]
           require_relative thePath
           raise "'#{name}' did not register an instantiator!!!" unless Instantiator[name]
@@ -594,8 +631,8 @@ will create a button as toplevel control
 #             tag "Instantiating autoform '#@autoform', unless #@firstform"
           @firstform ||= send(@autoform)
           # we delay creating the elements until form.run is called.
-#           tag "create macro for #{name}"
           Macro.new(@firstform, name, quicky, block)
+#           tag "create macro in #@firstform for #{name}, macrocount is now #{@firstform.macros.length}"
         else
           # is this a proper constraint?
           raise ReformError, 'only 1 control can be on top' if @firstform
@@ -614,11 +651,12 @@ will create a button as toplevel control
 
     # called from Reform::app
     def setupForms
-#       tag "here"
+#       tag "setupForms, firstform = #@firstform"
       # without any forms it loops, waiting until we quit.
-      @firstform.run if @firstform
-  #     puts "activeWindow = #{activeWindow.inspect}"
-      unless activeWindow
+      if @firstform
+        @firstform.run
+      elsif @all_forms.empty?
+#         tag "no forms registered"
         # I was tempted to put 'Hallo World' in this place:
         hello = Qt::PushButton::new tr('It Just Works')
         geometry = desktop.screenGeometry
@@ -670,9 +708,8 @@ will create a button as toplevel control
         if name[-4, 4] == 'Form'
           $qApp.singleton_class.send(:define_method, name) { aForm }
         end
-      else
-        @all_forms << aForm
       end
+      @all_forms << aForm
     end
 
     # delegate to @forms
@@ -687,38 +724,17 @@ will create a button as toplevel control
 #     tag "Creating Qt::Application!!"
     App.new ARGV
 #     tag "extend the Form class with the proper contributed widgets"
-    for file in Dir[File.dirname(__FILE__) + '/controls/*.rb']
-      basename = File.basename(file, '.rb')
-      registerControlClassProxy basename, 'controls/' + basename
-    end
-    for file in Dir[File.dirname(__FILE__) + '/menus/*.rb']
-      basename = File.basename(file, '.rb')
-      registerMenuClassProxy basename, 'menus/' + basename
-    end
-    for file in Dir[File.dirname(__FILE__) + '/actions/*.rb']
-      basename = File.basename(file, '.rb')
-      registerActionClassProxy basename, 'actions/' + basename
-    end
-    for file in Dir[File.dirname(__FILE__) + '/contrib_widgets/*.rb']
-      basename = File.basename(file, '.rb')
-      registerControlClassProxy basename, 'contrib_widgets/' + basename
-    end
-  #IMPORTANT, if any of the files loaded by these instantiators does not redefine the
-  # instantiator this will cause a stack failure since we keep loading for ever...
-    for file in Dir[File.dirname(__FILE__) + '/graphics/*.rb']
-      basename = File.basename(file, '.rb')
-      registerGraphicsControlClassProxy basename, 'graphics/' + basename
-    end
-    for file in Dir[File.dirname(__FILE__) + '/models/*.rb']
-      basename = File.basename(file, '.rb')
-#       tag "registerModelClassProxy #{basename} -> models/#{basename}.rb"
-      registerModelClassProxy basename, 'models/' + basename
-    end
+
+#IMPORTANT, if any of the files loaded by these instantiators does not redefine the
+# instantiator this will cause a stack failure since we keep loading for ever...
+
+    internalize 'controls'=>'Control', 'actions'=>'Action', 'contrib_widgets'=>'Control',
+                'menus'=>'Menu', 'graphics'=>'GraphicsControl', 'models'=>'Model'
     $qApp.instance_eval(&block) if block
 #     tag "CALLING app.exec"
     $qApp.setupForms
     $qApp.exec unless $qApp.doNotRun
-  end # app
+  end # app method
 end # module Reform
 
 if __FILE__ == $0

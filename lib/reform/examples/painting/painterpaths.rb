@@ -136,7 +136,7 @@ Reform::app {
 #             tag "renderara, qtc = #{@qtc}, must be QRenderArea"
 #             tag "nr = #{nr}"
             selv = self
-            whenConnected { |model|
+            whenConnected { |model, options|
 #               tag "model = #{model}, qtc=#{@qtc}"
               # Oh man!!! All 'when' triggers run in the form!
               # So self is the form.  Fortunately they are also closures...

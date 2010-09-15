@@ -3,7 +3,7 @@
 
 module Reform
 
-  require_relative 'controls/widget'
+  require 'reform/widget'
 
   class AbstractItemView < Widget
     private

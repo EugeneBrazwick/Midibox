@@ -35,12 +35,13 @@ However, in the previous version a form had 'containing_frame' being the form it
         # problematic: the creator tends to call postSetup, but it must be delayed
 #         tag "missing layout, create a '#{creator}'"
         layout = send(creator, postSetup: false)
-#         tag "#{self}, qtc=#@qtc, layout=#{layout}, layout.qtc=#{layout.qtc}, creator='#{creator}'"
+#         tag "CREATE IMPLICIT LAYOUT #{self}, qtc=#@qtc, layout=#{layout}, layout.qtc=#{layout.qtc}, creator='#{creator}'"
+#         tag "caller = #{caller.join("\n")}"
         @qtc.layout = layout.qtc
         @infused_layout = layout
       end
       if control
-#         tag "addWidget #{control} to infused layout + SETUP"
+#         tag "addWidget #{control} to infused layout #{layout} + SETUP"
         control.parent = layout
         layout.add control, hash, &block
 #         tag "add OK"
@@ -53,7 +54,7 @@ However, in the previous version a form had 'containing_frame' being the form it
       control.parent = self
     end
 
-    public
+  public
 
     attr_accessor :infused_layout
 
@@ -71,17 +72,17 @@ However, in the previous version a form had 'containing_frame' being the form it
           it will take no action by itself,
           but the connect propagates to each control that is a direct child
 =end
-    def updateModel aModel, options = nil
-#       tag "#{self}::connecting model, delegate to children, @all_widgets=#{@all_widgets.inspect}"
+    def updateModel aModel, propagation
+#       tag "#{self}::updateModel"
 #       tag "connector=#{connector}(getter?:#{aModel.getter?(connector)}), aModel = #{aModel}"
-      if (cid = connector) && aModel && aModel.getter?(cid)
+      if (cid = connector) && aModel
 #         tag "Applying getter #{cid} on model"
-        aModel = aModel.apply_getter(cid)
+        mod = aModel.apply_getter(cid)
+        applyModel mod, aModel
+        aModel = mod
       end
-#       tag "aModel = #{aModel}"
-      children.each { |child| child.updateModel(aModel, options) unless child.effectiveModel? }
-      super
-#       tag "DONE"
+#       tag "delegate model to children"
+      propagateModel aModel, propagation
     end
 
     def columnCount value
@@ -92,7 +93,8 @@ However, in the previous version a form had 'containing_frame' being the form it
     # override
     def effectiveModel
       return @model if instance_variable_defined?(:@model)
-      parent.effectiveModel
+      aModel = parent.effectiveModel
+      if (cid = connector) && aModel then aModel.apply_getter(cid) else aModel end
     end
 
     # override
@@ -104,12 +106,12 @@ However, in the previous version a form had 'containing_frame' being the form it
     def addWidget control, hash, &block
 #       tag "#{self}, adding widget #{control}, autolayout=#@autolayout"
       if layout = infused_layout
-#         tag "infused layout"
-        control.parent = layout
-        layout.addWidget(control, hash, &block)
+#         tag "infused layout, add control to layout"
+#         control.parent = layout               layout.added will do this
+        layout.add(control, hash, &block)
       else
         if @autolayout && layoutcreator = control.auto_layouthint
-#           tag "create proper layout"
+#           tag "create proper layout, namely : #{layoutcreator}"
           check_layout(control, layoutcreator,  hash, &block)
         else
           super

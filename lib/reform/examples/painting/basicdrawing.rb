@@ -248,7 +248,7 @@ Reform::app {
       sizeHint 400, 200
       minimumSize 100, 100
       # Now 'shape' is a simple switch that decides the visibility of the contents.
-      whenConnected { |data| renderArea.qtc.data = data }
+      whenConnected { |data, options| renderArea.qtc.data = data }
     }
     combobox { # shapeComboBox
       connector :shape

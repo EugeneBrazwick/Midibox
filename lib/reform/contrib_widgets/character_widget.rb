@@ -174,14 +174,9 @@ module Reform
     end
 
     protected
-    def whenConnected model = nil, &block
-      if block
-        @whenConnected = block
-      else
-# 	tag "whenConnected(#{model}), family=#{model.family}, calling updateFont"
-        @qtc.displayFont = model
-        rfCallBlockBack(model, &@whenConnected) if instance_variable_defined?(:@whenConnected)
-      end
+    def whenConnected model = nil, options = nil, &block
+      @qtc.displayFont = model unless block
+      super
     end
   end
 

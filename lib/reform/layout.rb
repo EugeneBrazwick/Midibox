@@ -3,7 +3,7 @@
 
 module Reform
 
-  require_relative 'controls/frame'
+  require 'reform/control'
 
 =begin
 
@@ -11,13 +11,9 @@ added widgets must be recorded, but not added immediately.
 Because when added their block has not yet been executed.
 However it must be in postSetup.
 =end
-  class Layout < Frame
+  class Layout < Control
+    include ControlContext
   private
-
-    def initialize parent, qtc
-#       tag "new Layout #{self}"
-      super(parent, qtc, false)
-    end
 
     define_simple_setter :margin, :sizeConstraint, :spacing
 
@@ -27,6 +23,10 @@ However it must be in postSetup.
     end
 
     alias :fixedSize :fixedsize
+
+    def added control
+      control.parent = self
+    end
 
   public
 
@@ -83,6 +83,10 @@ However it must be in postSetup.
 
     # override. If self is the class of the child, which qtc to use as parent
     def self.parent_qtc parent_control, parent_effective_qtc
+    end
+
+    def self.contextsToUse
+      [ControlContext, App] # actually only in frames...
     end
 
   end # Layout

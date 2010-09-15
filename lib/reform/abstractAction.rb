@@ -4,6 +4,15 @@ module Reform
 
     private
 
+    # notice: these can no longer be queried....
+    def enabler value = nil, &block
+      DynamicAttribute.new(self, :enabled, value, &block)
+    end
+
+    def disabler value = nil, &block
+      DynamicAttribute.new(self, :disabled, value, &block)
+    end
+
     public
     def self.contextsToUse
       ActionContext
@@ -21,6 +30,7 @@ module Reform
       parent_control.effective_qtc_for_action
     end
 
+    # with a block, connect the callback, without it call the event (no block need be connected)
     def whenTriggered &block
       if block
         connect(@qtc, SIGNAL('triggered()'), self) { rfCallBlockBack(&block) }

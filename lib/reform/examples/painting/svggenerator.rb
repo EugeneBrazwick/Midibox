@@ -54,7 +54,7 @@ Reform::app {
         fixedSize true
         stretch 200
         sizeHint 200
-        whenConnected { |data| displayWidget.update }
+        whenConnected { |data, options| displayWidget.update }
 #         def data= val           # FIXME: UGLY!
 # #           @data = val         NO LONGER USEFULL
 #           @qtc.update   # causes whenPainted to trigger

@@ -22,6 +22,10 @@ module Reform
     end
 
     public
+
+    def style=(*)
+    end
+
       # for grids, you can specify
     def spacing v = nil, w = nil
       return instance_variable_defined?(:@spacing) ? @spacing : nil unless v

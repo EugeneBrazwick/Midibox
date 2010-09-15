@@ -8,45 +8,40 @@ module Reform
   class Edit < LabeledWidget
     private
 
-    def initialize parent, qtc
-#       tag "new Edit(parent=#{parent}, qtc=#{qtc})"
-      super
-      connect(@qtc, SIGNAL('editingFinished()'), self) do
-        rfRescue do
-#           tag "changed, assign '#{@qtc.text}' to models property cid=#{connector}, effectiveModel=#{effectiveModel}"
-          model = effectiveModel and cid = connector and model.apply_setter(cid, @qtc.text)
+      def initialize parent, qtc
+        super
+#         tag "new Edit(parent=#{parent}, qtc=#{qtc})"
+        connect(@qtc, SIGNAL('editingFinished()'), self) do
+#             tag "changed, assign '#{@qtc.text}' to models property cid=#{connector}, effectiveModel=#{effectiveModel}"
+          if (model = effectiveModel) && (cid = connector)
+            rfRescue do
+              model.apply_setter(cid, @qtc.text, self)
+            end
+          end
         end
+  #       tag "initialized edit"
       end
-#       tag "initialized edit"
-    end
 
-    define_simple_setter :readOnly, :text, :alignment, :maxLength
+      define_simple_setter :readOnly, :text, :alignment, :maxLength
 
-    def rightalign
-      alignment Qt::AlignRight
-    end
+      def rightalign
+        alignment Qt::AlignRight
+      end
 
-    def changed_signal_signature
-      'textEdited(const QString &)'
-    end
+      def changed_signal_signature
+        'textEdited(const QString &)'
+      end
+
+      def applyModel data, model
+#         tag "applyModel"
+        @qtc.text = data.to_s
+        @qtc.readOnly = !model.setter?(connector)
+      end
 
     public
 
     def insert(*args)
       @qtc.insert(*args)
-    end
-
-    def updateModel model, options = nil
-#       tag "connectModel #{model.inspect}, cid=#{connector}"
-      cid = connector and
-        if model && model.getter?(cid)
-  #         tag "getter located"
-          @qtc.text = model.apply_getter(cid)
-          @qtc.readOnly = !model.setter?(cid)
-        else
-          @qtc.clear
-        end
-      super
     end
 
   end

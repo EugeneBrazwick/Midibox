@@ -1,32 +1,26 @@
 
+# Copyright (c) 2010 Eugene Brazwick
+
 module Reform
 
   require_relative '../graphicsitem'
 
+  # the position is once more the center
   class SimpleText < GraphicsItem
   private
 
-    # override. Position of the center(!)
-    def position x, y = nil
-      x, y = x if y.nil?
-      @qtc.setPos x, y
-    end
-
-    def text val
-      @qtc.text = val
+    # this text can contain newlines, resulting in a multiline item (left aligned, may be based on locale?)
+    def text t = nil
+      return @qtc.text unless t
+      @qtc.text = t
     end
 
   public
 
-    # same as Circle.  Share code ? FIXME
-    def self.new_qt_implementor(qt_implementor_class, parent, qparent)
-      t = qt_implementor_class.new(qparent)
-      t.pen, t.brush = parent.pen, parent.brush
-      t
-    end
-
   end # SimpleText
 
   createInstantiator File.basename(__FILE__, '.rb'), Qt::GraphicsSimpleTextItem, SimpleText
+#   tag "test for Scene#circle"
+#   raise ReformError, 'oh no' unless Scene.private_method_defined?(:circle)
 
 end # Reform

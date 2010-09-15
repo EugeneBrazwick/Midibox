@@ -5,11 +5,79 @@ require_relative '../model'
 require_relative '../control'
 
 =begin
+
+Slightly simplistic and incomplete wrapper for anything simple, up to
+arrays and hashes.
+
+Hashes have read and write support for the [] and []= only!!!
+Arrays were added later and support all writeops but for reading
+only [] once again.
+
+All unsupported methods will work but writes will not be noticed
+by the model, and reads may return raw Array and Hash instances.
+
+For simplistic JSON like operations it functions excelently, and missing
+stuff can easily be implemented as the 'ArrayWrapper' shows.
+
+In other words, it surely deserves the Nobel prize!
 =end
   class Structure < Control
     include Model
 
     private
+
+    class ArrayWrapper
+      private
+      def initialize grandparent, propname, ar
+        @grandparent, @propname, @ar = grandparent, propname, ar
+      end
+
+      def self.def_single_delegators(accessor, *methods)
+        methods.delete("__send__")
+        methods.delete("__id__")
+        for method in methods
+          def_single_delegator(accessor, method)
+        end
+      end
+
+      def self.def_single_delegator(accessor, method, ali = method)
+        line_no = __LINE__; str = %{
+          def #{ali}(*args, &block)
+            begin
+              #{accessor}.__send__(:#{method}, *args, &block)
+              @grandparent.dynamicPropertyChanged @propname
+            rescue Exception
+              $@.delete_if{|s| %r"#{Regexp.quote(__FILE__)}"o =~ s} unless Forwardable::debug
+              ::Kernel::raise
+            end
+          end
+        }
+        instance_eval(str, __FILE__, __LINE__)
+      end
+
+      public
+
+      def_single_delegators :@ar, :[]=, :<<, :clear, :collect!, :compact!, :delete, :delete_at,
+                                  :delete_if, :fill, :flatten!, :insert, :keep_if,
+                                  :map!, :pop, :push, :reject!, :replace, :reverse!, :shift,
+                                  :shuffle!, :slice!, :sort!, :uniq!, :unshift
+
+      # next thing: all stuff returning array elements must wrap them, if they are a plain hash or
+      # an array themselves...
+
+      def [] *args
+        case r = @ar.send(:[], *args)
+        when Array then ArrayWrapper.new(@grandparent, @propname, r)
+        when Hash then Structure.new(r, @grandparent)
+        else r
+        end
+      end
+
+      def method_missing sym, *args, &block
+        @ar.send(sym, *args, &block)
+      end
+    end # class ArrayWrapper
+
     def initialize parent, qtc = nil
       if Hash === parent
 #         tag "#{self}.new(#{parent.inspect}, gp=#{qtc}"
@@ -37,12 +105,19 @@ require_relative '../control'
         @value[symbol] = args.size == 1 ? args[0] : args
 #         tag "calling dynamicPropertyChanged for #{symbol}"
         @grandparent.dynamicPropertyChanged symbol
-      elsif @value.has_key?(symbol) && args.empty?
-#         tag "applying #{symbol} to hash #{@value}"
-        r = @value[symbol]
-        if Hash === r then self.class.new(r, @grandparent) else r end
       else
-        super
+        return super unless args.empty?
+        symbol = symbol[0...-1].to_sym if symbol.to_s[-1] == '?'
+        if @value.has_key?(symbol)
+  #         tag "applying #{symbol} to hash #{@value}"
+          case r = @value[symbol]
+          when Hash then Structure.new(r, @grandparent)
+          when Array then ArrayWrapper.new(@grandparent, symbol, r)
+          else r
+          end
+        else
+          nil
+        end
       end
     end
 
@@ -53,12 +128,22 @@ require_relative '../control'
 
     # To apply the getter, this method must be used.
     def apply_getter name
+#       tag "apply_getter(#{name})"
       return self if name == :self
-      name.call(self) if Proc === name
-#       tag "apply_getter #{name} to self == 'send'"
-#       if respond_to?(name)
-      r = @value[name]
-      if Hash === r then self.class.new(r, @grandparent) else r end
+      if Proc === name
+        #applying method on the structure (not on hash)
+        r = name.call(self)
+#         tag "apply getter proc -> #{r.inspect}"
+      else
+        # take raw hash value
+        r = @value[name]
+      end
+      # embellish it:
+      case r
+      when Hash then Structure.new(r, @grandparent)
+      when Array then ArrayWrapper.new(@grandparent, name, r)
+      else r
+      end
     end
 
     def setter?(name)
@@ -102,4 +187,10 @@ if __FILE__ == $0
   # Still something is wrong, this does NOT send an 'update' message...  FIXED!
   t.z.c.d = 'pindakaas'
   puts "t.x = #{t.x}, t.z.b = #{t.z.b}, t.z.c.d = #{t.z.c.d}"
+  t = MyStructure.new x: 24, y: [23, 'hallo', d: {i: :interesting}]
+  puts "t.y.class = #{t.y.class}"
+  puts "t.y[2].class = #{t.y[2].class}"
+  puts "t.y[2].d.i = '#{t.y[2].d.i}'"
+  t.y[2].d.i = :not
+  puts "t.y[2].d.i is now '#{t.y[2].d.i}', and we were informed!"
 end

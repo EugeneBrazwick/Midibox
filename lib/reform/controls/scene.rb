@@ -30,6 +30,15 @@ Even more, a QDialog can be stored in the view as well!
     # note that ControlContext is already included in Frame.
     include Graphical, GraphicContext
   private
+
+    def initialize parent, qtc
+      super
+      @brushes = {} # indexed by name
+      @groups = {} # ""
+      @pen = defaultPen
+      @brush = defaultBrush
+    end
+
     # set the topleft and size of the scene. These can be floats and
     # can be freely chosen. Zoom, offset and aspectratio can be changed
     # for a specific view (and even rotation etc)
@@ -48,12 +57,7 @@ Even more, a QDialog can be stored in the view as well!
     end
 
     def background brush
-      if brush.respond_to?(:to_str)
-        # load the image, where the path is given.
-        brush = Qt::Brush.new(Qt::Pixmap.new(brush))
-      end
-#       puts "#{File.basename(__FILE__)}:#{__LINE__}:#@qtc.backgroundBrush := #{brush}"
-      @qtc.backgroundBrush = brush
+      @qtc.backgroundBrush = make_brush(brush)
     end
 
 =begin rdoc
@@ -70,28 +74,144 @@ Even more, a QDialog can be stored in the view as well!
 #     def duplicate &block
 #     end  AARGH
 
+    class Brush < Control
+      include Graphical
+    private
+      def initialize
+        super(nil, Qt::Brush.new)
+      end
+
+    public
+      def name aName = nil # not supported since not a Qt::Object at all. And we already index them too
+      end
+
+    end # class Brush
+
+    class Pen < Control
+      include Graphical
+      def initialize
+        super(nil, Qt::Pen.new)
+      end
+
+    public
+      def name aName = nil
+      end
+    end # class Pen
+
+      # you can build a brush, pen and graphicitem pool.
+      class DefinitionsBlock < Control
+        include Graphical
+
+        private
+
+          class GroupMacro < Control
+            include Graphical, SceneFrameMacroContext
+            private
+              def initialize hash, &initblock
+                super(nil)
+                instance_eval(&initblock) if initblock
+                hash.each { |k, v| send(k, v) } if hash
+              end
+
+            public
+              def exec receiver, quicky, &block
+                tag "FIXME, ignoring quicky + block" # should be working on the group.
+      #           receiver.setup ???
+                executeMacros(receiver)
+              end
+
+          end # GroupMacro
+
+            # I see a pattern here (FIXME)
+          def brush quickyhash = nil, &block
+    #         tag "Is this even called??"
+            Brush.new.setup(quickyhash, &block)
+          end
+
+          alias :fill :brush
+
+          def pen quickyhash = nil, &block
+            Pen.new.setup(quickyhash, &block)
+          end
+
+          alias :stroke :pen
+
+          def shapegroup quickyhash = nil, &block
+            GroupMacro.new(quickyhash, &block)
+          end
+
+        public
+
+          def method_missing sym, *args, &block
+            if args.length == 1 && !block
+    #           tag "single arg: #{self}.#{sym}(#{args[0]})"
+              case what = args[0]
+              when Brush, Gradient then parent.registerBrush(sym, what)
+              when Pen then parent.registerPen(sym, what)
+                # parent is always the scene
+              when GroupMacro then Graphical.registerGroupMacro(parent, sym, what)
+              else super
+              end
+            else
+              super
+            end
+          end
+
+  #       def updateModel model, info
+          # IGNORE, at least currently. It may be usefull to create dynamic tools.... So never mind....
+  #       end
+      end # class DefinitionsBlock
+
+    def define quickyhash = nil, &block
+      DefinitionsBlock.new(self).setup(quickyhash, &block)
+    end
+
   public
+
+    def registerBrush name, brush
+      case brush
+      when Brush then @brushes[name] = brush.qtc
+      when Gradient then @brushes[name] = Qt::Brush.new(brush.qtc)
+      else raise "Cannot register a #{brush.class}"
+      end
+    end
+
+    def registerPen name, pen
+      @pens[name] = pen.qtc
+    end
+
+    def registeredPen(name)
+      @pens[name]  # THIS IS EVIL || :black
+    end
+
+    def registeredBrush(name)
+      @brushes[name] # ... || :white
+    end
+
+#     def registerGroupMacro name, group
+#       @groups[name] = group
+#     end
 
     # Set the default fill for elements.
     def fill brush = nil
       return (@brush || defaultBrush) unless brush
-      case brush
-      when Qt::Brush
-        @brush = brush
-      else
-        @brush = color2brush(brush)
+      @brush = case brush
+      when Symbol
+#         tag "is #{brush} registered? -> #{@brushes[brush]}"
+        @brushes[brush] || color2brush(brush)
+      when Qt::Brush then brush         # trivial speed-up case
+      else make_brush(brush)
       end
     end
-
 
     # Set the default stroke for elements
     def stroke pen = nil
       return (@pen || defaultPen) unless pen
-      case pen
-      when Qt::Pen
-        @pen = pen
-      else
-        @pen = color2pen(pen)
+      @pen = case pen
+      when Symbol
+        @pens[pen] || color2pen(pen)
+      when Qt::Pen then pen
+      else make_pen(pen)
       end
     end
 
@@ -101,8 +221,9 @@ Even more, a QDialog can be stored in the view as well!
   #override
     def addGraphicsItem control, quickyhash = nil, &block
 #       tag "addControl, control #{control} is added to SCENE"
-      qc = if control.respond_to?(:qtc) then control.qtc else control end
-      @qtc.addItem(qc)
+#       qc = if control.respond_to?(:qtc) then control.qtc else control end             BOGO we call 'setup' two lines ahead anyway!
+      @qtc.addItem control.qtc
+      control.parent = self
       control.setup quickyhash, &block
       added control
 #       when Timer, Qt::Timer #then tag "start timer"; qc.start(1000)
@@ -116,6 +237,13 @@ Even more, a QDialog can be stored in the view as well!
 
     # override. Panel is a widget, but I am not...
     def widget?
+    end
+
+    def_delegators :@qtc, :clear
+
+        #override
+    def addTo parent, hash, &block
+      parent.addScene(self, hash, &block)
     end
 
   end # class Scene

@@ -18,14 +18,7 @@ module Reform
     class MenuBarRef < Control
       # the bar can not contain actions, but it can contain a separator
       include MenuContext, ActionContext
-      private
-#       def initialize mw, qtc
-#         super()
-#         @mw, @qtc = mw, qtc
-#       end
-
       public
-
       def addMenu control, hash, &block
 #         tag "Calling #@qtc.addMenu(#{control.qtc})"
         @qtc.addMenu control.qtc
@@ -40,14 +33,13 @@ module Reform
 
     # I noticed this did not work correctly, but this still the case ?
     def menuBar quickyhash = nil, &initblock
+      return @qtc.menuBar unless quickyhash || initblock
 #       tag "#{self}::menuBar, qtc=#@qtc"
-#       m = MenuBarRef.new(self, @qtc.menuBar)
-#       m.setupQuickyhash(quickyhash) if quickyhash
-#       m.instance_eval(&initblock) if initblock
       MenuBarRef.new(self, @qtc.menuBar).setup quickyhash, &initblock
     end
 
     def statusBar quickyhash = nil, &initblock
+      return @qtc.statusBar unless quickyhash || initblock
       StatusBarRef.new(self, @qtc.statusBar).setup quickyhash, &initblock
     end
 
@@ -86,18 +78,7 @@ module Reform
   end
 
   class QMainWindow < Qt::MainWindow
-  private
-#     def initialize
-#       super
-#       tag "new QMainWindow, size=#{size.inspect}"
-#       resize 500, 400         does not help at all
-#     end
-
-  public
-    # override, almost same as QWindow's version
-    def sizeHint
-      @_reform_hack.sizeHint
-    end
+    include QWidgetHackContext
   end
 
   createInstantiator File.basename(__FILE__, '.rb'), QMainWindow, MainWindow, form: true

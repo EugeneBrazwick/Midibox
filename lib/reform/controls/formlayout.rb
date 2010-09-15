@@ -3,7 +3,7 @@
 
 module Reform
 
-  require_relative '../layout'
+  require 'reform/layout'
   require_relative 'label'
 
   class FormLayout < Layout
@@ -16,9 +16,11 @@ module Reform
     # override
     def postSetup
 #       tag "#{self}::postSetup"
+#       super
       # we must wait until all children are setup.
       children.each do |control|
         # note that labels without a buddy are ignored... (all labels are ignored)
+#         tag "Verify #{control}"
         next if control.is_a?(Label)
         if control.respond_to?(:labeltext) && (label = control.labeltext) # may be a string, may have been converted to a Label reference
           # it could be that the label was already added. And the text set.
@@ -41,6 +43,7 @@ module Reform
         # NEVER MIND, it can never have a name unless explicit!
       end
 #       remove_instance_variable :@collection
+#       tag "end postSetup"
     end
 
     def self.qtimplementor

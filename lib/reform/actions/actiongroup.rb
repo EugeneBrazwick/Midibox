@@ -31,9 +31,15 @@ module Reform
 
     def postSetup
       children.each do |action|
-        parent.qtc.addAction(action.qtc)
+#         tag "postSetup, parent=#{parent}, action=#{action}"
+        parent.qtc.addAction(action.qtc) if AbstractAction === action
       end
     end
+
+    def whenTriggered &block
+      connect(@qtc, SIGNAL('triggered(QAction*)'), self) { |a| rfCallBlockBack(a, &block) }
+    end
+
   end
 
   createInstantiator File.basename(__FILE__, '.rb'), Qt::ActionGroup, ActionGroup

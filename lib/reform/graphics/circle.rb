@@ -3,37 +3,31 @@ module Reform
 
   require_relative '../graphicsitem'
 
+# tag "LOADING Circle class"
+
+# the default pos is 0,0 and the width 100
   class Circle < GraphicsItem
-  private
+    private
 
-    # override. Position of the center(!)
-    def position x, y = nil
-      x, y = x if y.nil?
-      rect = @qtc.rect
-      w, center = rect.width, rect.center
-      radius = w / 2.0
-      @qtc.rect = Qt::RectF.new(x - radius, y - radius, w, w)
-#       tag "x=#{x}, y=#{y}, w=#{w} rect is now #{@qtc.rect.inspect}"
-    end
+      def width w = nil
+        return @qtc.rect.width unless w
+        # should not change the center
+        @qtc.rect = Qt::RectF.new(@qtc.x, @qtc.y, w, w)
+      end
 
-    def radius r
-      # should not change the center
-      rect = @qtc.rect
-      center = rect.center
-#       tag "original center = #{center.inspect}"
-      @qtc.rect = Qt::RectF.new(center.x - r, center.y - r, 2.0 * r, 2.0 * r)
-#       tag "after radius is set to #{r}: circle.rect=#{@qtc.rect.inspect}"
-    end
+    public
 
-  public
-
-    # KLUDGE ALERT: the rectangle argument is required, even though Qt(4.2) says it is not.
-    def self.new_qt_implementor(qt_implementor_class, parent, qparent)
-      circle = qt_implementor_class.new(-50.0, -50.0, 50.0, 50.0, qparent)
-#       tag "parent.brush=#{parent.brush}"
-      circle.pen, circle.brush = parent.pen, parent.brush
-      circle
-    end
+      # KLUDGE ALERT: the rectangle argument is required, even though Qt(4.2) says it is not.
+      def self.new_qt_implementor(qt_implementor_class, parent, qparent)
+  #       tag "new_qt_implementor(#{qt_implementor_class}, #{parent}, #{qparent})"
+        circle = qt_implementor_class.new(0, 0, 100.0, 100.0, qparent)
+  #       tag "created circle #{circle}"
+  #       tag "parent=#{parent}"
+  #       tag "parent.brush=#{parent.brush}, pen=#{parent.pen.inspect}"
+  #       tag "caller=#{caller.join("\n")}"
+        circle.pen, circle.brush = parent.pen, parent.brush
+        circle
+      end
 
   end # Circle
 

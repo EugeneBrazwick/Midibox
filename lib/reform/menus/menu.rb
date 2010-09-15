@@ -8,14 +8,22 @@ module Reform
     define_simple_setter :title
     alias :text :title
 
+    def quiter
+      action {
+        label tr('E&xit')
+        shortcut :quit
+        whenTriggered { $qApp.quit }
+      }
+    end
+
     public
     def self.contextsToUse
       MenuContext
     end
 
-    def menu?
-      true
-    end
+# #     def menu?
+#       true
+#     end
 
     def addTo parent, hash, &block
       parent.addMenu self, hash, &block

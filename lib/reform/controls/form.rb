@@ -8,6 +8,10 @@ module Reform
 =begin rdoc
  a ReForm is a basic form. It inherits Frame
  but is meant as a complete window.
+
+ FIXME: if a single canvas is added to a form (as the only control).
+ Or: if any control is the only control, I expect that the contents
+ resizes with the form automatically (unless fixedSize is set).
 =end
   class ReForm < Frame
     include ModelContext
@@ -50,7 +54,8 @@ module Reform
     # So you are encouraged to use names like myForm, mainForm, voiceForm etc..
     # It should also be possible to clone a registered form, for instance for
     # recursive structures. Only one of them can be registered within the application.
-    def name aName
+    def name aName = nil
+      return super unless aName
       @qtc.name = aName
       $qApp.registerForm self, aName
     end
@@ -113,6 +118,16 @@ module Reform
       end
     end
 
+    # called after the first raise, when the form is executed and visible.
+    # Not the same as responding to showEvent(!!)
+    def whenShown &block
+      if block
+        @whenShown = block
+      else
+        @whenShown.call if @whenShown
+      end
+    end
+
     # execute the form. The passed block is instance-evalled and recorded in @setup.
     # if no centralWidget is set, the first control is appointed to this task.
     # Assigns the menuBar (provided a setup block was passed)
@@ -130,7 +145,7 @@ module Reform
         when Hash then setupQuickyhash(@setup)
         when Proc then instance_eval(&@setup)
         end
-#         tag "calling Form.postSetup"
+#         tag "calling #{self}#postSetup"
         postSetup
         # menubar without a centralwidget would remain invisible. That is confusing
 
@@ -139,6 +154,7 @@ module Reform
 #           @qtc.layout.menuBar = @qmenuBar     # might just work for main windows as well? yes!
 #         end
       end
+#       tag "self=#{self}, firstform=#{$qApp.firstform}"
       if self == $qApp.firstform
         # if unambigous center widget... Set it to tell application there is some window
 #         tag "assigning activeWindow"
@@ -150,6 +166,7 @@ module Reform
 #       tag "qtc=#@qtc"
       @qtc.show
       @qtc.raise
+      whenShown
     end # ReForm#run
 
     # override
@@ -191,6 +208,8 @@ module Reform
     def [](i)
       @widget_index[i] or raise ReformError, tr("control '#{i}' does not exist")
     end
+
+    attr_writer :model
 
   end # class ReForm
 

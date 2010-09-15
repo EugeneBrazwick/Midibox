@@ -11,7 +11,7 @@ Reform::app {
       name :myCanvas
       antialiasing true
       fixedSize 210
-      whenConnected do |time| # callback is executed by the form, not the control.
+      whenConnected do |time, options| # callback is executed by the form, not the control.
         # this is bit UGLY. There should be a better way of connecting time.angle to canvas.rotation... FIXME
         # Maybe if a connector is a hash, like name=>name.  But that conflicts with the blockform {|model| ... }
         myCanvas.rotation = time.angle # degrees  around the center of the canvas. Ignores scenes center,

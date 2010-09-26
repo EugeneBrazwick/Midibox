@@ -5,9 +5,13 @@ module Reform
 
   require_relative '../graphicsitem'
 
-  # the position is once more the center
   class Rectangle < GraphicsItem
   private
+
+    def initialize parent, qtc
+      super
+      size 100
+    end
 
     def size w = nil, h = nil
       return @qtc.rect.size unless w
@@ -15,7 +19,18 @@ module Reform
       @qtc.setRect(@qtc.x, @qtc.y, w, h || w)
     end
 
+    alias :geometryF :geometry
+
   public
+
+    def geometry=(x, y = nil, w = nil, h = nil)
+      case x
+      when Qt::RectF then @qtc.setRect x
+      else @qtc.setRect(Qt::RectF.new(x, y, w, h))
+      end
+    end
+
+    alias :geometryF= :geometry=
 
   end # Rectangle
 

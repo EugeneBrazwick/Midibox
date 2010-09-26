@@ -130,14 +130,6 @@ However, in the previous version a form had 'containing_frame' being the form it
       end
     end
 
-    # note that form has an override. Frames collect immediate controls.
-    # Forms collect all controls, and they have an index too.
-    def registerName aName, aControl
-#       aName = aName.to_sym
-#       define_singleton_method(aName) { aControl }  not really used anyway
-      containing_form.registerName(aName, aControl)
-    end
-
     # override
     def postSetup
       super

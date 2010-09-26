@@ -14,9 +14,9 @@ module Reform
     end
 
     public
-    def self.contextsToUse
-      ActionContext
-    end
+#     def self.contextsToUse
+#       ActionContext
+#     end
 
     def action?
       true

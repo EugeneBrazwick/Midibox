@@ -1,13 +1,13 @@
 -0001  wo feb 24 11:40:47 CET 2010 TODO event_output MidiEvent support
-      za mrt  6 22:48:43 CET 2010 DONE
+       za mrt  6 22:48:43 CET 2010 DONE
 -0002  do feb 25 22:22:53 CET 2010 TODO make rplaymidi++ work as a two step system
                                        a) build an in-memory chunk     NODE -> midifile->chunk
                                        b) play the tracks in the chunk NODE -> chunk -> device[s]
-      vr mrt 19 21:00:38 CET 2010 more or less, by virtue of midifilereader + -writer.
+       vr mrt 19 21:00:38 CET 2010 more or less, by virtue of midifilereader + -writer.
 -0003 za feb 27 21:50:12 CET 2010 BUG rplaymidi reads a NoteOn without a NoteOff
          in fixtures/eurodance.midi.  Note 12, Rhythm track. I believe this was recorded
          with arecordmidi. So who's to blame? Is there an official midi file dumper somewhere?
-     di mrt 16 20:26:02 CET 2010 FIXED. At least in midifilereader.rb
+      di mrt 16 20:26:02 CET 2010 FIXED. At least in midifilereader.rb
 0004 do mrt  4 23:20:06 CET 2010 BUG rmidiroute.rb:14:in `block in midi_route': undefined method `set_subs'
 -0005 do mrt  4 23:24:01 CET 2010 TODO writing ev: param := ':modwheel', reading same event -> param == 1.
                                       This is an inconsistency. Must be mapped back.
@@ -101,3 +101,7 @@
      vr apr  2 12:24:10 CEST 2010
 0018 vr apr  2 10:36:35 CEST 2010 FIXME: Chunk as a producer does not create the TrackEvents and
     the initial tempo may also be missing.
+0019 Wed Sep 29 19:59:26 CEST 2010 BUG: rrecordmidi++ does not understand '-?' for --help
+0020 Wed Sep 29 20:13:13 CEST 2010 bin/node_identity.rb --output='UM-2 MIDI 2' --input=/tmp/t.yaml GIVES:
+    /home/ara/Midibox/lib/rrts/midiqueue.rb:88:in `set_queue_tempo':
+    wrong argument type RRTS::Driver::AlsaQueueTempo_i (expected Data) (TypeError)

@@ -85,9 +85,9 @@ However it must be in postSetup.
     def self.parent_qtc parent_control, parent_effective_qtc
     end
 
-    def self.contextsToUse
-      [ControlContext, App] # actually only in frames...
-    end
+#     def self.contextsToUse
+#       [ControlContext, App] # actually only in frames...
+#     end
 
   end # Layout
 

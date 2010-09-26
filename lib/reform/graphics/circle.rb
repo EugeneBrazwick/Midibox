@@ -15,6 +15,8 @@ module Reform
         @qtc.rect = Qt::RectF.new(@qtc.x, @qtc.y, w, w)
       end
 
+      alias :size :width
+
     public
 
       # KLUDGE ALERT: the rectangle argument is required, even though Qt(4.2) says it is not.

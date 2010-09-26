@@ -18,14 +18,6 @@ module Reform
 
     define_simple_setter :scaledContents
 
-  # slightly problematic and only for simplistic settings:
-    AlignmentMap = { left: Qt::AlignLeft, right: Qt::AlignRight,
-                     hcenter: Qt::AlignHCenter, justify: Qt::AlignJustify,
-                     top: Qt::AlignTop, bottom: Qt::AlignBottom,
-                     vcenter: Qt::AlignVCenter,
-                     center: Qt::AlignHCenter | Qt::AlignVCenter
-                     # topleft, ... etc. then we have :absolute etc.....
-                    }
 
     def alignment value = nil
       return @qtc.alignment if value.nil?
@@ -42,7 +34,24 @@ module Reform
     def text value = nil
       return @qtc.text unless value
 #       tag "Assigning labeltext '#{value}'"
-      @qtc.text = value
+
+  # the following code should be made into a generic function   ???
+  # But it does not work with models!
+  # Can't we abuse DynamicAttribute for this?
+  # DO NOT COPY IT !!!!!!!!!!!!
+      if Hash === value
+        value.each do |param, val|
+          case param
+          when :through_state
+            form = containing_form
+            val.each do |state, text|
+              form[state].qtc.assignProperty(@qtc, 'text', Qt::Variant::from_value(text))
+            end
+          end
+        end
+      else
+        @qtc.text = value
+      end
     end
 
   end

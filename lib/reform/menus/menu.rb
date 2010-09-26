@@ -17,9 +17,9 @@ module Reform
     end
 
     public
-    def self.contextsToUse
-      MenuContext
-    end
+#     def self.contextsToUse
+#       MenuContext
+#     end
 
 # #     def menu?
 #       true

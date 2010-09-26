@@ -21,8 +21,7 @@ stuff can easily be implemented as the 'ArrayWrapper' shows.
 
 In other words, it surely deserves the Nobel prize!
 =end
-  class Structure < Control
-    include Model
+  class Structure < AbstractModel
 
     private
 

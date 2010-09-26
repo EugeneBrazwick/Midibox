@@ -46,8 +46,7 @@ before the CW, it would remain unset!
    This is actually the same as solution 1)
 
 =end
-  class CalendarModel < Qt::Object # QObject required for 'tr'
-    include Model
+  class CalendarModel < AbstractModel
 
     # based on first three letters of locale converted monthnames.
     private

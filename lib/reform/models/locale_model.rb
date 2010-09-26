@@ -5,8 +5,8 @@ require_relative '../model'
 
 module Reform
 
-  class LocaleModel # < Qt::Object # QObject required for 'tr'
-    include Model, Enumerable
+  class LocaleModel < AbstractModel # < Qt::Object # QObject required for 'tr'
+    include Enumerable
 
     private
     def initialize

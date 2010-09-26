@@ -1,16 +1,43 @@
-alsa midi bindings:  finished
 
 requirements:
     - ruby1.9.2 or higher, including rdoc, gem etc.
     - libasound2-dev (on Ubuntu at least), alsa development headers
     - shoulda, testing machinery (sudo gem install shoulda)
     - graphviz, for documentation (optional)
-    - make
+    - the GNU 'make' program
+    - the environment variable $RUBYLIB should contain the 'lib' dir, for example:
+    export RUBYLIB=/home/eugene/Midibox/lib:/usr/local/lib/site_ruby/1.9.1:/usr/local/lib/site_ruby/1.9.1/x86_64-linux
 
-BUILD:
-    cd alsamidi
-    ruby ./extruby.rb
-    make
+BUILD: just run
+    rake
+in the toplevel dir.
+
+INSTALL: cannot be done yet
+
+Current state (sep 29 2010)
+    rjack -> DEAD code
+    Rakefile - seems to do its task OK (if the requirements are met)
+    lib/rrts/driver - the low level ALSA wrapper. Only contains sequencer/MIDI related API.
+                      But it should work.
+    lib/rrts - higher level ruby ALSA sequencer interface. The basics are finished.
+    lib/reform - qt GUI declarative interface. Still a running target. Very busy playing and tinkering with it.
+    bin - contains working examples of literal implementations of C tools like rrecordmidi and rplaymidi,
+          and the rrts powered versions rrecordmidi++ and rplaymidi++ along asorted goodies like 'panic'
+    bin/rrecordmidi++ -p 'UM-2 MIDI 1' /tmp/t   is BROKEN. Nothing much happens.
+
+HANDS ON.
+Run
+    bin/node_identity.rb -l
+Output is perhaps something like:
+  Port    Client name                      Port name
+  14:0    Midi Through                     Midi Through Port-0
+  24:0    UM-2                             UM-2 MIDI 1
+  24:1    UM-2                             UM-2 MIDI 2
+IMPORTANT: /usr/bin/ruby should be ruby1.9 or else you must use pe 'ruby1.9 bin/node_identity.rb ...'
+Now record:
+  bin/node_identity.rb --input='UM-2 MIDI 1' --output=/tmp/t.yaml'
+And play back:
+  bin/node_identity.rb --output='UM-2 MIDI 2' --input=/tmp/t.yaml
 
 Plan de campagne:
     1a implement Alsa MIDI API. Done. 14 days.

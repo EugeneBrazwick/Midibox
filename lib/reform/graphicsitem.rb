@@ -1,4 +1,6 @@
 
+# Copyright (c) 2010 Eugene Brazwick
+
 module Reform
 
   class GraphicsItem < Control
@@ -23,6 +25,18 @@ module Reform
         end
       end
 
+      define_simple_setter :zValue
+
+      # NOTE: this is 'fat'. Not every GraphicsItem has a geometry.
+      def geometry x = nil, y = nil, w = nil, h = nil, &block
+        return @qtc.geometry unless x || w || block
+        case x
+        when nil then DynamicAttribute.new(self, :geometryF).setup(nil, &block)
+        when Hash, Proc then DynamicAttribute.new(self, :geometryF).setup(x, &block)
+        else self.geometry = x, y, w, h
+        end
+      end
+
     public
 
       def movable= onoff
@@ -39,21 +53,23 @@ module Reform
 
       def fill brush = nil, g = nil, b = nil, a = nil, &block
   #       tag "fill(#{brush}, #{g}, #{b}, #{a})"
-        return @qtc.brush unless brush
+        return @qtc.brush unless brush || block
         case brush
         when Symbol then @qtc.brush = frame_ex.registeredBrush(brush) || make_brush(brush, g, b, a)
-        when Hash, Proc then DynamicAttribute.new(self, :brush, brush, &block)
+        when Hash, Proc then DynamicAttribute.new(self, :brush).setup(brush, &block)
         when Qt::Brush then @qtc.brush = brush
+        when nil then DynamicAttribute.new(self, :brush).setup(&block)
         else @qtc.brush = make_brush(brush, g, b, a)
         end
       end
 
-      def stroke pen = nil, g = nil, b = nil, a = nil
-        return @qtc.pen unless pen
+      def stroke pen = nil, g = nil, b = nil, a = nil, &block
+        return @qtc.pen unless pen || block
         case pen
         when Symbol then @qtc.pen = frame_ex.registeredPen(pen) || make_pen(pen, g, b, a)
         when Hash, Proc then DynamicAttribute.new(self, :pen, pen, &block)
         when Qt::Pen then @qtc.pen = pen
+        when nil then PenRef.new(self).setup(&block)
         else
   #       tag "stroke #{pen.inspect}"
           @qtc.pen = make_pen(pen, g, b, a)
@@ -102,9 +118,9 @@ module Reform
 #         true
 #       end
 
-      def self.contextsToUse
-        GraphicContext
-      end
+#       def self.contextsToUse
+#         GraphicContext
+#       end
 
       def addTo parent, hash, &block
         parent.addGraphicsItem self, hash, &block
@@ -116,6 +132,11 @@ module Reform
 
       def pen= pen
         @qtc.pen = case pen when Qt::Pen then pen else make_pen(pen) end
+      end
+
+      def geometry=(*value)  # this is quick 'n dirty.  FIXME
+        @qtc.pos = Qt::Point.new(value[0], value[1])
+        self.size  = Qt::Size.new(value[2],  value[3])
       end
 
   end # GraphicsItem

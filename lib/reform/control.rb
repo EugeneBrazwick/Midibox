@@ -3,7 +3,32 @@
 
 require 'reform/app'
 
+class Fixnum
+  def seconds
+    Reform::Milliseconds.new(self * 1000)
+  end
+
+  alias :s :seconds
+
+  def milliseconds
+    Reform::Milliseconds.new(self)
+  end
+
+  alias :ms :milliseconds
+
+end
+
 module Reform
+
+  class Milliseconds
+    private
+      def initialize val
+        @val = val
+      end
+    public
+      attr :val
+      alias :value :val # required for Qt::Variant interaction etc/
+  end
 
 =begin rdoc
   Control instances are qtruby wrappers around the Qt elements.
@@ -53,15 +78,20 @@ module Reform
       end
 
       # geometry, set geo or return it.
-      def geometry x = nil, y = nil, w = nil, h = nil
+      def geometry x = nil, y = nil, w = nil, h = nil, &block
         q = effective_qtc
-        return q.geometry unless x or w
-        @requested_size = w, h
-        if x or y
-          @has_pos = true
-          q.setGeometry x, y, w, h
+        return q.geometry unless x || w || block
+        case x
+        when nil then DynamicAttribute.new(self, :geometry).setup(nil, &block)
+        when Hash, Proc then DynamicAttribute.new(self, :geometry).setup(x, &block)
         else
-          q.resize w, h
+          @requested_size = w, h
+          if x or y
+            @has_pos = true
+            q.setGeometry x, y, w, h
+          else
+            q.resize w, h
+          end
         end
       end
 
@@ -159,7 +189,7 @@ module Reform
           if (p = parent).respond_to?(:want_data!)
             p.want_data!
           else
-            tag "propagation of want_data! blocks at #{self}, parent #{p} lacks want_data!" unless ReForm === self
+            tag "INFO: propagation of want_data! blocks at #{self}, parent #{p} lacks want_data!" unless ReForm === self
           end
         end
       end
@@ -196,6 +226,17 @@ module Reform
       def added control
       end
 
+      class Animation < Control
+
+        private
+          # our parent is the parent of the DynamicAttribute so it could be a GraphicsItem.
+          # Which is a Qt::Object, even if Qt::GraphicsItem is not
+          def initialize attrib
+#             tag "Assigned attrib and propertyname '#{@qtc.propertyName}'"
+          end
+
+      end
+
 =begin    # it may even be a very good idea to implement to 'enabler' and 'disabler' the very same way!
     # they are now kind of polluting the updateModel method.
 
@@ -211,14 +252,80 @@ module Reform
 #             tag "DynamicAttribute.new(#{parent}, :#{propertyname})"
             super(parent)
             @propertyname = propertyname
-            setup(quickyhash, &block)
+            setup(quickyhash, &block) if quickyhash || block
+          end
+
+          def through_state states2values
+            form = containing_form
+            setProperty('value', value2variant(:default))
+            states2values.each do |state, value|
+              form[state].qtc.assignProperty(self, 'value', value2variant(value))
+            end
+          end
+
+          def animation quickyhash = nil, &block
+            require_relative 'animations/attributeanimation'
+#             tag "Creating Qt::Variant of value"
+            setProperty('value', value2variant(:default))
+#             tag ("calling Animation.new")
+            AttributeAnimation.new(self, Qt::PropertyAnimation.new(self)).setup(quickyhash, &block)
           end
 
         public
 
-          def applyModel data, model
+          # override
+          def event e
+#             tag "#{self}.event(#{e})"
+            case e
+            when Qt::DynamicPropertyChangeEvent
+              # we may expect the value to be 'value'
+              raise "unexpected property '#{e.propertyName}'" unless e.propertyName == 'value'
+              val = property('value').value
+              tag "applyModel(#{val.inspect})"
+              applyModel val
+#             else
+#               tag "unhandled .... #{self}.event(#{e})"
+            end
+#             super  not much use
+          end
+
+          def value2variant *value
+            case @propertyname
+            when :brush
+              color = Graphical.color(*value)
+#               tag "Qt::Variant.new(#{color})"
+              Qt::Variant::fromValue(color)
+            when :geometry
+              Qt::Variant::fromValue(case value[0]
+              when :default then Qt::Rect.new
+              when Qt::Rect then value[0]
+              else Qt::Rect.new(*value) #.tap{|r| tag "creating value(#{r.inspect})"}
+              end)
+            when :geometryF
+              Qt::Variant::fromValue(case value[0]
+              when :default then Qt::RectF.new
+              when Qt::RectF then value[0]
+              else Qt::RectF.new(*value) #.tap{|r| tag "creating value(#{r.inspect})"}
+              end)
+            else
+              raise Error, tr("Not implemented: animation for property '#@propertyname'")
+            end
+          end
+
+          # called when Qt::DynamicPropertyChangeEvent is received
+          def applyModel data, model = nil
+            tag "#{parent}.#@propertyname := #{data.inspect}"
             parent.send(@propertyname.to_s + '=', data)
           end
+
+          # the result is a symbol
+          attr :propertyname, :animprop
+
+          alias :propertyName :propertyname
+
+#           attr_accessor  :value
+
+#           properties 'value'
 
       end # class DynamicAttribute
 
@@ -253,14 +360,15 @@ module Reform
             addMenu
             addAction
             addModel
+            addAnimation
+            addState
         these methods must setup the control too as the order differs sometimes
 
       2) which parent_qtc to use? This also depends on the child to be added and on the parent
 
 =end
-
       def addTo parent, quickyhash = nil, &initblock
-        raise ReformError, tr("Don't know how to add a %s") % self.class
+        raise ReformError, tr("Don't know how to add a %s to a #{parent.class}") % self.class
       end
 
           # If we are going to parent a 'reform_class' which qtc to use.
@@ -289,7 +397,7 @@ module Reform
       end
 
       # called when control was added to parent, except for models
-      def setup hash, &initblock
+      def setup hash = nil, &initblock
         instance_eval(&initblock) if initblock
         setupQuickyhash(hash) if hash
         postSetup
@@ -318,7 +426,8 @@ module Reform
       end
 
       def addScene control, hash, &block
-        @qtc.scene = control.qtc
+        # ONLY a canvas can set the scene
+#         @qtc.scene = control.qtc
         control.setup hash, &block
         added control
       end
@@ -342,6 +451,18 @@ module Reform
         @qtc.addAction control.qtc
         control.setup hash, &block
   #       tag "added action #{control} to parent #{parent}"
+        added control
+      end
+
+      def addAnimation control, quickyhash = nil, &block
+        control.parent = self
+        control.setup quickyhash, &block
+        added control
+      end
+
+      def addState control, quickyhash = nil, &block
+        control.parent = self
+        control.setup quickyhash, &block
         added control
       end
 
@@ -382,18 +503,26 @@ module Reform
         @has_pos
       end
 
-      def name aName = nil
-        if aName
+      def name aSymbol = nil
+        if aSymbol
   #       tag "#{self}::assigning objectname #{aName}"
-          @qtc.objectName = aName.to_s
+          self.objectName = @qtc.objectName = aSymbol.to_s
         # there is a slight duplication but the qt windowtree differs.
         # for example, a layout can have named children in 'reform' but not in Qt.
   #         tag "calling #parent.registerName(#{aName})"
-          parent.registerName aName, self
+          parent.registerName aSymbol, self
         else
   #         raise "#{self} has no @qtc. SHINE!" unless @qtc               Spacer has no Qt complement, maybe more
-          @qtc && @qtc.objectName
+          objectName.to_sym
         end
+      end
+
+      # note that form has an override. Frames collect immediate controls.
+      # Forms collect all controls, and they have an index too.
+      def registerName aName, aControl
+  #       aName = aName.to_sym
+  #       define_singleton_method(aName) { aControl }  not really used anyway
+        containing_form.registerName(aName, aControl)
       end
 
       # sets it if block is given, or calls it, if w,h is given, otherwise returns the handler itself
@@ -413,7 +542,7 @@ module Reform
       # when the control is added to the parent and should have been setup.
       # can be used for postProc. Example: initialization parameters are stored and
       # executed in one go.
-      # the default executes any gathered macro.
+      # the default executes any gathered macro. So you should call this first
       def postSetup
 #         tag "#{self}#postSetup, model=#@model"
         executeMacros
@@ -430,8 +559,10 @@ module Reform
       # parent is never nil, and may very well be unfinised, later components may follow
       # called from instantiate_child
       def self.new_qt_implementor qt_implementor_class, parent, qt_parent
-  #       tag "#{qt_implementor_class}.new(#{qt_parent})"
+#         tag "#{qt_implementor_class}.new(#{qt_parent})"
         qt_implementor_class.new qt_parent
+      rescue ArgumentError=>e
+        raise ArgumentError, "#{qt_implementor_class}.new(#{qt_parent}): #{e}"
       end
 
       # called to instantiate a child, qparent is basicly the effective qtc.
@@ -521,10 +652,10 @@ module Reform
       def model?
         instance_variable_defined?(:@model) ? @model : nil
       end
-  end # class Control
 
-  # forward             FOR WHO WHAT WHERE???
-#   class Timer < Control
-#   end
+      def geometry=(*value)
+        @qtc.geometry = *value
+      end
+  end # class Control
 
 end # Reform

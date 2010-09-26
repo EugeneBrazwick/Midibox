@@ -56,8 +56,7 @@ The model is decoupled from the gui, as opposed to the original Qt example.
 
 This demonstrates that ANY ruby class can easily be a model in the 'reform' system.
 =end
-  class CalculatorModel < Control
-    include Model
+  class CalculatorModel < AbstractModel
     private
     def initialize parent, q = nil
       super

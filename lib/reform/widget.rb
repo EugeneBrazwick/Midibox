@@ -297,9 +297,9 @@ module Reform
       @qtc.raise
     end # run
 
-    def self.contextsToUse
-      [ControlContext, App]
-    end
+#     def self.contextsToUse
+#       [ControlContext, App]
+#     end
 
     #override
     def addTo parent, hash, &block
@@ -326,6 +326,18 @@ module Reform
       added control
     end
 
+  # slightly problematic and only for simplistic settings:
+    AlignmentMap = { left: Qt::AlignLeft, right: Qt::AlignRight,
+                     hcenter: Qt::AlignHCenter, justify: Qt::AlignJustify,
+                     top: Qt::AlignTop, bottom: Qt::AlignBottom,
+                     vcenter: Qt::AlignVCenter,
+                     center: Qt::AlignHCenter | Qt::AlignVCenter,
+                     topleft: Qt::AlignLeft | Qt::AlignTop,
+                     topright: Qt::AlignRight | Qt::AlignTop,
+                     bottomleft: Qt::AlignLeft | Qt::AlignBottom,
+                     bottomright: Qt::AlignRight | Qt::AlignBottom
+                   }
+
   end # class Widget
 
   module QWidgetHackContext
@@ -349,7 +361,7 @@ module Reform
     # what to if you want both.... And what should be the order? Call qtc.method_missing(:paintEvent, painter.event)
     def paintEvent event
 #       tag "paintEvent_i(#{event})"
-      if instance_variable_defined?(:@_reform_hack) && @_reform_hack.whenPainted
+      if instance_variable_defined?(:@_reform_hack) && @_reform_hack.whenPainted?
         require 'reform/painter'
 #         tag "Creating Reform::Painter passing #{self}"
         painter = Painter.new(paint_target)

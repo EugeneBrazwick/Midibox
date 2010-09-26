@@ -4,8 +4,8 @@
 require_relative '../model'
 
 module Reform
-  # model class representing the current time.
-  # It reconnects to the control each second (by default).
+
+  # NOTE: THIS IS BROKEN as registration fails!!  Redesign????
   class ImageModel < Qt::Image
     include Model
 

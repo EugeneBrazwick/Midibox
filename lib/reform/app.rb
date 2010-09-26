@@ -201,237 +201,238 @@ module Reform
   end
 =end
 
-  class Error < StandardError
-  end
+    class Error < StandardError
+    end
 
-  ReformError = Error
+    ReformError = Error
 
 =begin rdoc
-  baseclass for ControlContext, GraphicContext etc.
-  As such it has a big impact on all Frame and Scene derivates, which are most container classes.
+    baseclass for ControlContext, GraphicContext etc.
+    As such it has a big impact on all Frame and Scene derivates, which are most container classes.
 
-  First we have instantiators for each file/class in the controls or graphics directory.
-  For example, since canvas.rb is in controls/ we have an instantiator 'canvas' in all
-  frames (widgetcontainers) and its subclasses.
-  This instantiator accepts an optional string and a setup block.
-  When called we decide to what parent to add the control, associated with the class involved,
-  in this case a 'Canvas', which is a Qt::GraphicsView wrapper (see canvas.rb).
-  At that point first the Qt implementor is instatiated, and then the Reform wrapper.
-  We then call Canvas.addControl(graphicsview, setupblock).
-  This should execute the setupblock, and finally call postSetup on the canvas.
+    First we have instantiators for each file/class in the controls or graphics directory.
+    For example, since canvas.rb is in controls/ we have an instantiator 'canvas' in all
+    frames (widgetcontainers) and its subclasses.
+    This instantiator accepts an optional string and a setup block.
+    When called we decide to what parent to add the control, associated with the class involved,
+    in this case a 'Canvas', which is a Qt::GraphicsView wrapper (see canvas.rb).
+    At that point first the Qt implementor is instatiated, and then the Reform wrapper.
+    We then call Canvas.addControl(graphicsview, setupblock).
+    This should execute the setupblock, and finally call postSetup on the canvas.
 =end
-  module Instantiator
+    module Instantiator
 
-#     tag "@@instantiator := {}"
-    @@instantiator = {}
+  #     tag "@@instantiator := {}"
+      @@instantiator = {}
 
-  public
+    public
 
-    def createInstantiator_i name, qt_implementor_class, reform_class, options = nil
-      @@instantiator[name.to_sym] = { qt_implementor_class: qt_implementor_class, reform_class: reform_class,
-                                      options: options }
-    end # createInstantiator_i
+      def createInstantiator_i name, qt_implementor_class, reform_class, options = nil
+        @@instantiator[name.to_sym] = { qt_implementor_class: qt_implementor_class, reform_class: reform_class,
+                                        options: options }
+      end # createInstantiator_i
 
-    # Example:
-    # ReForm::registerControlClassProxy 'mywidget' 'contrib_widgets/mywidget.rb'
-    # It will create a 'mywidget' method. to which the name and setupblock
-    # should be passed. So after this you can say
-    #           mywidget {
-    #              size 54, 123
-    #           }
-    # However, this is just a proxy.
-    # The unit is NOT opened here. Only if this code is executed will it.
-    # When called it performs 'require' and
-    # the unit loaded should call registerControlClass and so createInstantiator_i above
-    # It used to overwrite the 'name' method, but calling remove_method name from within 'name'
-    # itself caused sporadic SEGV's....
-    # And it was overly complicated as well.
-    # For internal use only (hence _i suffix)
-    def registerControlClassProxy_i name, thePath
-      name = name.to_sym
-#       tag "#{self}::registerControlClassProxy_i(#{name}, #{thePath})"
-      # to avoid endless loops we must consider that by loading some classes it is possible
-      # that we already loaded the file.
-      if Symbol === thePath
-#         tag "Create alias :#{name} :#{thePath}"
-        module_eval("alias :#{name} :#{thePath}")
-        return
-      end
-      return if private_method_defined?(name)
-#       tag "Defining method #{self}.#{name}"  It may return nil on exceptions... THis is by design
-# failing components do not stop the setup process.
-      define_method name do |quicky = nil, &block|
-        c = nil
-        rfRescue do
-          # are we registered at this point?
-          # this is done by the require which executes createInstantiator_i.
-          # IMPORTANT ruby1.9.2 corrupts name2 somehow.  Using name3 does the trick however
-          unless @@instantiator[name]
-  #           tag "arrived in #{self}##{name}"
-            require_relative thePath
-            # the loaded module should call createInstantiator (and so registerControlClass) which alters
-            # @@instantiator
-            raise "'#{name}' did not register an instantiator!!!" unless @@instantiator[name]
-          end
-          instantiator = @@instantiator[name]
-          reform_class = instantiator[:reform_class]
-          options = instantiator[:options]
-          qt_implementor_class = instantiator[:qt_implementor_class]
-          # It's important to use parent_qtc_to_use, since it must be a true widget.
-          # Normally, 'qparent' would be '@qtc' itself
-          qparent = quicky && quicky[:qtparent] || parent_qtc_to_use_for(reform_class)
-=begin
-      Severe problem:     sometimes the parenting must change but how can this be done before
-                          even the instance exists?
-      Example: creating a Qt::Layout with parent Qt::MainWindow will fail!
-      Answer: HACK IT!
-=end
-          ctrl = self
-#         graphicsproxy = false
-  # the smoke hacks prevent this from working since internally Qt::VBoxLayout subclasses Qt::Base !!!
-# Oh my GOD!!
-# NOT GOING TO WORK.
-#  BAD respond_to is USELESS!!        if qparent.respond_to?(:layout) && qparent.layout && reform_class <= Layout  # smart!!
-=begin
-            # assuming that qt_implementor_class <= QLayout, and layout is
-            # constructed with parent == 0 (see for example widgets/calendar/window.cpp )
-            #             && #(qparent.widgetType? && qparent.layout ||
-            # insert an additional generic frame (say Qt::GroupBox)
-            # you cannot store a layout in a layout, nor can you store a layout in a graphicsscene.
-            # See calendar.cpp in Nokia examples. layout.addLayout is OK.
-#     you cannot store a QWidget in a g-scene but since it accepts QGraphicsItems it is possible to
-#     create a QGraphicsProxyWidget
-
-# we create the implementor first, then the wrapper
-#         tag "reform_class=#{reform_class}, calling new_qt_implementor for #{qt_implementor_class}, parent=#{qparent}"
-=end
-#         raise 'CANTHAPPEN' if qparent && qparent.inherits('QGraphicsScene')
-#         tag "instantiate #{qt_implementor_class} with parent #{ctrl}/#{qparent}"
-          newqtc = qt_implementor_class &&
-                  ctrl.instantiate_child(reform_class, qt_implementor_class, qparent)
-  #         tag "#{reform_class}.new(#{ctrl}, #{newqtc})"
-          c2 = reform_class.new ctrl, newqtc
-  #           tag "instantiated c=#{c}, parent is a #{ctrl.class}"
-            # add will execute block, and then also call postSetup
-  #           tag "CALLING #{ctrl}.add(#{c})"
-          ctrl.add(c2, quicky, &block)
-          c = c2
+      # Example:
+      # ReForm::registerControlClassProxy 'mywidget' 'contrib_widgets/mywidget.rb'
+      # It will create a 'mywidget' method. to which the name and setupblock
+      # should be passed. So after this you can say
+      #           mywidget {
+      #              size 54, 123
+      #           }
+      # However, this is just a proxy.
+      # The unit is NOT opened here. Only if this code is executed will it.
+      # When called it performs 'require' and
+      # the unit loaded should call registerControlClass and so createInstantiator_i above
+      # It used to overwrite the 'name' method, but calling remove_method name from within 'name'
+      # itself caused sporadic SEGV's....
+      # And it was overly complicated as well.
+      # For internal use only (hence _i suffix)
+      def registerControlClassProxy_i name, thePath
+        name = name.to_sym
+  #       tag "#{self}::registerControlClassProxy_i(#{name}, #{thePath})"
+        # to avoid endless loops we must consider that by loading some classes it is possible
+        # that we already loaded the file.
+        if Symbol === thePath
+  #         tag "Create alias :#{name} :#{thePath}"
+          module_eval("alias :#{name} :#{thePath}")
+          return
         end
-#         tag "IMPORTANT: method '#{name}' return the control #{c}"
-        c
-      end  # define_method
+        return if private_method_defined?(name)
+#         tag "Defining method #{self}.#{name}"  # It may return nil on exceptions... THis is by design
+  # failing components do not stop the setup process.
+        define_method name do |quicky = nil, &block|
+          c = nil
+          rfRescue do
+            # are we registered at this point?
+            # this is done by the require which executes createInstantiator_i.
+            # IMPORTANT ruby1.9.2 corrupts name2 somehow.  Using name3 does the trick however
+            unless @@instantiator[name]
+    #           tag "arrived in #{self}##{name}"
+              require_relative thePath
+              # the loaded module should call createInstantiator (and so registerControlClass) which alters
+              # @@instantiator
+              raise "'#{name}' did not register an instantiator!!!" unless @@instantiator[name]
+            end
+            instantiator = @@instantiator[name]
+            reform_class = instantiator[:reform_class]
+            options = instantiator[:options]
+            qt_implementor_class = instantiator[:qt_implementor_class]
+            # It's important to use parent_qtc_to_use, since it must be a true widget.
+            # Normally, 'qparent' would be '@qtc' itself
+            qparent = quicky && quicky[:qtparent] || parent_qtc_to_use_for(reform_class)
+=begin
+        Severe problem:     sometimes the parenting must change but how can this be done before
+                            even the instance exists?
+        Example: creating a Qt::Layout with parent Qt::MainWindow will fail!
+        Answer: HACK IT!
+=end
+            ctrl = self
+  #         graphicsproxy = false
+    # the smoke hacks prevent this from working since internally Qt::VBoxLayout subclasses Qt::Base !!!
+  # Oh my GOD!!
+  # NOT GOING TO WORK.
+  #  BAD respond_to is USELESS!!        if qparent.respond_to?(:layout) && qparent.layout && reform_class <= Layout  # smart!!
+=begin
+              # assuming that qt_implementor_class <= QLayout, and layout is
+              # constructed with parent == 0 (see for example widgets/calendar/window.cpp )
+              #             && #(qparent.widgetType? && qparent.layout ||
+              # insert an additional generic frame (say Qt::GroupBox)
+              # you cannot store a layout in a layout, nor can you store a layout in a graphicsscene.
+              # See calendar.cpp in Nokia examples. layout.addLayout is OK.
+  #     you cannot store a QWidget in a g-scene but since it accepts QGraphicsItems it is possible to
+  #     create a QGraphicsProxyWidget
 
-      # make it private to complete it:
-      private name
+  # we create the implementor first, then the wrapper
+  #         tag "reform_class=#{reform_class}, calling new_qt_implementor for #{qt_implementor_class}, parent=#{qparent}"
+=end
+  #         raise 'CANTHAPPEN' if qparent && qparent.inherits('QGraphicsScene')
+  #         tag "instantiate #{qt_implementor_class} with parent #{ctrl}/#{qparent}"
+            newqtc = qt_implementor_class &&
+                    ctrl.instantiate_child(reform_class, qt_implementor_class, qparent)
+    #         tag "#{reform_class}.new(#{ctrl}, #{newqtc})"
+            c2 = reform_class.new ctrl, newqtc
+    #           tag "instantiated c=#{c}, parent is a #{ctrl.class}"
+              # add will execute block, and then also call postSetup
+    #           tag "CALLING #{ctrl}.add(#{c})"
+            ctrl.add(c2, quicky, &block)
+            c = c2
+          end
+  #         tag "IMPORTANT: method '#{name}' return the control #{c}"
+          c
+        end  # define_method
 
-    end # registerControlClassProxy_i
+        # make it private to complete it:
+        private name
 
-    def self.instantiator
-#       tag "instantiator -> #{@@instantiator}"
-      @@instantiator
-    end
+      end # registerControlClassProxy_i
 
-    def self.[] name
-      @@instantiator[name]
-    end
-  end # module Instantiator
-
-  # ControlContext means we get the instantiators in the 'controls' directory.
-  # So things including ControlContext can contain other widgets
-  module ControlContext
-    extend Instantiator
-  end # module ControlContext
-
-  WidgetContext = ControlContext
-
-  # GraphicContext means we get the instantiators in the 'graphics' directory.
-  module GraphicContext
-    extend Instantiator
-  end # module GraphicContext
-
-  # ModelContext means we can create models for the control that includes it
-  # These are all in the 'models' subdirectory
-  module ModelContext
-    extend Instantiator
-
-    private
-
-      # shortcut. You can then say simple_data 'hallo', 'world'
-      def simple_data *val
-        ruby_model value: if val.length == 1 then val[0] else val end
+      def self.instantiator
+  #       tag "instantiator -> #{@@instantiator}"
+        @@instantiator
       end
 
-      alias :simpledata :simple_data
-
-  end # module ModelContext
-
-  # MenuContext means we can create menus for the control that includes it
-  # These are all in the 'menus' subdirectory
-  module MenuContext
-    extend Instantiator
-  end
-
-  # ActionContext means we can create actions for the control that includes it
-  # These are all in the 'actions' subdirectory
-  module ActionContext
-    extend Instantiator
-    private
-    # add given action symbols to the menu
-    def actions *list
-      list = list[0] if list && Array === list
-      list.each { |action| add(containing_form.action(action), nil) }
-    end
-  end
-
-#   module DelegateContext
-#     extend Instantiator
-#   end
-#
-#   module ToplevelContext
-#     extend Instantiator
-#   end
-
-  # this class just stores a name with the arguments to a widget constructor
-  class Macro
-  private
-    def initialize control, name, quicky, block
-      raise unless control
-#       tag "Macro.new(#{control}, #{name})"
-      @control, @name, @quicky, @block = control, name, quicky, block
-      # WTF??? macros have not a name perse, so macros[name] = self DESTROYS macros!!!!
-      control.macros! << self
-    end
-  public
-    def exec receiver = nil
-#       tag "executing macro #{@control.class}::#@name, args=#@quicky, block=#@block"
-      (receiver ||= @control).send(@name, @quicky, &@block) #.tap do |t|
-#         tag "macroresult is #{t}"
-#       end
-    end
-#         attr :quickylabel, :block
-    attr :name
-
-    def to_s
-      "#{@control.class}::#@name(#{@quicky}) BLOCK #{@block.inspect}"
-    end
-  end # class Macro
-#
-
-  # experimental. 'Cans' graphicitem setups
-  module SceneFrameMacroContext
-    def self.createInstantiator_i name
-    end
-
-    def self.registerControlClassProxy_i name, thePath
-      name = name.to_sym
-      return if private_method_defined?(name)
-      define_method name do |quicky = nil, &block|
-        Macro.new(self, name, quicky, block)
+      def self.[] name
+        @@instantiator[name]
       end
-      private name
+    end # module Instantiator
+
+    # ControlContext means we get the instantiators in the 'controls' directory.
+    # So things including ControlContext can contain other widgets
+    module ControlContext
+      extend Instantiator
+    end # module ControlContext
+
+    WidgetContext = ControlContext
+
+    # GraphicContext means we get the instantiators in the 'graphics' directory.
+    module GraphicContext
+      extend Instantiator
+    end # module GraphicContext
+
+    # ModelContext means we can create models for the control that includes it
+    # These are all in the 'models' subdirectory
+    module ModelContext
+      extend Instantiator
+
+      private
+
+        # shortcut. You can then say simple_data 'hallo', 'world'
+        def simple_data *val
+          ruby_model value: if val.length == 1 then val[0] else val end
+        end
+
+        alias :simpledata :simple_data
+
+    end # module ModelContext
+
+    # MenuContext means we can create menus for the control that includes it
+    # These are all in the 'menus' subdirectory
+    module MenuContext
+      extend Instantiator
     end
 
-  end # module SceneFrameMacroContext
+    # ActionContext means we can create actions for the control that includes it
+    # These are all in the 'actions' subdirectory
+    module ActionContext
+      extend Instantiator
+      private
+      # add given action symbols to the menu
+      def actions *list
+        list = list[0] if list && Array === list
+        list.each { |action| add(containing_form.action(action), nil) }
+      end
+    end
+
+    module AnimationContext
+      extend Instantiator
+    end
+
+    module StateContext
+      extend Instantiator
+    end
+
+    # this class just stores a name with the arguments to a widget constructor
+    class Macro
+      private
+        def initialize control, name, quicky, block
+          raise unless control
+    #       tag "Macro.new(#{control}, #{name})"
+          @control, @name, @quicky, @block = control, name, quicky, block
+          # WTF??? macros have not a name perse, so macros[name] = self DESTROYS macros!!!!
+          control.macros! << self
+        end
+      public
+        def exec receiver = nil
+    #       tag "executing macro #{@control.class}::#@name, args=#@quicky, block=#@block"
+          (receiver ||= @control).send(@name, @quicky, &@block) #.tap do |t|
+    #         tag "macroresult is #{t}"
+    #       end
+        end
+    #         attr :quickylabel, :block
+        attr :name
+
+        def to_s
+          "#{@control.class}::#@name(#{@quicky}) BLOCK #{@block.inspect}"
+        end
+    end # class Macro
+  #
+
+    # experimental. 'Cans' graphicitem setups
+    module SceneFrameMacroContext
+    #     def self.createInstantiator_i name
+        def self.createInstantiator_i name, qt_implementor_class, reform_class, options = nil
+        end
+
+        def self.registerControlClassProxy_i name, thePath
+          name = name.to_sym
+          return if private_method_defined?(name)
+          define_method name do |quicky = nil, &block|
+            Macro.new(self, name, quicky, block)
+          end
+          private name
+        end
+
+    end # module SceneFrameMacroContext
 
   private
 
@@ -443,64 +444,56 @@ module Reform
         if File.symlink?(file)
           symlinks[basename.to_sym] = File.basename(File.readlink(file), '.rb').to_sym
         else
-          send("register#{klass}ClassProxy", basename, dir + '/' + basename)
+          send("registerKlassProxy", klass, basename, dir + '/' + basename)
         end
-      end
-      symlinks.each { |key, value| send("register#{klass}ClassProxy", key, value) }
-    end
-  end
-
-  # delegator. see App::registerControlClassProxy
-  def self.registerControlClassProxy id, path
-    ControlContext::registerControlClassProxy_i id, path
-    App::registerControlClassProxy_i id, path
-  end
-
-  # two in one if you want to use a class already loaded
-  def self.registerControlClass id, qclass, klass = Widget
-    registerControlClassProxy id, nil
-    createInstantiator id, qclass, klass
-  end
-
-  def self.registerModelClass id, klass
-    registerModelClassProxy id, nil
-    createInstantiator id, nil, klass
-  end
-
-  def self.registerGraphicsControlClassProxy id, path
-#     tag "registerGraphicsControlClassProxy(#{id}, #{path})"
-    GraphicContext::registerControlClassProxy_i id, path
-    SceneFrameMacroContext::registerControlClassProxy_i id, path
-  end
-
-  def self.registerModelClassProxy id, path
-    ModelContext::registerControlClassProxy_i id, path
-    App::registerModelClassProxy_i id, path
-  end
-
-  def self.registerMenuClassProxy id, path
-#     tag "Adding method '#{id}' to MenuContext"
-    MenuContext::registerControlClassProxy_i id, path
-  end
-
-  def self.registerActionClassProxy id, path
-    ActionContext::registerControlClassProxy_i id, path
+      end # Dir scan
+      symlinks.each { |key, value| send("registerKlassProxy", klass, key, value) }
+    end # each
   end
 
   # some forwards, for the ultimate lazy programming:
-  class Control < Qt::Object
+  class Control < Qt::Object; end
+  class GraphicsControl < Control; end
+  class Widget < Control;  end
+  class Frame < Widget; end
+  class Layout < Control; end
+  module Model; end
+  class AbstractModel < Control; end
+  class Animation < Control; end
+  class AbstractState < Control; end
+  class AbstractAction < Control; end
+  class Menu < Control; end
+  class App < Qt::Application; end
+
+  # My idea was to keep these outside the real classes to avoid repeating myself
+  # I abuse the fact that some Models are not (and need not be by design) AbstractModels...
+  # As long as they include Model. So anything unknown becomes a Model....
+  Contexts = { Widget=>[ControlContext, App],
+               AbstractModel=>[ModelContext, App],
+               Object=>[ModelContext, App],
+               GraphicsControl=>[GraphicContext, SceneFrameMacroContext],
+               Animation=>[AnimationContext, SceneFrameMacroContext],
+               AbstractState=>[StateContext, SceneFrameMacroContext, App],
+               Menu=>[MenuContext],
+               AbstractAction=>[ActionContext]
+              }
+
+  def self.getContext4 klass
+#     tag "getContext4(#{klass})"
+    Contexts[klass] || getContext4(klass.superclass)
   end
 
-  class Widget < Control
+  # delegator. see App::registerControlClassProxy
+  #  we add the X classProxy to those contexts in which we want the plugins
+  # to become available.
+  def self.registerKlassProxy klass, id, path = nil
+    Contexts[klass].each { |ctxt| ctxt::registerControlClassProxy_i id, path }
   end
 
-  class Frame < Widget
-  end
-
-  class Layout < Control
-  end
-
-  module Model
+  # two in one if you want to use a class already loaded
+  def self.registerKlass abstractklass, id, qclass, effectiveklass = Widget
+    registerKlassProxy abstractklass, id
+    createInstantiator id, qclass, effectiveklass
   end
 
   # delegator.
@@ -513,14 +506,15 @@ module Reform
 #     tag "createInstantiator '#{name}' implementor=#{qt_implementor_class}, klass=#{reform_class}"
     # this can be done using classmethods in reform_class.
     # Also we can have ToplevelContext, included by App itself
-    contextsToUse = reform_class.contextsToUse
-    if contextsToUse.respond_to?(:each)
-      contextsToUse.each do |ctxt|
-        ctxt::createInstantiator_i name, qt_implementor_class, reform_class, options
-      end
-    else
-      contextsToUse::createInstantiator_i name, qt_implementor_class, reform_class, options
+    getContext4(reform_class).each do |ctxt|
+#     contextsToUse
+#     if contextsToUse.respond_to?(:each)
+#       contextsToUse.each do |ctxt|
+      ctxt::createInstantiator_i name, qt_implementor_class, reform_class, options
     end
+#     else
+#       contextsToUse::createInstantiator_i name, qt_implementor_class, reform_class, options
+#     end
   end
 
 =begin rdoc
@@ -528,7 +522,6 @@ module Reform
   I use 'exec_i' from Reform::app
 =end
   class App < Qt::Application
-#     include ToplevelContext
     private
 
 =begin rdoc
@@ -645,9 +638,9 @@ will create a button as toplevel control
       private name
     end # registerControlClassProxy_i
 
-    def self.registerModelClassProxy_i name, thePath
-      self.registerControlClassProxy_i name, thePath
-    end
+#     def self.registerModelClassProxy_i name, thePath
+#       self.registerControlClassProxy_i name, thePath
+#     end
 
     # called from Reform::app
     def setupForms
@@ -728,8 +721,10 @@ will create a button as toplevel control
 #IMPORTANT, if any of the files loaded by these instantiators does not redefine the
 # instantiator this will cause a stack failure since we keep loading for ever...
 
-    internalize 'controls'=>'Control', 'actions'=>'Action', 'contrib_widgets'=>'Control',
-                'menus'=>'Menu', 'graphics'=>'GraphicsControl', 'models'=>'Model'
+    # Here I map directories to abstract base classes.
+    internalize 'controls'=>Widget, 'actions'=>AbstractAction, 'contrib_widgets'=>Widget,
+                'menus'=>Menu, 'graphics'=>GraphicsControl, 'models'=>AbstractModel,
+                'animations'=>Animation, 'states'=>AbstractState
     $qApp.instance_eval(&block) if block
 #     tag "CALLING app.exec"
     $qApp.setupForms

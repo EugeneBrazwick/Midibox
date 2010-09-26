@@ -37,9 +37,7 @@ module Reform
     attr :filename, :name
   end
 
-  # I think Control is too heavy as a parent FIXME
-  class IconExampleModel < Control
-    include Model
+  class IconExampleModel < AbstractModel
 
     private
     def initialize parent, qtc

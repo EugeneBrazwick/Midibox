@@ -11,8 +11,8 @@ insert delete and update of a single row?
 It seems more appropriate to call connectModel 'updateModel' instead. Were we pass in
 'options' what we actually changed since last time.
 =end
-  class SimpleModel < Control
-    include Model, Enumerable
+  class SimpleModel < AbstractModel
+    include Enumerable
 
     private
 

@@ -38,9 +38,9 @@ module Reform
       parent.addGraphicsItem @qtc.toFillPolygon, hash, &block
     end
 
-    def self.contextsToUse
-      GraphicContext
-    end
+#     def self.contextsToUse
+#       GraphicContext
+#     end
 
 
   end # PainterPath

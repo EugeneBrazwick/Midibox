@@ -28,7 +28,7 @@ Even more, a QDialog can be stored in the view as well!
   class Scene < Frame
     require_relative '../graphical'
     # note that ControlContext is already included in Frame.
-    include Graphical, GraphicContext
+    include Graphical, GraphicContext, AnimationContext, StateContext
   private
 
     def initialize parent, qtc

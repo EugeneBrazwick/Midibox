@@ -50,7 +50,7 @@ class Binding
 
       restart_cc = result = error = nil
 
-      tracer = -> *args do
+      tracer = lambda { |*args|
 #         puts "TRACER???"
         puts ":TRACER, armed=#{armed}, count=#{count}, type = #{args[0]}, context = #{args[4]}, extra_data = #{args}, self = #{eval('self', args[4])}"
         if armed
@@ -91,7 +91,7 @@ return3     callee of callee. Only there is context.self identical to the caller
                   "trailing statements of method using it aren't in the block."
           cc.call
         end
-      end
+      }
 
       # How does a cc work? If callcc is called it passed the cc as the arg.
       # We assign that to cc. callcc returns nil. And that's only where it begins.
@@ -224,7 +224,7 @@ transaction that is immediately committed (and at that point propagation starts)
 #             tag "CALLING BLOCK with self #{self}"
             self == @@transaction or raise 'WTF???'
             yield self
-            tag "EXECUTED tranblock, tran is now #{@@transaction}, commit unless nil"
+#             tag "EXECUTED tranblock, tran is now #{@@transaction}, commit unless nil"
             commit if @@transaction
           rescue
             abort if @@transaction
@@ -243,7 +243,7 @@ transaction that is immediately committed (and at that point propagation starts)
       end
 
       def commit
-        tag "#{self}.COMMIT WORK, @@tran= #{@@transaction}, aborted=#@aborted, sender = #@sender"
+#         tag "#{self}.COMMIT WORK, @@tran= #{@@transaction}, aborted=#@aborted, sender = #@sender"
         raise tr('Protocol error, no transaction to commit') unless @@transaction
         raise tr('Protocol error, transaction inactive') if @aborted || @committed
         model.propagateChange Propagation.new(@sender, @attrs_changed)
@@ -340,7 +340,8 @@ The old rule that 'names' imply 'connectors' is dropped completely.
 #               tag "#{attr} := #{value}, prev = #{prev}"
               return if prev == value
               if tran = Transaction.transaction
-                tag "Existing tran, this may be a tran aborting, and resetting our data"
+                # Existing tran. Note it may be a tran aborting, and resetting our data
+                # in that case, do not change anything.
                 tran.addPropertyChange(attrsym, prev) unless tran.aborted?
                 instance_variable_set(attr, value)
               else
@@ -387,9 +388,9 @@ The old rule that 'names' imply 'connectors' is dropped completely.
           end
 
         public
-          def contextsToUse
-            [ModelContext, App]
-          end
+#           def contextsToUse
+#             [ModelContext, App]
+#           end
 
           def parent_qtc(*)
           end
@@ -548,22 +549,9 @@ The old rule that 'names' imply 'connectors' is dropped completely.
       # the transaction is passed to this block
       def transaction(sender = nil, &block)
         return Transaction.transaction unless block
-        tag "Sender = #{sender}" # ie, the creator of the transaction
+#         tag "Sender = #{sender}" # ie, the creator of the transaction
         Transaction.new(self, sender, &block)
       end
-
-=begin DUPLICATED CODE>>> see  ClassMethods!
-    def self.contextsToUse
-      [ModelContext, App]
-    end
-
-    def self.parent_qtc parent_control, parent_effective_qtc
-    end
-=end
-
-#     def self.new_qt_implementor qt_implementor_class, parent, qt_parent
-#       qt_implementor_class.new qt_parent
-#     end
 
       # usefull for array like models. If only a single row is present, just return 1
       def length
@@ -590,6 +578,10 @@ The old rule that 'names' imply 'connectors' is dropped completely.
       end
 
   end # module Model
+
+  class AbstractModel < Control
+    include Model
+  end
 
 end # module Reform
 
@@ -631,7 +623,7 @@ if __FILE__ == $0
   tag "Can we repeat it?"
   B.new.b
 
-  set_trace_func -> *args { puts "TRACE: #{args}" }
+  set_trace_func lambda { |*args| puts "TRACE: #{args}" }
   tag "Does set_trace_func even work now???"
   set_trace_func(nil)
 

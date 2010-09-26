@@ -1,10 +1,9 @@
 
 module Reform
 
-  require_relative 'model'
+  require 'reform/model'
 
-  class DelegateModel < Control
-    include Model
+  class DelegateModel < AbstractModel
     private
 
     public

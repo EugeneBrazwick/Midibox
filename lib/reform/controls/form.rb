@@ -14,7 +14,7 @@ module Reform
  resizes with the form automatically (unless fixedSize is set).
 =end
   class ReForm < Frame
-    include ModelContext
+    include ModelContext, StateContext
     private
     # NOTE: due to a qtruby hack this is called twice per 'new'!!!
     # But the first time it never goes beyond 'super'!
@@ -40,7 +40,7 @@ module Reform
       @whenCommitted = nil
       # a form may have a single 'central' widget, together with border widgets like bars
       @qcentralWidget = nil
-      @widget_index = {} # hash name=>widget
+      @control_index = {} # hash name=>widget
       # main model in the form, frames can override this locally though
       @model = nil
 #       tag "calling registerForm #{self}"
@@ -195,18 +195,18 @@ module Reform
     #override, can be used to reregister a name with a different control
     def registerName aName, aControl
       aName = aName.to_sym
-      if (@widget_index ||= {})[aName]
+      if (@control_index ||= {})[aName]
 #       tag "removing old method '#{aName}'"
         (class << self; self; end).instance_eval do
           remove_method(aName)
         end
       end
       define_singleton_method(aName) { aControl }
-      @widget_index[aName] = aControl
+      @control_index[aName] = aControl
     end
 
-    def [](i)
-      @widget_index[i] or raise ReformError, tr("control '#{i}' does not exist")
+    def [](symbol)
+      @control_index[symbol] or raise ReformError, tr("control '#{symbol}' does not exist")
     end
 
     attr_writer :model

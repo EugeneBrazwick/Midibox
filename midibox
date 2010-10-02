@@ -1,0 +1,42 @@
+#!/bin/bash
+# Copyright (c) 2010 Eugene Brazwick
+# verified with clean Ubuntu version on Oct 2 2010.
+[ "$PREFIX" ] || export PREFIX=/usr
+while [ -z "$RUBY" ]; do
+#   echo "ATTEMPT 1: which"
+  export RUBY=$(which ruby)
+#   echo "RUBY=$RUBY ATTEMPT 2: ls"
+  [ "$RUBY" ] || export RUBY=$(ls "$PREFIX"/bin/ruby* | tail --lines=1)
+#   echo "RUBY=$RUBY"
+  if [ -z "$RUBY" ]; then
+    echo 'ruby is not installed. If it is, please set $RUBY before starting this script.'
+    echo "try to install it now (requires apt-get compat system)?"
+    echo -n "[Yn] "
+    read answer
+    case "$answer" in
+    ([Yy]*|'')
+      if [ "$(which apt-get)" ]; then
+#         echo "ATTEMPT 3, using aptitude"
+        export RUBY=$(aptitude search --display-format '%p' '^ruby[0-9\.]+$' | \
+                      sort --general-numeric-sort | tail --lines 1 | sed 's/ *$//')
+        [ "$RUBY" ] || { echo "could not locate latest ruby version for apt"; exit 3; }
+#         echo "RUBY=$RUBY, check for a 'full' version"
+        package=$(aptitude search --display-format '%p' '^'"$RUBY"'-full$' | sed 's/ *$//')
+        [ "$package" ] || package=$RUBY
+        sudo apt-get install "$package"
+      else
+        echo "Unfortunately, you will have to install it yourself"
+        exit 2
+      fi
+      ;;
+    (*) exit 1;;
+    esac
+  fi
+done
+case "$RUBYLIB" in
+($PWD/lib) ;;
+('') export RUBYLIB="$PWD/lib";;
+(*) export RUBYLIB="$PWD/lib:$RUBYLIB";;
+esac
+# echo "???? RUBYLIB=$RUBYLIB"
+exec "$RUBY" bin/midibox.rb

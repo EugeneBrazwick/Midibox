@@ -88,7 +88,7 @@ task :run_codeeditor_example do
   `#{RUBY} lib/reform/examples/widgets/codeeditor.rb`
 end
 
-desc 'panic, stop all notes on midipot 20:1'
+desc 'panic, stop all notes on midiport 20:1'
 task :panic do
   sh "#{RUBY} bin/panic 20:1"
 end

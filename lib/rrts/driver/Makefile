@@ -9,34 +9,32 @@ hdrdir = /usr/include/ruby-1.9.1
 arch_hdrdir = /usr/include/ruby-1.9.1/$(arch)
 VPATH = $(srcdir):$(arch_hdrdir)/ruby:$(hdrdir)/ruby
 prefix = $(DESTDIR)/usr
-rubylibprefix = $(libdir)/$(RUBY_BASE_NAME)
 exec_prefix = $(prefix)
 vendorhdrdir = $(rubyhdrdir)/vendor_ruby
 sitehdrdir = $(rubyhdrdir)/site_ruby
-rubyhdrdir = $(includedir)/$(RUBY_BASE_NAME)-$(ruby_version)
-vendordir = $(rubylibprefix)/vendor_ruby
-sitedir = $(rubylibprefix)/site_ruby
-ridir = $(datarootdir)/$(RI_BASE_NAME)
-mandir = $(datarootdir)/man
+rubyhdrdir = $(includedir)/ruby-$(ruby_version)
+vendordir = $(DESTDIR)/usr/lib/ruby/vendor_ruby
+sitedir = $(DESTDIR)/usr/local/lib/site_ruby
+mandir = $(prefix)/share/man
 localedir = $(datarootdir)/locale
 libdir = $(exec_prefix)/lib
 psdir = $(docdir)
 pdfdir = $(docdir)
 dvidir = $(docdir)
 htmldir = $(docdir)
-infodir = $(datarootdir)/info
+infodir = $(prefix)/share/info
 docdir = $(datarootdir)/doc/$(PACKAGE)
 oldincludedir = $(DESTDIR)/usr/include
 includedir = $(prefix)/include
-localstatedir = $(prefix)/var
+localstatedir = $(DESTDIR)/var
 sharedstatedir = $(prefix)/com
-sysconfdir = $(prefix)/etc
+sysconfdir = $(DESTDIR)/etc
 datadir = $(datarootdir)
 datarootdir = $(prefix)/share
-libexecdir = $(exec_prefix)/libexec
+libexecdir = $(prefix)/lib/ruby1.9.1
 sbindir = $(exec_prefix)/sbin
 bindir = $(exec_prefix)/bin
-rubylibdir = $(rubylibprefix)/$(ruby_version)
+rubylibdir = $(libdir)/ruby/$(ruby_version)
 archdir = $(rubylibdir)/$(arch)
 sitelibdir = $(sitedir)/$(ruby_version)
 sitearchdir = $(sitelibdir)/$(sitearch)
@@ -45,44 +43,43 @@ vendorarchdir = $(vendorlibdir)/$(sitearch)
 
 CC = gcc
 CXX = g++
-LIBRUBY = $(LIBRUBY_A)
+LIBRUBY = $(LIBRUBY_SO)
 LIBRUBY_A = lib$(RUBY_SO_NAME)-static.a
-LIBRUBYARG_SHARED = -Wl,-R -Wl,$(libdir) -L$(libdir) -l$(RUBY_SO_NAME)
-LIBRUBYARG_STATIC = -Wl,-R -Wl,$(libdir) -L$(libdir) -l$(RUBY_SO_NAME)-static
+LIBRUBYARG_SHARED = -l$(RUBY_SO_NAME)
+LIBRUBYARG_STATIC = -l$(RUBY_SO_NAME)-static
 OUTFLAG = -o 
 COUTFLAG = -o 
 
 RUBY_EXTCONF_H = 
-cflags   =  $(optflags) $(debugflags) $(warnflags)
-optflags = -O3
-debugflags = -ggdb
-warnflags = -Wextra -Wno-unused-parameter -Wno-parentheses -Wpointer-arith -Wwrite-strings -Wno-missing-field-initializers -Wno-long-long
-CFLAGS   = -fPIC $(cflags) 
+cflags   = $(optflags) $(debugflags) $(warnflags)
+optflags = -O2
+debugflags = -g
+warnflags = -Wall -Wno-parentheses
+CFLAGS   =  -fPIC -fno-strict-aliasing -g -g -O2 $(cflags)  -fPIC 
 INCFLAGS = -I. -I$(arch_hdrdir) -I$(hdrdir)/ruby/backward -I$(hdrdir) -I$(srcdir)
 DEFS     = 
 CPPFLAGS =   $(DEFS) $(cppflags)
-CXXFLAGS = $(CFLAGS) $(cxxflags)
-ldflags  = -L.  -rdynamic -Wl,-export-dynamic
+CXXFLAGS = $(CFLAGS) -fno-strict-aliasing -g $(cxxflags)
+ldflags  = -L. -Wl,-Bsymbolic-functions -rdynamic -Wl,-export-dynamic
 dldflags = 
-ARCH_FLAG = 
-DLDFLAGS = $(ldflags) $(dldflags)
+archflag = 
+DLDFLAGS = $(ldflags) $(dldflags) $(archflag)
 LDSHARED = $(CC) -shared
 LDSHAREDXX = $(CXX) -shared
 AR = ar
 EXEEXT = 
 
-RUBY_BASE_NAME = ruby
-RUBY_INSTALL_NAME = ruby
-RUBY_SO_NAME = ruby
+RUBY_INSTALL_NAME = ruby1.9.1
+RUBY_SO_NAME = ruby-1.9.1
 arch = x86_64-linux
-sitearch = $(arch)
+sitearch = x86_64-linux
 ruby_version = 1.9.1
-ruby = /usr/bin/ruby
+ruby = /usr/bin/ruby1.9.1
 RUBY = $(ruby)
 RM = rm -f
 RM_RF = $(RUBY) -run -e rm -- -rf
 RMDIRS = $(RUBY) -run -e rmdir -- -p
-MAKEDIRS = /bin/mkdir -p
+MAKEDIRS = mkdir -p
 INSTALL = /usr/bin/install -c
 INSTALL_PROG = $(INSTALL) -m 0755
 INSTALL_DATA = $(INSTALL) -m 644
@@ -93,7 +90,7 @@ COPY = cp
 preload = 
 
 libpath = . $(libdir)
-LIBPATH =  -L. -L$(libdir) -Wl,-R$(libdir)
+LIBPATH =  -L. -L$(libdir)
 DEFFILE = 
 
 CLEANFILES = mkmf.log
@@ -104,7 +101,7 @@ extout =
 extout_prefix = 
 target_prefix = 
 LOCAL_LIBS = 
-LIBS =  -lasound  -lpthread -lrt -ldl -lcrypt -lm   -lc
+LIBS = $(LIBRUBYARG_SHARED) -lasound  -lpthread -lrt -ldl -lcrypt -lm   -lc
 SRCS = alsa_midi_port.cpp alsa_midi_timer.cpp alsa_midi++.cpp alsa_midi_queue.cpp alsa_seq.cpp alsa_remove.cpp alsa_client_pool.cpp alsa_midi.cpp alsa_system_info.cpp alsa_midi_client.cpp alsa_port_subscription.cpp alsa_midi_event.cpp
 OBJS = alsa_midi_port.o alsa_midi_timer.o alsa_midi++.o alsa_midi_queue.o alsa_seq.o alsa_remove.o alsa_client_pool.o alsa_midi.o alsa_system_info.o alsa_midi_client.o alsa_port_subscription.o alsa_midi_event.o
 TARGET = alsa_midi
@@ -125,8 +122,6 @@ CLEANOBJS     = *.o  *.bak
 
 all:    $(DLLIB)
 static: $(STATIC_LIB)
-.PHONY: all install static install-so install-rb
-.PHONY: clean clean-so clean-rb
 
 clean-rb-default::
 clean-rb::
@@ -148,8 +143,7 @@ install: install-so install-rb
 install-so: $(RUBYARCHDIR)
 install-so: $(RUBYARCHDIR)/$(DLLIB)
 $(RUBYARCHDIR)/$(DLLIB): $(DLLIB)
-	@-$(MAKEDIRS) $(@D)
-	$(INSTALL_PROG) $(DLLIB) $(@D)
+	$(INSTALL_PROG) $(DLLIB) $(RUBYARCHDIR)
 install-rb: pre-install-rb install-rb-default
 install-rb-default: pre-install-rb-default
 pre-install-rb: Makefile

@@ -1,3 +1,10 @@
+IN A HURRY? Then run
+  ./midibox
+in this directory. It may ask for confirmation to install packages if they are missing.
+If started on a clean Ubuntu Lucid it will be able to run successfully, provided you
+allow it to install stuff. But maybe you want to do this by hand.
+
+In that case, read on:
 
 requirements:
     - ruby1.9.2 or higher, including rdoc, gem etc.

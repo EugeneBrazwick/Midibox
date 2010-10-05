@@ -13,23 +13,21 @@ CreateTrackEvent.
 =end
 
   module Node
-=begin rdoc
-    a Chunk has some meta information and contains a *single* track
-    but this may be a CompoundTrack
-    A chunk is an enumerable of events, but more importantly, it
-    has actual storage for events.
-
-    The following methods delegate to @track:
-    - rewind, Reset the track, and/or all subtracks
-    - each. Chunks can be treated as eventservers
-    - next. Return the next event. The first time called (or after rewind)
-            it returns the first event. If the track is a compound track
-	    it returns the event with smallest timestamp and priority
-    - peek. Return the same event as next but without changing the track position
-    - listing. Return a flat array with all contained tracks
-
-A chunk can also be used as a consumer.
-=end
+# a Chunk has some meta information and contains a *single* track
+# but this may be a CompoundTrack
+# A chunk is an enumerable of events, but more importantly, it
+# has actual storage for events.
+#
+# The following methods delegate to @track:
+# - rewind, Reset the track, and/or all subtracks
+# - each. Chunks can be treated as eventservers
+# - next. Return the next event. The first time called (or after rewind)
+#   it returns the first event. If the track is a compound track
+#   it returns the event with smallest timestamp and priority
+# - peek. Return the same event as next but without changing the track position
+# - listing. Return a flat array with all contained tracks
+#
+# A chunk can also be used as a consumer.
     class Chunk < Producer
       extend Forwardable
       # constant for setting the key

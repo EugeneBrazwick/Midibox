@@ -2,6 +2,14 @@
 // If changed do:         make
 // To create Makefile:    ruby ./extruby.rb
 
+/** :rdoc:
+
+alsa_midi.cpp
+
+This file contains the 'global' Driver functions. Also it contains the libraries
+initialization method that defines all other classes.
+
+*/
 #define DEBUG
 
 // #define DUMP_API
@@ -33,11 +41,7 @@
 
 VALUE alsaDriver, alsaMidiError;
 
-/* call-seq:
-  Driver.seq_open -> AlsaSequencer_i
-  Driver.seq_open name -> AlsaSequencer_i
-  Driver.seq_open name, streams -> AlsaSequencer_i
-  Driver.seq_open name, streams, mode -> AlsaSequencer_i
+/** call-seq: seq_open([name = 'default' [, streams = +SND_SEQ_OPEN_INPUT+ [, mode = 0]]]) -> AlsaSequencer_i
 
 Open the ALSA sequencer.
 
@@ -47,27 +51,27 @@ Parameters
           Usually you need to pass "default" here. This is also the default.
 
 [streams] The read/write mode of the sequencer. Can be one of three values:
-          * SND_SEQ_OPEN_OUTPUT - open the sequencer for output only
-          * SND_SEQ_OPEN_INPUT - open the sequencer for input only
-          * SND_SEQ_OPEN_DUPLEX - open the sequencer for output and input, the default
+          - +SND_SEQ_OPEN_OUTPUT+ - open the sequencer for output only
+          - +SND_SEQ_OPEN_INPUT+ - open the sequencer for input only
+          - +SND_SEQ_OPEN_DUPLEX+ - open the sequencer for output and input, the default
 
           _Note_:
-          Internally, these are translated to O_WRONLY, O_RDONLY and O_RDWR respectively and used
+          Internally, these are translated to +O_WRONLY+, +O_RDONLY+ and +O_RDWR+ respectively and used
           as the second argument to the C library open() call.
 
-[mode] Optional modifier. Can be either 0 (default), or else SND_SEQ_NONBLOCK, which will make
+[mode] Optional modifier. Can be either 0 (default), or else +SND_SEQ_NONBLOCK+, which will make
        read/write operations non-blocking. This can also be set later using
-       AlsaSequencer_i#nonblock.
+       RRTS::Driver::AlsaSequencer_i#nonblock.
        The default is blocking mode.
 
-Returns an AlsaSequencer_i instance. This instance must be kept and passed to most of
-the other sequencer functions.
+Returns: an RRTS::Driver::AlsaSequencer_i instance. This instance must be kept and passed to most of
+the other sequencer functions. The instance will *not* be automatically freed or closed.
 
 Creates a new handle and opens a connection to the kernel sequencer interface.
-After a client is created successfully, an event with SND_SEQ_EVENT_CLIENT_START
-is broadcast to announce port.
+After a client is created successfully, an event with +SND_SEQ_EVENT_CLIENT_START+
+is broadcast to the announce port.
 
-See also AlsaSequencer_i#close.
+See also RRTS::Driver::AlsaSequencer_i#close.
 */
 static VALUE
 wrap_snd_seq_open(int argc, VALUE *v_params, VALUE v_alsamod)
@@ -86,7 +90,9 @@ wrap_snd_seq_open(int argc, VALUE *v_params, VALUE v_alsamod)
   return Data_Wrap_Struct(alsaSequencerClass, 0, 0, seq);
 }
 
-/* AlsaClientInfo_i Driver#client_info_malloc
+/** call-seq: client_info_malloc() -> AlsaClientInfo_i
+
+Returns: an empty AlsaClientInfo_i instance.
 
 The returned instance is automatically freed when the object goes out of scope.
 */
@@ -100,9 +106,9 @@ wrap_snd_seq_client_info_malloc(VALUE v_module)
                           XMALLOC(snd_seq_client_info));
 }
 
-/* AlsaSystemInfo_i system_info_malloc
+/** call-seq: system_info_malloc() -> AlsaSystemInfo_i
 
-Returns: a new AlsaSystemInfo_i instance which is automatically freed
+Returns: a new, empty AlsaSystemInfo_i instance which is automatically freed
 */
 static VALUE wrap_snd_seq_system_info_malloc(VALUE v_module)
 {
@@ -113,9 +119,10 @@ static VALUE wrap_snd_seq_system_info_malloc(VALUE v_module)
                           XMALLOC(snd_seq_system_info));
 }
 
-/* AlsaMidiEvent_i Driver#ev_malloc
+/** call-seq: ev_malloc() -> AlsaMidiEvent_i
+
 Returns: a new AlsaMidiEvent_i instance, which is automatically freed. The buffer comes
-back uninitialized so you may want to call AlsaMidiEvent_i#clear first.
+back uninitialized so you may want to call RRTS::Driver::AlsaMidiEvent_i#clear first.
 
 This has no counterpart in the alsa API, since one would never (have to) do this.
 */
@@ -125,8 +132,9 @@ ev_malloc(VALUE v_module)
   return Data_Wrap_Struct(alsaMidiEventClass, 0/*mark*/, free/*free*/, ALLOC(snd_seq_event_t));
 }
 
-/* AlsaQueueInfo_i queue_info_malloc
-Allocates a new queue_info structure which is automatically freed when the instance
+/** call-seq: queue_info_malloc() -> AlsaQueueInfo_i
+
+Allocates and returns a new, empty queue_info structure which is automatically freed when the instance
 goes out of scope
 */
 static VALUE
@@ -140,12 +148,11 @@ wrap_snd_seq_queue_info_malloc(VALUE v_module)
 }
 
 
-/* AlsaPortInfo_i port_info_malloc
+/** call-seq: port_info_malloc() -> AlsaPortInfo_i
 
-allocate an empty snd_seq_port_info_t using standard malloc
+allocates an empty snd_seq_port_info_t instance using standard malloc
 
-Returns:
-    the port_info, it will automatically be freed
+Returns: the port_info instance, it will be automatically freed
 */
 static VALUE
 wrap_snd_seq_port_info_malloc(VALUE v_module)
@@ -157,8 +164,10 @@ wrap_snd_seq_port_info_malloc(VALUE v_module)
                           XMALLOC(snd_seq_port_info));
 }
 
-/* AlsaQueueTempo_i queue_tempo_malloc
-  Not required since done automatically called by AlsaQueue_i#tempo, if no parameter is passed
+/** call-seq: queue_tempo_malloc() -> AlsaQueueTempo_i
+
+This method is not necessary since it is automatically called by RRTS::Driver::AlsaQueue_i#tempo, if no
+AlsaQueueTempo_i instance is passed to it
 */
 static VALUE
 wrap_snd_seq_queue_tempo_malloc(VALUE v_module)
@@ -170,8 +179,10 @@ wrap_snd_seq_queue_tempo_malloc(VALUE v_module)
                           XMALLOC(snd_seq_queue_tempo));
 }
 
-/* AlsaQueueStatus_i queue_tempo_malloc. Not required since done automatically
- called internally by AlsaQueue_i#status if no parameter is passed
+/** call-seq: queue_tempo_malloc() -> AlsaQueueStatus_i
+
+Not required since done automatically called internally by RRTS::Driver;;AlsaQueue_i#status if
+no instance is passed to it.
 */
 static VALUE
 wrap_snd_seq_queue_status_malloc(VALUE v_module)
@@ -183,7 +194,7 @@ wrap_snd_seq_queue_status_malloc(VALUE v_module)
                           XMALLOC(snd_seq_queue_status));
 }
 
-/* AlsaPortSubscription_i port_subscribe_malloc
+/** call-seq: port_subscribe_malloc() -> AlsaPortSubscription_i
 Returns: a new port_subscribe structure which will be freed automatically
 */
 static VALUE
@@ -196,8 +207,9 @@ wrap_snd_seq_port_subscribe_malloc(VALUE v_mod)
                           XMALLOC(snd_seq_port_subscribe));
 }
 
-/* :rdoc: AlsaRemoveEvents_i remove_events_malloc
-Returns a new remove_events structure, which is freed automatically
+/** call-seq:  remove_events_malloc() -> AlsaRemoveEvents_i
+
+Returns a new RRTS::Driver::AlsaRemoveEvents_i instance, which will be freed automatically
 */
 static VALUE
 wrap_snd_seq_remove_events_malloc(VALUE v_mod)
@@ -209,7 +221,8 @@ wrap_snd_seq_remove_events_malloc(VALUE v_mod)
                           XMALLOC(snd_seq_remove_events));
 }
 
-/* :rdoc: AlsaClientPool_i client_pool_malloc
+/** call-seq: client_pool_malloc() -> AlsaClientPool_i
+
 Allocates a new client_pool structure, which is automatically freed
 */
 static VALUE
@@ -222,8 +235,9 @@ wrap_snd_seq_client_pool_malloc(VALUE v_mod)
                           XMALLOC(snd_seq_client_pool));
 }
 
-/* string strerror errno
-Returns the errorstring for the given systemerror, or alsa error.
+/** call-seq: strerror(errno) -> string
+
+Returns: the errorstring for the given system- or alsa-error.
 */
 static VALUE
 wrap_snd_strerror(VALUE v_module, VALUE v_err)
@@ -280,21 +294,22 @@ VALUE param2sym(uint param)
   return INT2NUM(param);
 }
 
-/* [clientid, portid] parse_address(arg)
+/** call-seq: parse_address(arg) ->  [clientid, portid]
+
 parse the given string and get the sequencer address
 
 Parameters:
 [arg] the string to be parsed
 
-Returns clientid + portid on success or it raises a AlsaMidiError.
+Returns: clientid + portid on success or it raises a AlsaMidiError.
 
 This function parses the sequencer client and port numbers from the given string.
 The client and port tokes are separated by either colon or period, e.g. 128:1.
 The function accepts also a client name not only digit numbers.
 
-The arguments could be '20:2' or 'MIDI2:0' etc.  Portnames are not understood!
+The arguments could be '20:2' or 'MIDI2:0' etc.  Portnames are *not* understood!
 
-See AlsaSequencer_i#parse_address
+See RRTS::Driver::AlsaSequencer_i#parse_address
 */
 static VALUE
 wrap_snd_seq_parse_address(VALUE v_module, VALUE v_arg)
@@ -306,10 +321,16 @@ wrap_snd_seq_parse_address(VALUE v_module, VALUE v_arg)
   return rb_ary_new3(2, INT2NUM(ret.client), INT2NUM(ret.port));
 }
 
-/* symbol param2sym param
-If the passed parameter is an integer, return the accompanying symbol, which is
+/** call-seq: param2sym(param) -> symbol
+
+Parameters:
+[param] if not already a symbol it is used as a controllerevent index and the correct
+        symbol is returned.
+
+Returns: if the passed parameter is an integer, the accompanying symbol, which is
 the symbol of the 'param' event attribute, used for ControllerEvent.
 Otherwise, return param as is.
+
 Example:
     Driver::param2sym(0) -> :bank
 */
@@ -339,6 +360,14 @@ i_block_test(void *ptr)
   return Qnil;
 }
 
+/** call-seq:  block_test blocktime block
+
+Parameters:
+[blocktime]     blocktime in seconds
+[block]  to be executed without GVL (Giant VM Lock)
+
+The block is executed with the GVL temporarily released
+*/
 static VALUE
 alsaDriver_block_test(VALUE v_driver, VALUE v_blocktime)
 {
@@ -347,12 +376,27 @@ alsaDriver_block_test(VALUE v_driver, VALUE v_blocktime)
   return rb_thread_blocking_region(i_block_test, &block, RUBY_UBF_PROCESS, 0);
 }
 
+/** call-seq: block_test_pure_sleep blocktime
+
+Parameters:
+[blocktime] blocktime in seconds
+
+Just calls the C function sleep()
+*/
 static VALUE
 alsaDriver_block_test_pure_sleep(VALUE v_driver, VALUE v_blocktime)
 {
   sleep(NUM2INT(v_blocktime));
   return Qnil;
 }
+
+/** call-seq: block_test_ruby_sleep blocktime
+
+Parameters:
+[blocktime] blocktime in seconds
+
+This method just calls Kernel#sleep
+*/
 static VALUE
 alsaDriver_block_test_ruby_sleep(VALUE v_driver, VALUE v_blocktime)
 {
@@ -360,6 +404,12 @@ alsaDriver_block_test_ruby_sleep(VALUE v_driver, VALUE v_blocktime)
   rb_funcall(v_driver, id_sleep, 1, v_blocktime);
   return Qnil;
 }
+
+/** call-seq: Kernel#sleep_eintr_test
+
+Added to kernel if compiled with DEBUG. If called it calls poll()
+until an interrupt takes place.
+*/
 static VALUE
 kernel_sleep_eintr_test(VALUE v_kernel)
 {
@@ -383,45 +433,54 @@ kernel_sleep_eintr_test(VALUE v_kernel)
 }
 #endif
 
+extern "C" void
+Init_alsa_midi()
+{
+/** Document-class: RRTS
 
-/* RRTS
-This is the main namespace. Ruby RealTime Sequencer. But how RT can it be?
+This module is the namespace for the entire MIDI API.
+
+RRTS originally stood for Ruby RealTime Sequencer. But how RT can it be?
 Currently it contains the Alsa (Advanced Linux Sound Architecture) MIDI Driver
 plus supporter classes, in particular Sequencer.
 
-The following rules were used
-* This is a literal implementation of the almost full alsa snd_seq API
-* functions have been made methods by using arg0 as self.
-* the snd_seq_ prefix was removed for methods, but not for constants.
-* special case seq_open for snd_seq_open, since just 'open' would conflict with
-  Kernel#open
-* the support classes have methods that do not require the Alsa constants anymore
-* obvious defaults value for parameters are applied, whereas the original API is C,
-  which has no defaults
-* where values are often used as pairs (or even a c-struct) as in client+port=address
-  I allow passing the address as a tuple (array with elements at 0 and 1).
-* similarly, instances of the Driver classes can be used, or even the higher level
+The following rules were used:
+- This is a literal implementation of the almost full alsa snd_seq API
+- functions have been made methods by using arg0 as +self+.
+- the +snd_seq_+ prefix was removed for methods, but not for constants.
+- special case seq_open for snd_seq_open, since just +open+ would conflict with
+  Kernel#open.
+- the support classes have methods that do not require the Alsa constants anymore,
+  however theses constants are still available in the RRTS::Driver namespace.
+- obvious default values for parameters are applied, whereas the original API is C,
+  which has no defaults to begin with.
+- where values are often used as pairs (or even a c-struct) as in client+port=address
+  I allow passing these as a tuple (array with elements at 0 and 1).
+- similarly, instances of the Driver classes can be used, or even the higher level
   classes (not always) where the original API expects the id or handle to be passed.
   This is always the case for queueids, where AlsaMidiQueue_i can be used, or for portids
   where AlsaMidiPort_i can be used.
-* methods starting with set (snd_seq_..._set), and with a single (required) argument have been
+- methods starting with 'set_' (snd_seq_..._set) with a single (required) argument have been
   replaced by the equivalent setter in ruby (as 'port=')
-* set methods with 0 or 2 or more arguments still remain
-* for methods starting with get_ this prefix has been removed as well.
-* getters that return a boolean are suffixed with '?'.
-* errors became exceptions, in particular AlsaMidiError and ENOSPC somewhere.
+- +set+ methods with 0 or 2 or more arguments still remain
+- for methods starting with 'get_' this prefix has been removed as well.
+- names for getters that return a boolean are suffixed with '?'.
+- errors became exceptions, in particular AlsaMidiError and ENOSPC somewhere.
   Exceptions on this rule are methods used in finalizers, since exceptions in finalizers
   are really not funny. So close/free/clear or whatever return their original value.
-  Currently now errormessage is printed, but I may change this in the future. This depends
-  on the failchance of given methods.
-* integers that could be (or should be) interpreted as booleans have been replaced by booleans
-* methods with a return argumentaddress in C have this method now return this parameter.
-  In some cases this lead to returning a tuple.
-* methods that would always return nil (though the original may not) now return self
-* in some cases, some parameters became meaningless.
-* normally in C, you would operate on the event object direct, using the structure definition.
-  This is no longer possible, and where names where unique within the union the fieldname became
-  a setter, getter. For ambiguous situations, the same approach is chosen, but the backend uses
+  This also implies the errorcode returnvalue was abolished.
+- integer arguments and returnvalues that could be (or should be) clearly interpreted as booleans
+  have been replaced by true booleans.
+- methods with a argumentaddress in C (Like 'int f(int *result)') are altered to return this parameter
+  (so f -> [int, int]).
+  In some cases this leads to returning a tuple.
+- methods that would always return nil (though the original may not) now return +self+.
+- in some cases, some parameters became meaningless.
+- normally in C, you would operate on the event object direct, using the structure definition.
+  As in 'event.value = 23'
+  This is no longer possible, but where names where unique within the union they became
+  setters and getters. So event.value = 23 is still valid ruby.
+  For ambiguous situations, the same approach is chosen, but the backend uses
   the type as set in the event.
   So:
      ev = ev_malloc
@@ -432,24 +491,29 @@ The following rules were used
      ev = ev_malloc
      ev.note = 63
   is perfectly OK, since the +note+ selector is unambiguous (ev.data.note.note).
-* in some cases, alsa uses ambigues names. Example the macro snd_seq_ev_set_source only sets
-  the port, and not the client. ev.source.port = p.
-  This has been renamed to source_port, similarly source_client source, and the three setters are
-  included. However for 'queue' this would not work, so
-  ev.queue refers to the queue on which the event was send or received while
-  ev.queue_queue refers to the queue as a subject of a queue control event
-* all other queue params have a queue_ prefix, including value.  ev.value is the control value.
-  Example: ev.data.queue.param.value  should be replaced with ev.queue_value.
-* I have decided that nonblocking IO will cause the EAGAIN systemerror be raised, if this is
-  appropriate. However the output_event call can't always use this since it would cause events
-  to be partly transmitted in some cases.  So this call will always block.
-  All functions that may block now (read should) use rb_thread_blocking_region. Blocking mode
+  The solution for the 'channel' case would then be:
+     ev = ev_malloc
+     ev.type = SND_SEQ_EVENT_NOTE
+     ev.channel = 7
+- in some cases, alsa uses ambiguous names. For example, the macro +snd_seq_ev_set_source+ only sets
+  the port, and not the client.
+  This has been renamed to +source_port+, and +source_client+ is similar. Then the +source+
+  setter and getter remain and they refer to the tuple client plus port.
+  However for 'queue' this would not work, so
+  +ev.queue+ refers to the queue on which the event was send or received while
+  +ev.queue_queue+ refers to the queue as a subject of a queue control event
+- all other queue params have a 'queue_' prefix, including value.
+  Example: +ev.data.queue.param.value+  should be replaced with +ev.queue_value+.
+- I have decided that nonblocking IO will cause the +EAGAIN+ systemerror to be raised, whenever this is
+  appropriate. However the +output_event+ call can't always do this since it would cause events
+  to be partly transmitted in some cases. So this call will always block.
+  All functions that may block now (read: should) use +rb_thread_blocking_region+. Blocking mode
   should therefore really be on, as this is much easier, and I don't really see any use of
   nonblocking mode anymore.
   Here is a list of all blocking methods:
-  * snd_seq_event_input
-  * snd_seq_event_output
-  * snd_seq_drain_output
+  - snd_seq_event_input
+  - snd_seq_event_output
+  - snd_seq_drain_output
 
 *IMPORTANT*: using this API as is, will not be the most efficient way to deal with
 alsa_midi.so.  Please use the ruby classes and additional methods in this library.
@@ -461,18 +525,46 @@ However, it implies that existing programs can easily be ported, see for instanc
 rrecordmidi.rb which is a 1 on 1 port of arecordmidi.c.
 Same for rplaymidi.rb
 
-The revents method is rather vague and the examples do not use it. What is the timeout?
-Or isn't there any.  Anyway, the result is made consistent with that of poll.
+The 'revents' method is rather vague and the examples do not use it. What is the timeout?
+Or isn't there any?  Anyway, the result is made consistent with that of poll.
+
+===Some things about certain parameters
+
+====connections
+
+represented by RRTS::MidiPort or by a splat or tuple [clientid, portid]
+or by a string that uses the port name like 'MIDI UM-2'.
+
+====realtimes
+
+represented by a float which is simple the number of seconds, or by a tuple
+or splat [seconds, nanoseconds]
+
+Note that some methods also except times in ticks if the value is an integer.
+So 35 is that much ticks, and not that much seconds, that would be 35.0(!)
+
+=== ids
+
+In case a method accepts an id, it always accepts the representing instance also.
+So you can pass a RRTS::MidiQueue where a queueid is expected etc..
+
 */
-extern "C" void
-Init_alsa_midi()
-{
   VALUE rrtsModule = rb_define_module("RRTS");
-  /* Driver is the namespace module for all things Alsa and MIDI
+  /** Document-class: RRTS::Driver
+
+    Driver is the namespace module for the basic Alsa MIDI API mapping.
+    Among other things all constants from the Alsa API are stored here. These
+    are not documented here. The original documentation is available on the net,
+    see http://www.alsa-project.org/alsa-doc/alsa-lib/modules.html
+
+    This module contains the basic sequencer constructor RRTS::Driver::seq_open
+    and a few general allocation functions.
   */
   alsaDriver = rb_define_module_under(rrtsModule, "Driver");
-  /* AlsaMidiError is an exception class that inherits from StandardError.
-  It is used for all Driver errors.
+  /** Document-class: RRTS::AlsaMidiError
+
+      This is an exception class that inherits from StandardError.
+      It is used for all RRTS::Driver errors.
   */
   alsaMidiError = rb_define_class_under(rrtsModule, "AlsaMidiError", rb_eStandardError);
   // class to store the result of snd_seq_port_subscribe_malloc: a snd_seq_port_subscribe_t*
@@ -502,10 +594,10 @@ Init_alsa_midi()
   rb_define_module_function(alsaDriver, "parse_address", RUBY_METHOD_FUNC(wrap_snd_seq_parse_address), 1);
 
 #if defined(DEBUG)
-  rb_define_method(alsaDriver, "block_test", RUBY_METHOD_FUNC(alsaDriver_block_test), 1);
-  rb_define_method(alsaDriver, "block_test_pure_sleep", RUBY_METHOD_FUNC(alsaDriver_block_test_pure_sleep), 1);
-  rb_define_method(alsaDriver, "block_test_ruby_sleep", RUBY_METHOD_FUNC(alsaDriver_block_test_ruby_sleep), 1);
-  rb_define_method(rb_mKernel, "sleep_eintr_test", RUBY_METHOD_FUNC(kernel_sleep_eintr_test), 0);
+  rb_define_module_function(alsaDriver, "block_test", RUBY_METHOD_FUNC(alsaDriver_block_test), 1);
+  rb_define_module_function(alsaDriver, "block_test_pure_sleep", RUBY_METHOD_FUNC(alsaDriver_block_test_pure_sleep), 1);
+  rb_define_module_function(alsaDriver, "block_test_ruby_sleep", RUBY_METHOD_FUNC(alsaDriver_block_test_ruby_sleep), 1);
+  rb_define_module_function(rb_mKernel, "sleep_eintr_test", RUBY_METHOD_FUNC(kernel_sleep_eintr_test), 0);
 #endif
 
   alsa_seq_init();

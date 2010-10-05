@@ -1,12 +1,10 @@
 #!/usr/bin/ruby
-# test suite for nodes using shoulda
+# test suite for nodes using rspec
 #  Please use 'rake test' to run, as this sets the pwd correctly
 # Otherwise run from toplevel (example)
 #               ruby test/ts_nodes.rb -n /identity/
 # using '-n' runs only matching 'shoulds'. n == nifty.
-require 'rubygems'
-require 'test/unit'
-require 'shoulda'
+require 'spec'
 require_relative '../lib/rrts/rrts'
 require_relative '../lib/rrts/node/track'
 include RRTS
@@ -18,42 +16,41 @@ def file_del *files
   end
 end
 
-class MidiFileReaderTest < Test::Unit::TestCase
-  context 'reader' do
-    setup do
-      Node::Track::reset_key
-      require_relative '../lib/rrts/node/midifilereader'
-      # the default is to immediately read the entire file.
-      # And use 'non-spam' mode for 'each'. This means that
-      # we run no more than three seconds ahead of the current time.
-      @input = Node::MidiFileReader.new('fixtures/eurodance.midi', split_channels: true,
-                                        spam: true # !
-                                       )
-    end
+describe MidiFileReader do
+  before do
+    Node::Track::reset_key
+    require_relative '../lib/rrts/node/midifilereader'
+    # the default is to immediately read the entire file.
+    # And use 'non-spam' mode for 'each'. This means that
+    # we run no more than three seconds ahead of the current time.
+    @input = Node::MidiFileReader.new('fixtures/eurodance.midi', split_channels: true,
+                                      spam: true # !
+                                    )
+  end
 
-    should "be able to setup properly" do
+  it "should be able to setup properly" do
 #       STDERR.puts "yes?"
-    end
+  end
 
     # the events have no track!??
     # that's normal, since MidiFileReader doesn't bother about tracks anymore
     # But if there are several tracks in the MIDI file I now no longer have the connection
     # So that's wrong!
-    should "create events with a track" do
-      assert(@input.find_all { |ev| ControllerEvent === ev }.all? { |ev| ev.track })
-    end
+  it "should create events with a track" do
+    @input.find_all { |ev| ControllerEvent === ev }.all? { |ev| ev.track }.should == true
+  end
 
-    should "split_channels must be set" do
-      assert(@input.split_channels?)
-    end
+  it "should split_channels must be set" do
+    @input.split_channels?.should == true
+  end
 
-    should "should contain 1767 events" do
-      # these events are NEVER processed
-      assert_equal(1767, @input.count)
+  it "should contain 1767 events" do
+    # these events are NEVER processed
+    @input.count.should == 1767
       # and 'each' does a rewind? NO. Cannot, stream closed due to auto_close
 #       assert_equal(1767, @input.count)
       # also, count uses each which always 'spams' (fortunately)
-    end
+  end
 
 =begin TAKES TOO LONG (18 seconds)
     should "create a non spamming thread for 'run'" do
@@ -66,188 +63,179 @@ class MidiFileReaderTest < Test::Unit::TestCase
     end
 =end
 
-    should "create 9 tracks with 985 events" do
-      require_relative '../lib/rrts/node/chunk'
-      chunk = Node::Chunk.new(@input)
-      @input.run
-      assert_equal(9, chunk.listing.count)
-      assert_equal(985, chunk.count)
-      assert_equal(985, chunk.count)
-    end
+  it "should create 9 tracks with 985 events" do
+    require_relative '../lib/rrts/node/chunk'
+    chunk = Node::Chunk.new(@input)
+    @input.run
+    chunk.listing.count.should == 9
+    chunk.count.should == 985
+    # read: should STILL be
+    chunk.count.should == 985
+  end
 
-    should "be able to run a spamming thread quickly" do
-      t1 = Time.now
-      @input.run
-      # My measured time is 0.28 seconds
-      assert_operator(Time.now - t1, :<=, 5.0)
-    end
+  it "should be able to run a spamming thread quickly" do
+    t1 = Time.now
+    @input.run
+    # My measured time is 0.28 seconds
+    (Time.now - t1).should <= 5.0
   end
 end
 
-class MidiFileWriterTest < Test::Unit::TestCase
-  context 'writer' do
-    setup do
-      Node::Track::reset_key
-      require_relative '../lib/rrts/node/midifilereader'
-      @input = Node::MidiFileReader.new('fixtures/eurodance.midi', no_tampering: true,
-                                        spam: true)
-      require_relative '../lib/rrts/node/midifilewriter'
-      @output = Node::MidiFileWriter.new('/tmp/t.midi', @input)
-    end
+describe MidiFileWriter do
+  before do
+    Node::Track::reset_key
+    require_relative '../lib/rrts/node/midifilereader'
+    @input = Node::MidiFileReader.new('fixtures/eurodance.midi', no_tampering: true,
+                                      spam: true)
+    require_relative '../lib/rrts/node/midifilewriter'
+    @output = Node::MidiFileWriter.new('/tmp/t.midi', @input)
+  end
 
-    should "save MIDI exactly as being read" do
-      @input.run
-      `diff /tmp/t.midi fixtures/eurodance.midi`
-      assert_equal(0, $?.exitstatus)
-    end
+  it  "should save MIDI exactly as being read" do
+    @input.run
+    `diff /tmp/t.midi fixtures/eurodance.midi`
+     $?.exitstatus.should == 0
+  end
 
-    should "create something that can be read" do
-      @input.run
-      assert_equal(1767, Node::MidiFileReader.new('/tmp/t.midi').count)
-    end
+  it "should create something that can be read" do
+    @input.run
+    Node::MidiFileReader.new('/tmp/t.midi').count.should == 1767
   end
 end
 
-class YamlWriterTest < Test::Unit::TestCase
-  context 'yamlwriter' do
-    setup do
-      Node::Track::reset_key
-      require_relative '../lib/rrts/node/midifilereader'
-      @input = Node::MidiFileReader.new('fixtures/eurodance.midi', no_tampering: true, spam: true)
-      require_relative '../lib/rrts/node/yamlwriter'
-      @output = Node::YamlFileWriter.new('/tmp/t.yaml', @input)
-    end
+describe YamlWriter do
+  before do
+    Node::Track::reset_key
+    require_relative '../lib/rrts/node/midifilereader'
+    @input = Node::MidiFileReader.new('fixtures/eurodance.midi', no_tampering: true, spam: true)
+    require_relative '../lib/rrts/node/yamlwriter'
+    @output = Node::YamlFileWriter.new('/tmp/t.yaml', @input)
+  end
 
-    should "save properly" do
-      @input.run
-      assert_match(/ASCII text/, `file --brief /tmp/t.yaml`.chomp)
-      `diff /tmp/t.yaml fixtures/eurodance.yaml`
-      assert_equal(0, $?.exitstatus)
-    end
+  it "should save properly" do
+    @input.run
+    `file --brief /tmp/t.yaml`.chomp.should =~ /ASCII text/
+    `diff /tmp/t.yaml fixtures/eurodance.yaml`
+     $?.exitstatus.should == 0
+  end
 
+end
+
+describe YamlReader
+  before do
+    Node::Track::reset_key
+    require_relative '../lib/rrts/node/midifilereader'
+    input = Node::MidiFileReader.new('fixtures/eurodance.midi', no_tampering: true, spam: true)
+    require_relative '../lib/rrts/node/yamlwriter'
+    filter = Node::YamlFileWriter.new('/tmp/t.yaml', input)
+    input.run
+    require_relative '../lib/rrts/node/yamlreader'
+    @input = Node::YamlFileReader.new('/tmp/t.yaml', spam: true)
+  end
+
+  it "should save properly" do
+    file_del('/tmp/t2.yaml')
+#     assert(@input.consumers, 'consumers not set in producer')
+    @input.consumers.should != nil
+    output = Node::YamlFileWriter.new('/tmp/t2.yaml', @input)
+    @input.run
+    File.exists?('/tmp/t2.yaml').should == true # , 'YamlFileWriter dit not write (or close?) file')
+    `diff /tmp/t.yaml /tmp/t2.yaml`
+    $?.exitstatus.should == 0
+  end
+
+  it "should have the same events as the midifilereader" do
+    file_del('/tmp/t4.yaml')
+    c0 = Node::MidiFileReader.new('fixtures/eurodance.midi', no_tampering: true, spam: true).count
+    output = Node::YamlFileWriter.new('/tmp/t4.yaml', @input)
+    @input.run
+    assert(File.exists?('/tmp/t4.yaml'), 'YamlFileWriter dit not write (or close?) file')
+    c1 = Node::MidiFileReader.new('fixtures/eurodance.midi', no_tampering: true, spam: true).count
+    c2 = Node::YamlFileReader.new('/tmp/t4.yaml', spam: true).count
+    c1.should == 1767
+    c2.should == 1767
   end
 end
 
-class YamlReaderTest < Test::Unit::TestCase
-  context 'yamlreader' do
-    setup do
-      Node::Track::reset_key
-      require_relative '../lib/rrts/node/midifilereader'
-      input = Node::MidiFileReader.new('fixtures/eurodance.midi', no_tampering: true, spam: true)
-      require_relative '../lib/rrts/node/yamlwriter'
-      filter = Node::YamlFileWriter.new('/tmp/t.yaml', input)
-      input.run
-      require_relative '../lib/rrts/node/yamlreader'
-      @input = Node::YamlFileReader.new('/tmp/t.yaml', spam: true)
-    end
+describe Identity
+  include RRTS
 
-    should "save properly" do
-      file_del('/tmp/t2.yaml')
-      assert(@input.consumers, 'consumers not set in producer')
-      output = Node::YamlFileWriter.new('/tmp/t2.yaml', @input)
-      @input.run
-      assert(File.exists?('/tmp/t2.yaml'), 'YamlFileWriter dit not write (or close?) file')
-      `diff /tmp/t.yaml /tmp/t2.yaml`
-      assert_equal(0, $?.exitstatus)
-    end
-
-    should "have the same events as the midifilereader" do
-      file_del('/tmp/t4.yaml')
-      c0 = Node::MidiFileReader.new('fixtures/eurodance.midi', no_tampering: true, spam: true).count
-      output = Node::YamlFileWriter.new('/tmp/t4.yaml', @input)
-      @input.run
-      assert(File.exists?('/tmp/t4.yaml'), 'YamlFileWriter dit not write (or close?) file')
-      c1 = Node::MidiFileReader.new('fixtures/eurodance.midi', no_tampering: true, spam: true).count
-      c2 = Node::YamlFileReader.new('/tmp/t4.yaml', spam: true).count
-      assert_equal(1767, c1)
-      assert_equal(1767, c2)
-    end
+  before do
+    Node::Track::reset_key
   end
-end
 
-class IdentityTest < Test::Unit::TestCase
-include RRTS
-
-  context "identity" do
-    setup do
-      Node::Track::reset_key
-    end
-
-    should 'create 2 identical yaml files' do
+  it 'should create 2 identical yaml files' do
 #       tag "DELETE"
-      file_del('/tmp/t6.midi', '/tmp/t5.yaml', '/tmp/t5.yaml')
-      require_relative '../bin/node_identity'
-      # Why does it not understand module Nodes here???
+    file_del('/tmp/t6.midi', '/tmp/t5.yaml', '/tmp/t5.yaml')
+    require_relative '../bin/node_identity'
+    # Why does it not understand module Nodes here???
 #       tag "create I 1"
 #       trace do
-      Nodes::I.new('--spam', '--input=fixtures/eurodance.midi',
-                     '--output=/tmp/t6.midi', '--no-tampering').run
-      assert(File::exists?('/tmp/t6.midi'))
+    Nodes::I.new('--spam', '--input=fixtures/eurodance.midi',
+                    '--output=/tmp/t6.midi', '--no-tampering').run
+    File::exists?('/tmp/t6.midi').should == true
 #       end
 #       tag "create I 2"
-      Node::Track::reset_key
-      Nodes::I.new('--spam', '--input=fixtures/eurodance.midi',
-                   '--output=/tmp/t5.yaml', '--no-tampering').run
-      assert(File::exists?('/tmp/t5.yaml'))
-      Node::Track::reset_key
+    Node::Track::reset_key
+    Nodes::I.new('--spam', '--input=fixtures/eurodance.midi',
+                  '--output=/tmp/t5.yaml', '--no-tampering').run
+    File::exists?('/tmp/t5.yaml').should == true
+    Node::Track::reset_key
 
 #       tag "create I 3"
-      RRTS::Nodes::I.new('--spam', '--input=/tmp/t6.midi',
-                   '--output=/tmp/t6.yaml', '--no-tampering').run
-      assert(File::exists?('/tmp/t6.yaml'))
-      `diff /tmp/t5.yaml /tmp/t6.yaml`
-      assert_equal(0, $?.exitstatus)
+    RRTS::Nodes::I.new('--spam', '--input=/tmp/t6.midi',
+                  '--output=/tmp/t6.yaml', '--no-tampering').run
+    File::exists?('/tmp/t6.yaml').should == true
+    `diff /tmp/t5.yaml /tmp/t6.yaml`
+    $?.exitstatus.should == 0
 #       tag "DONE TEST"
-    end
   end
 end
 
-class SplitterTest < Test::Unit::TestCase
-  context 'splitter' do
-    setup do
+describe Splitter
+  before do
 #       tag "here!!!"
-      require_relative '../lib/rrts/node/midifilereader'
-      # ANY node is automatically a 'splitter'. Just connect
-      # multiple consumers on top
-      @input = Node::MidiFileReader.new('fixtures/eurodance.midi', spam: true)
+    require_relative '../lib/rrts/node/midifilereader'
+    # ANY node is automatically a 'splitter'. Just connect
+    # multiple consumers on top
+    @input = Node::MidiFileReader.new('fixtures/eurodance.midi', spam: true)
 #       require_relative '../lib/rrts/node/splitter'
 #       @splitter = Node::Splitter.new(@input)
-      # currently it is fuzzy about what should go in lib/rrts/node
-      # and what is a script (like node_splitter.rb)
-      # will be moved later then
-    end
+    # currently it is fuzzy about what should go in lib/rrts/node
+    # and what is a script (like node_splitter.rb)
+    # will be moved later then
+  end
 
-    should "be able to setup properly" do
-    end
+  it "should be able to setup properly" do
+  end
 
-    should "be able to accept a filter" do
-      filter = Node::Filter.new(@input) { |ev| ev.channel == 1 }
-      require_relative '../lib/rrts/node/yamlwriter'
-      Node::YamlFileWriter.new('/tmp/t7.yaml', filter)
-      @input.run
-      assert(File.exists?('/tmp/t7.yaml'))
-    end
+  it "should be able to accept a filter" do
+    filter = Node::Filter.new(@input) { |ev| ev.channel == 1 }
+    require_relative '../lib/rrts/node/yamlwriter'
+    Node::YamlFileWriter.new('/tmp/t7.yaml', filter)
+    @input.run
+    File.exists?('/tmp/t7.yaml').should == true
+  end
 
-    should "be able to accept multiple filters" do
-      filter = []
-      filter << Node::Filter.new(@input) { |ev| ev.channel.nil? }
-      (1..16).each do |i|
-        # closures are super!  (But do NOT use a 'for' loop here (you will be sorry))
-        filter << Node::Filter.new(@input) { |ev| ev.channel == i }
-      end
-      require_relative '../lib/rrts/node/yamlwriter'
-      Node::YamlFileWriter.new('/tmp/chnil.yaml', filter[0])
-      for i in 1..16
-        Node::YamlFileWriter.new("/tmp/ch#{i}.yaml", filter[i])
-      end
-      @input.run
-      assert(File.exists?('/tmp/chnil.yaml'))
-      for i in 1..16
-        `diff /tmp/ch#{i}.yaml fixtures/split/ch#{i}.yaml`
-        assert_equal(0, $?.exitstatus)
-      end
+  it "should be able to accept multiple filters" do
+    filter = []
+    filter << Node::Filter.new(@input) { |ev| ev.channel.nil? }
+    (1..16).each do |i|
+      # closures are super!  (But do NOT use a 'for' loop here (you will be sorry))
+      filter << Node::Filter.new(@input) { |ev| ev.channel == i }
     end
-  end # context
+    require_relative '../lib/rrts/node/yamlwriter'
+    Node::YamlFileWriter.new('/tmp/chnil.yaml', filter[0])
+    for i in 1..16
+      Node::YamlFileWriter.new("/tmp/ch#{i}.yaml", filter[i])
+    end
+    @input.run
+    File.exists?('/tmp/chnil.yaml').should == true
+    for i in 1..16
+      `diff /tmp/ch#{i}.yaml fixtures/split/ch#{i}.yaml`
+      $?.exitstatus.should == 0
+    end
+  end
 end
 
 __END__

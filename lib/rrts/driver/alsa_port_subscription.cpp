@@ -9,10 +9,7 @@
 
 VALUE alsaPortSubscriptionClass;
 
-// External doc: http://www.alsa-project.org/~tiwai/alsa-subs.html
-
-/* call-seq:
-   dest -> [client, port]
+/** call-seq: dest() -> [client, port]
 
 Get destination address of a port_subscribe container as a tuple of two integers:
 clientid plus portid
@@ -26,9 +23,8 @@ wrap_snd_seq_port_subscribe_get_dest(VALUE v_port_subs)
   return rb_ary_new3(2, INT2NUM(adr->client), INT2NUM(adr->port));
 }
 
-/* call-seq:
-     dest_client -> clientid
-See #dest
+/** call-seq: dest_client() -> clientid
+See RRTS::Driver::AlsaPortSubscription_i#dest
 */
 static VALUE
 wrap_snd_seq_port_subscribe_get_dest_client(VALUE v_port_subs)
@@ -39,9 +35,8 @@ wrap_snd_seq_port_subscribe_get_dest_client(VALUE v_port_subs)
   return INT2NUM(adr->client);
 }
 
-/* call-seq: 
-     dest_port -> portid
-See #dest
+/** call-seq: dest_port() -> portid
+See RRTS::Driver::AlsaPortSubscription_i#dest
 */
 static VALUE
 wrap_snd_seq_port_subscribe_get_dest_port(VALUE v_port_subs)
@@ -52,10 +47,9 @@ wrap_snd_seq_port_subscribe_get_dest_port(VALUE v_port_subs)
   return INT2NUM(adr->port);
 }
 
-/* call-seq:
-    exclusive? -> bool
-Get the exclusive mode of a port_subscribe container. If a port is exclusive
-no one can subscribe it, and there can only be one subscriber.
+/** call-seq: exclusive?() -> bool
+
+Get the exclusive mode. If a subscription is exclusive no one else can subscribe it.
 */
 static VALUE
 wrap_snd_seq_port_subscribe_get_exclusive(VALUE v_port_subs)
@@ -65,9 +59,9 @@ wrap_snd_seq_port_subscribe_get_exclusive(VALUE v_port_subs)
   return INT2BOOL(snd_seq_port_subscribe_get_exclusive(port_subs));
 }
 
-/* call-seq:
-    queue -> int
-Get the queue id of a port_subscribe container.
+/** call-seq: queue()-> int
+
+Get the queue id
 */
 static VALUE
 wrap_snd_seq_port_subscribe_get_queue(VALUE v_port_subs)
@@ -77,10 +71,10 @@ wrap_snd_seq_port_subscribe_get_queue(VALUE v_port_subs)
   return INT2NUM(snd_seq_port_subscribe_get_queue(port_subs));
 }
 
-/* call-seq:
-    sender -> [client, port]
-Get sender address of a port_subscribe container.
-See #dest
+/** call-seq: sender() -> [client, port]
+
+Get sender address for received events
+See RRTS::Driver::AlsaPortSubscription_i#dest
 */
 static VALUE
 wrap_snd_seq_port_subscribe_get_sender(VALUE v_port_subs)
@@ -91,9 +85,9 @@ wrap_snd_seq_port_subscribe_get_sender(VALUE v_port_subs)
   return rb_ary_new3(2, INT2NUM(adr->client), INT2NUM(adr->port));
 }
 
-/* call-seq: 
-     sender_client -> clientid
-See #sender
+/** call-seq: sender_client() -> clientid
+
+See RRTS::Driver::AlsaPortSubscription_i#sender
 */
 static VALUE
 wrap_snd_seq_port_subscribe_get_sender_client(VALUE v_port_subs)
@@ -104,9 +98,9 @@ wrap_snd_seq_port_subscribe_get_sender_client(VALUE v_port_subs)
   return INT2NUM(adr->client);
 }
 
-/* call-seq: 
-   sender_port -> portid
-See #sender
+/** call-seq: sender_port() -> portid
+
+See RRTS::Driver::AlsaPortSubscription_i#sender
 */
 static VALUE
 wrap_snd_seq_port_subscribe_get_sender_port(VALUE v_port_subs)
@@ -117,9 +111,9 @@ wrap_snd_seq_port_subscribe_get_sender_port(VALUE v_port_subs)
   return INT2NUM(adr->port);
 }
 
-/* call-seq:
-    time_real? -> bool
-Get the real-time update mode of a port_subscribe container.
+/** call-seq: time_real?() -> bool
+
+Get the real-time update mode
 */
 static VALUE
 wrap_snd_seq_port_subscribe_get_time_real(VALUE v_port_subs)
@@ -129,9 +123,9 @@ wrap_snd_seq_port_subscribe_get_time_real(VALUE v_port_subs)
   return INT2BOOL(snd_seq_port_subscribe_get_time_real(port_subs));
 }
 
-/* call-seq:
-    time_update? -> bool
-Get the timestamping mode of a port_subscribe container.
+/** call-seq: time_update?() -> bool
+
+Get the timestamping mode
 */
 static VALUE
 wrap_snd_seq_port_subscribe_get_time_update(VALUE v_port_subs)
@@ -146,17 +140,16 @@ VALUE v_clientid, v_portid; \
 rb_scan_args(argc, argv, "11", &v_clientid, &v_portid); \
 solve_address(v_clientid, v_portid)
 
-/* call-seq:
-    dest=(address)
+/** call-seq: dest = addressspecification
 
 Set destination address of a port_subscribe container.
 
 Parameters:
-  [addr] destination address. A combination of MidiClient, MidiPort or integer ids.
-Example:
-  dest = 20, 1
-  dest = [20, 1]
-  dest = myPort
+[dest] destination address. A combination of RRTS::MidiClient, RRTS::MidiPort or integer ids.
+       Example:
+          dest = 20, 1
+          dest = [20, 1]
+          dest = myPort
 */
 static VALUE
 wrap_snd_seq_port_subscribe_set_dest(int argc, VALUE *argv, VALUE v_port_subs)
@@ -172,9 +165,9 @@ wrap_snd_seq_port_subscribe_set_dest(int argc, VALUE *argv, VALUE v_port_subs)
   return Qnil;
 }
 
-/* call-seq:
-     exclusive=(bool)
-Set the exclusive mode of a port_subscribe container. Should be set before construction
+/** call-seq: exclusive = bool
+
+Set the exclusive mode. Should be set before subscribing to a connection.
 */
 static VALUE
 wrap_snd_seq_port_subscribe_set_exclusive(VALUE v_port_subs, VALUE v_val)
@@ -185,11 +178,12 @@ wrap_snd_seq_port_subscribe_set_exclusive(VALUE v_port_subs, VALUE v_val)
   return Qnil;
 }
 
-/* call-seq;
-    queue=(queue)
-Set the queue id of a port_subscribe container.
+/** call-seq: queue = queueid
+
+Set the queue id, should be used before subscribing
+
 Parameters:
-  [qid] queueid or MidiQueue
+[queueid] queueid or RRTS::MidiQueue
 */
 static VALUE
 wrap_snd_seq_port_subscribe_set_queue(VALUE v_port_subs, VALUE v_queue_id)
@@ -205,10 +199,9 @@ wrap_snd_seq_port_subscribe_set_queue(VALUE v_port_subs, VALUE v_queue_id)
   return Qnil;
 }
 
-/* call-seq:
-    sender=(address)
+/** call-seq: sender = addressspecification
 
-Set sender address of a port_subscribe container. See also #dest=
+Set sender address of a port_subscribe container. See also RRTS::Driver::AlsaPortSubscription_i#dest=
 */
 static VALUE
 wrap_snd_seq_port_subscribe_set_sender(int argc, VALUE *argv, VALUE v_port_subs)
@@ -224,9 +217,9 @@ wrap_snd_seq_port_subscribe_set_sender(int argc, VALUE *argv, VALUE v_port_subs)
   return Qnil;
 }
 
-/* call-seq: 
-     real_time=(bool)
-Set the real-time mode of a port_subscribe container.
+/** call-seq: real_time = bool
+
+Set the real-time mode. Should be set before subscribing
 */
 static VALUE
 wrap_snd_seq_port_subscribe_set_time_real(VALUE v_port_subs, VALUE v_val)
@@ -241,9 +234,9 @@ wrap_snd_seq_port_subscribe_set_time_real(VALUE v_port_subs, VALUE v_val)
   return Qnil;
 }
 
-/*  call-seq:
-     time_update=(bool)
-Set the timestamp-update mode of a port_subscribe container.
+/**  call-seq: time_update = bool
+
+Set the timestamp-update (timestamping) mode
 */
 static VALUE
 wrap_snd_seq_port_subscribe_set_time_update(VALUE v_port_subs, VALUE v_val)
@@ -258,12 +251,6 @@ wrap_snd_seq_port_subscribe_set_time_update(VALUE v_port_subs, VALUE v_val)
   return Qnil;
 }
 
-/* AlsaPortSubscription_i
-
-This class can be used to connect two ports and to associate a queue with this
-subscription.  Then events can be send and their sender + destination + queue
-field is properly set automatically. FIXME: not implemented yet
-*/
 void
 port_subscription_init()
 {
@@ -272,6 +259,14 @@ port_subscription_init()
     VALUE rrtsModule = rb_define_module("RRTS");
     alsaDriver = rb_define_module_under(rrtsModule, "Driver");
   }
+  /** Document-class: RRTS::Driver::AlsaPortSubscription_i
+
+   Ones you subscribe for an Alsa connection between two ports you receive events from that
+   connection, and you can write events to it as well.
+   A queue can be associated with the connection and timestamping can be switched on.
+
+   See: http://www.alsa-project.org/~tiwai/alsa-subs.html
+  */
   alsaPortSubscriptionClass = rb_define_class_under(alsaDriver, "AlsaPortSubscription_i", rb_cObject);
   rb_define_method(alsaPortSubscriptionClass, "dest", RUBY_METHOD_FUNC(wrap_snd_seq_port_subscribe_get_dest), 0);
   rb_define_method(alsaPortSubscriptionClass, "dest_client", RUBY_METHOD_FUNC(wrap_snd_seq_port_subscribe_get_dest_client), 0);
@@ -291,5 +286,4 @@ port_subscription_init()
   rb_define_method(alsaPortSubscriptionClass, "sender=", RUBY_METHOD_FUNC(wrap_snd_seq_port_subscribe_set_sender), -1);
   rb_define_method(alsaPortSubscriptionClass, "time_real=", RUBY_METHOD_FUNC(wrap_snd_seq_port_subscribe_set_time_real), 1);
   rb_define_method(alsaPortSubscriptionClass, "time_update=", RUBY_METHOD_FUNC(wrap_snd_seq_port_subscribe_set_time_update), 1);
-
 }

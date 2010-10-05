@@ -39,23 +39,6 @@ of a model.
 
       alias :currentIndex= :currentIndex
 
-#       def applyModel data, model
-#         # we must now locate the row with that data...
-# #         tag "applyModel"
-#         no_signals do
-#           qmodel = @qtc.model
-#           (0...qmodel.rowCount(Qt::ModelIndex.new)).each do |i|
-#             idx = qmodel.index(i)
-#             break unless idx.valid?
-#             if idx.data.value == data
-#               @qtc.currentIndex = idx
-#               return
-#             end
-#           end
-#         end
-#         # do nothing
-#       end
-
     public
 
       def addModel aModel, hash, &block
@@ -68,7 +51,8 @@ of a model.
         end
       end
 
-      # passed to this callback are two Qt::ModelIndex instances. These give both row and value.
+      # passed to this callback are two Qt::ModelIndex instances. These give both row and value
+      # using row, column and data methods. 'data' returns a Qt::Variant though.
       def whenCurrentChanged current = nil, previous = nil, &block
         if block
           @whenCurrentChanged = block

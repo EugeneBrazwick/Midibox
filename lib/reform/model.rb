@@ -1,9 +1,11 @@
 
 # Copyright (c) 2010 Eugene Brazwick
 
-require 'continuation'
+# require 'continuation'
 require 'Qt'
+require 'reform/control'
 
+=begin
 # extend the Binding class with 'of_caller'
 class Binding
 
@@ -64,14 +66,14 @@ class Binding
           restart_cc.call
         end
         type, extra_data = args[0], args
-=begin
+= begin
 Normal case:
 c-return    set_trace_func
 line        of_caller: cc.call(context, nil)
 return1     of_caller
 return2     callee
 return3     callee of callee. Only there is context.self identical to the caller?
-=end
+= end
         if type == "return"
           count += 1
           # First this method and then calling one will return --
@@ -104,13 +106,13 @@ return3     callee of callee. Only there is context.self identical to the caller
       elsif error
         raise ArgumentError, error
       else
-=begin
+= begin
 Next stage. We got our 'cc'. We now start tracing methods by installing a
 tracer and return. The deal is our caller also returns.
 This is then caught here, and we call the cc at precisely the right time.
 At that point we have access to the binding of the caller, since it is
 passed to cc and returned into 'result' and it goes into the block with yield.
-=end
+= end
         tag "setting trace func to #{tracer.inspect}"
         Thread.current.set_trace_func tracer
 #         tag "returning nil"
@@ -119,28 +121,35 @@ passed to cc and returned into 'result' and it goes into the block with yield.
   #     Thread.critical = old_critical
     end  # of_caller
 end # class Binding
+=end
 
 module Reform
 
-=begin
-  the Propagation class is used when data is emitted from a datasource, due to a change,
-  or initialization.
-
-  Receivers of the data can inspect it to see if they can do anything usefull with it.
-
-  The Control class dispatches the notification through two methods
-    update_model, and propagate.
-  Update model informs a control, and propagate informs its children.
-  The sender of a notification never receives the notification itself.
-  Only controls that 'want_data?' will receive the update_model and propagate
-  methods.
-  If a control has another model (external, so not the data within a combobox)
-  set, then it will never receive propagations from outside its tree.
-
-  Only Frame can have a model set. A widget can have two frames with completely independend
-  models.
-
-=end
+#   the Propagation class is used when data is emitted from a datasource, due to a change,
+#   or initialization.
+#
+#   Receivers of the data can inspect it to see if they can do anything usefull with it.
+#
+#   The Control class dispatches the notification through two methods
+#     update_model, and propagate.
+#   Update model informs a control, and propagate informs its children.
+#   The sender of a notification never receives the notification itself.
+#   Only controls that 'want_data?' will receive the update_model and propagate
+#   methods.
+#   If a control has another model (external, so not the data within a combobox)
+#   set, then it will never receive propagations from outside its tree.
+#
+#   Only Frame can have a model set. A widget can have two frames with completely independend
+#   models.
+#
+#   I noticed a quirck in the design.  Depending attributes of a model don't get their 'changed'
+#  flag set if the data they depend on changes.  For example, in TimeModel, if the +currect+
+#  value changes then +to_s+ and +toString+ must also be changed.
+#  To mend this you can call for example:
+#
+#           dependencies_changed :to_s, :toString
+#
+# But this is TOO TRICKY!!!
   class Propagation
     private
       def initialize sender, attrs_changed, init = false
@@ -151,8 +160,10 @@ module Reform
       attr :sender, :attrs_changed
 
       def changed? connector
+        return true if @init
         case connector
-        when Symbol then @init || @attrs_changed[connector]
+        when Symbol then @attrs_changed[connector]
+        when Proc then true # what else can we do?
         else
           tag "Unhandled connector type #{connector}"
           true
@@ -183,10 +194,12 @@ transaction that is immediately committed (and at that point propagation starts)
   # unique global instance
       @@transaction = nil
 
-      class PropertyChange < Qt::UndoCommand
+    # After 11 clears of the undostack the whole thing crashes.
+      class PropertyChange #< Qt::UndoCommand #UNSTABLE
       private
         def initialize model, propname, oldval
           super()
+#           tag "New PropertyChange #{self}"
           # note this clone may tragically fail for many Qt classes....
           @model, @propname = model, propname
             # To be sure the abort returns the exact original state
@@ -212,7 +225,7 @@ transaction that is immediately committed (and at that point propagation starts)
 
       def initialize model, sender
 #         tag "CALLING super"
-        @stack = Qt::UndoStack.new # super()
+        @stack = [] # UNSTABLE Qt::UndoStack.new ## cannot pass self (self) # super()
 #         tag "tran test"
         raise tr('Protocol error, transaction already started') if @@transaction
 #         tag "BEGIN WORK"
@@ -247,19 +260,19 @@ transaction that is immediately committed (and at that point propagation starts)
         raise tr('Protocol error, no transaction to commit') unless @@transaction
         raise tr('Protocol error, transaction inactive') if @aborted || @committed
         model.propagateChange Propagation.new(@sender, @attrs_changed)
-        @stack.clear
+#         tag "Clearing undo stack, dropping #{@stack.length} commands"
+        @stack = [] # clear
         @@transaction = nil
         @committed = true
       end
 
       def abort
-        tag "#{self}.ABORT WORK, aborted := true, globtran=#{@@transaction}, sender = #@sender"
+#         tag "#{self}.ABORT WORK, aborted := true, globtran=#{@@transaction}, sender = #@sender"
         raise tr('Protocol error, no transaction to abort') unless @@transaction
         raise tr('Protocol error, transaction inactive') if @aborted || @committed
         @aborted = true
         # FIRST destroy the undo's since they will call apply_setter
-        @stack.setIndex 0
-        @stack.clear
+        @stack.pop.undo until @stack.empty?
         @@transaction = nil
       end
 
@@ -272,6 +285,11 @@ transaction that is immediately committed (and at that point propagation starts)
         raise tr('Protocol error, no transaction') unless @@transaction
         @attrs_changed[name] = true
         @stack.push PropertyChange.new(@model, name, oldval)
+      end
+
+      # call this method to add pseudo changes. See TimeModel source for an example.
+      def dependencies_changed *attrs
+        attrs.each { |attr|  @attrs_changed[attr] = true }
       end
   end
 
@@ -388,9 +406,6 @@ The old rule that 'names' imply 'connectors' is dropped completely.
           end
 
         public
-#           def contextsToUse
-#             [ModelContext, App]
-#           end
 
           def parent_qtc(*)
           end
@@ -498,7 +513,8 @@ The old rule that 'names' imply 'connectors' is dropped completely.
   #     end
 
       def apply_setter name, value, sender = nil
-        if name == :self
+        case name
+        when :self
 #           tag "apply_setter"
           # as an unwanted feature it will call 'postSetup' on self!!!!! FIXME(?)
           # setting the model will change the observers
@@ -506,6 +522,8 @@ The old rule that 'names' imply 'connectors' is dropped completely.
   #           tag "Resetting model #{self} to observer #{o}"
             o.updateModel value, Propagation.new(sender, nil, true)
           end
+        when Proc
+          # ignore. Notice that setter? already returns false, but some bogo controls call this anyway
         else
           name = name.to_s
           name = name[0...-1] if name[-1] == '?'
@@ -519,11 +537,15 @@ The old rule that 'names' imply 'connectors' is dropped completely.
       names like 'setX' are currently not supported
 =end
       def setter?(name)
-        return true if name == :self
-        n = name.to_s
-        n = n[0...-1] if n[-1] == '?'
-        m = (public_method(n + '=') rescue nil) or return
-        -2 <= m.arity && m.arity <= 1
+        case name
+        when :self then true
+        when Proc then false
+        else
+          n = name.to_s
+          n = n[0...-1] if n[-1] == '?'
+          m = (public_method(n + '=') rescue nil) or return false
+          -2 <= m.arity && m.arity <= 1
+        end
       end
 
       # key -> any. When a model consists of an array, hash or list of other objects
@@ -579,6 +601,7 @@ The old rule that 'names' imply 'connectors' is dropped completely.
 
   end # module Model
 
+  # This class implements Model but is also a Control.
   class AbstractModel < Control
     include Model
   end

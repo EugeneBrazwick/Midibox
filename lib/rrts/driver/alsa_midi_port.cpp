@@ -8,12 +8,11 @@
 
 VALUE alsaPortInfoClass;
 
-/* call-seq:
-    client=(clientid)
+/** call-seq: client = clientid
 
 Set the client or clientid of a port_info container, that is to be created
 Parameters:
-   [client] clientid or MidiClient
+[client] clientid or RRTS::MidiClient
 */
 static VALUE
 wrap_snd_seq_port_info_set_client(VALUE v_port_info, VALUE v_clientid)
@@ -25,14 +24,14 @@ wrap_snd_seq_port_info_set_client(VALUE v_port_info, VALUE v_clientid)
   return Qnil;
 }
 
-/* call-seq:
-   port=(portid)
+/** call-seq: port = portid
+
 Set the port id of a port_info container.
 Parameters:
-port    portid, can be nil to unset the port
+[port]   portid, can be nil to unset the port
 
-Setting it will set _port_specified_ to 1 (true), and also setting it to nil
-will set _port_specified_ to 0 (false).
+Setting it will set +port_specified+ to true, but setting it to nil
+will set +port_specified+ to false.
 
 To be used for a port being created
 */
@@ -55,13 +54,15 @@ wrap_snd_seq_port_info_set_port(VALUE v_port_info, VALUE v_portnr)
   return Qnil;
 }
 
-/* port_specified=(bool)
+/** call-seq: port_specified = bool
+
 Set the port-specified mode of a port_info container. This method is not
-required since setting the port will automatically set it. See #port=
+required since setting the port will automatically set it.
+See RRTS::Driver::AlsaPortInfo_i#port=
 
 Parameters:
-  [val] true if specifying the port id at creation. This also seems to
-        be the default.
+[val] true if specifying the port id at creation. This also seems to
+      be the default.
 */
 static VALUE
 wrap_snd_seq_port_info_set_port_specified(VALUE v_port_info, VALUE v_bool)
@@ -74,9 +75,9 @@ wrap_snd_seq_port_info_set_port_specified(VALUE v_port_info, VALUE v_bool)
   return Qnil;
 }
 
-/* call-seq:
-      client -> int
-Returns the clientid
+/** call-seq: client() -> int
+
+Returns: the clientid
 */
 static VALUE
 wrap_snd_seq_port_info_get_client(VALUE v_port_info)
@@ -86,9 +87,9 @@ wrap_snd_seq_port_info_get_client(VALUE v_port_info)
   return INT2NUM(snd_seq_port_info_get_client(port_info));
 }
 
-/* call-seq:
-       port -> int
-Returns the portid
+/** call-seq: port() -> int
+
+Returns: the portid
 */
 static VALUE
 wrap_snd_seq_port_info_get_port(VALUE v_port_info)
@@ -98,8 +99,8 @@ wrap_snd_seq_port_info_get_port(VALUE v_port_info)
   return INT2NUM(snd_seq_port_info_get_port(port_info));
 }
 
-/* call-seq:
-    addr -> [client, port]
+/** call-seq: addr() -> [client, port]
+
 Returns the address as a tuple of two integers
 */
 static VALUE
@@ -123,8 +124,9 @@ wrap_snd_seq_port_info_get_name(VALUE v_port_info)
   return rb_str_new2(snd_seq_port_info_get_name(port_info));
 }
 
-/* int capability
-Returns the capabilities as a bitmap. Use the SND_SEQ_PORT_CAP constants for grogging this
+/** call-seq: capability() -> int
+
+Returns: the capabilities as a bitmap. Use the +SND_SEQ_PORT_CAP+ constants for grogging this
 */
 static VALUE
 wrap_snd_seq_port_info_get_capability(VALUE v_port_info)
@@ -134,8 +136,9 @@ wrap_snd_seq_port_info_get_capability(VALUE v_port_info)
   return INT2NUM(snd_seq_port_info_get_capability(port_info));
 }
 
-/* int midi_channels
-Returns the number of channels supported by this port. Most ports will return 16
+/** call-seq: midi_channels() -> int
+
+Returns: the number of channels supported by this port. Normal ports will return 16
 */
 static VALUE
 wrap_snd_seq_port_info_get_midi_channels(VALUE v_port_info)
@@ -145,9 +148,10 @@ wrap_snd_seq_port_info_get_midi_channels(VALUE v_port_info)
   return INT2NUM(snd_seq_port_info_get_midi_channels(port_info));
 }
 
-/* call-seq:
-    midi_voices -> int
-Returns the number of voices present on the port. But many ports return 0 here
+/** call-seq: midi_voices() -> int
+
+Returns: the number of voices present on the port. But many ports return 0 here, which
+does not mean they have no voices.
 */
 static VALUE
 wrap_snd_seq_port_info_get_midi_voices(VALUE v_port_info)
@@ -157,10 +161,9 @@ wrap_snd_seq_port_info_get_midi_voices(VALUE v_port_info)
   return INT2NUM(snd_seq_port_info_get_midi_voices(port_info));
 }
 
-/* call-seq:
-   port_specified? -> bool
-Returns true if a portnumber was explicitely set by the user when the
-port was created
+/** call-seq: port_specified?() -> bool
+
+Returns: true if a portnumber was explicitely set by the user when the port was created
 */
 static VALUE
 wrap_snd_seq_port_info_get_port_specified(VALUE v_port_info)
@@ -170,9 +173,9 @@ wrap_snd_seq_port_info_get_port_specified(VALUE v_port_info)
   return INT2BOOL(snd_seq_port_info_get_port_specified(port_info));
 }
 
-/* call-seq:
-     read_use -> int
-Returns the number of read-subscriptions on the port
+/** call-seq: read_use() -> int
+
+Returns: the number of read-subscriptions on the port
 */
 static VALUE
 wrap_snd_seq_port_info_get_read_use(VALUE v_port_info)
@@ -182,9 +185,9 @@ wrap_snd_seq_port_info_get_read_use(VALUE v_port_info)
   return INT2NUM(snd_seq_port_info_get_read_use(port_info));
 }
 
-/* call-seq:
-    write_use -> int
-Returns the number of write-subscriptions on the port
+/** call-seq: write_use() -> int
+
+Returns: the number of write-subscriptions on the port
 */
 static VALUE
 wrap_snd_seq_port_info_get_write_use(VALUE v_port_info)
@@ -194,9 +197,9 @@ wrap_snd_seq_port_info_get_write_use(VALUE v_port_info)
   return INT2NUM(snd_seq_port_info_get_write_use(port_info));
 }
 
-/* call-seq:
-      synth_voices -> int
-Returns the number of non-MIDI(?) voices
+/** call-seq: synth_voices() -> int
+
+Returns: the number of non-MIDI(?) voices
 */
 static VALUE
 wrap_snd_seq_port_info_get_synth_voices(VALUE v_port_info)
@@ -206,9 +209,9 @@ wrap_snd_seq_port_info_get_synth_voices(VALUE v_port_info)
   return INT2NUM(snd_seq_port_info_get_synth_voices(port_info));
 }
 
-/* call-seq:
-   timestamp_queue -> int
-Returns the queueid of the timestamp queue associated with the port.
+/** call-seq: timestamp_queue() -> int
+
+Returns: the queueid of the timestamp queue associated with the port.
 */
 static VALUE
 wrap_snd_seq_port_info_get_timestamp_queue(VALUE v_port_info)
@@ -218,9 +221,9 @@ wrap_snd_seq_port_info_get_timestamp_queue(VALUE v_port_info)
   return INT2NUM(snd_seq_port_info_get_timestamp_queue(port_info));
 }
 
-/* call-seq:
-     timestamp_real? -> bool
-Returns true if timestamps are given in realtime
+/** call-seq: timestamp_real?() -> bool
+
+Returns: true if timestamps are given in realtime
 */
 static VALUE
 wrap_snd_seq_port_info_get_timestamp_real(VALUE v_port_info)
@@ -230,9 +233,9 @@ wrap_snd_seq_port_info_get_timestamp_real(VALUE v_port_info)
   return INT2BOOL(snd_seq_port_info_get_timestamp_real(port_info));
 }
 
-/* call-seq:
-   timestamping? -> bool
-Returns true if the port will timestamp events automatically on arrival
+/** call-seq: timestamping?() -> bool
+
+Returns: true if the port will timestamp events automatically on arrival
 */
 static VALUE
 wrap_snd_seq_port_info_get_timestamping(VALUE v_port_info)
@@ -242,10 +245,10 @@ wrap_snd_seq_port_info_get_timestamping(VALUE v_port_info)
   return INT2BOOL(snd_seq_port_info_get_timestamping(port_info));
 }
 
-/* call-seq:
-     type -> int
-Returns the type bitset. Use the SND_SEQ_PORT_TYPE... constants to
-interpret the result
+/** call-seq: type() -> int
+
+Returns the type bitset. Use the +SND_SEQ_PORT_TYPE+... constants to
+interpret the result.
 */
 static VALUE
 wrap_snd_seq_port_info_get_type(VALUE v_port_info)
@@ -255,10 +258,11 @@ wrap_snd_seq_port_info_get_type(VALUE v_port_info)
   return INT2NUM(snd_seq_port_info_get_type(port_info));
 }
 
-/* call-seq:
-     timestamping=(bool)
+/** call-seq: timestamping = bool
+
 Switch auto-timestamping on or off.  Note that the port needs a timestamp-queue
-as well to actually activate it.
+as well to actually activate it. This is not verified though. It will simply not
+work. See RRTS::Driver::AlsaPortInfo_i#timestamp_queue=
 */
 static VALUE
 wrap_snd_seq_port_info_set_timestamping(VALUE v_port_info, VALUE v_bool)
@@ -269,9 +273,11 @@ wrap_snd_seq_port_info_set_timestamping(VALUE v_port_info, VALUE v_bool)
   return Qnil;
 }
 
-/* call-seq:
-     midi_voices=(count)
-Set the number of MIDI voices this port supports.
+/** call-seq: midi_voices = count
+
+Set the number of MIDI voices this port supports. This (and other setters) are used
+before creating a port. The information is used to inform other clients. This is usefull
+when you write a softsynthdriver or something like it.
 */
 static VALUE
 wrap_snd_seq_port_info_set_midi_voices(VALUE v_port_info, VALUE v_count)
@@ -282,8 +288,8 @@ wrap_snd_seq_port_info_set_midi_voices(VALUE v_port_info, VALUE v_count)
   return Qnil;
 }
 
-/* call-seq:
-     synth_voices=(count)
+/** call-seq: synth_voices = count
+
 Sets the number of synth voices the port supports
 */
 static VALUE
@@ -295,8 +301,8 @@ wrap_snd_seq_port_info_set_synth_voices(VALUE v_port_info, VALUE v_count)
   return Qnil;
 }
 
-/* call-seq:
-     midi_channels=(count)
+/** call-seq: midi_channels = count
+
 Sets the number of MIDI channels the port supports
 */
 static VALUE
@@ -308,9 +314,9 @@ wrap_snd_seq_port_info_set_midi_channels(VALUE v_port_info, VALUE v_count)
   return Qnil;
 }
 
-/* call-seq:
-     type=(bits)
-Set a combination of SND_SEQ_PORT_TYPE flags to indicate what kind of port this will be
+/** call-seq: type = bits
+
+Set a combination of +SND_SEQ_PORT_TYPE+ flags to indicate what kind of port this will be
 */
 static VALUE
 wrap_snd_seq_port_info_set_type(VALUE v_port_info, VALUE v_bits)
@@ -321,9 +327,9 @@ wrap_snd_seq_port_info_set_type(VALUE v_port_info, VALUE v_bits)
   return Qnil;
 }
 
-/* call-seq:
-    capability=(bits)
-Set a combination of SND_SEQ_PORT_CAP flags to indicate what this port can do
+/** call-seq: capability = bits
+
+Set a combination of _SND_SEQ_PORT_CAP+ flags to indicate what this port can do
 */
 static VALUE
 wrap_snd_seq_port_info_set_capability(VALUE v_port_info, VALUE v_bits)
@@ -334,9 +340,9 @@ wrap_snd_seq_port_info_set_capability(VALUE v_port_info, VALUE v_bits)
   return Qnil;
 }
 
-/* call-seq:
-    name=(string)
-Sets the port name. Note: must be called prior to creating a port
+/** call-seq: name = string
+
+Sets the port name. This must be called prior to creating a port
 */
 static VALUE
 wrap_snd_seq_port_info_set_name(VALUE v_port_info, VALUE v_name)
@@ -347,10 +353,11 @@ wrap_snd_seq_port_info_set_name(VALUE v_port_info, VALUE v_name)
   return Qnil;
 }
 
-/* call-seq:
-    timestamp_real=(bool)
+/** call-seq: timestamp_real = bool
+
 Set the timestamping mode to realtime. You need to activate timestamping, and you
-need a timestamp-queue to truly activate this.
+need a timestamp-queue associated with the port to truly activate this. If not,
+this call is silently ignored.
 */
 static VALUE
 wrap_snd_seq_port_info_set_timestamp_real(VALUE v_port_info, VALUE v_bool)
@@ -361,9 +368,12 @@ wrap_snd_seq_port_info_set_timestamp_real(VALUE v_port_info, VALUE v_bool)
   return Qnil;
 }
 
-/* call-seq:
-    timestamp_queue=(queue)
-Set the timestamp-queue
+/** call-seq: timestamp_queue = queue
+
+Set the timestamp-queue.
+
+Parameters:
+[queue] queueid or RRTS::MidiQueue
 */
 static VALUE
 wrap_snd_seq_port_info_set_timestamp_queue(VALUE v_port_info, VALUE v_qid)
@@ -375,10 +385,11 @@ wrap_snd_seq_port_info_set_timestamp_queue(VALUE v_port_info, VALUE v_qid)
   return Qnil;
 }
 
-/* call-seq:
-    copy_to -> other
-    copy_to(other) -> self
-Make a copy of this record. Without an argument it returns a copy.
+/** Document-method: RRTS::Driver::AlsaPortInfo_i#copy_to
+call-seq: copy_to([other = nil]) -> clone
+
+Make a copy of this record. Without an argument it returns a copy, otherwise the information
+of +self+ is copied into +other+.
 */
 static VALUE
 wrap_snd_seq_port_info_copy_to(int argc, VALUE *argv, VALUE v_port_info)
@@ -408,6 +419,29 @@ or it can be used to queury a port's attributes
 void
 alsa_midi_port_init()
 {
+  if (0)  // this is to make rdoc document it.
+  {
+      VALUE rrtsModule = rb_define_module("RRTS");
+      alsaDriver = rb_define_module_under(rrtsModule, "Driver");
+  }
+  /** Document-class: RRTS::Driver::AlsaPortInfo_i
+
+  This class represents a 'port' ie, an Alsa connection. Ports have an associated
+  client (like the sequencer itself).
+  Ports cannot be directly used to read or write events from/to, you need RRTS::Driver::AlsaSequencer_i
+  for that.
+
+  This class merely functions as a way to retrieve information about a certain port.
+  Example:
+
+    p = RRTS::Driver::port_info_malloc
+    p.client = 128
+    p.port = 1
+    puts "nr of midi channels on 128:1 is #{p.midi_channels}"
+
+   Please do not use this class but use RRTS::Sequencer#port, RRTS::Sequencer#ports and
+   RRTS::MidiPort::new to gain access to the port API
+  */
   alsaPortInfoClass = rb_define_class_under(alsaDriver, "AlsaPortInfo_i", rb_cObject);
   rb_define_method(alsaPortInfoClass, "port", RUBY_METHOD_FUNC(wrap_snd_seq_port_info_get_port), 0);
   rb_define_method(alsaPortInfoClass, "client", RUBY_METHOD_FUNC(wrap_snd_seq_port_info_get_client), 0);

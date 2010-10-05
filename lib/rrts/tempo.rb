@@ -7,15 +7,15 @@ require 'forwardable'
 module RRTS
 
   # Contains information about the speed
-  # The following methods delegate:
-  # * AlsaQueueTempo_i#skew
-  # * AlsaQueueTempo_i#skew=
-  # * AlsaQueueTempo_i#ppq
-  # * AlsaQueueTempo_i#ppq=
-  # * AlsaQueueTempo_i#skew_base
-  # * AlsaQueueTempo_i#skew_base=
-  # * AlsaQueueTempo_i#tempo
-  # * AlsaQueueTempo_i#queue,  but this method is called queue_id here!!
+  # The following delegates exist:
+  # Driver::AlsaQueueTempo_i#skew
+  # Driver::AlsaQueueTempo_i#skew=
+  # Driver::AlsaQueueTempo_i#ppq
+  # Driver::AlsaQueueTempo_i#ppq=
+  # Driver::AlsaQueueTempo_i#skew_base
+  # Driver::AlsaQueueTempo_i#skew_base=
+  # Driver::AlsaQueueTempo_i#tempo
+  # Driver::AlsaQueueTempo_i#queue,  but this method is called queue_id here!!
   class Tempo
     extend Forwardable
     include Driver
@@ -23,20 +23,18 @@ module RRTS
 
     Frames2TempoPPQ = { 24=>[500_000, 12], 25=>[400_000, 10], 29=>[100_000_000, 2997], 30=>[500_000, 15] }
 
-=begin rdoc
-  Parameters:
-  * [beats] quarters per minute, defaults to 120. But with smpte_timing it is the framecount!
-  * [params] any of
-      * [:smpte_timing] using frames, not beats (quarters). Must be first!
-                        This is specifically for movie soundtracks as the tempo is
-                        tied to the number of frames (images) per second.
-                        If set, the +beats+ parameter is in fact the framecount.
-      * [:ticks] overrides the default of 384 for beats, or 40 for frames
-      * [:skew] ?
-      * [:skew_base] ?
- Example:
-     Tempo.new 25, smpte_timing: true
-=end
+#   Parameters:
+#   [beats] quarters per minute, defaults to 120. But with smpte_timing it is the framecount!
+#   [params] any of
+#            [:smpte_timing] using frames, not beats (quarters). Must be first!
+#                            This is specifically for movie soundtracks as the tempo is
+#                            tied to the number of frames (images) per second.
+#                            If set, the +beats+ parameter is in fact the framecount.
+#            [:ticks] overrides the default of 384 for beats, or 40 for frames
+#            [:skew] ?
+#            [:skew_base] ?
+#  Example:
+#      Tempo.new 25, smpte_timing: true
      def initialize beats = 120, params = nil
        frames = nil
        @smpte_timing, ticks = false, 384
@@ -99,7 +97,7 @@ module RRTS
                               :tempo, :skew, :skew_base, :ppq
      def_delegator :@handle, :queue, :queue_id
 
-     # returns true is smptr_timing is set.
+     # returns true is smpte_timing is set.
      def smpte_timing?
        @smpte_timing
      end

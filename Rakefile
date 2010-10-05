@@ -1,7 +1,21 @@
 
 require 'rake/clean'
-require 'rake/rdoctask'
-require 'spec/rake/spectask'
+
+begin
+  require 'spec/rake/spectask'
+  RSPEC = true
+rescue
+  RSPEC = false
+end
+
+begin
+  gem 'darkfish-rdoc'
+  require 'darkfish-rdoc'
+  DARKFISH = true
+rescue
+  require 'rake/rdoctask'
+  DARKFISH = false
+end
 
 ALSALIB='lib/rrts/driver/alsa_midi.so'
 MIDI_IN_PORT = '20:0'
@@ -15,24 +29,26 @@ Rake::RDocTask.new do |rd|
   rd.main = 'lib/rrts/rrts.rb'
   rd.rdoc_files.include('LICENSE', 'README', '**/*.rb', '**/*.cpp')
   rd.title = 'Midibox'
-  rd.options << '--line-numbers' <<
-                %q[--exclude="bin/|,v|Makefile|\.yaml|\.css|\.html|\.dot|\.rid|\.log"]
-    #ALTERNATIVES: --inline-source --fileboxes --diagram
+  rd.options << %q[--exclude="bin/|,v|Makefile|\.yaml|\.css|\.html|\.dot|\.rid|\.log"]
+  DARKFISH and
+    rd.options << '--format=darkfish'
 end
 
-desc "Run all rspec_test"
-Spec::Rake::SpecTask.new(:rspec_tests) do |t|
-  t.spec_files = FileList['test/**/*_spec.rb']
-end
+if RSPEC
+  desc "Run all rspec_test"
+  Spec::Rake::SpecTask.new(:rspec_tests) do |t|
+    t.spec_files = FileList['test/**/*_spec.rb']
+  end
 
-task :test=>:rspec_tests do
-  require 'rake/runtest'
-  Rake.run_tests 'test/ts_*.rb'
+  task :test=>:rspec_tests do
+    require 'rake/runtest'
+    Rake.run_tests 'test/ts_*.rb'
+  end
 end
 
 file ALSALIB => FileList['lib/rrts/driver/*.cpp'] do
   Dir.chdir 'lib/rrts/driver' do
-    sh 'ruby ./extruby.rb && make'
+    sh 'ruby ./extruby.rb && make && rm -f *.o mkmf.log'
   end
 end
 

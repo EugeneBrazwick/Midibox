@@ -31,7 +31,7 @@ However it must be in postSetup.
   public
 
     # override
-    def effective_qtc
+    def effective_qwidget
 #       tag "#{self}::parent_qtc_to_use_for -> parent*"
       frame = parent
       frame = frame.parent until frame.widget?

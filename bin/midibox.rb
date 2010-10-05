@@ -1,10 +1,14 @@
+#!/usr/bin/ruby
 
 # Copyright (c) 2010 Eugene Brazwick
 # verified with clean Ubuntu version on Oct 2 2010.
 # However some backtracking was done.
 
 =begin
-CONTEXT:   ../midibox.          This shellscript tries to set $RUBY.
+This shellscript installs all midibox required software and then
+launches the real program which is ../gui/mainform.rb
+
+CONTEXT:   ../midibox.          This shellscript tries to set $RUBY, then calls us.
 
 The philosophy is this: it should just work!
 So I assume nothing yet.
@@ -14,24 +18,30 @@ PACKAGELIST:
   DEBS: ruby1.9.1-full rubygems  cmake g++ qt4-qmake libqt4-dev libasound2-dev
   GEMS: qtbindings rspec
 
+OPTIONS:
+  GEMS: darkfish-rdoc
+
 =end
 module Prelims
     QTRUBYGEMNAME = 'qtbindings'
     PREFIX = ENV['PREFIX'] || '/usr'
 
-    module UIHandler
+    class UIHandler
 
-      SUDO = 'sudo'
-
+    public
       def self.die code, msg
         STDERR.puts msg
         exit code
       end
 
       def self.critical_question title, msg
+        exit 4 unless question title, msg
+      end
+
+      def self.question title, msg
         puts msg
         print "[Yn] "
-        exit 4 unless gets.chomp =~ /^[Yy]|^$/
+        gets.chomp =~ /^[Yy]|^$/
       end
 
       def self.busy
@@ -39,24 +49,21 @@ module Prelims
       end
 
       def self.sudo cmd
-        `#{SUDO} #{cmd}` && $?.exitstatus == 0
+        `sudo #{cmd}` && $?.exitstatus == 0
       end
 
     end # module UIHandler
 
-    module QtUIHandler
-
-      SUDO = 'gksu'
+    class QtUIHandler < UIHandler
 
       def self.die code, msg
         Qt::MessageBox::critical(nil, 'Cannot continue', msg)
         exit code
       end
 
-      def self.critical_question title, msg
-        res = Qt::MessageBox::question(nil, title, msg, Qt::MessageBox::Yes | Qt::MessageBox::No,
-                                       Qt::MessageBox::Yes)
-        exit 4 unless res == Qt::MessageBox::Yes
+      def self.question title, msg
+        Qt::MessageBox::question(nil, title, msg, Qt::MessageBox::Yes | Qt::MessageBox::No,
+                                 Qt::MessageBox::Yes) == Qt::MessageBox::Yes
       end
 
       def self.yesno title, msg
@@ -73,8 +80,8 @@ module Prelims
       end
 
       def self.sudo cmd
-        STDERR.puts %Q[#{SUDO} "#{cmd}"]
-        `#{SUDO} "#{cmd}"` && $?.exitstatus == 0
+        STDERR.puts %Q[gksu "#{cmd}"]
+        `gksu "#{cmd}"` && $?.exitstatus == 0
       end
 
     end
@@ -98,21 +105,28 @@ module Prelims
     # similar to aptget, but
     #   1) there is a $qApp
     #   2) gem is present through @@gemcmd
-    def self.geminstall package, target
+    # returns false if user says 'no' and it is en option
+    def self.geminstall package, target, params = {}
 #       STDERR.puts "geminstall missing '#{file}' critq"
-      @@handler::critical_question 'Missing jewelry',
-                                   "Gem '#{package}' is missing but it can be installed now. Do this now?"
+      if params[:optional]
+        return false unless @@handler::question 'Missing jewelry',
+                                                "The optional gem '#{package}' is missing, install it now?"
+      else
+        @@handler::critical_question 'Missing jewelry',
+                                    "Gem '#{package}' is missing but it can be installed now. Do this now?"
+      end
 #       STDERR.puts "BUSY?"
       @@handler::busy do
 #          STDERR.puts "gksu '#{@@gemcmd}' install '#{package}'"
         @@handler::sudo "'#{@@gemcmd}' install '#{package}'" or
           @@handler::die(3, "Failed to install package '#{package}'")
       end
+      true
     end
 
     def self.check_libdev_and_opt_apt_get(incl, package, target) # for example: 't.h', 'pack-dev', 'qtruby'
       until File.exists?("#{PREFIX}/#{incl}")
-        STDERR.puts "#{PREFIX}/#{incl} does NOT EXIST!!!"
+#         STDERR.puts "#{PREFIX}/#{incl} does NOT EXIST!!!"
         aptget incl, package,target
       end
     end
@@ -134,12 +148,18 @@ module Prelims
       cmd
     end
 
-    def self.check_gem(binary, package, target) # for example: 'spec', 'rspec', 'project'
-      while (cmd = `which #{binary}`.chomp).empty?
-        cmd = `ls "#{PREFIX}"/bin/#{binary}* | grep '/#{binary}[0-9\.]*$' | \
-               sort --general-numeric-sort | tail --lines 1`.chomp
-        return cmd unless cmd.empty?
-        geminstall package, target
+    def self.check_gem(binary, package, target, params = {}) # for example: 'spec', 'rspec', 'project'
+      if binary
+        while (cmd = `which #{binary}`.chomp).empty?
+          cmd = `ls "#{PREFIX}"/bin/#{binary}* | grep '/#{binary}[0-9\.]*$' | \
+                sort --general-numeric-sort | tail --lines 1`.chomp
+          return cmd unless cmd.empty?
+          geminstall package, target, params or break
+        end
+      else
+        while (cmd = `gem list | grep '#{package}'`.chomp).empty?
+          geminstall package, target, params or break
+        end
       end
       cmd
     end
@@ -149,9 +169,8 @@ module Prelims
       major, minor, patch = RUBY_VERSION.split('.').map(&:to_i)
       if major < 1 || major == 1 && minor < 9
         # No use trying to fix this, since the ../midibox script should already have done so.
-        STDERR.puts "Your ruby version (#{RUBY_VERSION}) is too low. 1.9 is required!\n" +
-                    "If you have it, but $RUBY points to a lower version, please adjust $RUBY"
-        exit 1
+        @@handler::die 1, "Your ruby version (#{RUBY_VERSION}) is too low. 1.9 is required!\n" +
+                          "If you have it, but $RUBY points to a lower version, please adjust $RUBY"
       end
 
 =begin
@@ -183,13 +202,7 @@ module Prelims
 # I overlooked one somehow.  Ruby-dev is required for /usr/include/ruby/ruby.h
         check_libdev_and_opt_apt_get("include/ruby-#{RUBY_VERSION}/ruby.h", "ruby#{RUBY_VERSION}-dev", 'qtruby')
         check_libdev_and_opt_apt_get('include/qt4/Qt/qglobal.h', 'libqt4-dev', 'qtruby')
-        puts "Could not load Qt4, install it now (this will take 10-40 minutes)?"
-        print "[Yn] "
-        exit 4 unless gets.chomp =~ /^[Yy]|^$/
-        `sudo '#{@@gemcmd}' install #{QTRUBYGEMNAME}`
-        retry if $?.exitstatus == 0
-        STDERR.puts "failed to install '#{QTRUBYGEMNAME}', error: #{$?.exitstatus}"
-        exit 5
+        check_gem(nil, QTRUBYGEMNAME, 'qtruby')
       end
 
 =begin
@@ -211,7 +224,9 @@ then we can continue
         # rake is part of the 'ruby' core package. But let's get the correct version.
         @@rakecmd = check_exe_and_opt_apt_get('rake', 'CANTHAPPEN', 'alsa_midi.so')
         # We need the rspec gem first.
-        speccmd = check_gem('spec', 'rspec', 'alsa_midi.so')
+        ENV['RSPEC'] = check_gem('spec', 'rspec', 'alsa_midi.so')
+        check_gem(nil, 'darkfish-rdoc', 'htmldocs', optional: true)
+        check_gem(nil, 'shoulda', 'testing', optional: true)
         check_libdev_and_opt_apt_get('include/alsa/asoundlib.h', 'libasound2-dev', 'alsa_midi.so')
         @@handler::busy do
           `"#{@@rakecmd}"`
@@ -238,9 +253,30 @@ then we can continue
       @@handler = @@gemcmd = nil
     end # def prelims_and_spectest
 
+    def self.check_reqs
+      # just a list of all checks, for debugging purposes. (use bin/midibox.rb --check-reqs)
+      check_exe_and_opt_apt_get('gem', "rubygems#{RUBY_VERSION}", 'qtruby')
+      check_exe_and_opt_apt_get('cmake', 'cmake', 'qtruby')
+      check_exe_and_opt_apt_get('g++', 'g++', 'qtruby')
+      check_exe_and_opt_apt_get('qmake', 'qt4-qmake', 'qtruby')
+      check_libdev_and_opt_apt_get("include/ruby-#{RUBY_VERSION}/ruby.h", "ruby#{RUBY_VERSION}-dev", 'qtruby')
+      check_libdev_and_opt_apt_get('include/qt4/Qt/qglobal.h', 'libqt4-dev', 'qtruby')
+      check_gem(nil, QTRUBYGEMNAME, 'qtruby')
+      check_gem('spec', 'rspec', 'alsa_midi.so')
+      check_gem(nil, 'darkfish-rdoc', 'htmldocs', optional: true)
+      check_libdev_and_opt_apt_get('include/alsa/asoundlib.h', 'libasound2-dev', 'alsa_midi.so')
+    end
 end # module Prelims
 
-Prelims::prelims_and_spectest
-# It is also tempting to say `exec $RUBY $PWD/gui/mainform.rb &`
-# Otherwise we get a stuck terminal.... So:
-spawn "$RUBY '#{File.dirname(__FILE__)}/gui/mainform.rb'"
+if ARGV[0] == '--check-reqs'
+  ARGV.shift
+  # This takes too long for a normal jumpstart. But if you miss some optional stuff
+  # it could be usefull.
+  Prelims::check_reqs
+else
+  Prelims::prelims_and_spectest
+  # It is also tempting to say `exec $RUBY $PWD/gui/mainform.rb &`
+  # Otherwise we get a stuck terminal.... So:
+  ENV['RUBY'] ||= 'ruby'
+  spawn "$RUBY '#{File.dirname(__FILE__)}/../gui/mainform.rb'"
+end

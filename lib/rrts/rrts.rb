@@ -2,8 +2,12 @@
 require_relative 'driver/alsa_midi.so'
 
 module RRTS
-  RRTSError = RuntimeError
 
+  # Exception class to distinguish with ordinary runtime errors
+  class RRTSError < RuntimeError
+  end
+
+  # Set up a scope (namely the passed block) in which tracing is active.
   def trace onoff = true
     if onoff
       set_trace_func -> event, file, line, id, binding, classname do
@@ -21,16 +25,20 @@ module RRTS
     end
   end
 
+  # tag automagically prints the file+linenr where it was, for easy removal
+  # Apart from that it is the same as +puts+
   def tag msg = ''
     # avoid puts for threading problems
     STDERR.print "#{caller[0]} #{msg}\n"
   end
 
-  def todo msg = ''
-    tag 'Todo: ' + msg
+  # Special tag that prints TODO + msg on STDERR
+  def todo msg = nil
+    tag 'TODO' + (msg ? ': ' + msg : '')
   end
 
-  def niy
-    tag 'Not implemented yet: ' + msg
+  # prints a NIY message on stderr
+  def niy msg = ''
+    tag 'NOT IMPLEMENTED YET' + (msg ? ': ' + msg : '')
   end
 end # module RRTS

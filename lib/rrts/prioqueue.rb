@@ -2,7 +2,7 @@
 
 module RRTS
 
-  # basicly Enumerator WITH peek then
+  # basicly Enumerator WITH peek then. Ruby 1.9.2 or higher won't need this code anymore
   class MyEnumerator
 
     private
@@ -33,25 +33,6 @@ module RRTS
     attr :array
   end
 
-=begin
-  This priority queue works on enumerators and it dequeues
-  the first element of the first enumerator.
-  Enqueued is the full enumerator, not a single entry.
-  It is important that each enumerator is already sorted.
-
-  enqueue [4,4, 8, 12]
-  enqueue [5, 6,6 24]
-
-  dequeue* -> 4,4,5,6,6,8,12,24
-
-  To make it easier the internals use a main hub, called the Tree
-  but other nodes are PriorityNodes. The tree has a single node
-  and caches the first enum.
-  The nodes have a single enum, and a left and right branch.
-
-  enqueue and dequeue on nodes return a replacement node for
-  the node they were called upon.
-=end
   class PriorityNode
     private
     def initialize enumerable
@@ -107,13 +88,14 @@ module RRTS
 
     public
 
-    # this is the 'next' element within the enumerable
+    # this is the 'next' element within the enumerable, but the queue is not altered
     def peek
       @enum.peek
     end
 
     attr_accessor :enum
 
+    # for internal use
     def next
       @enum.next
     end
@@ -148,6 +130,29 @@ module RRTS
     end
   end
 
+=begin
+  This priority queue (PriorityTree) works on enumerators and it dequeues
+  the first element of the first enumerator.
+  It is used to keep track of the first event present if we are supplied
+  with several streams (enumerables) of them.
+
+  Enqueued is the full enumerator, not a single entry.
+  It is important that each enumerator is already sorted. Since supposedly
+  these are tracks with events in order that should just be the case.
+
+  enqueue [4, 4, 8, 12]
+  enqueue [5, 6, 6, 24]
+
+  dequeue* -> 4, 4, 5, 6, 6, 8, 12, 24
+
+  To make it easier the internals use a main hub, called the Tree
+  but other nodes are PriorityNodes. The tree has a single node
+  and caches the first enum.
+  The nodes have a single enum, and a left and right branch.
+
+  enqueue and dequeue on nodes return a replacement node for
+  the node they were called upon.
+=end
   class PriorityTree
     private
     def initialize
@@ -156,12 +161,14 @@ module RRTS
 
     public
 
+    # enqueue a list of elements
     def enqueue enumerable
       n = PriorityNode.new(enumerable)
       @node = @node ? @node.enqueue(n) : n
   #     puts "enqueue node is now #{@node.inspect}"
     end
 
+    # dequeue the first event from all the tracks enqueued.
     def dequeue
       return nil unless @node
       array = @node.array
@@ -170,12 +177,14 @@ module RRTS
       return result, array
     end
 
+    # get the first event (as in dequeue) but do not alter the queue
     def peek
       @node && @node.peek rescue nil
     end
 
+    # Erm.... ?????
     def array
-      @node.enum.array
+      @node.array
     end
   end
 

@@ -46,7 +46,9 @@ static size_t MIDI_BYTES_PER_SEC = 31250 / (1 + 8 + 2);
 #if defined (DEBUG)
 static bool AlsaSequencer_dump_notes = false;
 
-/* dump_notes=(bool)
+/** call-seq: dump_notes = value
+
+Debug method
 */
 static VALUE
 AlsaSequencer_set_dump_notes(VALUE v_seq, VALUE v_on)
@@ -57,7 +59,7 @@ AlsaSequencer_set_dump_notes(VALUE v_seq, VALUE v_on)
 #endif
 
 
-/* int close
+/** call-seq: close() -> int|nil
 
 Close the sequencer.
 
@@ -65,8 +67,8 @@ Returns:
 nil on success otherwise a negative error code
 
 Closes the sequencer client and releases its resources. After a client is closed, an event with
-SND_SEQ_EVENT_CLIENT_EXIT is broadcast to announce port.
-The connection between other clients are disconnected.
++SND_SEQ_EVENT_CLIENT_EXIT+ is broadcast to the announce port.
+The connections with other clients are teared down.
 Call this just before exiting your program.
 */
 static VALUE
@@ -81,13 +83,14 @@ wrap_snd_seq_close(VALUE v_seq)
   return r ? INT2NUM(r) : Qnil;
 }
 
-/* string name
+// RDOC bug: methodname 'name' results in blank methodname
+/** call-seq: \name() -> string
 get the name of the sequencer handle. This should really be 'default'.
 
 Returns the ASCII identifier of the given sequencer handle. It's the same identifier
-specified in Driver#seq_open
+specified in RRTS::Driver#seq_open
 
-Do not confuse it with #client_name
+Do not confuse it with RRTS::Driver::AlsaSequencer_i#client_name
 */
 static VALUE
 wrap_snd_seq_name(VALUE v_seq)
@@ -97,10 +100,10 @@ wrap_snd_seq_name(VALUE v_seq)
   return rb_str_new2(snd_seq_name(seq));
 }
 
-/* int client_id
-Returns the id of the specified client. If an error occurs, function raises AlsaMidiError
-A client id is necessary to inquiry or to set the client information.
-A user client is assigned from 128 to 191.
+/** call-seq: client_id -> int
+Returns the clientid of the sequencer itself. If an error occurs, it raises RRTS::AlsaMidiError
+A client id is necessary for inquiry or to set the client information.
+A user client is assigned an id in the range 128..191.
 */
 static VALUE
 wrap_snd_seq_client_id(VALUE v_seq)
@@ -115,13 +118,14 @@ wrap_snd_seq_client_id(VALUE v_seq)
   return INT2NUM(r);
 }
 
-/* nonblock([none])
-Set nonblock mode.
+/** call-seq: nonblock
+
+Set nonblocking mode.
 
 Parameters:
-  [nonblock] false = block, true (the default) = nonblock mode
+[nonblock] false = block, true (the default) = nonblock mode
 
-May raise AlsaMidiError
+May raise RRTS::AlsaMidiError
 
 Change the blocking mode of the given client. In block mode, the client falls into
 sleep when it fills the output memory
@@ -142,10 +146,10 @@ wrap_snd_seq_nonblock(int argc, VALUE *v_params, VALUE v_seq)
   return Qnil;
 }
 
-/* client_name=(name)
-set client name
+/** call-seq: client_name = name
 
-This should update the connections as others see it.
+This should update the connections as others see it, ie it will send
+some Alsa-events.
 */
 static VALUE
 wrap_snd_seq_set_client_name(VALUE v_seq, VALUE v_name)
@@ -161,12 +165,12 @@ wrap_snd_seq_set_client_name(VALUE v_seq, VALUE v_name)
   return v_seq;
 }
 
-/* AlsaMidiPort_i create_port(port_info)
+/** call-seq: create_port(port_info) -> AlsaMidiPort_i
 
 create a sequencer port on the current client
 
 Parameters:
-  [port_info]    port construction information for the new port. Also returned.
+[port_info]    port construction information for the new port. Also returned.
 
 Creates a sequencer port on the current client. The attributes of created port is
 specified in info argument.
@@ -179,29 +183,29 @@ Each port has the capability bit-masks to specify the access capability of the p
 from other clients.
 The capability bit flags are defined as follows:
 
-        * SND_SEQ_PORT_CAP_READ Readable from this port
-        * SND_SEQ_PORT_CAP_WRITE Writable to this port.
-        * SND_SEQ_PORT_CAP_SYNC_READ For synchronization (not implemented)
-        * SND_SEQ_PORT_CAP_SYNC_WRITE For synchronization (not implemented)
-        * SND_SEQ_PORT_CAP_DUPLEX Read/write duplex access is supported
-        * SND_SEQ_PORT_CAP_SUBS_READ Read subscription is allowed
-        * SND_SEQ_PORT_CAP_SUBS_WRITE Write subscription is allowed
-        * SND_SEQ_PORT_CAP_NO_EXPORT Subscription management from 3rd client is disallowed
+        - +SND_SEQ_PORT_CAP_READ+ Readable from this port
+        - +SND_SEQ_PORT_CAP_WRITE+ Writable to this port.
+        - +SND_SEQ_PORT_CAP_SYNC_READ+ For synchronization (not implemented)
+        - +SND_SEQ_PORT_CAP_SYNC_WRITE+ For synchronization (not implemented)
+        - +SND_SEQ_PORT_CAP_DUPLEX+ Read/write duplex access is supported
+        - +SND_SEQ_PORT_CAP_SUBS_READ+ Read subscription is allowed
+        - +SND_SEQ_PORT_CAP_SUBS_WRITE+ Write subscription is allowed
+        - +SND_SEQ_PORT_CAP_NO_EXPORT+ Subscription management from 3rd client is disallowed
 
 Each port has also the type bitmasks defined as follows:
 
-        * SND_SEQ_PORT_TYPE_SPECIFIC Hardware specific port
-        * SND_SEQ_PORT_TYPE_MIDI_GENERIC Generic MIDI device
-        * SND_SEQ_PORT_TYPE_MIDI_GM General MIDI compatible device
-        * SND_SEQ_PORT_TYPE_MIDI_GM2 General MIDI 2 compatible device
-        * SND_SEQ_PORT_TYPE_MIDI_GS GS compatible device
-        * SND_SEQ_PORT_TYPE_MIDI_XG XG compatible device
-        * SND_SEQ_PORT_TYPE_MIDI_MT32 MT-32 compatible device
-        * SND_SEQ_PORT_TYPE_HARDWARE Implemented in hardware
-        * SND_SEQ_PORT_TYPE_SOFTWARE Implemented in software
-        * SND_SEQ_PORT_TYPE_SYNTHESIZER Generates sound
-        * SND_SEQ_PORT_TYPE_PORT Connects to other device(s)
-        * SND_SEQ_PORT_TYPE_APPLICATION Application (sequencer/editor)
+        - +SND_SEQ_PORT_TYPE_SPECIFIC+ Hardware specific port
+        - +SND_SEQ_PORT_TYPE_MIDI_GENERIC+ Generic MIDI device
+        - +SND_SEQ_PORT_TYPE_MIDI_GM+ General MIDI compatible device
+        - +SND_SEQ_PORT_TYPE_MIDI_GM2+ General MIDI 2 compatible device
+        - +SND_SEQ_PORT_TYPE_MIDI_GS+ GS compatible device
+        - +SND_SEQ_PORT_TYPE_MIDI_XG+ XG compatible device
+        - +SND_SEQ_PORT_TYPE_MIDI_MT32+ MT-32 compatible device
+        - +SND_SEQ_PORT_TYPE_HARDWARE+ Implemented in hardware
+        - +SND_SEQ_PORT_TYPE_SOFTWARE+ Implemented in software
+        - +SND_SEQ_PORT_TYPE_SYNTHESIZER+ Generates sound
+        - +SND_SEQ_PORT_TYPE_PORT+ Connects to other device(s)
+        - +SND_SEQ_PORT_TYPE_APPLICATION+ Application (sequencer/editor)
 
 A port may contain specific midi channels, midi voices and synth voices.
 These values could be zero as default.
@@ -227,18 +231,19 @@ wrap_snd_seq_create_port(VALUE v_seq, VALUE v_portinfo)
   return v_portinfo;
 }
 
-/* int create_simple_port(name, capsbits, typebits)
+/** call-seq: create_simple_port(name, capsbits, typebits) -> int
 
-create a port - simple version, buffering and queueing is not supported
+create a port - simple version, buffering and queueing is *not* supported
 
 Parameters:
-  [name] the name of the port
-  [caps] capability bits
-  [type] type bits
+[name] the name of the port
+[caps] capability bits
+[type] type bits
 
-Returns the created port number.
+Returns: the created port number. It may raise RRTS::AlsaMidiError.
+
 Creates a port with the given capability and type bits.
-See #create_port.
+See RRTS::Driver::AlsaSequencer_i#create_port.
 */
 static VALUE
 wrap_snd_seq_create_simple_port(VALUE v_seq, VALUE v_name, VALUE v_caps, VALUE v_type)
@@ -256,13 +261,14 @@ wrap_snd_seq_create_simple_port(VALUE v_seq, VALUE v_name, VALUE v_caps, VALUE v
   return INT2NUM(r);
 }
 
-/* int delete_simple_port(port)
+/** call-seq: delete_simple_port(port) -> int|nil
+
 delete the port
 
 Parameters:
-  [port] portid or MidiPort
+[port] portid or MidiPort
 
-Returns nil on success or negative error code
+Returns: nil on success or a negative error code
 */
 static VALUE
 wrap_snd_seq_delete_simple_port(VALUE v_seq, VALUE v_portid)
@@ -277,12 +283,12 @@ wrap_snd_seq_delete_simple_port(VALUE v_seq, VALUE v_portid)
   return r ? INT2NUM(r) : Qnil;
 }
 
-/* int delete_port  port
+/** call-seq: delete_port(port) -> int|nil
 
 delete a sequencer port on the current client
 
 Parameters:
-  [port]    portid or MidiPort to be deleted
+[port]    portid or RRTS::MidiPort to be deleted
 
 Returns: nil on success, a negative errorcode otherwise
 */
@@ -317,20 +323,20 @@ i_event_input(void *ptr)
   return Qnil;
 }
 
-/* call-seq:
-    event_input -> AlsaMidiEvent_i
-retrieve an event from sequencer
+/** call-seq: event_input() -> AlsaMidiEvent_i
 
-Obtains an input event from sequencer.
-This function firstly receives the event byte-stream data from sequencer as much as
-possible at once. Then it retrieves the first event record and store the pointer on ev.
+retrieve an event from the sequencer
+
+Obtains an input event from the sequencer.
+This function firstly receives the event byte-stream data from the sequencer as much as
+possible at once. Then it retrieves the first event record and stores the pointer.
 By calling this function sequentially, events are extracted from the input buffer.
-If there is no input from sequencer, function falls into sleep in blocking mode until
-an event is received, or raise EAGAIN in non-blocking mode. Occasionally, it may raise
-the ENOSPC SystemError. This means that the input FIFO of sequencer overran,
+If there is no input from the sequencer, function falls into sleep in blocking mode until
+an event is received, or raises +EAGAIN+ in non-blocking mode. Occasionally, it may raise
+the +ENOSPC+ SystemError. This means that the input FIFO of sequencer overran,
 and some events are lost. Once this error is returned, the input FIFO is cleared automatically.
 
-Function returns the event. It may also raise the EAGAIN SystemError if in nonblocking mode.
+Returns: the event. It may also raise the +EAGAIN+ SystemError when in nonblocking mode.
 */
 static VALUE
 wrap_snd_seq_event_input(VALUE v_seq)
@@ -964,19 +970,19 @@ wrap_snd_seq_event_output_func(VALUE v_seq, VALUE v_ev, EOutput func)
   return r;
 }
 
-/* int event_output(event)
+/** call-seq: event_output(event) -> int
 
 output an event
 
 Parameters:
-[event] AlsaMidiEvent_i or MidiEvent to be output
+[event] RRTS::Driver::AlsaMidiEvent_i or RRTS::MidiEvent to be output
 
-Returns the number of remaining events.
+Returns: the number of remaining events.
 
 An event is once expanded on the output buffer. The output buffer will be
 drained (flushed) automatically if it becomes full.  However, this may still block the
 process (and ruby) if the other side does not read fast enough. For this problem, see
-also #event_input.
+also RRTS::Driver::AlsaSequencer_i#event_input.
 
 If events remain unprocessed on the output buffer before drained, the size of total
 byte data on output buffer is returned. If the output buffer is empty, this returns zero.
@@ -992,8 +998,9 @@ wrap_snd_seq_event_output(VALUE v_seq, VALUE v_ev)
   return wrap_snd_seq_event_output_func(v_seq, v_ev, Normal);
 }
 
-/* int event_output_buffer(event)
-See #event_output. The same, but the buffer is not flushed when becoming full.
+/** call-seq: event_output_buffer(event) -> int
+
+See RRTS::Driver::AlsaSequencer_i#event_output. The same, but the buffer is not flushed when becoming full.
 */
 static VALUE
 wrap_snd_seq_event_output_buffer(VALUE v_seq, VALUE v_ev)
@@ -1001,9 +1008,10 @@ wrap_snd_seq_event_output_buffer(VALUE v_seq, VALUE v_ev)
   return wrap_snd_seq_event_output_func(v_seq, v_ev, Buffer);
 }
 
-/* int event_output_direct(event)
-See #event_output. The same, except no buffer is used but timestamping is still possible,
-if there is a queue.
+/** call-seq: event_output_direct(event) -> int
+
+See RRTS::Driver::AlsaSequencer_i#event_output. The same, except no buffer is used
+but timestamping is still possible, provided if there is a queue associated with the outputstream.
 */
 static VALUE
 wrap_snd_seq_event_output_direct(VALUE v_seq, VALUE v_ev)
@@ -1011,17 +1019,18 @@ wrap_snd_seq_event_output_direct(VALUE v_seq, VALUE v_ev)
   return wrap_snd_seq_event_output_func(v_seq, v_ev, Direct);
 }
 
-/* bool query_next_client(clientinfo)
+/** call-seq: query_next_client(clientinfo) -> bool
+
 Parameters:
-  [clientinfo] query pattern and result
+[clientinfo] query pattern and result
 
 Queries the next client. The search begins at the client with an id one greater
-than client field in info.
+than client field in info. To get the first client set this id to -1.
 If a client is found, its attributes are stored in info, and true is returned.
 If not found (-ENOENT I hope) false is returned.
-Otherwise an AlsaMidiError is raised
+Otherwise an RRTS::AlsaMidiError is raised
 
-In this case -ENOENT seems to indicate endofdata.  However, the specification doesn't say this.
+_note_: -ENOENT seems to indicate endofdata.  However, the specification doesn't say this.
 */
 static VALUE
 wrap_snd_seq_query_next_client(VALUE v_seq, VALUE v_client_info)
@@ -1037,9 +1046,10 @@ wrap_snd_seq_query_next_client(VALUE v_seq, VALUE v_client_info)
   return Qtrue;
 }
 
-/* bool query_next_port(portinfo)
+/** call-seq: query_next_port(portinfo) -> bool
+
 Parameters:
-  [portinfo]  query pattern and result
+[portinfo]  query pattern and result
 
 Queries the next matching port on the client specified in info argument. The search
 begins at the next port specified in port field of info argument.
@@ -1060,15 +1070,15 @@ wrap_snd_seq_query_next_port(VALUE v_seq, VALUE v_port_info)
   return Qtrue;
 }
 
-/* int alloc_named_queue(name)
+/** call-seq: alloc_named_queue(name) -> int
 
 allocate a queue with the specified name.
-According to aplaymidi.c this queue is locked (which is just fine)
+According to aplaymidi.c this queue is _locked_ (which is just fine, but what does it mean)
 
 Parameters:
-   [name] the name of the new queue
+[name] the name of the new queue
 
-Returns the queue id (zero or positive) on success, throws AlsaMidiError otherwise
+Returns: the queue id (zero or positive) on success, throws RRTS::AlsaMidiError otherwise
 */
 static VALUE
 wrap_snd_seq_alloc_named_queue(VALUE v_seq, VALUE v_name)
@@ -1080,9 +1090,10 @@ wrap_snd_seq_alloc_named_queue(VALUE v_seq, VALUE v_name)
   return INT2NUM(r);
 }
 
-/* subinfo subscribe_port(subinfo)
+/** call-seq: subscribe_port(subinfo) -> subinfo
+
 Parameters:
-  [subinfo] subscription information
+[subinfo] subscription information
 
 Subscribes a connection between two ports. The subscription information is stored in
 the subinfo argument (returned as well)
@@ -1102,7 +1113,8 @@ wrap_snd_seq_subscribe_port(VALUE v_seq, VALUE v_port_subs)
   return v_port_subs;
 }
 
-/* int unsubscribe_port(port_sub)
+/** call-seq: unsubscribe_port(port_sub) -> int|nil
+
 Returns nil if OK, otherwise negative errorcode. Reverse of subscribing.
 */
 static VALUE
@@ -1125,12 +1137,13 @@ rb_scan_args(argc, v_params, "21", &v_myportid, &v_##prefix##_clientid, &v_##pre
 solve_address(v_##prefix##_clientid, v_##prefix##_portid); \
 RRTS_DEREF_DIRTY(v_myportid, @port)
 
-/* self connect_to(myport, dest_address)
-simple subscription (w/o exclusive & time conversion)
+/** call-seq: connect_to(myport, dest_address) -> self
+
+simple subscription (without exclusive & time conversion)
 
 Parameters:
-  [myport]       the portid or MidiPort as sender
-  [dest_address] a tuple, or two single arguments as client + port, or a MidiPort
+[myport]       the portid or RRTS::MidiPort as sender
+[dest_address] a tuple, or two single arguments as client + port, or a RRTS::MidiPort
 
 Connect from the given receiver port in the current client to the given destination client:port.
 */
@@ -1146,9 +1159,10 @@ wrap_snd_seq_connect_to(int argc, VALUE *v_params, VALUE v_seq)
   return v_seq;
 }
 
-/* connect_from(myport, source_address)
+/** call-seq: connect_from(myport, source_address)
+
 Connect from the given sender client:port to the given destination port in the current client.
-See #connect_to
+See RRTS::Driver::AlsaSequencer_i#connect_to
 */
 static VALUE
 wrap_snd_seq_connect_from(int argc, VALUE *v_params, VALUE v_seq)
@@ -1163,9 +1177,11 @@ wrap_snd_seq_connect_from(int argc, VALUE *v_params, VALUE v_seq)
   return v_seq;
 }
 
-/* int disconnect_from(myport, source_address)
-See #connect_to
-Returns nil if OK, otherwise negative errorcode
+/** call-seq: disconnect_from(myport, source_address) -> int|nil
+
+See RRTS::Driver::AlsaSequencer_i#connect_to
+
+Returns: nil if OK, otherwise negative errorcode
 */
 static VALUE
 wrap_snd_seq_disconnect_from(int argc, VALUE *v_params, VALUE v_seq)
@@ -1177,8 +1193,9 @@ wrap_snd_seq_disconnect_from(int argc, VALUE *v_params, VALUE v_seq)
   return r ? INT2NUM(r) : Qnil;
 }
 
-/* int disconnect_to(myport, dest_address)
-See also #disconnect_from
+/** call-seq: disconnect_to(myport, dest_address) -> int
+
+See also RRTS::Driver::AlsaSequencer_i#disconnect_from
 */
 static VALUE
 wrap_snd_seq_disconnect_to(int argc, VALUE *v_params, VALUE v_seq)
@@ -1190,23 +1207,22 @@ wrap_snd_seq_disconnect_to(int argc, VALUE *v_params, VALUE v_seq)
   return r ? INT2NUM(r) : Qnil;
 }
 
-/* call-seq:
-    parse_address(string) -> [client_id, port_id]
+/** call-seq: parse_address(string) -> [client_id, port_id]
 
 parse the given string and get the sequencer address
 
 Parameters:
-  [arg] the string to be parsed
+[arg] the string to be parsed
 
-Returns clientid + portid on success or it raises an AlsaMidiError.
+Returns clientid + portid on success or it raises an RRTS::AlsaMidiError.
 
 This function parses the sequencer client and port numbers from the given string.
 The client and port tokes are separated by either colon or period, e.g. 128:1.
 The function accepts also a client name not only digit numbers.
 
-The arguments could be '20:2' or 'MIDI2:0' etc.  Portnames are not understood!
+The arguments could be '20:2' or 'MIDI2:0' etc.  Portnames are *not* understood!
 
-See Sequencer#parse_address
+See RRTS::Sequencer#parse_address
 */
 static VALUE
 wrap_snd_seq_parse_address(VALUE v_seq, VALUE v_arg)
@@ -1234,10 +1250,12 @@ i_sync_output_queue(void *ptr)
   return Qnil;
 }
 
-/* self sync_output_queue
-wait until all events are processed
+/** call-seq: sync_output_queue() -> self
+
+wait until all events are processed.
+
 This function waits (blocks) until all events of this client are processed.
-See the note on blocking ruby at #event_output
+See the note on blocking ruby at RRTS::Driver::AlsaSequencer_i#event_output
 */
 static VALUE
 wrap_snd_seq_sync_output_queue(VALUE v_seq)
@@ -1260,11 +1278,13 @@ i_drain_output(void *ptr)
   return Qnil;
 }
 
-/* int drain_output
+/** call-seq: drain_output() -> int
+
 drain output buffer to sequencer
+
 Returns 0 when all events are drained and sent to sequencer. When events
 still remain on the buffer, the byte size of remaining events are returned.
-On error a AlsaMidiError is raised.
+On error a RRTS::AlsaMidiError is raised.
 This function drains all pending events on the output buffer.
 The function returns immediately after the events are sent to the queues regardless
 whether the events are processed or not. To get synchronization with the
@@ -1289,7 +1309,7 @@ wrap_snd_seq_drain_output(VALUE v_seq)
   return INT2NUM(data.rescode);
 }
 
-/* int input_pending(fetch_sequencer_fifo = true)
+/** call-seq: input_pending([fetch_sequencer_fifo = true]) -> int
 
  check events in input buffer
 
@@ -1301,7 +1321,7 @@ wrap_snd_seq_drain_output(VALUE v_seq)
  events on sequencer FIFO.
  When events exist, they are transferred to the input buffer, and the number of
  received events are returned.
- If fetch_sequencer argument is zero and no events remain on the input buffer,
+ If fetch_sequencer argument is false and no events remain on the input buffer,
  the function simply returns zero.
 */
 static VALUE
@@ -1314,7 +1334,8 @@ wrap_snd_seq_event_input_pending(int argc, VALUE *v_params, VALUE v_seq)
   return INT2NUM(snd_seq_event_input_pending(seq, NIL_P(v_fetchseq) ? 1 : NUM2INT(v_fetchseq)));
 }
 
-/* self drop_input
+/** call-seq: drop_input() -> self
+
 clear the input buffer and and remove all events in the sequencer queue
 */
 static VALUE
@@ -1326,7 +1347,7 @@ wrap_snd_seq_drop_input(VALUE v_seq)
   return v_seq;
 }
 
-/* self drop_input_buffer
+/** call-seq: drop_input_buffer() -> self
 
 remove all events on user-space input FIFO
 */
@@ -1339,13 +1360,13 @@ wrap_snd_seq_drop_input_buffer(VALUE v_seq)
   return v_seq;
 }
 
-/* self set_queue_info(queue, info)
+/** call-seq: set_queue_info(queue, info) -> self
 
 change the queue attributes
 
 Parameters:
-  queue   queueid or MidiQueue to change
-  info    information changed
+[queue] queueid or RRTS::MidiQueue to use
+[info]  the new information to set, it should be a RRTS::Driver::AlsaQueueInfo_i instance
 */
 static VALUE
 wrap_snd_seq_set_queue_info(VALUE v_seq, VALUE v_qid, VALUE v_qi)
@@ -1363,14 +1384,13 @@ wrap_snd_seq_set_queue_info(VALUE v_seq, VALUE v_qid, VALUE v_qi)
   return v_seq;
 }
 
-/* call-seq:
-    set_queue_tempo(queue, tempo) -> self
+/** call-seq: set_queue_tempo(queue, tempo) -> self
 
 set the tempo of the queue
 
 Parameters:
-  [queue] queueid or MidiQueue to change the tempo
-  [tempo] AlsaQueueTempo_i or Tempo instance
+[queue] queueid or RRTS::MidiQueue to change the tempo
+[tempo] RRTS::Driver::AlsaQueueTempo_i or RRTS::Tempo instance
 */
 static VALUE
 wrap_snd_seq_set_queue_tempo(VALUE v_seq, VALUE v_qid, VALUE v_tempo)
@@ -1391,22 +1411,18 @@ wrap_snd_seq_set_queue_tempo(VALUE v_seq, VALUE v_qid, VALUE v_tempo)
   return v_seq;
 }
 
-/* call-seq:
-      queue_tempo(queue, tempo) -> tempo
-      queue_tempo(queue) -> tempo
+/** call-seq: queue_tempo(queue[, tempo]) -> tempo
 
 obtain the current tempo of the queue
 
 Parameters:
-        q       MidiQueue or queue id to be queried
-        tempo   AlsaQueueTempo_i or Tempo to store the current tempo,
-               if not given room is allocated
+[q]       RRTS::MidiQueue or queue id to be queried
+[tempo]   RRTS::Driver::AlsaQueueTempo_i or RRTS::Tempo to store the current tempo,
+          if not given a tempo is allocated (and it will be automatically freed)
 
-Returns:
-    the retrieve AlsaQueueTempo_i (not Tempo)
+Returns: the retrieve RRTS::Driver::AlsaQueueTempo_i (never RRTS::Tempo)
 
-See also:
-    AlsaSequencer_i#set_queue_tempo
+See also: RRTS::Driver::AlsaSequencer_i#set_queue_tempo
 */
 static VALUE
 wrap_snd_seq_get_queue_tempo(int argc, VALUE *argv, VALUE v_seq)
@@ -1433,16 +1449,16 @@ wrap_snd_seq_get_queue_tempo(int argc, VALUE *argv, VALUE v_seq)
   return v_tempo;
 }
 
-/* call-seq:
-    queue_info q [, info] -> AlsaQueueInfo_i
+/** call-seq: queue_info(q [, info]) -> AlsaQueueInfo_i
 
 obtain queue attributes
 
 Parameters:
-  [q]     queueid or MidiQueue to query
-  [info] room for information returned, if omitted it is allocated
+[q]     queueid or RRTS::MidiQueue to query
+[info] room for information returned, if omitted it is allocated
 
-Returns info
+Returns: a (perhaps) new RRTS::Driver::AlsaQueueInfo_i. If allocated by this method
+         it should not be freed
 */
 static VALUE
 wrap_snd_seq_get_queue_info(int argc, VALUE *v_params, VALUE v_seq)
@@ -1465,17 +1481,17 @@ wrap_snd_seq_get_queue_info(int argc, VALUE *v_params, VALUE v_seq)
   return v_qi;
 }
 
-/* self remove_events([remove_event_descriptor])
+/** call-seq: remove_events([remove_event_descriptor]) -> self
 
 remove events on input/output buffers and pools
 
 Parameters:
-  [remove_events_descriptor] remove event container.
-                             If omitted all output events except OFFS are erased.
+[remove_events_descriptor] remove event container (RRTS::Driver::RemoveEvents instance).
+                           If omitted all output events except +OFF+s are erased.
 
 Removes matching events with the given condition from input/output buffers and pools.
 This can be used to erase events that are currently underway, parked in qeueus etc.
-Use it to cleanly exit a process
+Use it to cleanly exit a process.
 */
 static VALUE
 wrap_snd_seq_remove_events(int argc, VALUE *argv, VALUE v_seq)
@@ -1499,15 +1515,15 @@ wrap_snd_seq_remove_events(int argc, VALUE *argv, VALUE v_seq)
   return v_seq;
 }
 
-/* int create_queue(queueinfo)
+/** call-seq: create_queue(queueinfo) -> int
 
 create a queue
 
 Parameters:
-   [queueinfo]  AlsaQueueInfo_i instance used to initialize
+[queueinfo]  RRTS::Driver::AlsaQueueInfo_i instance used to initialize
 
-Returns the queue id (zero or positive) on success or raise AlsaMidiError.
-The queue should be freed using #free_queue.
+Returns: the queue id (zero or positive) on success or raises RRTS::AlsaMidiError.
+The queue should be freed using RRTS::Driver::AlsaSequencer_i#free_queue.
 */
 static VALUE
 wrap_snd_seq_create_queue(VALUE v_seq, VALUE v_qi)
@@ -1524,7 +1540,12 @@ wrap_snd_seq_create_queue(VALUE v_seq, VALUE v_qi)
   return INT2NUM(r);
 }
 
-/* int free_queue(queue)
+/** call-seq: free_queue(queue) -> int|nil
+
+Parameters:
+[queue] queueid or RRTS::Queue to free
+
+Returns: nil on success or a negative errorcode
 */
 static VALUE
 wrap_snd_seq_free_queue(VALUE v_seq, VALUE v_qid)
@@ -1539,11 +1560,12 @@ wrap_snd_seq_free_queue(VALUE v_seq, VALUE v_qid)
   return r < 0 ? INT2NUM(r) : Qnil;
 }
 
-/* int query_named_queue(name)
-  Parameters:
-    [name]    the queuename to locate
+/** call-seq: query_named_queue(name) -> int|nil
 
-  Returns the queueid of the queue with given name or else nil.
+Parameters:
+[name]    the queuename to locate
+
+Returns: the queueid of the queue with given name or else nil.
 */
 static VALUE
 wrap_snd_seq_query_named_queue(VALUE v_seq, VALUE v_name)
@@ -1556,14 +1578,15 @@ wrap_snd_seq_query_named_queue(VALUE v_seq, VALUE v_name)
   return INT2NUM(r);
 }
 
-/* self start_queue(queue)
+/** call-seq: start_queue(queue) -> self
+
 start the specified queue
 
 Parameters:
-  [queue] queueid or MidiQueue to start
-  [ev]    optional event record (see snd_seq_control_queue)   CURRENTLY NOT SUPPORTED!
+[queue] queueid or RRTS::MidiQueue to start
+[ev]    optional event record (see snd_seq_control_queue)   CURRENTLY NOT SUPPORTED!
 
-See also MidiQueue#start
+See also RRTS::MidiQueue#start
 */
 static VALUE
 wrap_snd_seq_start_queue(VALUE v_seq, VALUE v_qid)
@@ -1578,28 +1601,30 @@ wrap_snd_seq_start_queue(VALUE v_seq, VALUE v_qid)
   return v_seq;
 }
 
-/* self stop_queue(q)
+/** call-seq: stop_queue(q) -> self
 
-See #start_queue
+See RRTS::Driver::AlsaSequencer_i#start_queue
+
+Parameters:
+[q]  queueid or RRTS::MidiQueue to stop
 */
 static VALUE
 wrap_snd_seq_stop_queue(VALUE v_seq, VALUE v_qid)
 {
   snd_seq_t *seq;
   Data_Get_Struct(v_seq, snd_seq_t, seq);
+  RRTS_DEREF_DIRTY(v_qid, @id);
   snd_seq_stop_queue(seq, NUM2INT(v_qid), 0);
   return Qnil;
 }
 
-/* call-seq:
-      AlsaQueueInfo_i#queue_usage queue -> bool
+/** call-seq: queue_usage(queue) -> bool
 
 Parameters:
-  q       queue id or MidiQueue
+[queue]       queueid or RRTS::MidiQueue
 
-Returns:
-  true = client is allowed to access the queue, false = not allowed,
-  otherwise it raise AlsaMidiError
+Returns: true if client is allowed to access the queue, false if not allowed,
+         on errors it raises RRTS::AlsaMidiError
 */
 static VALUE
 wrap_snd_seq_get_queue_usage(VALUE v_seq, VALUE v_qid)
@@ -1615,8 +1640,7 @@ wrap_snd_seq_get_queue_usage(VALUE v_seq, VALUE v_qid)
   return INT2BOOL(r);
 }
 
-/* call-seq:
-    set_queue_usage queue, bool -> self
+/** call-seq: set_queue_usage(queue, bool) -> self
 
 Allow or disallow the use of this queue. But to whom? And why?
 */
@@ -1634,17 +1658,16 @@ wrap_snd_seq_set_queue_usage(VALUE v_seq, VALUE v_qid, VALUE v_bool)
   return v_seq;
 }
 
-/* AlsaQueueStatus_i queue_status(q [, status ])
+/** call-seq: queue_status(q [, status ]) -> AlsaQueueStatus_i
 
 obtain the running state of the queue
 
 Parameters:
-  [q]      queueid or MidiQueue to query
-  [status] pointer to store the current status
+[q]      queueid or RRTS::MidiQueue to query
+[status] pointer to store the current status
 
-Returns: status
+Returns: status. If +status+ was not passed a new one is allocated. This needs not be freed.
 
-If the +status+ parameter is omitted a new one is allocated
 */
 static VALUE
 wrap_snd_seq_get_queue_status(int argc, VALUE *v_params, VALUE v_seq)
@@ -1666,10 +1689,15 @@ wrap_snd_seq_get_queue_status(int argc, VALUE *v_params, VALUE v_seq)
   return v_status;
 }
 
-/* call-seq:
-timer -> AlsaQueueTimer_i
-timer(buffer) -> AlsaQueueTimer_i
+/* call-seq: queue_timer([buffer])-> AlsaQueueTimer_i
+
 Obtain the queue timer information
+
+Parameters:
+[buffer] - optional buffer to return. It not passed a new one is allocated. It need
+           not be freed
+
+Returns:  a timer
 */
 static VALUE
 wrap_snd_seq_get_queue_timer(int argc, VALUE *v_params, VALUE v_seq)
@@ -1691,14 +1719,13 @@ wrap_snd_seq_get_queue_timer(int argc, VALUE *v_params, VALUE v_seq)
   return v_timer;
 }
 
-/* call-seq:
-    set_queue_timer(queue, timer) -> self
+/** call-seq: set_queue_timer(queue, timer) -> self
 
 set the timer of the queue
 
 Parameters:
-[queue] queueid or MidiQueue to change the timer
-[timer] AlsaQueueTimer_i
+[queue] queueid or RRTS::MidiQueue to change the timer
+[timer] RRTS::Driver::AlsaQueueTimer_i
 */
 static VALUE
 wrap_snd_seq_set_queue_timer(VALUE v_seq, VALUE v_qid, VALUE v_timer)
@@ -1718,16 +1745,16 @@ wrap_snd_seq_set_queue_timer(VALUE v_seq, VALUE v_qid, VALUE v_timer)
   return v_seq;
 }
 
-/* call-seq:
-    poll_descriptors_count(eventmask) -> int
+/** call-seq: poll_descriptors_count(eventmask) -> int
 
 Parameters:
-  [eventmask] (int) the poll events to be checked (POLLIN or POLLOUT or combination)
+[eventmask] (int) the poll events to be checked (+POLLIN+ or +POLLOUT+ or combination)
 
- Get the number of poll descriptors. The polling events to be checked can be
- specified by the second argument.
- When both input and output are to be checked, pass POLLIN|POLLOUT.
- There are also two constants in Sequencer: Sequencer::PollIn and Sequencer::PollOut.
+Returns: the number of poll descriptors.
+
+The polling events to be checked can be specified by the +eventmask+.
+When both input and output are to be checked, pass +POLLIN+|+POLLOUT+.
+There are also two constants in RRTS::Sequencer: RRTS::Sequencer::PollIn and RRTS::Sequencer::PollOut.
 */
 static VALUE
 wrap_snd_seq_poll_descriptors_count(VALUE v_seq, VALUE v_pollflags)
@@ -1737,22 +1764,23 @@ wrap_snd_seq_poll_descriptors_count(VALUE v_seq, VALUE v_pollflags)
   return INT2NUM(snd_seq_poll_descriptors_count(seq, NUM2INT(v_pollflags)));
 }
 
-/* call-seq:
-    poll_descriptors([[space, ]eventmask]) -> AlsaPollFds_i
+/** call-seq: poll_descriptors([[space = auto, ]eventmask = POLLIN]) -> AlsaPollFds_i
 
 Get poll descriptors. If space is omitted snd_seq_poll_descriptors_count is used for that.
-If eventmask is missing as well then PollIn is used.
+If eventmask is missing as well then +PollIn+ is used.
 
- Parameters:
-    [space]      space in the poll descriptor array
-    [eventmask]  polling events to be checked (POLLIN or POLLOUT or combination)
+Parameters:
+[space]      space in the poll descriptor array
+[eventmask]  polling events to be checked (+POLLIN+ or +POLLOUT+ or combination)
+
+Returns: a RRTS::Driver::AlsaPollFds_i instance.
 
 Get poll descriptors assigned to the sequencer handle. Since a sequencer handle can duplex streams,
-you need to set which direction(s) is/are polled in events argument. When POLLIN bit is specified,
+you need to set which direction(s) is/are polled in events argument. When +POLLIN+ bit is specified,
 the incoming events to the ports are checked.
 
 These descriptors have a method poll() that serves as a wrapper around the poll() system call.
-To check the returned poll-events, call #poll_descriptors_revents
+To check the returned poll-events, call RRTS::Driver::AlsaSequencer_i#poll_descriptors_revents
 instead of reading the pollfd structs directly.
 */
 static VALUE
@@ -1785,12 +1813,12 @@ wrap_snd_seq_poll_descriptors(int argc, VALUE *argv, VALUE v_seq)
   return Data_Wrap_Struct(alsaPollFdsClass, 0/*mark*/, free/*free*/, fds);
 }
 
-/* boolarray poll_descriptors_revents(pollfds)
+/** call-seq: poll_descriptors_revents(pollfds) -> boolarray
 
-get returned events from poll descriptors, after you called AlsaPollFds_i#poll().
+get returned events from poll descriptors, after you called RRTS::Driver::AlsaPollFds_i#poll().
 
- Parameters:
-   pollfds    AlsaPollFds_i, the poll descriptors
+Parameters:
+pollfds    RRTS::Driver::AlsaPollFds_i, the poll descriptors
 
 Returns boolean array or nil if there are no events.
 The resulting array holds an entry per filedescriptor, in the same order, holding true if
@@ -1864,12 +1892,15 @@ i_wrapPoll(void *ptr)
   return v_revents;
 }
 
-/* boolarray poll([timeout_msec = -1])
+/** call-seq: poll([timeout_msec = -1]) -> boolarray|nil
+
+Parameters:
+[timeout_msec] - timeout in milliseconds
+
+Returns: nil if no events where present, an array of booleans where the index matches
+         the original polldescriptorarray. At least one of them will be true.
 
 Wrapper around poll (not ppoll -- currently)
-Returns nil if no events where present
-Returns an array of booleans where the index matches the polldescriptors passed.
-At least one of them will be true.
 
 This method will block if +timeout_msec+ is larger than 0, regardless of the sequencers
 blocking mode (since we don't depend on AlsaSequencer_i).
@@ -1877,7 +1908,7 @@ If timeout is -1 it will block indefinitely
 
 On interrupts it will return prematurely, but no error is raised
 According to the also docs you should not use the return value but use
-poll_descriptors_revents instead
+RRTS::Driver::AlsaSequencer_i#poll_descriptors_revents instead
 */
 static VALUE
 wrapPoll(int argc, VALUE *argv, VALUE v_descriptors)
@@ -1894,7 +1925,7 @@ wrapPoll(int argc, VALUE *argv, VALUE v_descriptors)
   return r;
 }
 
-/* int output_buffer_size
+/** call-seq: output_buffer_size() -> int
 
 Obtains the size in bytes of output buffer. This buffer is used to store decoded
 byte-stream of output events before transferring to sequencer.
@@ -1907,7 +1938,7 @@ wrap_snd_seq_get_output_buffer_size(VALUE v_seq)
   return UINT2NUM(snd_seq_get_output_buffer_size(seq));
 }
 
-/* int input_buffer_size
+/** call-seq: input_buffer_size() -> int
 
 Obtains the size of input buffer in bytes. This buffer is used to read byte-stream
 of input events from the sequencer.
@@ -1920,12 +1951,12 @@ wrap_snd_seq_get_input_buffer_size(VALUE v_seq)
   return UINT2NUM(snd_seq_get_input_buffer_size(seq));
 }
 
-/* input_buffer_size=(size)
+/** call-seq: input_buffer_size = size
 
 Resize the input buffer.
 
 Parameters:
-  [size] the size of input buffer to be changed in bytes
+[size] the size of input buffer to be changed in bytes.
 */
 static VALUE
 wrap_snd_seq_set_input_buffer_size(VALUE v_seq, VALUE v_sz)
@@ -1937,12 +1968,12 @@ wrap_snd_seq_set_input_buffer_size(VALUE v_seq, VALUE v_sz)
   return Qnil;
 }
 
-/* output_buffer_size=(size)
+/** call-seq: output_buffer_size = size
 
 Resize the output buffer.
 
 Parameters:
-  [size] the size of output buffer to be changed in bytes
+[size] the size of output buffer to be changed in bytes.
 */
 static VALUE
 wrap_snd_seq_set_output_buffer_size(VALUE v_seq, VALUE v_sz)
@@ -1954,14 +1985,15 @@ wrap_snd_seq_set_output_buffer_size(VALUE v_seq, VALUE v_sz)
   return Qnil;
 }
 
-/* AlsaPortInfo_i port_info(portid)
+/** call-seq: port_info(portid) -> AlsaPortInfo_i
+
 obtain the information of a port on the current client
 
 Parameters:
-  [portid] portid to get
+[portid] portid to get
 
 Returns:
-  AlsaPortInfo_i instance
+  RRTS::Driver::AlsaPortInfo_i instance
 */
 static VALUE
 wrap_snd_seq_get_port_info(VALUE v_seq, VALUE v_portid)
@@ -1975,8 +2007,9 @@ wrap_snd_seq_get_port_info(VALUE v_seq, VALUE v_portid)
   return Data_Wrap_Struct(alsaPortInfoClass, 0/*mark*/, snd_seq_port_info_free/*free*/, info);
 }
 
-/* AlsaPortInfo_i any_port_info(clientid, portid)
-Return information about ports on any client
+/** call-seq: any_port_info(clientid, portid) -> AlsaPortInfo_i
+
+Returns: RRTS::Driver::AlsaPortInfo_i with information about the given port
 */
 static VALUE
 wrap_snd_seq_get_any_port_info(VALUE v_seq, VALUE v_clientid, VALUE v_portid)
@@ -1990,16 +2023,15 @@ wrap_snd_seq_get_any_port_info(VALUE v_seq, VALUE v_clientid, VALUE v_portid)
   return Data_Wrap_Struct(alsaPortInfoClass, 0/*mark*/, snd_seq_port_info_free/*free*/, info);
 }
 
-/* self set_port_info(portid, port_info)
+/** call-seq: set_port_info(portid, port_info) -> self
 
 set the information of a port on the current client
 
 Parameters:
-  [portid]     port to be set
-  [port_info]  AlsaPortInfo_i instance to be set
+[portid]     port to be set
+[port_info]  AlsaPortInfo_i instance to be set
 
-Returns:
-  self
+Returns: self
 */
 static VALUE
 wrap_snd_seq_set_port_info(VALUE v_seq, VALUE v_portid, VALUE v_portinfo)
@@ -2013,8 +2045,11 @@ wrap_snd_seq_set_port_info(VALUE v_seq, VALUE v_portid, VALUE v_portinfo)
   return v_seq;
 }
 
-/* AlsaClientPool_i client_pool([poolinfo])
+/** call-seq: client_pool([poolinfo = nil]) -> AlsaClientPool_i
+
 obtain the pool information of the current client, allocates space if required
+
+Returns: a RRTS::Driver::AlsaClientPool_i instance. If allocated, it need not be freed.
 */
 static VALUE
 wrap_snd_seq_get_client_pool(int argc, VALUE *argv, VALUE v_seq)
@@ -2036,8 +2071,12 @@ wrap_snd_seq_get_client_pool(int argc, VALUE *argv, VALUE v_seq)
   return v_pool;
 }
 
-/* client_pool=(poolinfo)
+/** call-seq: client_pool = poolinfo
+
 set the pool information
+
+Parameters:
+[poolinfo] - a RRTS::Driver::AlsaClientPool_i instance
 */
 static VALUE
 wrap_snd_seq_set_client_pool(VALUE v_seq, VALUE v_pool)
@@ -2051,7 +2090,8 @@ wrap_snd_seq_set_client_pool(VALUE v_seq, VALUE v_pool)
   return Qnil;
 }
 
-/* client_pool_output=(size)
+/** call-seq: client_pool_output = size
+
 change the output pool size of the current client
 */
 static VALUE
@@ -2064,7 +2104,8 @@ wrap_snd_seq_set_client_pool_output(VALUE v_seq, VALUE v_sz)
   return Qnil;
 }
 
-/* int client_pool_output_room=(size)
+/** call-seq: client_pool_output_room = size
+
 change the output room size of the current client
 */
 static VALUE
@@ -2077,7 +2118,8 @@ wrap_snd_seq_set_client_pool_output_room(VALUE v_seq, VALUE v_sz)
   return Qnil;
 }
 
-/* client_pool_input=(size)
+/** call-seq: client_pool_input = size
+
 change the input pool size of the current client
 */
 static VALUE
@@ -2090,7 +2132,7 @@ wrap_snd_seq_set_client_pool_input(VALUE v_seq, VALUE v_sz)
   return Qnil;
 }
 
-/* self reset_pool_output
+/** call-seq: reset_pool_output -> self
 */
 static VALUE
 wrap_snd_seq_reset_pool_output(VALUE v_seq)
@@ -2102,7 +2144,7 @@ wrap_snd_seq_reset_pool_output(VALUE v_seq)
   return v_seq;
 }
 
-/* self reset_pool_input
+/** call-seq: reset_pool_input -> self
 */
 static VALUE
 wrap_snd_seq_reset_pool_input(VALUE v_seq)
@@ -2114,8 +2156,11 @@ wrap_snd_seq_reset_pool_input(VALUE v_seq)
   return v_seq;
 }
 
-/* AlsaSystemInfo_i seq_system_info([info])
+/** call-seq: seq_system_info([info = nil]) -> AlsaSystemInfo_i
+
 obtain the sequencer system information, if no buffer is passed, it is allocated
+
+Returns: a RRTS::Driver::AlsaSystemInfo_i instance
 */
 static VALUE
 wrap_snd_seq_system_info(int argc, VALUE *argv, VALUE v_seq)
@@ -2139,10 +2184,6 @@ wrap_snd_seq_system_info(int argc, VALUE *argv, VALUE v_seq)
   return v_info;
 }
 
-/*
-Wrapper around snd_seq_t. A sequencer is basically a client.
-Create one using Driver#seq_open
-*/
 void alsa_seq_init()
 {
   WRAP_CONSTANT(POLLIN);
@@ -2158,7 +2199,31 @@ void alsa_seq_init()
   WRAP_CONSTANT(SND_SEQ_TYPE_HW); //       hardware
   WRAP_CONSTANT(SND_SEQ_TYPE_SHM); //       shared memory (NYI)
   WRAP_CONSTANT(SND_SEQ_TYPE_INET); //        network (NYI)
+  if (0)  // this is to make rdoc document it.
+    {
+       VALUE rrtsModule = rb_define_module("RRTS");
+       alsaDriver = rb_define_module_under(rrtsModule, "Driver");
+    }
+  /** Document-class: RRTS::Driver::AlsaSequencer_i
+      The sequencer is a special Alsa client. To create one use RRTS::Driver::seq_open.
+      To be able to send or receive Alsa or MIDI events requires this class to be
+      instantiated. It has generic methods of sending and receiving events. This is combined
+      with a few methods for buffering and queueing of events, and some methods to create connections.
+
+      Context: this is the main class, and normally you would instantiate a singleton for it:
+
+          sequencer = RRTS::Driver::seq_open
+          ....
+          sequencer.close
+
+      However, you probably want to use RRTS::Sequencer instead
+
+  */
   alsaSequencerClass = rb_define_class_under(alsaDriver, "AlsaSequencer_i", rb_cObject);
+  /** Document-class: RRTS::Driver::AlsaPollFds_i
+
+  This class is used for use with the operating systems +poll+() and +select+() systemcalls.
+  */
   alsaPollFdsClass = rb_define_class_under(alsaDriver, "AlsaPollFds_i", rb_cObject);
   rb_define_method(alsaSequencerClass, "close", RUBY_METHOD_FUNC(wrap_snd_seq_close), 0);
   rb_define_method(alsaSequencerClass, "name", RUBY_METHOD_FUNC(wrap_snd_seq_name), 0);

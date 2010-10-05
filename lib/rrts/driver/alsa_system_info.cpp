@@ -10,9 +10,13 @@
 
 VALUE alsaSystemInfoClass;
 
-/*
-void    snd_seq_system_info_copy (snd_seq_system_info_t *dst, const snd_seq_system_info_t *src)
-Copy one snd_seq_system_info_t to another.
+/** Document-method: RRTS::Driver::AlsaSystemInfo_i#copy_to
+call-seq: copy_to([dest=nil]) -> clone
+
+Copy one RRTS::Driver::AlsaSystemInfo_i to another.
+
+Parameters:
+[dest]   if not given, it returns a newly allocated copy (no need to free it)
 */
 static VALUE
 wrap_snd_seq_system_info_copy_to(int argc, VALUE *argv, VALUE v_sysinfo)
@@ -34,8 +38,8 @@ wrap_snd_seq_system_info_copy_to(int argc, VALUE *argv, VALUE v_sysinfo)
   return retval;
 }
 
-/*
-int     snd_seq_system_info_get_queues (const snd_seq_system_info_t *info)
+/** call-seq:  queues() -> int
+
 Get maximum number of queues.
 */
 static VALUE
@@ -46,9 +50,9 @@ wrap_snd_seq_system_info_get_queues(VALUE v_info)
   return INT2NUM(snd_seq_system_info_get_queues(info));
 }
 
-/*
-int     snd_seq_system_info_get_clients (const snd_seq_system_info_t *info)
-Get maximum number of clients.
+/** call-seq:  clients() -> int
+
+Get the maximum number of clients.
 */
 static VALUE
 wrap_snd_seq_system_info_get_clients(VALUE v_info)
@@ -58,8 +62,8 @@ wrap_snd_seq_system_info_get_clients(VALUE v_info)
   return INT2NUM(snd_seq_system_info_get_clients(info));
 }
 
-/*
-int     snd_seq_system_info_get_ports (const snd_seq_system_info_t *info)
+/** call-seq: ports() -> int
+
 Get maximum number of ports.
 */
 static VALUE
@@ -70,8 +74,8 @@ wrap_snd_seq_system_info_get_ports(VALUE v_info)
   return INT2NUM(snd_seq_system_info_get_ports(info));
 }
 
-/*
-int     snd_seq_system_info_get_channels (const snd_seq_system_info_t *info)
+/** call-seq:  channels() -> int
+
 Get maximum number of channels.
 */
 static VALUE
@@ -82,8 +86,8 @@ wrap_snd_seq_system_info_get_channels(VALUE v_info)
   return INT2NUM(snd_seq_system_info_get_channels(info));
 }
 
-/*
-int     snd_seq_system_info_get_cur_clients (const snd_seq_system_info_t *info)
+/** call-seq: cur_clients() -> int
+
 Get the current number of clients.
 */
 static VALUE
@@ -94,8 +98,8 @@ wrap_snd_seq_system_info_get_cur_clients(VALUE v_info)
   return INT2NUM(snd_seq_system_info_get_cur_clients(info));
 }
 
-/*
-int     snd_seq_system_info_get_cur_queues (const snd_seq_system_info_t *info)
+/** call-seq: cur_queues() -> int
+
 Get the current number of queues.
 */
 static VALUE
@@ -109,6 +113,11 @@ wrap_snd_seq_system_info_get_cur_queues(VALUE v_info)
 void
 alsa_system_info_init()
 {
+  /** Document-class: RRTS::Driver::AlsaSystemInfo_i
+
+  This is basicly a module that returns system information like the maximum number
+  of clients etc..
+  */
   alsaSystemInfoClass = rb_define_class_under(alsaDriver, "AlsaSystemInfo_i", rb_cObject);
   rb_define_method(alsaSystemInfoClass, "copy_to", RUBY_METHOD_FUNC(wrap_snd_seq_system_info_copy_to), -1);
   rb_define_method(alsaSystemInfoClass, "clients",

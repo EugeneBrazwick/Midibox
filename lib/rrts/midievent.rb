@@ -8,7 +8,8 @@ module RRTS
 
 # MidiEvent can be used to read, write and manipulate MIDI events.
 #
-# To create an event use Sequencer#event_input
+# To create an event you would normally use Sequencer#event_input but to
+# synthesize events MidiEvent::new can be used
   class MidiEvent
     include Driver, Comparable
 
@@ -104,15 +105,49 @@ module RRTS
     new Sequencer, AlsaMidiEvent_i
     new typesymbol [,...]
 =end
+
+# call-seq:  new(typeid [, params = nil]) -> MidiEvent
+#
+# This constructor should not be called directly, as this is an abstract class.
+#
+# Parameters:
+# [typeid] for internal use
+# [params] can be any of the following keys, plus a value
+#         [:value] the +value+ as interpreted by the class of event. For notes this
+#                  is the note.
+#         [:channel] in range 1..16
+#         [:duration] only for NoteEvent. Should be compatible with the timemode set
+#         [:velocity], in range 0..127
+#         [:off_velocity] speed with which the note was released
+#         [:source] the port that sent or will send the event
+#         [:sender] same as +source+
+#         [:dest] the port that will receive or received the event
+#         [:destination] same as +dest+
+#         [:sender_queue] the midi queue to use for sending, as opposed to +queue+
+#         [:tick] the time the event occured, or should occur
+#         [:time] same as +tick+. Use this name for realtime queues
+#         [:queue] as subject of this event (specific for QueueEvent.
+#         [:time_mode_tick]  boolean to set the timemode to ticks
+#         [:time_mode_real] set the timemode to realtime
+#         [:time_mode_relative] set the timemode relative (to the queuetime ?)
+#         [:time_mode_absolute] timestamps are absolute
+#         [:coarse] indicates that the value passed should be send as single 7 bit value
+#                   and the event should not be split automatically
+#         [:param] the parameter for ControllerEvent end the like. In that case +value+
+#                  is in fact the real parameter! And the value follows using :data_entry
+#                  messages
+#         [:track] Higher level ownership of the event
+#         [:direct] If true then there is no queueing, nor timing and the event is sent
+#                   immediately without buffering
     def initialize arg0, arg1 = nil
-      case arg1 when AlsaMidiEvent_i # input_event handling
-        @flags = DEFAULT_FLAGS
-        arg1.populate(arg0, self) # See alsa_midi++.cpp
+      @flags = DEFAULT_FLAGS
+      case arg1
+      when AlsaMidiEvent_i # input_event handling
+       arg1.populate(arg0, self) # See alsa_midi++.cpp
         #       puts "called populate, @type=#@type, type=#{type}"
       else # result of user construction
         @type = arg0 or raise RRTSError.new("illegal type man!!")
         # Don't use flags, as it seems rather costly using a hash here.
-        @flags = DEFAULT_FLAGS
         @channel = nil # OK
         @velocity = @value = @param = @source = @track = nil
         # @dest = @queue = nil  used???
@@ -275,18 +310,30 @@ module RRTS
     attr_accessor :time
     alias :tick :time
     alias :tick= :time=
-    # The source MidiPort
+
+    # The source MidiPort, also called the _sender_
     attr_accessor :source
-    # The destination MidiPort
-    attr_accessor :dest
-    # Track that stores this event (not neccesarily the source)
-    attr_accessor :track
     alias :sender :source
     alias :sender= :source=
 
-    # hash of bools.
-#     attr_accessor :flags  ILLEGAL
+    # The destination MidiPort
+    attr_accessor :dest
 
+    # Track that stores this event (not neccesarily the source)
+    attr_accessor :track
+
+    # test for a flag. If more than one is given, all must be set.
+    # the following keys are understood:
+    # [:time_mode_real], for +SND_SEQ_TIME_STAMP_REAL+
+    # [:time_real], for +SND_SEQ_TIME_STAMP_REAL+
+    # [:time_mode_ticks] for +SND_SEQ_TIME_STAMP_TICK+
+    # [:time_mode_tick] for +SND_SEQ_TIME_STAMP_TICK+
+    # [:time_tick] for +SND_SEQ_TIME_STAMP_TICK+
+    # [:time_ticks] preffered alias for +time_tick+
+    # [:time_mode_relative] for +SND_SEQ_TIME_MODE_REL+
+    # [:time_mode_absolute] for +SND_SEQ_TIME_MODE_ABS+
+    # [:time_relative] for +SND_SEQ_TIME_MODE_REL+
+    # [:time_absolute] for +SND_SEQ_TIME_MODE_ABS+
     def flag *keys
       for k in keys
         return false unless @flags[k]
@@ -294,6 +341,7 @@ module RRTS
       true
     end
 
+    # see MidiEvent#flag
     def set_flag hash
       @flags = @flags.dup if @flags.equal?(DEFAULT_FLAGS)
       for k, v in hash
@@ -304,34 +352,47 @@ module RRTS
 
     # the MidiQueue used for sending, if both queue and time are unset we use +direct+ events
     attr_accessor :sender_queue
+
     # receiver queue. id or MidiQueue
     attr :receiver_queue
+
     # notes and control events have a channel. We use the range 1..16
     # The channel can be set to an enumerable. This will make the
     # messages be sent to all the given channels
     attr_accessor :channel
+
     # notes have this
     attr_accessor :velocity
-    # for NoteEvent specific
+
+    # for NoteEvent (which is not a MIDI event) specific
     attr :off_velocity
+
     # for NoteEvent specific
     attr_accessor :duration
+
     # can be 'event' for result messages, but normally used for controls
     attr :param
+
     # value is a note or a control-value, a result-value, or a queue-value, also a sysex binary string
-    # normally integer
+    # normally it would be an integer
     # Can be ticks for queues, time for queues, or a [skew, skew_base] tuple
     # Can be a MidiPort for port message, and a MidiClient for client messages
     # It is legal to pass notenames as strings like 'C#5' or 'Bb3'. [A-Ga-g](#|b)?[0-9]
     # When retrieved they will be integers though.
     attr_accessor :value
+
     # queue: the queue (id or MidiQueue) of a queue control message
     attr_accessor :queue
+
     # these are MidiPorts for connection events
     attr :connnect_sender, :connect_dest
 
-    # two events are 'the same' if the time is the same. In other words
-    # if you sort them this will be on time.
+    # two events are 'the same' if the time and priority is the same. In other words
+    # if you sort them this will be on time. The priority depends on the class of MidiEvents
+    # a 'bank select' event and a 'note' event on the same time should be taken in that
+    # order, as it is obvious that we must change the voice first. See controller events
+    # have a lower priority index (indicating a *higher* priority). 0 is the highest
+    # priority
     def <=> other
 #       tag "<=>"
       d = @time <=> other.time
@@ -406,17 +467,17 @@ module RRTS
       FlagHelper.new(self)
     end
 
-    # midi status nibble
+    # the default midi status nibble
     def status
       0x0
     end
   end  # MidiEvent
 
   # a VoiceEvent has a channel (arg0), and also a value (arg1) (could be 'note')
+  # This is an abstract class.
   class VoiceEvent < MidiEvent
     private
-    # new Sequencer, event
-    # new type, channel, value, [,...]
+    # :call-seq: new(type, channel, value, [, params = nil]) -> VoiceEvent
     def initialize arg0, arg1 = nil, value = nil, params = nil
       case arg1 when AlsaMidiEvent_i then super(arg0, arg1)
       else
@@ -438,7 +499,10 @@ module RRTS
     # new(sequencer, event)
     # new(channel, note, velocity [,...])
 
-    # It is allowed to use strings like 'C4' or 'd5' or 'Eb6' for 'note' (arg1)
+    # Parameters:
+    # [channel] in range 1..16
+    # [note] 0..127 but it is allowed to use strings like 'C4' or 'd#5' or 'Eb6'
+    # [velocity] 0..127
     def initialize channel, note = nil, velocity = nil, params = nil
       case note when AlsaMidiEvent_i then super(channel, note)
       else
@@ -449,12 +513,14 @@ module RRTS
 
     public
 
+    # for debugging purposes mostly
     def to_s
       "NoteOnEvent[#@time] ch:#@channel, #@value, vel:#@velocity"
     end
 
     alias :note :value
 
+    # REALLY low
     def priority
       990
     end
@@ -467,9 +533,11 @@ module RRTS
   # Keypress or aftertouch event
   class KeypressEvent < NoteOnOffEvent
     private
-    # new sequencer, event
-    # new channel, note, pressure[,...]
-    # It is allowed to use strings like 'C4' or 'd5' or 'Eb6' for 'note' (arg1)
+
+    # Parameters:
+    # [channel] 1..16
+    # [note] 0..127 but it is allowed to use strings like 'C4' or 'd5' or 'Eb6'
+    # [velocity] 0..127
     def initialize channel, note = nil, velocity = nil, params = nil
       case note when AlsaMidiEvent_i then super(channel, note)
       else
@@ -498,10 +566,10 @@ module RRTS
   # noteoff event
   class NoteOffEvent < NoteOnOffEvent
     private
-    # new(sequencer, event)
-    # new(channel, note [,...])
 
-    # It is allowed to use strings like 'C4' or 'd5' or 'Eb6' for 'note' (arg1)
+    # Parameters:
+    # [channel] 1..16
+    # [note] 0..127 or a string like 'C4' or 'd5' or 'Eb6'
     def initialize channel, note = nil, params = nil
       @off_velocity = 0 # as default
       case note when AlsaMidiEvent_i then super(channel, note)
@@ -532,8 +600,15 @@ module RRTS
   # them is Chunk.
   class NoteEvent < NoteOnOffEvent
     private
-    # new(channel, note, velocity [, ...])
-    # It is allowed to use strings like 'C4' or 'd5' or 'Eb6' for 'note' (arg1)
+    # :call-seq: new(channel, note, velocity [, params - nil ]) -> NoteEvent
+    # +duration+ must be set using a named parameter. Same for +off_velocity+.
+    # Parameters:
+    # [channel] 1..16
+    # [note]  It is allowed to use strings like 'C4' or 'd5' or 'Eb6'
+    # [velocity] The 'on' velocity only
+    # [params] Normally you want to set:
+    #         [:duration] in time compatible with the input or output
+    #         [:off_velocity] by default this is set to 0 if missing
     def initialize arg0, arg1 = nil, velocity = nil, params = nil
       @off_velocity = 0
       case arg1 when AlsaMidiEvent_i then super(arg0, arg1)
@@ -559,8 +634,8 @@ module RRTS
     end
   end
 
-  # a controller event is basicly a large group of more specific events
-  # All having a parameter denoting the kind of event, and value where appropriate
+  # the controller event class represents in reality a large group of more specific events
+  # Each having a parameter denoting the kind of event, and value where appropriate
   # Currently all values are unsigned, but I may still change this (probably even)
   class ControllerEvent < VoiceEvent
 
@@ -583,40 +658,57 @@ module RRTS
 # if one of the _lsb params is used the controller will have a 7 bits value
 # In both cases only one event is sent.
 #
-#   'param' can be a symbol from:
-#     :bank_select (14 bits), or better 7+7
-#     :modulation_wheel (14)
-#     :breath_controller (14)
-#     :foot_pedal (14)
-#     :portamento_time (14)
-#     :data_entry (14)
-#     :volume (14)
-#     :balance (14)                  as in MONO, this just makes L or R stronger
-#     :pan_position(14)  POSITIVE    as in STEREO, this places the source elsewhere (virtually)
-#     :expression(14)
+# 'param' can be a symbol from:
+# - :bank_select (14 bits), or better 7+7
+# - :modulation_wheel (14)
+# - :breath_controller (14)
+# - :foot_pedal (14)
+# - :portamento_time (14)
+# - :data_entry (14)
+# - :volume (14)
+# - :balance (14)                  as in MONO, this just makes L or R stronger
+# - :pan(14)  POSITIVE    as in STEREO, this places the source elsewhere (virtually)
+# - :expression(14)
+# - :general_purpose 1 to 4
 #
-#   These are 1 bit:
-#     :hold_pedal, portamento, sustenuto, soft, legato
-#     :hold_2_pedal.
-#     Note that value 'ON' (bit 7) is used for this.
-#     IMPORTANT: passing '1' here does therefore not activate the control!
-#     But 'true' can be passed safely
+# or any from these, which are 1 bit (a boolean):
+# - :hold_pedal,
+# - :portamento,
+# - :sustenuto,
+# - :soft,
+# - :legato
+# - :hold_2_pedal.
+# Note that value 'ON' (bit 7) is used for this.
+# IMPORTANT: passing '1' here does therefore not activate the control!
+# But 'true' can be passed safely
 #
-#     These are unsigned 7 bits:
-#     :timbre, :release, :attack, :brightness,
-#     :effects_level, :tremulo_level/:tremulo, :chorus_level/:chorus,
-#     :celest_level/:celeste/:detune
-#     :phaser
+# and these are also valid params, all unsigned 7 bits:
+# - :timbre,
+# - :release,
+# - :attack,
+# - :brightness,
+# - :effects_level,
+# - :tremulo_level/:tremulo,
+# - :chorus_level/:chorus,
+# - :celest_level/:celeste/:detune
+# - :phaser
+# - :general_purpose 5 to 8 (??)
 #
-#     These are 0 bits:
-#     :all_controllers_off (single channel)
-#     :all_notes_off (nonlocal, except pedal)
-#     :all_sound_off/:panic (nonlocal)
-#     :omni_off, :omni_on, :mono, :poly
+# These are 0 bits:
+# - :all_controllers_off (single channel)
+# - :all_notes_off (nonlocal, except pedal)
+# - :all_sound_off/:panic (nonlocal)
+# - :omni_off,
+# - :omni_on,
+# - :mono,
+# - :poly
 #
-#     It is also possible to pass a tuple as 'value'.
-#     ControllerEvent.new channel, :bank_select, [1, 23]
-#     This would select bank 1*128+23.    BROKEN???
+# Finally it is possible that the paramnumber itself is a 14 bit unsigned int.
+# Use :nonreg_parm_num and :regist_parm_num for this. I believe 'registered' means
+# it is reserved by some company.
+# It is also possible to pass a tuple as 'value'.
+#   ControllerEvent.new channel, :bank_select, [1, 23]
+#   This would select bank 1*128+23.    BROKEN???
     def initialize channel, param = nil, value = 0, params = nil
       case param when AlsaMidiEvent_i
         super(channel, param)
@@ -678,10 +770,12 @@ module RRTS
     arg0 is a Sequencer, arg1 is a LOW LEVEL AlsaMidiEvent_i.
     new sequencer, event
 =end
-    # program can be a single value in range 0..127.
-    # Or it may be a tuple [bank_msb, progno]
-    # Or even [bank_msb, bank_lsb, progno]
-    # The last one will of course send 3 events when send.
+    # Parameters:
+    # [channel] 1..16
+    # [program] can be a single value in range 0..127.
+    #           Or it may be a tuple [bank_msb, progno]
+    #           Or even [bank_msb, bank_lsb, progno]
+    #           The last one will of course send 3 events when sent.
     def initialize channel, program = nil, params = nil
       case program when AlsaMidiEvent_i then super(channel, program)
       else
@@ -712,8 +806,10 @@ module RRTS
   # to bend the pitch (and who does not want to do that)
   class PitchbendEvent < VoiceEvent
     private
-#       Note that value is a 14 bits signed integer
-#       in the range -0x2000 to 0x2000
+# Parameters:
+# [channel] 1..16
+# [value] a 14 bits signed integer in the range -0x2000 to 0x2000 (FIXME)
+# [params] See MidiEvent::new
     def initialize channel, value = nil, params = nil
       case value when AlsaMidiEvent_i then super(channel, value)
       else
@@ -736,7 +832,7 @@ module RRTS
     private
     # new Sequencer, event
 
-    # new(channel, pressure [,...])
+    # call-seq: new(channel, pressure [,params = nil]) -> ChannelPressureEvent
     # Pressure should be in the range 0..127
     def initialize arg0, arg1 = nil, params = nil
       case arg1 when AlsaMidiEvent_i then super(arg0, arg1)
@@ -785,18 +881,23 @@ module RRTS
   0xF7  End of SysEx
 =end
 
+# a SystemExclusiveEvent is basicly an 'escape' event, which allows you to send
+# arbitraty binary data to a device.  There is hardly any standard for this.
   class SystemExclusiveEvent < MidiEvent
+
     # value to send to enable GM on a GM compatible device
     # After sending progchanges 0 to 127 have fixed voices, according to the GM specs
     # Bank should probably set to 0 but I think it is ignored
     ENABLE_GM = "\xf0\x7e\x7f\x09\x01\xf7".force_encoding('ascii-8bit')
+
     # value to send to disable GM on a GM enabled device
     DISABLE_GM = "\xf0\x7e\x7f\x09\x00\xf7".force_encoding('ascii-8bit')
 
     private
     # new Sequencer, event
 
-    # new(data [,...])
+    # Parameters:
+    # [data] binary blob
     def initialize data, params = nil
       case params when AlsaMidiEvent_i then super(data, params)
       else
@@ -816,10 +917,10 @@ module RRTS
 
   SysexEvent = SystemExclusiveEvent
 
+  # a QueueEvent is an event that changes the state of some queue
+  # This is abstract class
   class QueueEvent < MidiEvent
     private
-    # new Sequencer, event
-    # new type, queue, [,...]
     def initialize arg0, arg1 = nil, params = nil
       case arg1 when AlsaMidiEvent_i then super(arg0, arg1)
       else
@@ -829,6 +930,7 @@ module RRTS
     end
   end
 
+  # Send this event to start a queue. This is not a MIDI event, but an Alsa event.
   class StartEvent < QueueEvent
     private
     # create a new StartEvent
@@ -840,6 +942,7 @@ module RRTS
     end
   end
 
+  # request to stop/pause a queue
   class StopEvent < QueueEvent
     private
     def initialize queue, params = nil
@@ -850,6 +953,7 @@ module RRTS
     end
   end
 
+  # request to continue with the queue
   class ContinueEvent < QueueEvent
     private
     def initialize queue, params = nil
@@ -860,6 +964,7 @@ module RRTS
     end
   end
 
+  # represents a timing event, used for keeping in sync
   class ClockEvent < QueueEvent
     private
     def initialize queue, params = nil
@@ -870,6 +975,7 @@ module RRTS
     end
   end
 
+  # specificly a timing event. Each beat (quarter) is divided into 384 (192?) ticks.
   class TickEvent < QueueEvent
     private
     # new Sequencer, event
@@ -882,6 +988,7 @@ module RRTS
     end
   end
 
+  # change the current queue position with this event
   class SetposTickEvent < QueueEvent
     private
 =begin
@@ -902,6 +1009,7 @@ module RRTS
     alias :tick :value
   end
 
+  # same as SetposTickEvent, but for realtime queues
   class SetposTimeEvent < QueueEvent
     private
 =begin
@@ -922,6 +1030,7 @@ module RRTS
     alias :time :value
   end
 
+  # Queue sync event. Don't know what this is
   class SyncPosEvent < QueueEvent
     private
 =begin
@@ -952,12 +1061,13 @@ module RRTS
     arg0 is a Sequencer, arg1 is a LOW LEVEL AlsaMidiEvent_i.
     new sequencer, event
 =end
-    #  call-seq:
-    #     new(queue, tempo[, params])
-    # tempo is an integer indicating the nr of microseconds per beat
-    # or it can be a Tempo
-    # queue can be a MidiQueue or a queueid.
-    # if tempo is nil we use queue.tempo instead
+    # call-seq: new(queue, tempo[, params = nil]) -> TempoEvent
+    #
+    # Parameters:
+    # [queue]     can be a MidiQueue or a queueid.
+    # [tempo}     an integer indicating the nr of microseconds per beat
+    #             or it can be a Tempo
+    #             if +nil+ we use +queue.tempo+ instead
     def initialize queue, tempo = nil, params = nil
       if AlsaMidiEvent_i === tempo
         super(queue, tempo)
@@ -986,6 +1096,7 @@ module RRTS
     end
   end
 
+  # To skew the queue obviuously
   class QueueSkewEvent < QueueEvent
     private
 =begin
@@ -1006,6 +1117,7 @@ module RRTS
     alias :skew :value
   end
 
+  # Rather specific request to a machine
   class TuneRequestEvent < MidiEvent
     private
     # new Sequencer, AlsaMidiEvent_i
@@ -1018,6 +1130,8 @@ module RRTS
   end # TuneRequestEvent
 
   # TODO: these classes can be made on the fly.
+
+  # Request the device to reset itself (if supported)
   class ResetEvent < MidiEvent
     private
     def initialize params = nil, arg1 = nil
@@ -1027,6 +1141,7 @@ module RRTS
     end
   end # ResetEvent
 
+  # Can be used to check whether a connection is still alive
   class SensingEvent < MidiEvent
     private
     def initialize arg0 = nil, arg1 = nil
@@ -1036,6 +1151,7 @@ module RRTS
     end
   end # SensingEvent
 
+  # Can be send as a reply, for example to trigger something else
   class EchoEvent < MidiEvent
     private
     def initialize params = nil, arg1 = nil
@@ -1049,45 +1165,58 @@ module RRTS
   class ClientEvent < MidiEvent
   end
 
+  # Received when a client has joined in
   class ClientStartEvent < ClientEvent
   end
 
+  # Received when a client was removed
   class ClientExitEvent < ClientEvent
   end
 
+  # Received when parameters (but which?) on the client changes.
   class ClientChangeEvent < ClientEvent
   end
 
   class PortEvent < ClientEvent
   end
 
+  # Received when another client creates a port
   class PortStartEvent < PortEvent
   end
 
+  # Received when another client deletes a port
   class PortExitEvent < PortEvent
   end
 
+  # Received when portparameters change (?)
   class PortChangeEvent < PortEvent
   end
 
   class SubscriptionEvent < ClientEvent
   end
 
+  # Received when someone subscribes to a port
   class PortSubscribedEvent < SubscriptionEvent
   end
 
+  # Received when someone unsubscribes a port
   class PortUnsubscribedEvent < SubscriptionEvent
   end
 
+  # Free to use, with fixed room
   class UserEvent < MidiEvent
   end
 
+  # What's the difference between Bounce and Echo?
+  # Maybe to signal that an event is looping around in the system
   class BounceEvent < MidiEvent
   end
 
+  # Free to use, with variable room
   class VarUserEvent < MidiEvent
   end
 
+  # An event that says things about events
   class MetaEvent < MidiEvent
     private
     # can never be constructed through AlsaMidi since there is no such event
@@ -1106,9 +1235,11 @@ module RRTS
     end
   end
 
+  # This signals that no more events will follow
   class LastEvent < MetaEvent
   end
 
+  # This event can contain descriptional text
   class MetaTextEvent < MetaEvent
     private
     def initialize value, params = nil
@@ -1120,11 +1251,17 @@ module RRTS
   # see http://www.midi.org/techspecs/rp17.php
   # Can be used for Karaoke
   class LyricsEvent < MetaTextEvent; end
-  class ProgramNameEvent < MetaTextEvent; end
+
+  # free comments
   class CommentEvent < MetaTextEvent; end
+
+  # marker as placed by some program
   class MarkerEvent < MetaTextEvent; end
+
+  # cue point for syncing with movies and clips
   class CuePointEvent < MetaTextEvent; end
 
+  # used to store the name of a voice (like for programchanges)
   class ProgramNameEvent < MetaTextEvent
     private
     def initialize channel, value, params = {}
@@ -1133,9 +1270,10 @@ module RRTS
     end
   end
 
+  # Voicename would be a better name, but what's the difference?
   class VoiceNameEvent < ProgramNameEvent; end
 
-  # class for time signature changes
+  # class for time signature changes (like going from 3/4 to 4/4)
   class TimeSignatureEvent < MetaEvent
     private
     # Typically num/denom is 4/4 or 3/4 etc..
@@ -1153,6 +1291,7 @@ module RRTS
     end
   end # class TimeSignatureEvent
 
+  # signals the use of a specific key, like D sharp, or d minor
   class KeySignatureEvent < MetaEvent
     private
     # key can be :C or :'C#' etc
@@ -1175,9 +1314,12 @@ module RRTS
     end
   end
 
+  # abstract class. In fact it doesn't really belong here since it uses the
+  # RTTS::Node library
   class TrackEvent < MidiEvent
   end
 
+  # Signals the creation of trackdata
   class TrackCreateEvent < TrackEvent
     private
     def initialize
@@ -1189,6 +1331,7 @@ module RRTS
     alias :key :value
   end
 
+  # for Node internals.
   class ChunkCreateEvent < TrackEvent
     private
     def initialize params = nil

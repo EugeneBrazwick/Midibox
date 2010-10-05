@@ -15,8 +15,6 @@
 #include <alsa/asoundlib.h>
 #include <math.h> // floor
 
-//  DOC on all events + types http://alsa-project.org/alsa-doc/alsa-lib/group___seq_events.html
-
 VALUE alsaMidiEventClass;
 
 const char *
@@ -76,7 +74,8 @@ dump_event(snd_seq_event_t *ev, const char *file, int line)
   return result;
 }
 
-/* string inspect
+/** call-seq: inspect() -> string
+
 for debugging purposes
 */
 static VALUE
@@ -90,7 +89,8 @@ alsaMidiEventClass_inspect(VALUE v_ev)
   return r;
 }
 
-/* self clear
+/** call-seq: clear() -> self
+
 Initialize the event with all zeroes
 */
 static VALUE
@@ -105,9 +105,15 @@ wrap_snd_seq_ev_clear(VALUE v_ev)
   return v_ev;
 }
 
-/* self set_noteon(channel, key, velocity)
+/** call-seq: set_noteon(channel, key, velocity) -> self
+
 Make the event a NOTEON event. Note that NOTEON events with velocity == 0 yield
-as NOTEOFF events. Channels must be in range 0..15, keys and velocity in 0..127.
+as NOTEOFF events.
+
+Parameters:
+[channel] must be in range 0..15
+[key] 0..127
+[velocity] 0..127. 0 makes it a NOTEOFF instead.
 */
 static VALUE
 wrap_snd_seq_ev_set_noteon(VALUE v_ev, VALUE v_ch, VALUE v_key, VALUE v_vel)
@@ -121,8 +127,14 @@ wrap_snd_seq_ev_set_noteon(VALUE v_ev, VALUE v_ch, VALUE v_key, VALUE v_vel)
   return v_ev;
 }
 
-/* self set_noteoff(channel, key [, off_velocity])
-See #set_noteon.
+/** call-seq: set_noteoff(channel, key [, off_velocity = 0]) -> self
+
+See RTTS::Driver::AlsaMidiEvent_i#set_noteon.
+
+Parameters:
+[channel] in range 0..15
+[key] 0..127
+[off_velocity] 0..127, note that not all hardware/software supports this
 */
 static VALUE
 wrap_snd_seq_ev_set_noteoff(int argc, VALUE *argv, VALUE v_ev)
@@ -139,14 +151,22 @@ wrap_snd_seq_ev_set_noteoff(int argc, VALUE *argv, VALUE v_ev)
   return v_ev;
 }
 
-/* self set_note(channel, key, velocity, duration)
-Make it a note-event and set the 4 four parameters for such events. Note that NOTE
-is not NOTEON.
-See #set_noteon. Duration is given in ticks or milliseconds, depending on scheduling mode.
-See also #schedule_real and #schedule_tick.
+/** call-seq: set_note(channel, key, velocity, duration) -> self
 
-Note the NOTE events are not MIDI at all. Supposedly Alsa interprets these events when
-put in a queue, and internally schedules the NOTEON and NOTEOFF events.
+Make it a note-event and set the 4 four parameters for such events.
+
+Parameters:
+[channel] 0..15
+[key] 0..127
+[velocity] 1..127, 0 would be weird, but is valid too.
+[duration] in ticks or milliseconds, depending on the scheduling mode.
+
+*Note*: the NOTE events are *not* MIDI at all. Supposedly Alsa interprets these events when
+written into a queue, and internally schedules the NOTEON and NOTEOFF events.
+
+See RRTS::Driver::AlsaMidiEvent_i#set_noteon.
+See also RRTS::Driver::AlsaMidiEvent_i#schedule_real and  RRTS::Driver::AlsaMidiEvent_i#schedule_tick.
+
 */
 static VALUE
 wrap_snd_seq_ev_set_note(VALUE v_ev, VALUE v_ch, VALUE v_key, VALUE v_vel, VALUE v_dur)
@@ -160,8 +180,9 @@ wrap_snd_seq_ev_set_note(VALUE v_ev, VALUE v_ch, VALUE v_key, VALUE v_vel, VALUE
   return v_ev;
 }
 
-/* self set_keypress(channel, key, velocity)
-Make this event an AFTERTOUCH event (aka KEYPRESS). See #noteon for valid ranges.
+/** call-seq: set_keypress(channel, key, velocity) -> self
+
+Make this event an AFTERTOUCH event (aka KEYPRESS). See RRTS::Driver::AlsaMidiEvent_i#noteon for valid ranges.
 */
 static VALUE
 wrap_snd_seq_ev_set_keypress(VALUE v_ev, VALUE v_ch, VALUE v_key, VALUE v_vel)
@@ -175,9 +196,14 @@ wrap_snd_seq_ev_set_keypress(VALUE v_ev, VALUE v_ch, VALUE v_key, VALUE v_vel)
   return v_ev;
 }
 
-/* self set_pgmchange(channel, value)
-Make the event a PGMCHANGE event with gaven voice number. This event is normally preceded by
-a bank select event. Value should be in range 0..127.
+/** call-seq: set_pgmchange(channel, value) -> self
+
+Make the event a PGMCHANGE event with given voice number. This event is normally preceded by
+a bank select event.
+
+Parameters:
+[channel] should be in range 0..15
+[value] should be in range 0..127
 */
 static VALUE
 wrap_snd_seq_ev_set_pgmchange(VALUE v_ev, VALUE v_ch, VALUE v_val)
@@ -191,9 +217,13 @@ wrap_snd_seq_ev_set_pgmchange(VALUE v_ev, VALUE v_ch, VALUE v_val)
   return v_ev;
 }
 
-/* self set_pitchbend(channel, value)
-Make the event a PITCHBEND event, value should be in the range -0x2000..+0x1FFF
-(-8192..8191).
+/** call-seq: set_pitchbend(channel, value) -> self
+
+Make the event a PITCHBEND event
+
+Parameters:
+[channel] in range 0..15
+[value] should be in the range -0x2000..+0x1FFF (-8192..8191).
 */
 static VALUE
 wrap_snd_seq_ev_set_pitchbend(VALUE v_ev, VALUE v_ch, VALUE v_val)
@@ -207,8 +237,13 @@ wrap_snd_seq_ev_set_pitchbend(VALUE v_ev, VALUE v_ch, VALUE v_val)
   return v_ev;
 }
 
-/* self set_chanpress(channel, value)
-Make the event a CHANPRESS (aftertouch on all playing notes). Value is in range 0..127
+/** call-seq: set_chanpress(channel, value) -> self
+
+Make the event a CHANPRESS (aftertouch on all playing notes).
+
+Parameters:
+[channel] 0..15
+[value] must be in range 0..127
 */
 static VALUE
 wrap_snd_seq_ev_set_chanpress(VALUE v_ev, VALUE v_ch, VALUE v_val)
@@ -222,10 +257,14 @@ wrap_snd_seq_ev_set_chanpress(VALUE v_ev, VALUE v_ch, VALUE v_val)
   return v_ev;
 }
 
-/* sysex=(data)
+/** call-seq: sysex = data
+
 Make the event a sysex. The buffer given is copied internally somewhere. It should be
 investigated how solid this is.
-This is probably the same as #set_variable
+This is probably the same as set_variable?
+
+Parameters:
+[data] your average binary blob (say a ruby string, encoding ascii-8bits)
 */
 static VALUE
 wrap_snd_seq_ev_set_sysex(VALUE v_ev, VALUE v_data)
@@ -240,10 +279,17 @@ wrap_snd_seq_ev_set_sysex(VALUE v_ev, VALUE v_data)
   return Qnil;
 }
 
-/* self set_controller(channel, param, value)
-Make it a CONTROLLER event. param and value are in range 0..127
-Note that some controller events have a MSB and LSB counterpart so that the effective
-range becomes 0..16383.
+/** call-seq: set_controller(channel, param, value) -> self
+
+Make it a CONTROLLER event.
+
+Parameters:
+[channel] 0..15
+[param] 0..127
+[value] also in range 0..127
+
+Note that some controller paramaters have a MSB and LSB counterpart so that the effective
+range becomes 0..16383, by sending two events (one for each param-component)
 */
 static VALUE
 wrap_snd_seq_ev_set_controller(VALUE v_ev, VALUE v_ch, VALUE v_cc, VALUE v_val)
@@ -257,10 +303,11 @@ wrap_snd_seq_ev_set_controller(VALUE v_ev, VALUE v_ch, VALUE v_cc, VALUE v_val)
   return v_ev;
 }
 
-/* self set_subs
+/** call-seq set_subs() -> self
+
 sets the destination to 'SUBSCRIBERS:UNKNOWN', a special client+port
 This causes the event to be broadcast to all subscribers of the connection.
-For MidiEvent you can also say event.dest = sequencer.subscribers_unknown_port
+For RRTS::MidiEvent you can also say event.dest = sequencer.subscribers_unknown_port
 which makes it more understandable
 */
 static VALUE
@@ -275,10 +322,14 @@ wrap_snd_seq_ev_set_subs(VALUE v_ev)
   return v_ev;
 }
 
-/*  call-seq:
-      schedule_tick(queue, relative?, tick) -> self
+/**  call-seq: schedule_tick(queue, relative?, tick) -> self
 
-Sets the queue and the specified eventtime in the event. Queue can be an integer or MidiQueue
+Sets the queue and the specified eventtime in the event.
+
+Parameters:
+[queue] can be an integer or an RRTS::MidiQueue
+[relative?] true if +tick+ should be considered relative (to what? perhaps the current queuetime?)
+[tick] time in ticks
 */
 static VALUE
 wrap_snd_seq_ev_schedule_tick(VALUE v_ev, VALUE v_qid, VALUE v_relative, VALUE v_tick)
@@ -293,8 +344,14 @@ wrap_snd_seq_ev_schedule_tick(VALUE v_ev, VALUE v_qid, VALUE v_relative, VALUE v
   return v_ev;
 }
 
-/* self schedule_real qid, relative, timetuple
-Sets the queue and realtime for the event. The subscription must support this.
+/** call-seq: schedule_real(qid, relative?, timetuple) -> self
+
+Sets the queue and realtime for the event. The subscription must support realtime events for this.
+
+Parameters:
+[queue] can be an integer or an RRTS::MidiQueue
+[relative?] true if +timetuple+ should be considered relative (to what? perhaps the current queuetime?)
+[timetuple] time as [seconds, nanoseconds] or a float
 */
 static VALUE
 wrap_snd_seq_ev_schedule_real(VALUE v_ev, VALUE v_qid, VALUE v_relative, VALUE v_time)
@@ -324,22 +381,6 @@ wrap_snd_seq_ev_schedule_real(VALUE v_ev, VALUE v_qid, VALUE v_relative, VALUE v
   return v_ev;
 }
 
-/* :rdoc:
-the following type checking methods exist:
-  bool note_type?
-  bool result_type?
-  bool control_type?
-  bool channel_type?
-  bool message_type?
-  bool subscribe_type?
-  bool sample_type?
-  bool user_type?
-  bool instr_type?
-  bool fixed_type?
-  bool variable_type?
-  bool varusr_type?
-See alsa documentation, but that won't help you.
-*/
 #define IS_TYPE_EXPANSIONS \
 IS_TYPE_EXPANSION(result) \
 IS_TYPE_EXPANSION(note) \
@@ -448,20 +489,6 @@ return INT2BOOL(snd_seq_ev_is_##nam##_type(ev)); \
 IS_TYPE_EXPANSIONS
 #undef IS_TYPE_EXPANSION
 
-/* :rdoc:
-
-The following methods exist:
-   bool abstime?   , is the time absolute
-   bool reltime?   , or relative
-   bool direct?    , bypass buffers when sending
-   bool reserved?  , stay off
-   bool prior?     , is it a high-priority event
-   bool fixed?     , message has fixed size
-   bool variable?  , or variable
-   bool tick?      , times are set in ticks (1 bar = 384 ticks)
-   bool real?      , times are set in nanoseconds
-*/
-
 #define EV_IS_EXPANSIONS \
 EV_IS_EXPANSION(abstime) \
 EV_IS_EXPANSION(reltime) \
@@ -485,8 +512,9 @@ return INT2BOOL(snd_seq_ev_is_##nam(ev)); \
 EV_IS_EXPANSIONS
 #undef EV_IS_EXPANSION
 
-/* bool type_check(to_check)
-+to_check+ must be one off SND_SEQ_EVFLG_RESULT..SND_SEQ_EVFLG_VARUSR.
+/** call-seq: type_check(to_check) -> self
+
++to_check+ must be one off +SND_SEQ_EVFLG_RESULT+..+SND_SEQ_EVFLG_VARUSR+.
 Flags cannot be combined using '|'.
 */
 static VALUE
@@ -499,14 +527,14 @@ wrap_snd_seq_type_check(VALUE v_ev, VALUE v_x)
   return INT2BOOL(snd_seq_type_check(ev, x));
 }
 
-/* int length
+/** call-seq: length() -> int
+
 calculates the (encoded) byte-stream size of the event
 
-Returns:
-the size of decoded bytes, ie. the number of bytes (including message formatting)
+Returns: the size of decoded bytes, ie. the number of bytes (including message formatting)
 required in the buffer to send the event.
 
-This is not the same as #len.
+This is not the same as RRTS::Driver::AlsaMidiEvent_i#len.
 */
 static VALUE
 wrap_snd_seq_event_length(VALUE v_ev)
@@ -517,9 +545,9 @@ wrap_snd_seq_event_length(VALUE v_ev)
   return INT2NUM(snd_seq_event_length(ev));
 }
 
-/* int note
+/** call-seq: note() -> int
 
-Returns the note. If this is not a note-message it returns nil instead.
+Returns: the note. If this is not a note-message it returns nil instead.
 */
 static VALUE
 alsaMidiEventClass_note(VALUE v_ev)
@@ -530,7 +558,7 @@ alsaMidiEventClass_note(VALUE v_ev)
   return UINT2NUM(ev->data.note.note);
 }
 
-/* note=(value)
+/** call-seq: note = value
 
 Alter the note value. Consider using set_note/on/off instead.
 */
@@ -543,7 +571,8 @@ alsaMidiEventClass_set_note(VALUE v_ev, VALUE v_val)
   return Qnil;
 }
 
-/* velocity=(value)
+/** call-seq: velocity = value
+
 Alter the velocity value. Consider using set_note/on/off instead.
 */
 static VALUE
@@ -555,7 +584,8 @@ alsaMidiEventClass_set_velocity(VALUE v_ev, VALUE v_val)
   return Qnil;
 }
 
-/* off_velocity=(value)
+/** call-seq: off_velocity = value
+
 Specific for NoteOff and Note events
 */
 static VALUE
@@ -567,7 +597,8 @@ alsaMidiEventClass_set_off_velocity(VALUE v_ev, VALUE v_val)
   return Qnil;
 }
 
-/* duration=(value)
+/** call-seq: duration = value
+
 Set the duration in ticks or milliseconds, depending on the scheduling mode
 */
 static VALUE
@@ -579,7 +610,8 @@ alsaMidiEventClass_set_duration(VALUE v_ev, VALUE v_val)
   return Qnil;
 }
 
-/* int channel
+/** call-seq: channel() -> int
+
 Valid for both note- and controlmessages
 */
 static VALUE
@@ -595,7 +627,8 @@ alsaMidiEventClass_channel(VALUE v_ev)
   return Qnil;
 }
 
-/* channel=(channel)
+/** call-seq: channel = value
+
 Valid for both note- and controlmessages, provided the type is set properly first!
 */
 static VALUE
@@ -612,7 +645,8 @@ alsaMidiEventClass_set_channel(VALUE v_ev, VALUE v_ch)
   return Qnil;
 }
 
-/* int queue
+/** call-seq: queue() -> int
+
 Returns the queue id, as set.
 */
 static VALUE
@@ -623,8 +657,10 @@ alsaMidiEventClass_queue(VALUE v_ev)
   return INT2NUM(ev->queue);
 }
 
-/* queue=(queue)
-+queue+ can be an integer or a MidiQueue instance
+/** call-seq: queue = qid
+
+Parameters:
+[qid] can be an integer or an RRTS::MidiQueue instance
 */
 static VALUE
 alsaMidiEventClass_set_queue(VALUE v_ev, VALUE v_queue)
@@ -636,7 +672,8 @@ alsaMidiEventClass_set_queue(VALUE v_ev, VALUE v_queue)
   return Qnil;
 }
 
-/* int queue_queue
+/** call-seq: queue_queue() -> int
+
 Returns the queueid for a queue-event (not the senderqueue)
 */
 static VALUE
@@ -647,9 +684,11 @@ alsaMidiEventClass_queue_queue(VALUE v_ev)
   return UINT2NUM(ev->data.queue.queue);
 }
 
-/* queue_queue=(queue)
-+queue+ can be an integer or a MidiQueue. This sets the subject of a queue-event,
-not the senderqueue.
+/** call-seq: queue_queue = qid
+
+Parameters:
+[qid] can be an integer or an RRTS::MidiQueue. This sets the subject of a queue-event,
+      not the senderqueue.
 */
 static VALUE
 alsaMidiEventClass_set_queue_queue(VALUE v_ev, VALUE v_queue)
@@ -661,8 +700,9 @@ alsaMidiEventClass_set_queue_queue(VALUE v_ev, VALUE v_queue)
   return Qnil;
 }
 
-/* int flags
-Returns the flags set.
+/** call-seq: flags() -> Int
+
+Returns: the flags set.
 */
 static VALUE
 alsaMidiEventClass_flags(VALUE v_ev)
@@ -672,7 +712,8 @@ alsaMidiEventClass_flags(VALUE v_ev)
   return UINT2NUM(ev->flags);
 }
 
-/* flags=(int)
+/** call-seq: flags = int
+
 Alter the Alsa flags for the event
 */
 static VALUE
@@ -684,7 +725,8 @@ alsaMidiEventClass_set_flags(VALUE v_ev, VALUE v_flags)
   return Qnil;
 }
 
-/* int param
+/** call-seq: param() -> int
+
 Returns the controller param, or nil if this is not a controller event
 */
 static VALUE
@@ -696,8 +738,9 @@ alsaMidiEventClass_param(VALUE v_ev)
   return UINT2NUM(ev->data.control.param);
 }
 
-/* param=(value)
-Changed the controller param
+/** call-seq: param = value
+
+Changes the controller param
 */
 static VALUE
 alsaMidiEventClass_set_param(VALUE v_ev, VALUE v_val)
@@ -708,7 +751,8 @@ alsaMidiEventClass_set_param(VALUE v_ev, VALUE v_val)
   return Qnil;
 }
 
-/* int value
+/** call-seq: value() -> int
+
 Returns the controller value, or nil, if this is not a controller event
 */
 static VALUE
@@ -720,7 +764,8 @@ alsaMidiEventClass_value(VALUE v_ev)
   return INT2NUM(ev->data.control.value);
 }
 
-/* value=(value)
+/** call-seq: value = aValue
+
 Alters the controller value
 */
 static VALUE
@@ -732,7 +777,8 @@ alsaMidiEventClass_set_value(VALUE v_ev, VALUE v_val)
   return Qnil;
 }
 
-/* string sysex
+/** call-seq: sysex() -> string
+
 Returns the sysex value as a bytesstring (encoding ascii-8bits).
 Returns nil if the event is not of the _variable_ type, which hopefully
 is the same a 'sysex'.
@@ -747,7 +793,8 @@ alsaMidiEventClass_sysex(VALUE v_ev)
   return rb_str_new((const char *)ev->data.ext.ptr, len);
 }
 
-/* int velocity
+/** call-seq: velocity() ->
+
 Returns the velocity, or nil if this is not a note type event
 */
 static VALUE
@@ -759,8 +806,9 @@ alsaMidiEventClass_velocity(VALUE v_ev)
   return INT2NUM(ev->data.note.velocity);
 }
 
-/* int type
-Returns the alsa type of the event. Will be one of the SND_SEQ_EVENT_... constants
+/** call-seq: type() -> int
+
+Returns the alsa type of the event. Will be one of the +SND_SEQ_EVENT_+... constants
 */
 static VALUE
 alsaMidiEventClass_type(VALUE v_ev)
@@ -770,8 +818,9 @@ alsaMidiEventClass_type(VALUE v_ev)
   return INT2NUM(ev->type);
 }
 
-/* type=(value)
-Alters the type of the event
+/** call-seq: type = value
+
+Alters the type of the event.
 */
 static VALUE
 alsaMidiEventClass_set_type(VALUE v_ev, VALUE v_tp)
@@ -782,7 +831,7 @@ alsaMidiEventClass_set_type(VALUE v_ev, VALUE v_tp)
   return Qnil;
 }
 
-/* int len
+/** call-seq: len() -> int
 
 Better use sysex.length.
 Also do not confuse with length.
@@ -797,7 +846,8 @@ alsaMidiEventClass_len(VALUE v_ev)
   return UINT2NUM(ev->data.ext.len);
 }
 
-/* int off_velocity
+/** call-seq: off_velocity() -> int
+
 Returns the off_velocity for NOTE and NOTEOFF. Returns nil if not a note-event
 */
 static VALUE
@@ -809,8 +859,9 @@ alsaMidiEventClass_off_velocity(VALUE v_ev)
   return INT2NUM(ev->data.note.off_velocity);
 }
 
-/* int duration
-For none note-events returns nil.
+/** call-seq: duration() -> int
+
+For none note-events (the Alsa NOTE eventtype) returns nil.
 */
 static VALUE
 alsaMidiEventClass_duration(VALUE v_ev)
@@ -821,7 +872,7 @@ alsaMidiEventClass_duration(VALUE v_ev)
   return INT2NUM(ev->data.note.duration);
 }
 
-/* client, port dest
+/** call-seq: dest() -> [client, port]
 Returns a tuple of two integers
 */
 static VALUE
@@ -832,7 +883,8 @@ alsaMidiEventClass_dest(VALUE v_ev)
   return rb_ary_new3(2, INT2NUM(ev->dest.client), INT2NUM(ev->dest.port));
 }
 
-/* int dest_port
+/** call-seq: dest_port() -> int
+
 Returns the destination portid
 */
 static VALUE
@@ -843,7 +895,8 @@ alsaMidiEventClass_dest_port(VALUE v_ev)
   return INT2NUM(ev->dest.port);
 }
 
-/* int dest_client
+/** call-seq: dest_client() -> int
+
 Returns the destinations clientid
 */
 static VALUE
@@ -854,7 +907,8 @@ alsaMidiEventClass_dest_client(VALUE v_ev)
   return INT2NUM(ev->dest.client);
 }
 
-/* client, port source
+/** call-seq: source() -> [client, port]
+
 Returns the source as a tuple clientid + portid
 */
 static VALUE
@@ -865,8 +919,9 @@ alsaMidiEventClass_source(VALUE v_ev)
   return rb_ary_new3(2, INT2NUM(ev->source.client), INT2NUM(ev->source.port));
 }
 
-/* int source_port
-See also #source
+/** call-seq: source_port() -> int
+
+See also RRTS::Driver::AlsaMidiEvent_i#source
 */
 static VALUE
 alsaMidiEventClass_source_port(VALUE v_ev)
@@ -876,8 +931,9 @@ alsaMidiEventClass_source_port(VALUE v_ev)
   return INT2NUM(ev->source.port);
 }
 
-/* int source_client
-See also #source
+/** call-seq: source_client() -> int
+
+See also RRTS::Driver::AlsaMidiEvent_i#source
 */
 static VALUE
 alsaMidiEventClass_source_client(VALUE v_ev)
@@ -887,10 +943,11 @@ alsaMidiEventClass_source_client(VALUE v_ev)
   return INT2NUM(ev->source.client);
 }
 
-/* source=(address_specification)
+/** call-seq: source = address_specification
 
  IMPORTANT: this differs from the alsa API which suffers from a naming inconsistency.
- You must pass a tuple clientid, portid or a MidiClient, portid tuple, or a single MidiPort instance.
+ You must pass a tuple clientid, portid or a RRTS::MidiClient, portid tuple, or a single RRTS::MidiPort instance.
+
  Examples:
      event.source = 20, 1
      event.source = [20, 1]
@@ -908,8 +965,10 @@ alsaMidiEventClass_set_source(int argc, VALUE *argv, VALUE v_ev)
   return Qnil;
 }
 
-/* source_client=(client)
-The +client+ can be an integer (clientid) or a MidiClient instance
+/** call-seq: source_client = client
+
+Parameters:
+[client] can be an integer (clientid) or an RRTS::MidiClient instance
 */
 static VALUE
 alsaMidiEventClass_set_source_client(VALUE v_ev, VALUE v_clientid)
@@ -920,8 +979,9 @@ alsaMidiEventClass_set_source_client(VALUE v_ev, VALUE v_clientid)
   return Qnil;
 }
 
-/* source_port=(port)
-This sets the port part of the source. This would be weird.
+/** call-seq: source_port = port
+
+This sets the port part of the source.
 */
 static VALUE
 alsaMidiEventClass_set_source_port(VALUE v_ev, VALUE v_portid)
@@ -933,8 +993,9 @@ alsaMidiEventClass_set_source_port(VALUE v_ev, VALUE v_portid)
   return Qnil;
 }
 
-/* skewvalue, base queue_skew
-Returns the queue skew as a tuple value + base
+/** call-seq: queue_skew() -> [skewvalue, base]
+
+Returns: the queue skew as a tuple value + base
 I have no idea what a queue skew is at this point. See Alsa docs (but they won't tell you)
 */
 static VALUE
@@ -945,8 +1006,9 @@ alsaMidiEventClass_queue_skew(VALUE v_ev)
   return rb_ary_new3(2, UINT2NUM(ev->data.queue.param.skew.value), UINT2NUM(ev->data.queue.param.skew.base));
 }
 
-/* queue_skew=(value, base)
-You can also pass a tuple, as returned by #queue_skew for instance.
+/** call-seq: queue_skew = [value, base]
+
+You can also pass a splat.
 */
 static VALUE
 alsaMidiEventClass_set_queue_skew(int argc, VALUE *argv, VALUE v_ev)
@@ -967,9 +1029,10 @@ alsaMidiEventClass_set_queue_skew(int argc, VALUE *argv, VALUE v_ev)
   return Qnil;
 }
 
-/* time=(time_specification)
-If time is given as a single integer, it is ticks. Otherwise it must be two arguments
-or a tuple, namely the seconds, and then the nanoseconds.
+/** call-seq: time = time_specification
+
+If time is given as a single integer, it is ticks, if it is a float, than it is in seconds.
+Otherwise it must be a splat or a tuple, namely the seconds, and then the nanoseconds.
 
 This does not change the scheduling mode. It just fills the time data structure.
 */
@@ -1005,8 +1068,9 @@ alsaMidiEventClass_set_time(int argc, VALUE *argv, VALUE v_ev)
   return Qnil;
 }
 
-/* float time_real
-Returns a realtime tuple: seconds + nanoseconds
+/** call-seq: time_real() -> float
+
+Returns realtime in seconds
 */
 static VALUE
 alsaMidiEventClass_time_real(VALUE v_ev)
@@ -1016,11 +1080,9 @@ alsaMidiEventClass_time_real(VALUE v_ev)
   return DBL2NUM(double(ev->time.time.tv_sec) + 1000000000.0 * ev->time.time.tv_nsec);
 }
 
-/* call-seq:
-    time_real=(sec, nsec)
-    time_real=float
+/** call-seq: time_real = timespecification
 
-See #time=
+See RRTS::Driver::AlsaMidiEvent_i#time=
 */
 static VALUE
 alsaMidiEventClass_set_time_real(int argc, VALUE *argv, VALUE v_ev)
@@ -1049,9 +1111,10 @@ alsaMidiEventClass_set_time_real(int argc, VALUE *argv, VALUE v_ev)
   return Qnil;
 }
 
-/* queue_time=(time_specification)
-See also #time=, this works the same but for the timespecification within the queue-control
-event
+/** call-seq: queue_time = time_specification
+
+See also RRTS::Driver::AlsaMidiEvent_i#time=, this works the same but for the
+timespecification within the queue-control event
 */
 static VALUE
 alsaMidiEventClass_set_queue_time(int argc, VALUE *argv, VALUE v_ev)
@@ -1085,8 +1148,8 @@ alsaMidiEventClass_set_queue_time(int argc, VALUE *argv, VALUE v_ev)
   return Qnil;
 }
 
-/* call-seq:
-    float queue_time_real
+/** call-seq: queue_time_real() -> float
+
 Returns the set realtime for a queue-control event
 */
 static VALUE
@@ -1098,11 +1161,10 @@ alsaMidiEventClass_queue_time_real(VALUE v_ev)
                  + 1000000000.0 * ev->data.queue.param.time.time.tv_nsec);
 }
 
-/* call-seq:
-    queue_time_real=(sec, nsec)
-    queue_time_real = float
+/** call-seq: queue_time_real = timespecification
 
-Works in the same way as #time_real=, see also #queue_time=
+Works in the same way as RRTS::Driver::AlsaMidiEvent_i#time_real=,
+see also RRTS::Driver::AlsaMidiEvent_i#queue_time=
 */
 static VALUE
 alsaMidiEventClass_set_queue_time_real(int argc, VALUE *argv, VALUE v_ev)
@@ -1131,8 +1193,9 @@ alsaMidiEventClass_set_queue_time_real(int argc, VALUE *argv, VALUE v_ev)
   return Qnil;
 }
 
-/* dest=(address)
-Sets the destination in the same way as #source= does
+/** call-seq: dest = address
+
+Sets the destination in the same way as RRTS::Driver::AlsaMidiEvent_i#source= does
 */
 static VALUE
 alsaMidiEventClass_set_dest(int argc, VALUE *argv, VALUE v_ev)
@@ -1145,8 +1208,9 @@ alsaMidiEventClass_set_dest(int argc, VALUE *argv, VALUE v_ev)
   return Qnil;
 }
 
-/* dest_client=(client)
-See #dest=
+/** call-seq: dest_client = client
+
+See RRTS::Driver::AlsaMidiEvent_i#dest=
 */
 static VALUE
 alsaMidiEventClass_set_dest_client(VALUE v_ev, VALUE v_clientid)
@@ -1157,8 +1221,9 @@ alsaMidiEventClass_set_dest_client(VALUE v_ev, VALUE v_clientid)
   return Qnil;
 }
 
-/* dest_port=(port)
-See #dest=
+/** call-seq: dest_port = port
+
+See RRTS::Driver::AlsaMidiEvent_i#dest=
 */
 static VALUE
 alsaMidiEventClass_set_dest_port(VALUE v_ev, VALUE v_portid)
@@ -1169,10 +1234,9 @@ alsaMidiEventClass_set_dest_port(VALUE v_ev, VALUE v_portid)
   return Qnil;
 }
 
-/* call-seq:
-    time -> float
-    time -> int
-Returns either the realtime (as a float, or the ticks)
+/** call-seq: time() -> float|int
+
+Returns: either the realtime (as a float, or the ticks)
 */
 static VALUE
 alsaMidiEventClass_time(VALUE v_ev)
@@ -1186,8 +1250,9 @@ alsaMidiEventClass_time(VALUE v_ev)
               : UINT2NUM(t.tick);
 }
 
-/* int time_tick
-See also #time. If the event is a realtime event it will return nil.
+/** call-seq: time_tick() -> int
+
+See also RRTS::Driver::AlsaMidiEvent_i#time. If the event is a realtime event it will return nil.
 */
 static VALUE
 alsaMidiEventClass_time_tick(VALUE v_ev)
@@ -1198,7 +1263,8 @@ alsaMidiEventClass_time_tick(VALUE v_ev)
   return UINT2NUM(ev->time.tick);
 }
 
-/* time_tick=(value)
+/** call-seq: time_tick = value
+
 Sets the time in ticks, but does not change the timemode of the event
 */
 static VALUE
@@ -1210,8 +1276,9 @@ alsaMidiEventClass_set_time_tick(VALUE v_ev, VALUE v_val)
   return Qnil;
 }
 
-/* int queue_value
-Note that #value only works for CONTROLLER events. This method returns the
+/** call-seq: queue_value() -> int
+
+Note that RRTS::Driver::AlsaMidiEvent_i#value only works for CONTROLLER events. This method returns the
 value of a queue parameter of a queue-control-event
 */
 static VALUE
@@ -1222,7 +1289,8 @@ alsaMidiEventClass_queue_value(VALUE v_ev)
   return INT2NUM(ev->data.queue.param.value);
 }
 
-/* queue_value=(value)
+/** call-seq: queue_value = value
+
 Sets the value of a queue-control parameter
 */
 static VALUE
@@ -1234,9 +1302,8 @@ alsaMidiEventClass_set_queue_value(VALUE v_ev, VALUE v_val)
   return Qnil;
 }
 
-/* call-seq:
-      queue_time -> float
-      queue_time -> int
+/** call-seq: queue_time() -> float|int
+
 snd_seq_ev_is_real is used to decide whether ticks are returned or
 a realtime (as a float)
 */
@@ -1251,8 +1318,8 @@ alsaMidiEventClass_queue_time(VALUE v_ev)
               : UINT2NUM(t.tick);
 }
 
-/* call-seq:
-    queue_time_tick -> int
+/** call-seq: queue_time_tick() -> int
+
 Returns the queue time in ticks for a queue-control-message.
 If the event was realtime it returns nil instead
 */
@@ -1265,9 +1332,9 @@ alsaMidiEventClass_queue_time_tick(VALUE v_ev)
   return UINT2NUM(ev->data.queue.param.time.tick);
 }
 
-/* call-seq:
-      queue_time_tick= int
-See #queue_time=
+/** call-seq: queue_time_tick = int
+
+See RRTS::Driver::AlsaMidiEvent_i#queue_time=
 */
 static VALUE
 alsaMidiEventClass_set_queue_time_tick(VALUE v_ev, VALUE v_val)
@@ -1278,8 +1345,8 @@ alsaMidiEventClass_set_queue_time_tick(VALUE v_ev, VALUE v_val)
   return Qnil;
 }
 
-/* call-seq:
-      queue_position -> int
+/** call-seq: queue_position() -> int
+
 Returns the position parameter for a queue-control message
 */
 static VALUE
@@ -1290,8 +1357,8 @@ alsaMidiEventClass_queue_position(VALUE v_ev)
   return UINT2NUM(ev->data.queue.param.position);
 }
 
-/* call-seq:
-    queue_position= int
+/** call-seq: queue_position = int
+
 Alter the position. Do not confuse with queue_pos.
 What is this anyway?
 */
@@ -1304,9 +1371,12 @@ alsaMidiEventClass_set_queue_position(VALUE v_ev, VALUE v_val)
   return Qnil;
 }
 
-/* tag=(value)
-Tag can be in range of 0..255. I believe this can be used by the user to mark
+/** call-seq: tag = value
+
+Tag can be in range of 0..255. This can be used by the user to mark
 specific events, so they can be removed using the tagvalue.
+
+See the RRTS::Driver::AlsaRemoveEvents_i class
 */
 static VALUE
 wrap_snd_seq_ev_set_tag(VALUE v_ev, VALUE v_tag)
@@ -1317,8 +1387,10 @@ wrap_snd_seq_ev_set_tag(VALUE v_ev, VALUE v_tag)
   return Qnil;
 }
 
-/* self set_broadcast
-Specify that the event must be broadcast to ALL clients on the system
+/** call-seq: set_broadcast() -> self
+
+Specify that the event must be broadcast to ALL clients on the system. This simply sets
+destination to a 'hack' value.
 */
 static VALUE
 wrap_snd_seq_ev_set_broadcast(VALUE v_ev)
@@ -1329,10 +1401,11 @@ wrap_snd_seq_ev_set_broadcast(VALUE v_ev)
   return v_ev;
 }
 
-/* self set_direct
+/** call-seq: set_direct() -> self
+
 Specify that the event does not use a queue and is send immediately.
-If neither a schedule is perfomed, and 'direct' is not set, then the event
-is still buffered and will only be send on a flush
+If neither a schedule is performed, and 'direct' is not set, then the event
+will be buffered and will only be send on a flush
 */
 static VALUE
 wrap_snd_seq_ev_set_direct(VALUE v_ev)
@@ -1343,7 +1416,8 @@ wrap_snd_seq_ev_set_direct(VALUE v_ev)
   return v_ev;
 }
 
-/* priority=(bool)
+/** call-seq: priority = bool
+
 specify that the event has a high priority (true) or normal (false)
 */
 static VALUE
@@ -1355,7 +1429,8 @@ wrap_snd_seq_ev_set_priority(VALUE v_ev, VALUE v_prio)
   return Qnil;
 }
 
-/* self set_fixed
+/** call-seq: set_fixed -> self
+
 specify that the event has a fixed length
 */
 static VALUE
@@ -1367,7 +1442,8 @@ wrap_snd_seq_ev_set_fixed(VALUE v_ev)
   return v_ev;
 }
 
-/* self set_variable(data)
+/** call-seq: set_variable(data) -> self
+
 Set variable data, making it a sysex. Probably the same as #sysex=
 */
 static VALUE
@@ -1380,7 +1456,8 @@ wrap_snd_seq_ev_set_variable(VALUE v_ev, VALUE v_data)
   return v_ev;
 }
 
-/* self set_varusr(data)
+/** call-seq: set_varusr(data) -> self
+
 set a varusr event's data, making it a VARUSR event
 */
 static VALUE
@@ -1393,7 +1470,8 @@ wrap_snd_seq_ev_set_varusr(VALUE v_ev, VALUE v_data)
   return v_ev;
 }
 
-/* self set_queue_control(type, queue, value)
+/** call-seq: set_queue_control(type, queue, value) -> self
+
 Utility 'macro' for the other queue_control macro's
 */
 static VALUE
@@ -1405,7 +1483,8 @@ wrap_snd_seq_ev_set_queue_control(VALUE v_ev, VALUE v_tp, VALUE v_q, VALUE v_val
   return v_ev;
 }
 
-/* self set_queue_start(queue)
+/** call-seq: set_queue_start(queue) -> self
+
 make it a start queue event
 */
 static VALUE
@@ -1418,7 +1497,8 @@ wrap_snd_seq_ev_set_queue_start(VALUE v_ev, VALUE v_q)
   return v_ev;
 }
 
-/* self set_queue_stop(queue)
+/** call-seq:  set_queue_stop(queue) -> self
+
 make it a stop queue event
 */
 static VALUE
@@ -1431,7 +1511,8 @@ wrap_snd_seq_ev_set_queue_stop(VALUE v_ev, VALUE v_q)
   return v_ev;
 }
 
-/* self set_queue_continue(queue)
+/** call-seq: set_queue_continue(queue) -> self
+
 make it a queue continue event
 */
 static VALUE
@@ -1444,7 +1525,8 @@ wrap_snd_seq_ev_set_queue_continue(VALUE v_ev, VALUE v_q)
   return v_ev;
 }
 
-/* self set_queue_tempo(queue, tempo)
+/** call-seq: set_queue_tempo(queue, tempo) -> self
+
 make it a set-queue-tempo event.
 For the tempo parameter see Alsa docs (but there isn't any)
 Use google to find meaningfull example.
@@ -1460,9 +1542,8 @@ wrap_snd_seq_ev_set_queue_tempo(VALUE v_ev, VALUE v_q, VALUE v_tempo)
   return v_ev;
 }
 
-/* call-seq:
-    set_queue_pos_real(queue, [sec, nsec]) -> self
-    set_queue_pos_real(queue, float) -> self
+/** call-seq: set_queue_pos_real(queue, realtimespec) -> self
+
 Make it a a realtime seek event, for changing the current position in queue.
 Events are hence skipped or resend
 */
@@ -1492,9 +1573,9 @@ wrap_snd_seq_ev_set_queue_pos_real(VALUE v_ev, VALUE v_q, VALUE v_time)
   return v_ev;
 }
 
-/* call-seq:
-    set_queue_pos_tick(queue, int) -> self
-See #set_queue_pos_real
+/** call-seq: set_queue_pos_tick(queue, int) -> self
+
+See RRTS::Driver::AlsaMidiEvent_i#set_queue_pos_real
 */
 static VALUE
 wrap_snd_seq_ev_set_queue_pos_tick(VALUE v_ev, VALUE v_q, VALUE v_ticks)
@@ -1506,14 +1587,41 @@ wrap_snd_seq_ev_set_queue_pos_tick(VALUE v_ev, VALUE v_q, VALUE v_ticks)
   return v_ev;
 }
 
-/* AlsaMidiEvent_i is the class wrapper for snd_seq_event_t.
-
-Use this for one on one ports only as the ruby implementation has a lot
-of overhead over the original one. Use MidiEvent if possible.
-*/
 void
 alsa_midi_event_init()
 {
+/** Document-class: RRTS::Driver::AlsaMidiEvent_i
+
+The class wrapper for snd_seq_event_t.
+
+Use this for one on one ports only as the ruby implementation has a lot
+of overhead over the original one. Use RRTS::MidiEvent whenever possible.
+
+Documentation on all events + types:  http://alsa-project.org/alsa-doc/alsa-lib/group___seq_events.html
+
+the following extra type checking methods exist:
+-  note_type?
+-  result_type?
+-  control_type?
+-  channel_type?
+-  message_type?
+-  subscribe_type?
+-  sample_type?
+-  user_type?
+-  instr_type?
+-  fixed_type?
+-  variable_type?
+-  varusr_type?
+-  abstime?   , is the time absolute
+-  reltime?   , or relative
+-  direct?    , bypass buffers when sending
+-  reserved?  , stay off
+-  prior?     , is it a high-priority event
+-  fixed?     , message has fixed size
+-  variable?  , or variable
+-  tick?      , times are set in ticks (1 bar = 384 ticks)
+-  real?      , times are set in nanoseconds
+*/
   alsaMidiEventClass = rb_define_class_under(alsaDriver, "AlsaMidiEvent_i", rb_cObject);
 
   //arg1 for snd_seq_ev_is....type

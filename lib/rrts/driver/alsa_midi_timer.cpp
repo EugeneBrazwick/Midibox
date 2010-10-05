@@ -9,19 +9,18 @@
 
 VALUE alsaQueueTimerClass;
 
-/*  call-seq:
-      copy_to other -> self
-      copy_to -> AlsaQueueTimer_i
-Makes a copy of the current timer. If +other+ is not specified it
-returns a copy.
+/**  Document-method: RRTS::Driver::AlsaQueueTimer_i#copy_to
+call-seq: copy_to([other = nil]) -> copy
+
+Makes a copy of +self+. If +other+ is not specified it
+returns a copy, otherwise it is used as targetbuffer.
 */
 ALSA_MIDI_COPY_TO_TEMPLATE(queue_timer, QueueTimer)
 
-/* call-seq:
-    queue -> queueid
-Get the queue id of a queue_timer container.
-*/
+/** call-seq: queue() -> queueid
 
+Get the queue id
+*/
 static VALUE
 wrap_snd_seq_queue_timer_get_queue(VALUE v_info)
 {
@@ -30,10 +29,10 @@ wrap_snd_seq_queue_timer_get_queue(VALUE v_info)
   return INT2NUM(snd_seq_queue_timer_get_queue(info));
 }
 
-/* call-seq:
-    type ->  int
+/** call-seq: type() ->  int
+
 Get the timer type of a queue_timer container. 0 == alsa, 1 = realtime, 2 = ticks
-See the constants SND_SEQ_TIMER_...
+See the constants +SND_SEQ_TIMER_+...
 */
 static VALUE
 wrap_snd_seq_queue_timer_get_type(VALUE v_info)
@@ -43,18 +42,18 @@ wrap_snd_seq_queue_timer_get_type(VALUE v_info)
   return INT2NUM(snd_seq_queue_timer_get_type(info));
 }
 
-/*
+/** call-seq: id() -> int
 const snd_timer_id_t *  snd_seq_queue_timer_get_id (const snd_seq_queue_timer_t *info)
 Get the timer id of a queue_timer container.
-NIY
+
+*NOT* IMPLEMENTED YET
+
 */
 
-/* call-seq:
-     resolution -> int
+/** call-seq: resolution() -> int
 
-Get the timer resolution of a queue_timer container.
+Get the timer resolution
 */
-
 static VALUE
 wrap_snd_seq_queue_timer_get_resolution(VALUE v_info)
 {
@@ -63,10 +62,9 @@ wrap_snd_seq_queue_timer_get_resolution(VALUE v_info)
   return UINT2NUM(snd_seq_queue_timer_get_resolution(info));
 }
 
-/*
-    call-seq:
-      type= int
-Set the timer type of a queue_timer container. See AlsaQueueTimer_i#type
+/** call-seq: type = int
+
+Set the timer type of a queue_timer container. See RRTS::Driver::AlsaQueueTimer_i#type
 */
 static VALUE
 wrap_snd_seq_queue_timer_set_type(VALUE v_info, VALUE v_tp)
@@ -77,15 +75,17 @@ wrap_snd_seq_queue_timer_set_type(VALUE v_info, VALUE v_tp)
   return Qnil;
 }
 
-/*
-void    snd_seq_queue_timer_set_id (snd_seq_queue_timer_t *info, const snd_timer_id_t *id)
+/** call-seq: id = int
+
 Set the timer id of a queue_timer container.
-NIY
+
+*NOT* IMPLEMENTED YET
+
 */
 
-/* call-seq:
-      resolution = int
-Set the timer resolution of a queue_timer container.
+/** call-seq: resolution = int
+
+Set the timer resolution
 */
 static VALUE
 wrap_snd_seq_queue_timer_set_resolution(VALUE v_info, VALUE v_reso)
@@ -99,6 +99,16 @@ wrap_snd_seq_queue_timer_set_resolution(VALUE v_info, VALUE v_reso)
 void
 alsa_midi_timer_init()
 {
+  if (0)  // this is to make rdoc document it.
+    {
+      VALUE rrtsModule = rb_define_module("RRTS");
+      alsaDriver = rb_define_module_under(rrtsModule, "Driver");
+    }
+  /** Document-class: RRTS::Driver::AlsaQueueTimer_i
+
+  This class overlaps with other Alsa API, which is not associated with MIDI. Therefore not
+  all methods are implemented, and I even don't know why these are.
+  */
   alsaQueueTimerClass = rb_define_class_under(alsaDriver, "AlsaQueueTimer_i", rb_cObject);
   WRAP_CONSTANT(SND_SEQ_TIMER_ALSA); // = 0,
   WRAP_CONSTANT(SND_SEQ_TIMER_MIDI_CLOCK);

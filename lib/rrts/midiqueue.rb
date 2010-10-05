@@ -7,6 +7,7 @@ require 'forwardable'
 module RRTS
 
   # MidiQueue is required for scheduling events
+  # But you probably can get away with using Sequencer#create_queue
   class MidiQueue
     include Comparable
     include Driver
@@ -15,14 +16,20 @@ module RRTS
     private
 
 #  This will allocate a 'named' queue
+#
 #  Parameters:
-#  * [sequencer] owner
-#  * [name] the name
-#  * [block] if passed the queue is auto-freed
-#  * [params] allowed options:
-#       * [tempo] - quarters per minute (int) or a Tempo
-#                   or a hash suitable for #tempo=
-#       * any option for the Tempo constructor
+#  [sequencer] owner
+#  [name] the name
+#  [block] if passed the queue is auto-freed by the constructor. Works like IO::open c.s.
+#  [params] allowed options:
+#           [:tempo] - quarters per minute (int) or a Tempo
+#                   or a hash suitable for MidiQueue#tempo=
+#           plus any option for the Tempo constructor:
+#           [:beats]
+#           [:bpm]
+#           [:qpm]
+#           [:frames]
+#           [:ticks]
     def initialize sequencer, name, params = nil
       @sequencer = sequencer
       @seq_handle = sequencer.instance_variable_get(:@handle)
@@ -74,7 +81,6 @@ module RRTS
     end
 
     # Assign a Tempo, or a hash containing :beats, :bpm, :qpm or :frames plus :ticks (optionally)
-    # * [tmpo] Tempo instance, or a hash
     def tempo= tmpo
       if Hash === tmpo
 #         tag "setting tempo to #{tmpo.inspect}"
@@ -130,7 +136,7 @@ module RRTS
     end
 
     # returns true if the queue has been started
-    # *Important*: there is a delay. Presumably because events are send out and
+    # *Important*: there is a delay. Presumably because events are sent out and
     # only on receiving these the state is actually changed.
     # So this method is slightly unreliable
     def running?
@@ -138,25 +144,24 @@ module RRTS
       @id && status.status != 0
     end
 
-#     ConditionMap = {:input=>SND_SEQ_REMOVE_INPUT, :output=>SND_SEQ_REMOVE_OUTPUT,
-#                     :dest=>SND_SEQ_R
-
 #     Remove elements according to specification
 #     With no arguments it removes all output events except NoteOffs.
 #     Otherwise pass a bitset as expected by remove_events_set_condition
 #     Or a hash with the following options:
-#     - input: true
-#     - output: true
-#     - tag: string,  must match this tag
-#     - time_before: time
-#     - time_after: time
-#     - time_ticks or ticks:  int. With exactly this 'tick' value
-#     - dest_channel or channel: on this channel
-#     - dest: on this destination port
-#     - ignore_off: do NOT remove any NoteOffs.
+#     [:input] value must be true, indicates to flush input
+#     [:output], must be true, indicates to flush output
+#     [:tag] int,  must match this 'tag'
+#     [:time_before] realtime or ticks
+#     [:time_after] realtime or ticks
+#     [:time_ticks] int. With exactly this 'tick' value
+#     [:ticks]. Same as +time_ticks+
+#     [:dest_channel] on this channel
+#     [:channel] same as +dest_channel+
+#     [:dest] on this destination port
+#     [:ignore_off]: do *not* remove any NoteOffs. Should be +false+ since the default is +true+.
 #
 #     A mix of options requires each one to be set. There is no constraint on options
-#     that are not set. To remove all events pass 0 or {}.
+#     that are not set.
 #
 #     Experimentation must confirm that NoteOn with velocity 0 is taken as a NoteOff.
     def clear events_to_remove = nil
@@ -200,6 +205,8 @@ module RRTS
     end
 
     alias :remove_events :clear
+
+    # returns the owning Sequencer instance
     attr :sequencer
 
     # short for status.tick_time

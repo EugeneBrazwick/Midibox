@@ -7,22 +7,25 @@ module RRTS
 
   # This class represents a client, which is always a sequencer or something close to it
   # Clients can read or write events to each other through ports.
+  # Apart from that, this class is hardly ever required.
   # The Sequencer class itself basically is a special client, since it represents us.
+  # The Sequencer can be used as a MidiClient, event if it does not immediately inherit it.
+  #
   # The following delegators are present
-  # * AlsaClientInfo_i#name
-  # * AlsaClientInfo_i#broadcast_filter?
-  # * AlsaClientInfo_i#error_bounce?
-  # * AlsaClientInfo_i#event_lost
-  # * AlsaClientInfo_i#events_lost
-  # * AlsaClientInfo_i#num_ports
-  # * AlsaClientInfo_i#num_open_ports
-  # * AlsaClientInfo_i#type
+  # * Driver::AlsaClientInfo_i#name
+  # * Driver::AlsaClientInfo_i#broadcast_filter?
+  # * Driver::AlsaClientInfo_i#error_bounce?
+  # * Driver::AlsaClientInfo_i#event_lost
+  # * Driver::AlsaClientInfo_i#events_lost
+  # * Driver::AlsaClientInfo_i#num_ports
+  # * Driver::AlsaClientInfo_i#num_open_ports
+  # * Driver::AlsaClientInfo_i#type
 class MidiClient
 include Driver
 include Comparable
 extend Forwardable;
 private
-  # normally never used
+  # :nodoc: normally never used
   def initialize sequencer, cinfo
     @sequencer = sequencer
     @handle = cinfo.copy_to
@@ -49,11 +52,12 @@ public
 
   # the internal clientid
   attr :client
+
   def_delegators :@handle, :name, :broadcast_filter?, :error_bounce?, :event_lost, :events_lost,
                            :num_ports, :num_open_ports, :type
 
   # the result is an arrray with references into sequencer#@ports
-  # if you require a hash, why not use sequencer.ports or port ?
+  # but it is better to use Sequencer#ports and Sequencer#port
   def ports
     r = []
     pinfo = port_info_malloc

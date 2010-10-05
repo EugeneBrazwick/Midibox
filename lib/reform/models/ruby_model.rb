@@ -32,17 +32,17 @@ It seems more appropriate to call connectModel 'updateModel' instead. Were we pa
 
     So the new policy is to use 'structure' for simple non-list like hashes
 =end
-      def value v = nil
-        return @value if v.nil?
-        @value = v
+      def value(*v)
+        return instance_variable_defined?(:@value) ? @value : nil if v.nil?
+        @value = v.length == 1 ? v[0] : v
 #         tag "SimpleModel#value(value := #{v.inspect}, Enumerable?=#{Enumerable===@value})"
         @key2index = @index2key = nil
         if Enumerable === @value
           @key2index = {}
           if @value
             to_invert = if Hash === @value then @value.keys else @value end
-            to_invert.each_with_index do |v, idx|
-              key = Model::enum2i(v.respond_to?(:key) ? v.key : v)
+            to_invert.each_with_index do |w, idx|
+              key = Model::enum2i(w.respond_to?(:key) ? w.key : w)
               @key2index[key] ||= idx
             end
           end

@@ -12,6 +12,7 @@ module Reform
       action {
         label tr('E&xit')
         shortcut :quit
+        statustip tr('Quit the application')
         whenTriggered { $qApp.quit }
       }
     end

@@ -12,22 +12,23 @@
 
 VALUE alsaClientInfoClass;
 
-/* call-seq:
-     client_info.copy_to other -> client_info
-     client_info.copy_to       -> client_info
+/** Document-method: RRTS::Driver::AlsaClientInfo_i#copy_to
+call-seq: copy_to([other = nil]) -> AlsaClientInfo_i
 
 Make a duplicate. Used internally by AlsaClientInfo_i#initialize_copy.
-The second form creates an actual clone
+
+Parameters:
+[other] if a RRTS::Driver::AlsaClientInfo_i is passed here we copy +self+ into it,
+        otherwise this method returns a new copy of itself.
 */
 ALSA_MIDI_COPY_TO_TEMPLATE(client_info, ClientInfo)
 
-/* call-seq:
-   ClientInfo.client= clientid
+/** call-seq: client = clientid
 
-Set the client id of a client_info container.
+Set the client id of a client_info container. After this information can be retrieved.
 
 Parameters:
-client  client id
+[client]  client id
 */
 static VALUE
 wrap_snd_seq_client_info_set_client(VALUE v_client_info, VALUE v_clientid)
@@ -38,8 +39,7 @@ wrap_snd_seq_client_info_set_client(VALUE v_client_info, VALUE v_clientid)
   return Qnil;
 }
 
-/* call-seq:
-  ClientInfo#client -> int
+/** call-seq: client() -> int
 
 Get the clientid of a client_info container.
 */
@@ -51,10 +51,10 @@ wrap_snd_seq_client_info_get_client(VALUE v_client_info)
   return INT2NUM(snd_seq_client_info_get_client(client_info));
 }
 
-/* call-seq:
-   ClientInfo#type -> int
-Get client type of a client_info container. Can be SND_SEQ_USER_CLIENT
- or SND_SEQ_KERNEL_CLIENT
+/** call-seq:  type() -> int
+
+Get client type of a client_info container.
+Can be +SND_SEQ_USER_CLIENT+ or +SND_SEQ_KERNEL_CLIENT+
 */
 static VALUE
 wrap_snd_seq_client_info_get_type(VALUE v_client_info)
@@ -64,8 +64,8 @@ wrap_snd_seq_client_info_get_type(VALUE v_client_info)
   return INT2NUM(snd_seq_client_info_get_type(client_info));
 }
 
-/* call-seq:
-   ClientInfo#name -> string
+/** call-seq: name() -> string
+
 Get the name of a client_info container.
 */
 static VALUE
@@ -76,9 +76,9 @@ wrap_snd_seq_client_info_get_name(VALUE v_client_info)
   return rb_str_new2(snd_seq_client_info_get_name(client_info));
 }
 
-/* call-seq:
-ClientInfo#broadcast_filter? -> bool
-Get the broadcast filter usage of a client_info container.
+/** call-seq:  broadcast_filter?() -> bool
+
+Returns: the broadcast filter usage of a client_info container.
 */
 static VALUE
 wrap_snd_seq_client_info_get_broadcast_filter(VALUE v_client_info)
@@ -88,9 +88,9 @@ wrap_snd_seq_client_info_get_broadcast_filter(VALUE v_client_info)
   return INT2BOOL(snd_seq_client_info_get_broadcast_filter(client_info));
 }
 
-/* call-seq:
-   ClientInfo#error_bounce? -> bool
-Get the error-bounce usage of a client_info container.
+/** call-seq: error_bounce?() -> bool
+
+Returns: the error-bounce usage of a client_info container. But what is it?
 */
 static VALUE
 wrap_snd_seq_client_info_get_error_bounce(VALUE v_client_info)
@@ -100,9 +100,9 @@ wrap_snd_seq_client_info_get_error_bounce(VALUE v_client_info)
   return INT2BOOL(snd_seq_client_info_get_error_bounce(client_info));
 }
 
-/* call-seq:
-   ClientInfo#num_ports -> int
-Get the number of opened ports of a client_info container.
+/** call-seq: num_ports() -> int
+
+Returns: the number of opened ports of a client_info container.
 */
 static VALUE
 wrap_snd_seq_client_info_get_num_ports(VALUE v_client_info)
@@ -112,9 +112,10 @@ wrap_snd_seq_client_info_get_num_ports(VALUE v_client_info)
   return INT2NUM(snd_seq_client_info_get_num_ports(client_info));
 }
 
-/* call-seq:
- ClientInfo#event_lost -> int
-Get the number of lost events of a client_info container.
+/** call-seq: event_lost() -> int
+
+Returns: the number of lost events of a client_info container. Also available using
+         the name +events_lost+.
 */
 static VALUE
 wrap_snd_seq_client_info_get_event_lost(VALUE v_client_info)
@@ -124,8 +125,6 @@ wrap_snd_seq_client_info_get_event_lost(VALUE v_client_info)
   return INT2NUM(snd_seq_client_info_get_event_lost(client_info));
 }
 
-/* AlsaMidiClient_i is used to external clients or the sequencer client itself.
-*/
 void
 alsa_midi_client_init()
 {
@@ -138,6 +137,24 @@ alsa_midi_client_init()
        VALUE rrtsModule = rb_define_module("RRTS");
        alsaDriver = rb_define_module_under(rrtsModule, "Driver");
     }
+/** Document-class: RRTS::Driver::AlsaClientInfo_i
+
+This class stands for Alsa-clients ie, owners of Alsa connections, however, as its name suggests, it
+is primarily used for retrieving information.
+
+A RRTS::Driver::AlsaSequencer_i is also a client, and its clientid can be retrieved with
+the method RRTS::Driver::AlsaSequencer_i#client_id
+
+while the infoblock can be queried like this:
+
+    i = RRTS::Driver::client_info_malloc
+    i.client = sequencer.client_id
+    if i.event_lost > 3  # etc.
+
+Context: this class is pretty useless. Except maybe for RRTS::Driver::AlsaClientInfo_i#events_lost.
+You probably want to use RRTS::MidiClient or use RRTS::Sequencer#client and RRTS::Sequencer#clients
+to gain access to the clientinformation.
+*/
   alsaClientInfoClass = rb_define_class_under(alsaDriver, "AlsaClientInfo_i", rb_cObject);
   rb_define_method(alsaClientInfoClass, "client=", RUBY_METHOD_FUNC(wrap_snd_seq_client_info_set_client), 1);
   rb_define_method(alsaClientInfoClass, "client", RUBY_METHOD_FUNC(wrap_snd_seq_client_info_get_client), 0);

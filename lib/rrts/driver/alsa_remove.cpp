@@ -8,16 +8,15 @@
 
 VALUE alsaRemoveEventsClass;
 
-/* void    snd_seq_remove_events_free (snd_seq_remove_events_t *ptr)
-frees a previously allocated snd_seq_remove_events_t
-*/
+/** Document-method: RRTS::Driver::AlsaRemoveEvents_i#copy_to
+call-seq: copy_to([dst = nil]) -> copy
 
-/* copy AlsaRemoveEvents_i#copy_to dst
-copy one snd_seq_remove_events_t to another
+copy one snd_seq_remove_events_t to another (+dst+), or if +dst+ is not given, it returns a clone.
 */
 ALSA_MIDI_COPY_TO_TEMPLATE(remove_events, RemoveEvents)
 
-/* int    AlsaRemoveEvents_i#condition
+/** call-seq: condition() -> int
+
 Get the removal condition bits.
 */
 static VALUE
@@ -28,9 +27,9 @@ wrap_snd_seq_remove_events_get_condition(VALUE v_rmp)
   return UINT2NUM(snd_seq_remove_events_get_condition(rmp));
 }
 
-/*
-int     snd_seq_remove_events_get_queue (const snd_seq_remove_events_t *info)
-Get the queue as removal condition.
+/** call-seq:  queue() -> id
+
+Get the queueid that serves as a removal condition (events with _this_ queue)
 */
 static VALUE
 wrap_snd_seq_remove_events_get_queue(VALUE v_rmp)
@@ -40,9 +39,9 @@ wrap_snd_seq_remove_events_get_queue(VALUE v_rmp)
   return INT2NUM(snd_seq_remove_events_get_queue(rmp));
 }
 
-/*
-int AlsaRemoveEvents_i#time_tick
-Get the event timestamp as removal condition.
+/** call-seq:  time_tick() -> int
+
+Get the event timestamp (in ticks) as removal condition.
 */
 static VALUE
 ARE_get_time_tick(VALUE v_rmp)
@@ -52,8 +51,8 @@ ARE_get_time_tick(VALUE v_rmp)
   return UINT2NUM(snd_seq_remove_events_get_time(rmp)->tick);
 }
 
-/*
-sec, nsec AlsaRemoveEvents_i#time_real
+/** call-seq: time_real() -> [sec, nsec]
+
 Get the event timestamp as removal condition
 */
 static VALUE
@@ -65,8 +64,8 @@ ARE_get_time_real(VALUE v_rmp)
   return rb_ary_new3(2, UINT2NUM(tm->time.tv_sec), UINT2NUM(tm->time.tv_nsec));
 }
 
-/*
-clientid, portid AlsaRemoveEvents_i#dest
+/** call-seq: dest() -> [clientid, portid]
+
 Get the event destination address as removal condition.
 */
 static VALUE
@@ -78,7 +77,8 @@ wrap_snd_seq_remove_events_get_dest(VALUE v_rmp)
   return rb_ary_new3(2, UINT2NUM(a->client), UINT2NUM(a->port));
 }
 
-/*int    AlsaRemoveEvents_i#channel
+/** call-seq: channel() -> int
+
 Get the event channel as removal condition.
 */
 static VALUE
@@ -89,8 +89,8 @@ wrap_snd_seq_remove_events_get_channel(VALUE v_rmp)
   return INT2NUM(snd_seq_remove_events_get_channel(rmp));
 }
 
-/*
-int     snd_seq_remove_events_get_event_type (const snd_seq_remove_events_t *info)
+/** call-seq: type() -> int
+
 Get the event type as removal condition.
 */
 static VALUE
@@ -101,8 +101,8 @@ wrap_snd_seq_remove_events_get_event_type(VALUE v_rmp)
   return INT2NUM(snd_seq_remove_events_get_event_type(rmp));
 }
 
-/*
-int     snd_seq_remove_events_get_tag (const snd_seq_remove_events_t *info)
+/** call-seq: tag() -> int
+
 Get the event tag id as removal condition.
 */
 static VALUE
@@ -113,9 +113,27 @@ wrap_snd_seq_remove_events_get_tag(VALUE v_rmp)
   return INT2NUM(snd_seq_remove_events_get_tag(rmp));
 }
 
-/*
-void    snd_seq_remove_events_set_condition (snd_seq_remove_events_t *info, unsigned int flags)
-Set the removal condition bits.
+/** call-seq: condition = flags
+
+Set the removal condition bits. These bits must be used in conjunction with other
+arguments and specify which values are checked.
+
+*IMPORTANT*: the other setters do *not* set implicit flags.
+
+
+Parameters:
+[flags]   a combination of:
+          - +SND_SEQ_REMOVE_INPUT+, all input queues will be flushed (not a restriction)
+          - +SND_SEQ_REMOVE_OUTPUT+, all output queues will be flushed ("")
+          - +SND_SEQ_REMOVE_DEST+, 'with this destination', use +dest=+
+          - +SND_SEQ_REMOVE_DEST_CHANNEL+
+          - +SND_SEQ_REMOVE_TIME_BEFORE+
+          - +SND_SEQ_REMOVE_TIME_AFTER+
+          - +SND_SEQ_REMOVE_TIME_TICK+, to indicate time given is in ticks
+          - +SND_SEQ_REMOVE_EVENT_TYPE+
+          - +SND_SEQ_REMOVE_TAG_MATCH+, with identical tag.
+          - +SND_SEQ_REMOVE_IGNORE_OFF+, do not flush any +OFF+ events (as in NOTE_OFF etc.)
+            Because that could make things worse.
 */
 static VALUE
 wrap_snd_seq_remove_events_set_condition(VALUE v_rmp, VALUE v_flags)
@@ -126,9 +144,14 @@ wrap_snd_seq_remove_events_set_condition(VALUE v_rmp, VALUE v_flags)
   return Qnil;
 }
 
-/*
-void    snd_seq_remove_events_set_queue (snd_seq_remove_events_t *info, int queue)
-Set the queue as removal condition.
+/** call-seq:  queue = queueid
+
+Set the queue as removal condition. This can be used to remove events within that queue.
+
+Parameters:
+[queue]  either a queueid or a RRTS::MidiQueue
+
+See RRTS::Driver::AlsaRemoveClass_i#condition=.
 */
 static VALUE
 wrap_snd_seq_remove_events_set_queue(VALUE v_rmp, VALUE v_queue)
@@ -140,9 +163,16 @@ wrap_snd_seq_remove_events_set_queue(VALUE v_rmp, VALUE v_queue)
   return Qnil;
 }
 
-/*
-void    snd_seq_remove_events_set_time (snd_seq_remove_events_t *info, const snd_seq_timestamp_t *time)
+/** call-seq:  time = time
+
 Set the timestamp as removal condition.
+Parameters:
+[time]   an integer, for specifying ticks, or a tuple of splat of seconds and nanoseconds
+
+Normally used with the flags +SND_SEQ_REMOVE_TIME_AFTER+ or +SND_SEQ_REMOVE_TIME_BEFORE+.
+
+See RRTS::Driver::AlsaRemoveClass_i#condition=.
+
 */
 static VALUE
 wrap_snd_seq_remove_events_set_time(int argc, VALUE *argv, VALUE v_rmp)
@@ -173,11 +203,12 @@ wrap_snd_seq_remove_events_set_time(int argc, VALUE *argv, VALUE v_rmp)
   return Qnil;
 }
 
-/* call-seq:
-     AlsaRemoveEvents_i.time_real= sec, nsec
-     AlsaRemoveEvents_i.time_real= [sec, nsec]
+/** call-seq: time_real = sec, nsec
 
-For removing events based on this specified realtime
+For removing events based on this specified realtime. It is also possible to pass a tuple
+as single argument.
+
+See RRTS::Driver::AlsaRemoveClass_i#condition=.
 */
 static VALUE
 ARE_set_time_real(int argc, VALUE *argv, VALUE v_rmp)
@@ -200,7 +231,12 @@ ARE_set_time_real(int argc, VALUE *argv, VALUE v_rmp)
   return Qnil;
 }
 
-/* For removing events based on a tick time
+/** call-seq: time = ticks
+
+For removing events based on a tick time. Note that +SND_SEQ_REMOVE_TIME_TICK+
+should be set to indicate the time is in fact in ticks (guess from Eugene).
+
+See RRTS::Driver::AlsaRemoveClass_i#condition=.
 */
 static VALUE
 ARE_set_time_tick(VALUE v_rmp, VALUE v_ticks)
@@ -213,9 +249,14 @@ ARE_set_time_tick(VALUE v_rmp, VALUE v_ticks)
   return Qnil;
 }
 
-/*
-void    snd_seq_remove_events_set_dest (snd_seq_remove_events_t *info, const snd_seq_addr_t *addr)
+/** call-seq: dest = addressspecification
+
 Set the destination address as removal condition.
+Parameters:
+[dest]   a single RRTS::Driver::AlsaPortInfo_i or RRTS::MidiPort. Or a tuple [client, portid]
+         where client can be RRTS::Driver::AlsaClientInfo_i or RRTS::MidiClient.
+
+See RRTS::Driver::AlsaRemoveClass_i#condition=.
 */
 static VALUE
 wrap_snd_seq_remove_events_set_dest(int argc, VALUE *argv, VALUE v_rmp)
@@ -230,9 +271,11 @@ wrap_snd_seq_remove_events_set_dest(int argc, VALUE *argv, VALUE v_rmp)
   return Qnil;
 }
 
-/*
-void    snd_seq_remove_events_set_channel (snd_seq_remove_events_t *info, int channel)
+/** call-seq: channel = aChannel
+
 Set the channel as removal condition.
+
+See RRTS::Driver::AlsaRemoveClass_i#condition=.
 */
 static VALUE
 wrap_snd_seq_remove_events_set_channel(VALUE v_rmp, VALUE v_ch)
@@ -243,9 +286,11 @@ wrap_snd_seq_remove_events_set_channel(VALUE v_rmp, VALUE v_ch)
   return Qnil;
 }
 
-/*
-void    snd_seq_remove_events_set_event_type (snd_seq_remove_events_t *info, int type)
+/** call-seq:  event_type = type
+
 Set the event type as removal condition.
+
+See RRTS::Driver::AlsaRemoveClass_i#condition=.
 */
 static VALUE
 wrap_snd_seq_remove_events_set_event_type(VALUE v_rmp, VALUE v_evtype)
@@ -256,8 +301,8 @@ wrap_snd_seq_remove_events_set_event_type(VALUE v_rmp, VALUE v_evtype)
   return Qnil;
 }
 
-/*
-void    snd_seq_remove_events_set_tag (snd_seq_remove_events_t *info, int tag)
+/** call-seq:  tag = value
+
 Set the event tag as removal condition.
 */
 static VALUE
@@ -269,9 +314,6 @@ wrap_snd_seq_remove_events_set_tag(VALUE v_rmp, VALUE v_tag)
   return Qnil;
 }
 
-/* AlsaRemoveClass_i
-Class to remove (already sent) events from queues.
-*/
 void
 alsa_remove_init()
 {
@@ -286,6 +328,14 @@ alsa_remove_init()
   WRAP_CONSTANT(SND_SEQ_REMOVE_EVENT_TYPE);
   WRAP_CONSTANT(SND_SEQ_REMOVE_TAG_MATCH);
   WRAP_CONSTANT(SND_SEQ_REMOVE_IGNORE_OFF);
+
+  /** Document-class: RRTS::Driver::AlsaRemoveClass_i
+
+     Class to remove (already sent) events from queues and buffers.
+
+     You don't want to use this class. Instead use RRTS::MidiQueue#clear.
+
+  */
 
   alsaRemoveEventsClass = rb_define_class_under(alsaDriver, "AlsaRemoveEvents_i", rb_cObject);
   rb_define_method(alsaRemoveEventsClass, "copy_to", RUBY_METHOD_FUNC(wrap_snd_seq_remove_events_copy_to), -1);

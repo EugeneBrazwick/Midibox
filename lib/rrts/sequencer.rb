@@ -7,6 +7,7 @@ module RRTS
 
   # This class is the main client for the Alsa MIDI system.
   # It is possible to use more than one Sequencer within an application
+  #
   # Delegates to:
   # *  Driver::AlsaSequencer_i#poll_descriptors
   # *  Driver::AlsaSequencer_i#poll_descriptors_count
@@ -14,7 +15,7 @@ module RRTS
   # *  Driver::AlsaSequencer_i#drain_output,  with alias +flush+
   # *  Driver::AlsaSequencer_i#start_queue
   # *  Driver::AlsaSequencer_i#nonblock
-  # *  Driver::AlsaSequencer_i#alloc_named_queue,  but please use MidiQueue#new
+  # *  Driver::AlsaSequencer_i#alloc_named_queue,  but please use RRTS::MidiQueue::new
   # *  Driver::AlsaSequencer_i#set_queue_tempo
   # *  Driver::AlsaSequencer_i#queue_tempo
   # *  Driver::AlsaSequencer_i#output_buffer_size
@@ -22,7 +23,7 @@ module RRTS
   # *  Driver::AlsaSequencer_i#input_buffer_size
   # *  Driver::AlsaSequencer_i#input_buffer_size=
   # *  Driver::AlsaSequencer_i#sync_output_queue
-  # *  Driver::AlsaSequencer_i#create_port, please use MidiPort.new
+  # *  Driver::AlsaSequencer_i#create_port, please use RRTS::MidiPort::new
   # *  Driver::AlsaSequencer_i#event_output
   # *  Driver::AlsaSequencer_i#event_output_buffer
   # *  Driver::AlsaSequencer_i#event_output_direct
@@ -45,18 +46,28 @@ module RRTS
   # *  Driver::AlsaClientInfo_i#num_ports
   # *  Driver::AlsaClientInfo_i#num_open_ports
   # *  Driver::AlsaClientInfo_i#type
+  #
+  # The sequencer also stores some global entities, like the list of ports on the
+  # system. Even though not a MidiClient, the Sequencer has access to the client
+  # information methods like +events_lost+ etc..
+  #
+  # Context: you would normally use it like this:
+  #
+  #    Sequencer.new('myseq') do |seq|
+  #       ...
+  #    end # closed automatically
 class Sequencer
 include Driver # open up namespace
 extend Forwardable
-  # for #new
+  # for ::new
   Duplex = SND_SEQ_OPEN_DUPLEX
-  # for #new
+  # for ::new
   InputOnly = SND_SEQ_OPEN_INPUT
-  # for #new
+  # for ::new
   OutputOnly = SND_SEQ_OPEN_OUTPUT
-  # for #new
+  # for ::new
   Blocking = false
-  # for #new
+  # for ::new
   NonBlocking = true
   # for the poll methods
   PollIn = POLLIN
@@ -68,20 +79,23 @@ extend Forwardable
   @@sequencers = {}
 
 private
-=begin rdoc
-   parameters:
-   client_name::  name of the instantiated client, if nil no client will be instantiated
-   params::       hash of optional parameters:
-        name::         default 'default'. Do not alter.
-        openmode::     default Duplex
-        map_ports::    default true if client_name is given
-        blockingmode:: default Blocking
-        dump_notes::   if true dump to stderr and do NOT play them!! Only works with HACKED cpp
-                       backend
-        polltime::     timeout in seconds for sleep, for nonblockingmode, default is 0.01
-                       If left nil methods will currently fail.
-   block:: encapsulation for automatic close. Works like IO::open.
-=end
+
+# Create a new sequencer
+#
+# Parameters:
+# [client_name] name of the instantiated client, if nil no client will be instantiated ie,
+#               the sequencer will be nameless and cannot be seen by other Alsa clients.
+# [params] hash of optional parameters:
+#          [name]         default 'default'. Do not alter. This is *not* the client_name
+#          [openmode]     default Duplex
+#          [map_ports]    default true if client_name is passed as first argument
+#          [blockingmode] default Blocking
+#          [dump_notes]   if true dump to stderr and do NOT play them!! Only works with HACKED cpp
+#                         backend
+#          [polltime]     timeout in seconds for sleep, for nonblockingmode, default is 0.01
+#                         If left nil methods will currently fail.
+# [block] encapsulation for automatic close. Works like IO::open.
+#
   def initialize client_name = nil, params = nil, &block
     @client = @handle = nil
     @client_id = @ports = @ports_index = @clients = nil  # not guaranteed open does this
@@ -101,9 +115,8 @@ protected
 
 public
 
-# See #new
+# See Sequencer#new. Please use that.
 # Only call this after a close, if you want to reopen it.
-# Just use 'new'.
   def open client_name = nil, params = nil
     close
     name = 'default'
@@ -117,6 +130,8 @@ public
         when :name then name = value
         when :openmode then openmode = value
         when :blockingmode then blockingmode = value
+        # the next entry seems to be some hack? It makes it possible of storing all constructor
+        # parameters in a single hash... Except that +map_ports+ is no longer set.
         when :client_name, :clientname then client_name = value
         when :map_ports then map_ports = value
         when :dump_notes then dump_notes = true
@@ -150,7 +165,7 @@ public
     end
   end
 
-  # closes the sequencer. Must be called to free resources, unless a block is passed to 'new'
+  # closes the sequencer. Must be called to free resources.
   # This is normally automatically called if you pass a block to the constructor
   def close
     return unless @handle
@@ -228,17 +243,17 @@ public
 
 # Returns a MidiEvent
 #
-#   Obtains a MidiEvent from the sequencer.
-#   This function firstly receives the event byte-stream data from sequencer as much as possible at once.
-#   Then it retrieves the first event record.
-#   By calling this function sequentially, events are extracted from the input buffer.
-#   If there is no input from sequencer, function falls into sleep in blocking mode until
-#   an event is received,
-#   or it raises Errno::EAGAIN in non-blocking mode.
+# Obtains a MidiEvent from the sequencer.
+# This function firstly receives the event byte-stream data from sequencer as much as possible at once.
+# Then it retrieves the first event record.
+# By calling this function sequentially, events are extracted from the input buffer.
+# If there is no input from sequencer, function falls into sleep in blocking mode until
+# an event is received,
+# or it raises Errno::EAGAIN in non-blocking mode (not the default mode).
 #
-#   Occasionally, it may raise an Errno::ENOSPC error. This means
-#   that the input FIFO of sequencer overran, and some events are lost.
-#   Once this error is returned, the input FIFO is cleared automatically.
+# Occasionally, it may raise an Errno::ENOSPC error. This means
+# that the input FIFO of sequencer overran, and some events are lost.
+# Once this error is returned, the input FIFO is cleared automatically.
 #
   def event_input
 #     tag "Calling event_input"
@@ -282,6 +297,9 @@ public
   def_delegators :@client, :broadcast_filter?, :error_bounce?, :event_lost, :events_lost,
                            :num_ports, :num_open_ports, :type
 
+  # in blocking mode the same as Driver::AlsaSequencer_i#drain_output.
+  # in nonblocking mode it may go to sleep until the output is drained.
+  # Therefore it always blocks.
   def drain_output
     loop do
       begin
@@ -303,14 +321,14 @@ public
   # drain_output is just a flush, so let's support that name:
   alias :flush :drain_output
 
-  # Same as event_output, except for returnvalue (self).
+  # Same as event_output, except for the returnvalue (self).
   def << event
 #     tag "<< #{event}"
     @handle.event_output event
     self
   end
 
-  # MidiPort parse_address pattern. In addition to '0:0' or 'UM-2:1' we also understand 'UM-2 PORT2'
+  # MidiPort parse_address string. In addition to '0:0' or 'UM-2:1' we also understand 'UM-2 PORT2'
   # May throw AlsaMidiError if the port is invalid or does not exist
   def parse_address portspec
     if portspec.respond_to?(:to_ary)
@@ -323,14 +341,9 @@ public
     end
   end
 
-  # call-seq:
-  #   port(clientid, portid) -> MidiPort
-  #   port(portspecstring) -> MidiPort
-  #   port(clientstring, portid) -> MidiPort
-  #   port(:specialportsymbol) -> MidiPort, supported are :system_timer and :subscribers_unknown
-  #   port([clientid, portid]) -> MidiPort
-  #
-  # The port must exist
+  # Returns the specified port, the port must exist or an AlsaMidiError is raised
+  # Port can be given as a splat or tuple of client + portid, or as a string.
+  # Also the special symbols :subscribers_unknown and :system_timer are resolved here.
   def port clientid, portid = nil
     case clientid
     when Array then return port(clientid[0], clientid[1])
@@ -370,18 +383,21 @@ public
 
   # a shortcut
   alias :subscribers_unknown :subscribers_unknown_port
+
   # a shortcut
   alias :any_subscribers :subscribers_unknown_port
+
   # a shortcut
   alias :system_timer :system_timer_port
 
-  # returns true if the sequencer is currently open (which it normally is)
+  # returns true if the sequencer is currently open
+  # it would be weird if it returned false
   def open?
     @handle
   end
 
   # returns a hash of MidiClient instances, index by clientid
-  # The result is cached, use clients! or ports! to reload
+  # The result is cached, use clients! or ports! to force a fetch
   def clients
     @clients and return @clients
     @clients = {}
@@ -399,8 +415,8 @@ public
     clients
   end
 
-  # return a has of MidiPorts, indexed by portname
-  # The result is cached, used ports! to force a reload (also of clients)
+  # return a hash of MidiPorts, indexed by portname (a string)
+  # The result is cached, use ports! to force a reload
   def ports
     return @ports if @ports
     @ports = {}
@@ -429,7 +445,7 @@ public
   end
 
   # Create a queue with given name, plus options
-  # See MidiQueue#new
+  # See RRTS::MidiQueue::new
   # Important, a queue created using this method is automatically freed when
   # the sequencer closes.
   # The queuename should be unique however.
@@ -464,12 +480,15 @@ public
 
   # us, an integer client_id. Same as client.client
   attr :client_id
-  # returns a hash, indexed by queuename
+
+  # returns a hash, indexed by queuename. So queue(name) == queues[name]
   attr :queues
+
   # float, polltime in seconds
   attr :polltime
 
-  # returns the *opened* sequencer with that name.
+  # returns the *opened* sequencer with that name ie, the sequencer must have been created with a name,
+  # and it must not be closed yet.
   def self.[](name)
     @@sequencers[name]
   end

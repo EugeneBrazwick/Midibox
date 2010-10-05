@@ -52,7 +52,10 @@ describe Frame do
   it 'should see the edit control' do
 #     tag "DOES THIS SHOW?"
     $qApp.firstform.should respond_to :myEdit
-    $qApp.firstform.myEdit.name.should == 'myEdit'
+    # reform now uses 'Qt::Object#objectName' which returns a string
+    $qApp.firstform.myEdit.objectName.should == 'myEdit'
+    # however, 'name' returns the original symbol
+    $qApp.firstform.myEdit.name.should == :myEdit
   end
 
   it 'should have created a formlayout and reparented edit' do

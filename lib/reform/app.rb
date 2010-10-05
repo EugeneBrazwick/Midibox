@@ -66,147 +66,79 @@ public
   end
 end
 
-=begin  rdoc
-The Reform library is a qtruby based library for building gui's in a 100%
-declarative way (we do not compromise!!!)
-There are NO methods involved. Ever. Anywhere.
-
-Requirements:
-=========================================================
-  - qt4.6
-  - kdebindings_4.4.2
-  - ruby1.9.2rc
-
-Recepy for Ubuntu (of the Blood, Sweat and Tears Kind -- but in the end it was 'simply' this:)
-
-Preliminaries:
-  I hacked my ruby install on ubuntu (since 1.9.1 works fine),
-  with a bunch of links (does not work with ruby1.8 installed as well):
-    for i in erb rake ruby irb rdoc ri
-    do
-      sudo ln -s /usr/bin/${i}1.9.1 /etc/alternatives/$i
-      sudo ln -s /etc/alternatives/$i /usr/bin/$i
-    done
-    cd /usr/lib
-    sudo ln -s libruby-1.9.1.so libruby-1.9.so
-    cd /usr/include/ruby-1.9.1/ruby
-    sudo ln -s ../x86_64-linux/ruby/config.h
-    sudo apt-get install libqt4-dev libasound2-dev rubygems1.9.1 subversion cmake autoconf
-    sudo apt-get install kde-devel
-  - download source from ubuntu (lucid)
-  https://launchpad.net/ubuntu/lucid/+source/kdebindings/4:4.4.2-0ubuntu2
-  - the following does not need the links above, accept the config.h one
-  - cd /loadsofspace
-  - tar zxf tarballs/kdebindings_4.4.2.orig.tar.gz
-  - gunzip tarballs/kdebindings_4.4.2-0ubuntu2.diff.gz
-  - patch < tarballs/kdebindings_4.4.2-0ubuntu2.diff
-  - cd kdebindings-4.4.2/
-  - cmake -DCMAKE_INSTALL_PREFIX=/usr/local \
-      -DRUBY_EXECUTABLE=/usr/bin/ruby1.9.1 \
-      -DRUBY_INCLUDE_PATH=/usr/include/ruby-1.9.1 \
-      -DRUBY_LIBRARY=/usr/lib/libruby-1.9.1.so \
-      -DENABLE_QIMAGEBLITZ_SMOKE=off -DENABLE_ATTICA_SMOKE=off -DENABLE_KROSSRUBY=off -Wno-dev
-  - make
-  - sudo make install
-
-IMPORTANT: RUBYLIB should be ~/Midibox/lib:/usr/local/lib/site_ruby/1.9.1:/usr/local/lib/site_ruby/1.9.1/x86_64-linux
-But why?? It worked fine first...
-
-DIAGNOSTICS:
- Q: ERROR: cmake/modules/FindKDE4Internal.cmake not found in ...
- A: kde-devel kdelibs5-dev  (presumably???)  NOT kdelibs4-dev!
- Q: on any failure?
- A: cd ..; rm -rf kdebindings-4.4.2  # and repeat from start after fixing!
-
-Note: it builds far too much... So takes an hour. Feel free to skip more by disabling more
-    modules. For your convenience:
-      -DENABLE_QTWEBKIT_SMOKE=off -DENABLE_QTSCRIPT_SMOKE=off \
-      -DENABLE_QTUITOOLS_SMOKE=off -DENABLE_QTTEST_SMOKE=off -DENABLE_PHONON_SMOKE=off  \
-      -DENABLE_QSCI_SMOKE=off -DENABLE_QWT_SMOKE=off -DENABLE_KDE_SMOKE=off \
-      -DENABLE_KDEVPLATFORM_SMOKE=off -DENABLE_KHTML_SMOKE=off -DENABLE_KTEXTEDITOR_SMOKE=off \
-      -DENABLE_SOLID_SMOKE=off -DENABLE_PLASMA_SMOKE=off -DENABLE_QTWEBKIT_RUBY=off \
-      -DENABLE_QTUITOOLS_RUBY=off -DENABLE_QTSCRIPT=off  -DENABLE_QTTEST=off -DENABLE_PHONON_RUBY=off \
-      -DENABLE_QSCINTILLA_RUBY=off -DENABLE_QWT_RUBY=off -DENABLE_SOPRANO_RUBY=off  \
-      -DENABLE_KDEVPLATFORM_RUBY=off -DENABLE_KORUNDUM_RUBY=off -DENABLE_KHTML_RUBY=off \
-      -DENABLE_KTEXTEDITOR_RUBY=off -DENABLE_SOLID_RUBY=off -DENABLE_PLASMA_RUBY=off \
-
-However, this is uncharted territory. The modules I disabled had to be disabled because the
-compile failed.
-
-About the 'qt4-qtruby' package. This package is for ruby1.8. You can download the source and compile
-it for ruby1.9.1 but it will never work (it did for karmic though).
-qtruby is now officially part of kdebindings, I guess.
-
-# with ruby 1.9.2rc1 compilation fails at 96% as STR2CSTR is missing: I added the following in
-  krubypluginfactory.cpp:
-#define STR2CSTR StringValueCStr
-    VALUE ara1 = rb_obj_as_string(info);        plus use this iso original...
-         .....   .arg( STR2CSTR(ara1) )
-....
-
-CONCEPTS
-========================================
-
-Shoes (as in 'stolen from')
-
-But 'shoes' is too much a toy.
-
-The idea is to map a datastructure one-on-one on a form. By picking the controls
-you can make any view for a model.
-
-Richard Dale has made two qtruby modelsystems that can be used for ActiveRecord and
-ActiveResource.
-I would like to add one for Object. Or even BasicObject. Because any ruby instance is
-obviously a model.
-
-=end
-
-# FIXME
-=begin
-to_variant is LETAL
-because the object may well be no longer referenced.
-Then it is disposed off.
-BAD IDEA
-
-class Object
-  def to_variant
-#= begin DOES NOT WORK
-#    Reform::Variant.new self
-# =e nd
-    Qt::Variant.new object_id
-  end
-end
-
-class Qt::Variant
-  def to_object
-    ObjectSpace._id2ref(to_int)
-  end
-end
-=end
-
+# The Reform library is a qtruby based library for building gui's in a 100%
+# declarative way (we do not compromise!!!)
+# There are NO methods involved. Ever. Anywhere.
+#
+# Required deb packages (for Ubuntu):
+# - rubygems1.9.1
+# - cmake
+# - g++
+# - qt4-qmake
+# - ruby1.9.1-dev
+# - libqt4-dev
+# - libasound2-dev
+#
+# Required gems:
+# - qtbindings
+# - rspec
+#
+# Optional gems:
+# - darkfish-rdoc
+#
+# CONCEPTS
+# ========================================
+#
+# Shoes (as in 'stolen from')
+#
+# But 'shoes' is too much a toy.
+#
+# The idea is to map a datastructure one-on-one on a form. By picking the controls
+# you can make any view for a model.
+#
+# Richard Dale has made two qtruby modelsystems that can be used for ActiveRecord and
+# ActiveResource.
+# I would like to add one for Object. Or even BasicObject. Because any ruby instance is
+# obviously a model.
+#
+# A program looks like this:
+#
+#    Reform::app {
+#      formX {
+#        widgetA {
+#          prop1 value1
+#          .....
+#        }
+#        widgetB {
+#          properties for widgetB
+#        }
+#        ....
+#      } #
+#      formY {
+#         ....
+#      }
+#    }
+#
+# The syntax is the same on each and every level.
+# All available widgets (and other stuff) are plugins stored in one of the
+# lib/reform subdirectories. We have:
+# [controls] for widgets and layouts
+# [graphics] for graphic items
+# [states] for states
+# [models] for models
+#
+# etc..
+# The names of the files are the names of the possible 'constructors' in +Reform::app+.
+#
 module Reform
 
-=begin DOES NOT WORK AT ALL
-  # taken from kde qtruby introduction page:
-  # http://techbase.kde.org/Development/Languages/Ruby#QtRuby
-  class Variant < Qt::Variant
-    private
-    def initialize(value)
-        super()
-        @value = value
-    end
-    public
-    # I feel rather cheap about this:
-    attr_accessor :value
-  end
-=end
-
+    # Use this class for GUI errors, including misconfigurations.
     class Error < StandardError
     end
 
     ReformError = Error
 
-=begin rdoc
+=begin
     baseclass for ControlContext, GraphicContext etc.
     As such it has a big impact on all Frame and Scene derivates, which are most container classes.
 
@@ -277,6 +209,8 @@ module Reform
             reform_class = instantiator[:reform_class]
             options = instantiator[:options]
             qt_implementor_class = instantiator[:qt_implementor_class]
+            raise ArgumentError, 'Bad hash passed to instantiator' unless quicky == nil || Hash === quicky
+#             tag "quicky hash = #{quicky.inspect}"
             # It's important to use parent_qtc_to_use, since it must be a true widget.
             # Normally, 'qparent' would be '@qtc' itself
             qparent = quicky && quicky[:qtparent] || parent_qtc_to_use_for(reform_class)
@@ -297,8 +231,6 @@ module Reform
               # constructed with parent == 0 (see for example widgets/calendar/window.cpp )
               #             && #(qparent.widgetType? && qparent.layout ||
               # insert an additional generic frame (say Qt::GroupBox)
-              # you cannot store a layout in a layout, nor can you store a layout in a graphicsscene.
-              # See calendar.cpp in Nokia examples. layout.addLayout is OK.
   #     you cannot store a QWidget in a g-scene but since it accepts QGraphicsItems it is possible to
   #     create a QGraphicsProxyWidget
 
@@ -308,7 +240,7 @@ module Reform
   #         raise 'CANTHAPPEN' if qparent && qparent.inherits('QGraphicsScene')
   #         tag "instantiate #{qt_implementor_class} with parent #{ctrl}/#{qparent}"
             newqtc = qt_implementor_class &&
-                    ctrl.instantiate_child(reform_class, qt_implementor_class, qparent)
+                     ctrl.instantiate_child(reform_class, qt_implementor_class, qparent)
     #         tag "#{reform_class}.new(#{ctrl}, #{newqtc})"
             c2 = reform_class.new ctrl, newqtc
     #           tag "instantiated c=#{c}, parent is a #{ctrl.class}"
@@ -378,8 +310,12 @@ module Reform
       private
       # add given action symbols to the menu
       def actions *list
-        list = list[0] if list && Array === list
-        list.each { |action| add(containing_form.action(action), nil) }
+        list = list[0] if list.length == 1 && Array === list[0]
+        frm = containing_form
+        list.each do |action|
+#           tag "Add action #{action.inspect}"
+          add(frm.action(action), nil)
+        end
       end
     end
 
@@ -498,6 +434,15 @@ module Reform
 
   # delegator.
   # Called from all plugins, who in turn are loaded by a method created using register*Proxy_i
+  #
+  # Parameters:
+  # [name] a string that should be File.basename(__FILE__, '.rb') in all cases
+  # [qt_implementor_class] the Qt class to use. This may be nil
+  # [reform_class] the reform class to use. The default is Widget
+  # [options] Named parameters, with valid keys:
+  #           [:form] boolean if the class is a ReForm or subclass. This is only
+  #                   because sometimes the ReForm class is not known here so reform_class <= ReForm
+  #                   will fail.
   def self.createInstantiator name, qt_implementor_class, reform_class = Widget, options = {}
 #     tag "createInstantiator(#{name.inspect})"
     # 'Widget' is implicit (since the default), and this 'require' avoids having to load it, as the caller may
@@ -517,17 +462,38 @@ module Reform
 #     end
   end
 
-=begin rdoc
-  the App is a basic Qt::Application extension. So see the qt docs as well.
-  I use 'exec_i' from Reform::app
-=end
+# the App is a basic Qt::Application extension. So see the qt docs as well.
+# Within an app there are 1 or more forms.
+# It is however possible to construct any Widget, AbstractState, Animation and AbstractModel.
+# # in that case we construct an implicit form and put everything in there.
   class App < Qt::Application
     private
 
-=begin rdoc
-the application constructor is passed the commandline. Or any splat for that matter.
-The idea is that it is a singleton.
-=end
+# You would normally pass ARGV here (not *ARGV). However the way to create a reform application is:
+#
+#    Reform::app {
+#      pluginname { prop1 value1; prop2 value2; .... }
+#      pluginname prop1: value1, prop2: value2, ....
+#      .....
+#    }
+#
+# What you normally store in an application would be MainWindow (mainwindow), Form (form) or Dialog (dialog)
+# If a block is passed to a plugin (or to +app+ itself) it is executed in the context of the instance
+# being setup. This means that private methods can be called.
+# Passing a hash is identical to passing a block. The properties are the setter methods to be
+# called. For multiargument setters the arguments must be put in an array:
+#
+#       Reform::app {
+#         form {
+#           sizeHint 400, 200
+#         }
+#       }
+#
+#       Reform::app {
+#         form sizeHint: [400, 200]
+#       }
+#
+# The idea is that the hash-form can be used for quick oneliners.
     def initialize *argv
       super
       # firstform points to the first form defined, which is the main form (mainwindow)
@@ -543,19 +509,19 @@ The idea is that it is a singleton.
       @doNotRun = false
     end
 
-=begin rdoc
-    normally, value would be false so @autoform is switched of.
-Example:
-    Reform::app {
-      button
-   }
-will create a form, plus a hbox implicitely, but:
-    Reform::app {
-      autoform false
-      button
-    }
-will create a button as toplevel control
-=end
+# +autoform+ is normally true and indicates that the application will create
+# an implicit form, if a non-form widget is stored in it. You would want to
+# switch it off to create another toplevel window, like a simple button.
+# Example:
+#     Reform::app {
+#       button
+#    }
+# will create a form, plus a hbox layout implicitely, but:
+#     Reform::app {
+#       autoform false
+#       button
+#     }
+# will create a button as toplevel control
     def autoform value
       @autoform = value
     end
@@ -569,6 +535,7 @@ will create a button as toplevel control
     attr :all_forms
 
     # set when the first form is defined. This serves as the main window.
+    # Do not use
     attr :firstform
 
     # for use with rspec tests:
@@ -671,7 +638,7 @@ will create a button as toplevel control
       Macro.new(@firstform, :menuBar, quicky, block)
     end
 
-=begin
+=begin :nodoc:
   Use Reform::createInstantiator
 
   createInstantiator_i(string name)
@@ -692,7 +659,7 @@ will create a button as toplevel control
       @title
     end
 
-    # called without 'name' by ReForm::initialize, and with 'name'
+    # :nodoc: called without 'name' by ReForm::initialize, and with 'name'
     # by ReForm::name
     def registerForm aForm, name = nil
       if name
@@ -705,7 +672,7 @@ will create a button as toplevel control
       @all_forms << aForm
     end
 
-    # delegate to @forms
+    # Return a form by name
     def [](formname)
       @forms[formname]
     end

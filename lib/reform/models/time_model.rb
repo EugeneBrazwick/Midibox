@@ -14,11 +14,17 @@ module Reform
 #         tag "TimeModel.new(#{parent}, #{qtc})"
 #         @timerid = nil
         @autostart = true
+
+#         @current = Qt::Time::currentTime # this may lag!! FIXME? can we not always return the currentTime??
+# BAD IDEA:  @current != current
+
         @frequency, @frameNr, @oneShot = 1.0, 0, false
         connect @qtc, SIGNAL('timeout()') do
-          transaction do
+          transaction do |tran|
             self.frameNr += 1
+#             tag "self.current := .... "
             self.current = Qt::Time::currentTime
+            tran.dependencies_changed :to_s, :toString
           end
         end
   #       tag "creating timer"
@@ -59,6 +65,12 @@ module Reform
 #         tag "postSetup, autostart = #@autostart"
         @qtc.start if @autostart
       end
+
+      def toString format = Qt::TextDate
+        return (current || Qt::Time::currentTime).toString(format)
+      end
+
+      alias :to_s :toString
 
       # angle of the cycle. Assumes it is 0.0 at the 'start' of the timer.
       # The result is always between 0.0 and 360.0

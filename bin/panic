@@ -3,7 +3,7 @@
 # Sends a SHUT UP event to port ARGV[0]
 
 # Since Roland E-80 (expensive though it may be) has no such button
-# and aplaymidi violates the midi standard(!) buy allowing ^C to interrupt
+# and aplaymidi violates the midi standard(!) by allowing ^C to interrupt
 # it.
 
 # NOW It does send (I think) the right bytes, but nothing ever happens.
@@ -13,7 +13,7 @@
 # That causes EINVAL midway. Also bytes remaining in queue grows to 16380...
 # So this learns us
 #    the default queuespace == 16384 == 2**14
-#    you MUST use a queue, or at least start q 0?
+#    you MUST use a queue
 #    The ALSA API proves ones more to be crappy.  There is nothing invalid about the parameters....
 require 'rrts/sequencer'
 include RRTS

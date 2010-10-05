@@ -13,25 +13,32 @@
 
 VALUE alsaQueueInfoClass, alsaQueueTempoClass, alsaQueueStatusClass;
 
-/* self copy_to([other])
+/** Document-method: RRTS::Driver::AlsaQueueTempo_i#copy_to
+call-seq: copy_to([other = nil]) -> clone
+
 Makes a copy of the current tempo. If +other+ is not specified it
-returns a copy.
+returns a copy, otherwise +other+ is used to copy +self+ into.
 */
 ALSA_MIDI_COPY_TO_TEMPLATE(queue_tempo, QueueTempo)
 
-/* self copy_to([other])
+/** Document-method: RRTS::Driver::AlsaQueueStatus_i#copy_to
+call-seq: copy_to([other = nil]) -> clone
+
 Makes a copy of the current queuestatus. If +other+ is not specified it
-returns a copy
+returns a copy, otherwise +other+ is used to copy +self+ into.
 */
 ALSA_MIDI_COPY_TO_TEMPLATE(queue_status, QueueStatus)
 
-/* self copy_to([other])
+/** Document-method: RRTS::Driver::AlsaQueueInfo_i#copy_to
+call-seq: copy_to([other = nil]) -> clone
+
 Returns a copy of the queue info structure. If +other+ is given it will be used
 as a buffer, otherwise a new buffer is allocated
 */
 ALSA_MIDI_COPY_TO_TEMPLATE(queue_info, QueueInfo)
 
-/* flags=(flags)
+/** call-seq: flags = someFlags
+
 Alter the flags for this queue. Must be used before creating a queue.
 God knows what these flags are. See the Alsa docs (but they won't tell you).
 */
@@ -44,7 +51,8 @@ wrap_snd_seq_queue_info_set_flags(VALUE v_qi, VALUE v_flags)
   return Qnil;
 }
 
-/* locked=(bool)
+/** call-seq: locked = bool
+
 I believe that queues are created locked, but you may lock or unlock them
 with this method. But what does it do?? The Alsa documentation says nothing...
 */
@@ -57,7 +65,8 @@ wrap_snd_seq_queue_info_set_locked(VALUE v_qi, VALUE v_locked)
   return Qnil;
 }
 
-/* name=(string)
+/** call-seq: name = string
+
 Change the name of the queue to be (must be called before creating a queue)
 */
 static VALUE
@@ -72,8 +81,9 @@ wrap_snd_seq_queue_info_set_name(VALUE v_qi, VALUE v_name)
   return Qnil;
 }
 
-/* int queue
-Gives the queueid of the queue
+/** call-seq: queue() -> int
+
+Returns: the queueid of the queue
 */
 static VALUE
 wrap_snd_seq_queue_info_get_queue(VALUE v_qi)
@@ -83,8 +93,9 @@ wrap_snd_seq_queue_info_get_queue(VALUE v_qi)
   return INT2NUM(snd_seq_queue_info_get_queue(qi));
 }
 
-/* int flags
-Returns some flags, but these are undocumented
+/** call-seq: flags() -> int
+
+Returns: some flags, but these are undocumented
 */
 static VALUE
 wrap_snd_seq_queue_info_get_flags(VALUE v_qi)
@@ -94,7 +105,9 @@ wrap_snd_seq_queue_info_get_flags(VALUE v_qi)
   return UINT2NUM(snd_seq_queue_info_get_flags(qi));
 }
 
-/* string name
+/** call-seq: name() -> string
+
+Returns: the name of this queue
 */
 static VALUE
 wrap_snd_seq_queue_info_get_name(VALUE v_qi)
@@ -104,8 +117,9 @@ wrap_snd_seq_queue_info_get_name(VALUE v_qi)
   return rb_str_new2(snd_seq_queue_info_get_name(qi));
 }
 
-/* int owner
-returns the clientid of the owner. Normally this would be yourself
+/** call-seq: owner() -> int
+
+Returns: the clientid of the owner. Normally this would be yourself
 */
 static VALUE
 wrap_snd_seq_queue_info_get_owner(VALUE v_qi)
@@ -115,8 +129,9 @@ wrap_snd_seq_queue_info_get_owner(VALUE v_qi)
   return INT2NUM(snd_seq_queue_info_get_owner(qi));
 }
 
-/* bool locked?
-Returns true if the queue is locked. But locked how or what?
+/** call-seq: locked?() -> bool
+
+Returns: true if the queue is locked. But locked how or what?
 */
 static VALUE
 wrap_snd_seq_queue_info_get_locked(VALUE v_qi)
@@ -126,12 +141,12 @@ wrap_snd_seq_queue_info_get_locked(VALUE v_qi)
   return INT2BOOL(snd_seq_queue_info_get_locked(qi));
 }
 
-/* owner=(client)
+/** call-seq: owner = clientid
 
 Set the owner client id of a queue_info container.
 
 Parameters:
-   owner   clientid or MidiClient
+[owner] clientid or RRTS::MidiClient
 */
 static VALUE
 wrap_snd_seq_queue_info_set_owner(VALUE v_qi, VALUE v_owner_clientid)
@@ -146,9 +161,9 @@ wrap_snd_seq_queue_info_set_owner(VALUE v_qi, VALUE v_owner_clientid)
   return Qnil;
 }
 
-/* int ppq
+/** call-seq: ppq() -> int
 
-Get the ppq (ticks per beat) of a queue_tempo container.
+Get the ppq (ticks per beat)
 */
 static VALUE
 wrap_snd_seq_queue_tempo_get_ppq(VALUE v_tempo)
@@ -158,9 +173,9 @@ wrap_snd_seq_queue_tempo_get_ppq(VALUE v_tempo)
   return INT2NUM(snd_seq_queue_tempo_get_ppq(tempo));
 }
 
-/* int queue
+/** call-seq: queue() -> int
 
-Get the queue id of a queue_status container.
+Get the queue id
 */
 static VALUE
 wrap_snd_seq_queue_tempo_get_queue(VALUE v_tempo)
@@ -170,10 +185,11 @@ wrap_snd_seq_queue_tempo_get_queue(VALUE v_tempo)
   return INT2NUM(snd_seq_queue_tempo_get_queue(tempo));
 }
 
-/* int skew
+/** call-seq: skew() -> int
 
-Get the timer skew value of a queue_tempo container, whatever it is.
-See #skew_base
+Get the timer skew value, whatever it is. Probably you can program some fixed delay
+on the queue ?
+See RRTS::Driver::AlsaQueueTempo_i#skew_base
 */
 static VALUE
 wrap_snd_seq_queue_tempo_get_skew(VALUE v_tempo)
@@ -183,10 +199,10 @@ wrap_snd_seq_queue_tempo_get_skew(VALUE v_tempo)
   return UINT2NUM(snd_seq_queue_tempo_get_skew(tempo));
 }
 
-/* int skew_base
+/** call-seq: skew_base() -> int
 
 Get the timer skew base value of a queue_status container.
-See #skew.
+See RRTS::Driver::AlsaQueueTempo_i#skew.
 */
 static VALUE
 wrap_snd_seq_queue_tempo_get_skew_base(VALUE v_tempo)
@@ -196,9 +212,10 @@ wrap_snd_seq_queue_tempo_get_skew_base(VALUE v_tempo)
   return UINT2NUM(snd_seq_queue_tempo_get_skew_base(tempo));
 }
 
-/* int tempo
-Get the tempo of a queue_tempo container. But WTF is this???
-Please tell me!!!
+/** call-seq: tempo() -> int
+
+Get the tempo. This is (?) the number of microseconds per beat (quarternote)
+So if ♩ = 60 then 1_000_000, and if ♩ = 120 then 500_000 etc..
 */
 static VALUE
 wrap_snd_seq_queue_tempo_get_tempo(VALUE v_tempo)
@@ -208,8 +225,10 @@ wrap_snd_seq_queue_tempo_get_tempo(VALUE v_tempo)
   return UINT2NUM(snd_seq_queue_tempo_get_tempo(tempo));
 }
 
-/* ppq=(ppq)
-Set the ppq of a queue_tempo container.
+/** call-seq: ppq = value
+
+Set the ppq (pulses per quarter). You would normally set this before creating
+a queue.
 */
 static VALUE
 wrap_snd_seq_queue_tempo_set_ppq(VALUE v_tempo, VALUE v_ppq)
@@ -220,7 +239,7 @@ wrap_snd_seq_queue_tempo_set_ppq(VALUE v_tempo, VALUE v_ppq)
   return Qnil;
 }
 
-/* skew=(skew)
+/** call-seq: skew = value
 */
 static VALUE
 wrap_snd_seq_queue_tempo_set_skew(VALUE v_tempo, VALUE v_skew)
@@ -231,7 +250,7 @@ wrap_snd_seq_queue_tempo_set_skew(VALUE v_tempo, VALUE v_skew)
   return Qnil;
 }
 
-/* skew_base=(skew_base)
+/** call-seq: skew_base = value
 */
 static VALUE
 wrap_snd_seq_queue_tempo_set_skew_base(VALUE v_tempo, VALUE v_skew)
@@ -242,7 +261,8 @@ wrap_snd_seq_queue_tempo_set_skew_base(VALUE v_tempo, VALUE v_skew)
   return Qnil;
 }
 
-/* tempo=(something)
+/** call-seq: tempo = something
+
 I quote here the Alsa documentation:
 "Set the tempo of a queue_status container."
 So there it is...
@@ -261,8 +281,9 @@ wrap_snd_seq_queue_tempo_set_tempo(VALUE v_tempo, VALUE v_val)
   return Qnil;
 }
 
-/* int queue
-Returns the queueid
+/** call-seq: queue() -> into
+
+Returns: the queueid
 */
 static VALUE
 wrap_snd_seq_queue_status_get_queue(VALUE v_status)
@@ -272,8 +293,9 @@ wrap_snd_seq_queue_status_get_queue(VALUE v_status)
   return INT2NUM(snd_seq_queue_status_get_queue(status));
 }
 
-/* int events
-Returns the nr of events remaining in the queue
+/** call-seq: events() -> int
+
+Returns: the number of events remaining in the queue
 */
 static VALUE
 wrap_snd_seq_queue_status_get_events(VALUE v_status)
@@ -283,8 +305,9 @@ wrap_snd_seq_queue_status_get_events(VALUE v_status)
   return INT2NUM(snd_seq_queue_status_get_events(status));
 }
 
-/* int tick_time
-Returns the current time/position in the queue (in ticks)
+/** call-seq: tick_time() -> int
+
+Returns: the current time/position in the queue (in ticks)
 */
 static VALUE
 wrap_snd_seq_queue_status_get_tick_time(VALUE v_status)
@@ -294,8 +317,9 @@ wrap_snd_seq_queue_status_get_tick_time(VALUE v_status)
   return UINT2NUM(snd_seq_queue_status_get_tick_time(status));
 }
 
-/* [secs, nsec] real_time
-Returns the current time/position in the queue in nanoseconds
+/** call-seq: real_time -> [secs, nsec]
+
+Returns: the current time/position in the queue as a tuple [seconds, nanoseconds]
 */
 static VALUE
 wrap_snd_seq_queue_status_get_real_time(VALUE v_status)
@@ -306,8 +330,9 @@ wrap_snd_seq_queue_status_get_real_time(VALUE v_status)
   return rb_ary_new3(2, UINT2NUM(t->tv_sec), UINT2NUM(t->tv_nsec));
 }
 
-/* int status
-Returns something. 'status bits' says the Alsa doc. But which?
+/** call-seq: status() -> int
+
+Returns: something. 'status bits' says the Alsa doc. But which?
 */
 static VALUE
 wrap_snd_seq_queue_status_get_status(VALUE v_status)
@@ -317,15 +342,39 @@ wrap_snd_seq_queue_status_get_status(VALUE v_status)
   return UINT2NUM(snd_seq_queue_status_get_status(status));
 }
 
-/* AlsaMidiQueue_i
-
-This wrapper is used for creating queues, and also for querying existing ones
-*/
 void
 alsa_midi_queue_init()
 {
+  if (0)  // this is to make rdoc document it.
+    {
+      VALUE rrtsModule = rb_define_module("RRTS");
+      alsaDriver = rb_define_module_under(rrtsModule, "Driver");
+    }
+
+  /** Document-class: RRTS::Driver::AlsaMidiQueue_i
+
+  This wrapper is used for creating queues, and also for querying existing ones.
+
+  Only if a queue is associated with an Alsa connection (see RRTS::Driver::AlsaPortInfo_i#timestamp_queue=)
+  can notes received be timestamped, and notes send can be queued for emission on a very precise
+  moment.
+
+  A queue can operate as a recording or playback device. You can use queueevents to operate on the
+  queue to start, pause and continue it, or you can set the position (time) to a specific value
+  causing events to be skipped or replayed.
+  */
   alsaQueueInfoClass = rb_define_class_under(alsaDriver, "AlsaQueueInfo_i", rb_cObject);
+
+  /** Document-class: RRTS::Driver::AlsaQueueTempo_i
+
+  This wrapper is used for setting and retrieving tempo information
+  */
   alsaQueueTempoClass = rb_define_class_under(alsaDriver, "AlsaQueueTempo_i", rb_cObject);
+
+  /** Document-class: RRTS::Driver::AlsaQueueStatus_i
+
+  This wrapper is used for retrieving the current 'time' of the queue.
+  */
   alsaQueueStatusClass = rb_define_class_under(alsaDriver, "AlsaQueueStatus_i", rb_cObject);
 
   rb_define_method(alsaQueueTempoClass, "tempo=", RUBY_METHOD_FUNC(wrap_snd_seq_queue_tempo_set_tempo), 1);

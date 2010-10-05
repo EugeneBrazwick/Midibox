@@ -4,12 +4,14 @@
 require 'reform/app'
 
 class Fixnum
+  # create an instance of Reform::Milliseconds
   def seconds
     Reform::Milliseconds.new(self * 1000)
   end
 
   alias :s :seconds
 
+  # create an instance of Reform::Milliseconds
   def milliseconds
     Reform::Milliseconds.new(self)
   end
@@ -20,6 +22,8 @@ end
 
 module Reform
 
+  # A class specifically representing a duration in milliseconds
+  # See Fixnum#seconds and Fixnum#milliseconds
   class Milliseconds
     private
       def initialize val
@@ -30,10 +34,39 @@ module Reform
       alias :value :val # required for Qt::Variant interaction etc/
   end
 
-=begin rdoc
-  Control instances are qtruby wrappers around the Qt elements.
-  We extend QObject (Qt::Object) itself to enable slots and signals
-=end
+  MilliSeconds = Milliseconds
+
+# Control instances are reform wrappers around the Qt(ruby) elements.
+# We extend QObject (Qt::Object) itself to enable slots and signals
+# Since all setup blocks are executed in the context of the item being
+# setup, most property setters can be private.
+# This means that private methods are rather important
+#
+# Events are received back in our objects through some largescale hacking
+# All event callbacks start with the text 'when'. And the callback is always
+# executed in the context of the form.
+#
+# === Connects
+# Something about the connect call.
+#
+# Since Control is a Qt::Object you can connect its signals to slots. Or other controls signals to procs.
+# But you should be careful to do this only once, for example in the constructor(initialize).
+# The reason is that Qt stacks all connections on top of each other. They do not replace previous connections.
+# The proper setup is this:
+#
+#       class MyControl
+#         def initialize ...
+#           connect(@qtc, SIGNAL('oops()')) do
+#             rfCallBlockBack(@whenOops) if instance_variable_defined?(:@whenOops)
+#           end
+#         end
+#
+#         def whenOops &block
+#           @whenOops = block
+#         end
+#
+# And you can replace the callback any time you like.
+#
   class Control < Qt::Object
     private
 
@@ -54,38 +87,36 @@ module Reform
   #       tag "HERE"
         # FIXME: each control has these and only qtc is of real importance
         # containing_form can be cached in the getter and has_pos needs not be set at all
-        @containing_form, @qtc, @has_pos = frame && frame.containing_form, qtc, false
+        @containing_form, @qtc = frame && frame.containing_form, qtc
         @want_data = false
         # NOTE: parent may change to its definite value using 'added' See Frame::added
         # in all cases: c.parent.children.contains?(c)
       end
 
-  #     def blockSignals val = true
-  #       @qtc.blockSignals = val
-  #     end
-
-      # size QSize or size w,h, without args it returns qtc.size
-      def size w = nil, h = nil
-        q = effective_qtc
-        return q.size unless w
-        if h
-          @requested_size = w, h
-          q.resize w, h
-        else
-          @requested_size = w, w
-          q.resize w, w
-        end
+      # it returns qtc.size
+      # use sizeHint to set a requested size
+      def size # w = nil, h = nil
+        effective_qwidget.size
+#         return q.size unless w
+#         tag "better use
+#         if h
+#           @requested_size = w, h
+#           q.resize w, h
+#         else
+#           @requested_size = w, w
+#           q.resize w, w
+#         end
       end
 
-      # geometry, set geo or return it.
+      # geometry, set geo, return it or instantiate a dynamic property or animation
       def geometry x = nil, y = nil, w = nil, h = nil, &block
-        q = effective_qtc
+        q = effective_qwidget
         return q.geometry unless x || w || block
         case x
         when nil then DynamicAttribute.new(self, :geometry).setup(nil, &block)
         when Hash, Proc then DynamicAttribute.new(self, :geometry).setup(x, &block)
         else
-          @requested_size = w, h
+#           @requested_size = w, h
           if x or y
             @has_pos = true
             q.setGeometry x, y, w, h
@@ -96,7 +127,19 @@ module Reform
       end
 
       # define a simple set method for each element passed, forwarding it to qtc.
-      # using the same name plus '=' as the setter.
+      # using the same name plus '=' as the setter. Also it creates the getter
+      # (which is the same method in the 'reform' system)
+      # Example:
+      #
+      #         define_simple_setter :prop
+      #
+      # will basicly create:
+      #
+      #         def prop value = nil
+      #           return @qtc.prop if value.nil?
+      #           @qtc.prop = value
+      #         end
+      #
       def self.define_simple_setter *list
         list.each do |name|
           define_method name do |value = nil|
@@ -105,8 +148,6 @@ module Reform
           end
         end
       end
-
-  #     alias :def_simple_setter :define_simple_setter  DOES NOT WORK
 
       def executeMacros(receiver = nil)
 #         tag "#{self}#executeMacros, EXECUTE #{instance_variable_defined?(:@macros) ? @macros.length : 0} macros"
@@ -117,6 +158,7 @@ module Reform
       end
 
       # a ruby scope instantiator that wraps around 'Qt::Object#blockSignals'.
+      # Within the block all Qt signals are suppressed
       def no_signals
         old_blockSig = @qtc.blockSignals true
         begin
@@ -137,8 +179,37 @@ module Reform
         @whenTimeout = block
       end
 
-      # you should be able to set it too, and it can even be a block/proc(!!)
-      # but BOTH a value and a block is not allowed. (?)
+      # This very important method ties the object in the reform model propagation
+      # system. The connector is normally the name (symbol) of a getter method of the model.
+      # When the model propagates this getter is applied to the model and the result is
+      # used to show it.
+      # The _connector_ can also be a proc which is then applied to the model as the getter,
+      # and the result from the block is used.
+      # What the control does with the supplied data is up to itself.
+      # Example:
+      #
+      #          Reform::app {
+      #            ruby_model name: 'johnny'
+      #            edit {
+      #              connector :name
+      #            }
+      #
+      # The contents of the edit will be 'johnny' and if changed, this change will propagate through the
+      # entire form (or other forms as well).
+      # An equivalent connector would be:
+      #
+      #              connector { |data| data.name }
+      #
+      # Connectors will not work on all controls, but they should work as 'expected'.
+      #
+      # To make a working clock with 'reform' you can say:
+      #
+      #          Reform::app {
+      #            timer
+      #            edit connector: current
+      #          }
+      #
+      # BANG! A clock.
       def connector value = nil, &block
         if value || block
 #           tag "setting connector, want_data!"
@@ -207,9 +278,12 @@ module Reform
   #       tag "rfCallBlockBack #{block}, caller=#{caller.join("\n")}"
   #       raise unless block
         rfRescue do
-            # RETURN is deadly!!!!!??????????
-  #         tag "rfCallBlockBack, block=#{block.inspect}"
-          return containing_form.instance_exec(*args, &block)
+          begin
+            return containing_form.instance_exec(*args, &block)
+          rescue LocalJumpError
+            # utterly ignore it. It is caused because the block did a return or break itself.
+            # This is basicly illegal as our block has lost its original context
+          end
         end
       end
 
@@ -281,7 +355,7 @@ module Reform
               # we may expect the value to be 'value'
               raise "unexpected property '#{e.propertyName}'" unless e.propertyName == 'value'
               val = property('value').value
-              tag "applyModel(#{val.inspect})"
+#               tag "applyModel(#{val.inspect})"
               applyModel val
 #             else
 #               tag "unhandled .... #{self}.event(#{e})"
@@ -314,7 +388,7 @@ module Reform
 
           # called when Qt::DynamicPropertyChangeEvent is received
           def applyModel data, model = nil
-            tag "#{parent}.#@propertyname := #{data.inspect}"
+#             tag "#{parent}.#@propertyname := #{data.inspect}"
             parent.send(@propertyname.to_s + '=', data)
           end
 
@@ -335,6 +409,10 @@ module Reform
 
       attr_writer :connector
 
+      # Once a control sets a connector it then returns true here, and so will
+      # all its parents, up to (but excluding) the containing form.
+      # this is used when propagating modelchanges to easily skip controls
+      # that have no interest in any changes.
       def want_data?
         @want_data
       end
@@ -346,7 +424,7 @@ module Reform
       attr :qtc
 
       # tuple w,h   as set in last call of setSize/setGeometry
-      attr :requested_size
+#       attr :requested_size
 
       # an Array of macros,   we may need a separate index for named macros but
       # I forgot what needed that. Probably broken now.
@@ -362,6 +440,9 @@ module Reform
             addModel
             addAnimation
             addState
+            addDockWidget
+            addToolbar
+            etc. etc.
         these methods must setup the control too as the order differs sometimes
 
       2) which parent_qtc to use? This also depends on the child to be added and on the parent
@@ -371,14 +452,13 @@ module Reform
         raise ReformError, tr("Don't know how to add a %s to a #{parent.class}") % self.class
       end
 
-          # If we are going to parent a 'reform_class' which qtc to use.
-      # The result must be a Qt::Widget in all cases
-      # Also, some subcontrols need 'nil' as their parent and this can be arranged
-      # like this as well. By default we use effective_qtc, since it it about the same thing.
-      # IMPORTANT: the argument is the class!
+      # If we are going to parent a 'reform_class' which qtc to use.
+      # Some subcontrols need 'nil' as their parent and this can be arranged
+      # like this as well. By default we use effective_qwidget, since it it about the same thing.
+      # IMPORTANT: the argument is the class, not an instance!
       def parent_qtc_to_use_for reform_class
         #reform_class.respond_to?(:parent_qtc) &&
-        reform_class.parent_qtc(self, effective_qtc)
+        reform_class.parent_qtc(self, effective_qwidget)
       end
 
       # If self is the class of the child, which qtc to use as parent
@@ -392,11 +472,14 @@ module Reform
       end
 
       # The result must be a Qt::Widget in all cases.
-      def effective_qtc
+      # only layouts currently override this
+      def effective_qwidget
         @qtc
       end
 
-      # called when control was added to parent, except for models
+      # called when control was added to parent, except for models.
+      # here we 'execute' the block or the hash, whichever was given
+      # and then we call postSetup
       def setup hash = nil, &initblock
         instance_eval(&initblock) if initblock
         setupQuickyhash(hash) if hash
@@ -416,8 +499,7 @@ module Reform
   #       added child
       end
 
-      # also this only does something with the qt hierarchie
-      # Normally 'q' will be control.qtc
+      # :nodoc:
       def addWidget control, hash, &block
   #       tag "#@qtc.addWidget(#{control.qtc})"
         @qtc.addWidget control.qtc if @qtc
@@ -425,6 +507,7 @@ module Reform
         added control
       end
 
+      # :nodoc: called by +add+ if the control was a scene
       def addScene control, hash, &block
         # ONLY a canvas can set the scene
 #         @qtc.scene = control.qtc
@@ -432,6 +515,7 @@ module Reform
         added control
       end
 
+      # :nodoc: called by +add+ if the control was a layout
       def addLayout control, hash, &block
         raise "#{self} '#{name}' already has #{@qtc.layout} '#{@qtc.layout.objectName}'!" if @qtc.layout
         @qtc.layout = control.qtc
@@ -439,6 +523,7 @@ module Reform
         added control
       end
 
+      # :nodoc: called by +add+ if the control was a menu
       def addMenu control, hash, &block
         raise "#{self} '#{name}' already has #{@qtc.menu} '#{@qtc.menu.objectName}'!" if @qtc.menu
         @qtc.menu = control.qtc
@@ -446,6 +531,7 @@ module Reform
         added control
       end
 
+      # :nodoc: called by +add+ if the control was an action
       def addAction control, hash = nil, &block
   #       tag "#@qtc.addAction(#{control.qtc})"
         @qtc.addAction control.qtc
@@ -454,23 +540,21 @@ module Reform
         added control
       end
 
+      # :nodoc: called by +add+ if the control was an animation
       def addAnimation control, quickyhash = nil, &block
         control.parent = self
         control.setup quickyhash, &block
         added control
       end
 
+      # :nodoc: called by +add+ if the control was a state
       def addState control, quickyhash = nil, &block
         control.parent = self
         control.setup quickyhash, &block
         added control
       end
 
-  #     def addSeparator control, hash, &block
-  #       @qtc.addSeparator
-  #           # added control  not usefull
-  #     end
-
+      # :nodoc: called by +add+ if the control was a model
       def addModel control, hash, &block
         @model ||= nil
         control.setup hash, &block
@@ -484,6 +568,7 @@ module Reform
         added control
       end
 
+      # :nodoc:
       def setupQuickyhash hash
 #         tag "#{self}.setupQuickyhash(#{hash.inspect})"
         hash.each do |k, v|
@@ -498,11 +583,27 @@ module Reform
         @macros ||= []
       end
 
-      # was a position given
-      def has_pos?
-        @has_pos
-      end
-
+      # Return or set the name (a symbol, not a string).
+      # If the name is set the control is registered in the containing form and
+      # can be referenced by a method with the same name. This is very usefull
+      # since all callbacks in the system are executed in the context of the
+      # containing form.
+      # *Important*: the name must not clash with a control internal or public
+      # method, so make sure you use a system like prefixing controls with 'my'
+      # or 'm_'.
+      #
+      # Example:
+      #
+      #         Reform::app {
+      #           form {
+      #             label {
+      #               name :johnny
+      #             }
+      #             button {
+      #               whenClicked { johnny.text = 'johnny' }
+      #             }
+      #           }
+      #         }
       def name aSymbol = nil
         if aSymbol
   #       tag "#{self}::assigning objectname #{aName}"
@@ -517,16 +618,17 @@ module Reform
         end
       end
 
-      # note that form has an override. Frames collect immediate controls.
-      # Forms collect all controls, and they have an index too.
+      # note that form has an override.
+      # Called if a control is given a name. It then becomes a reference singleton method
+      # in the containing form.
       def registerName aName, aControl
   #       aName = aName.to_sym
   #       define_singleton_method(aName) { aControl }  not really used anyway
         containing_form.registerName(aName, aControl)
       end
 
-      # sets it if block is given, or calls it, if w,h is given, otherwise returns the handler itself
-      # that last feature is never used anymore.
+      # normally you can define a callback here. But if you pass no block but a width and height
+      # instead the callback is called with those arguments.
       def whenResized(w = nil, h = nil, &block)
         if block
           @whenResized = block
@@ -540,9 +642,11 @@ module Reform
 
       # this callback is called after the 'block' initialization. Or even without a block,
       # when the control is added to the parent and should have been setup.
-      # can be used for postProc. Example: initialization parameters are stored and
+      # can be used for postProcessing. Example: initialization parameters are stored and
       # executed in one go.
-      # the default executes any gathered macro. So you should call this first
+      # the default executes any gathered macro's. Then, if a model was set it calls
+      # updateModel to initialize all connecting controls.
+      # So you should call this first if you override this method
       def postSetup
 #         tag "#{self}#postSetup, model=#@model"
         executeMacros
@@ -572,12 +676,12 @@ module Reform
         reform_class.new_qt_implementor(qt_implementor_class, self, qparent)
       end
 
-      # widget -> bool.  Returns true if the control is a widget.
+      # Returns true if the control is a widget.
       # Required because some things (like scene) inherit Widget but are realy no widgets
       def widget?
       end
 
-      # layout -> bool. Returns true if the control is a layout  Better use Layout === x
+      #Returns true if the control is a layout  Better use Layout === x
       def layout?
       end
 
@@ -586,6 +690,8 @@ module Reform
       end
 
       # may return nil or a layout instantiator symbol (like :formlayout, :hbox, :vbox)
+      # This answers the question: if this control is added to a form, which kind of
+      # layout should we use. The default is :vbox.
       def auto_layouthint
         # labeledwidget takes formlayout, which makes sense.
         # If I pass nil back the form will add the widget as is, and the result is pretty
@@ -593,23 +699,21 @@ module Reform
         :vbox
       end
 
-=begin rdoc
-        - the specific value of nil stands for a nonset value. This could be automatically
-          converted to 0 or an empty string, but the control must not treat the value as
-          valid by default and validation must be triggered if the user attempts to 'commit'
-          the formdata.
-          - controls that can be changed should be protected if the accompanying setter is
-          not available.
-          - controls can set a @connector, that overrides @name.
-          - if :initializing is set in 'options' the control must keep or set its 'clean'
-          state, and must
-          treat the field as being untouched by the user. In particular no triggers should be
-          applied, and no validation should take place.
-          - controls that have components must propagate the connection, even if they have no
-          name.
-          - if the value of a control does not change by the connect operation, no triggers must
-          be called (at least not now).
-=end
+#         - the specific value of nil stands for a nonset value. This could be automatically
+#           converted to 0 or an empty string, but the control must not treat the value as
+#           valid by default and validation must be triggered if the user attempts to 'commit'
+#           the formdata.
+#         - controls that can be changed should be protected if the accompanying setter is
+#           not available.
+#         - controls can set a @connector, that overrides @name.
+#         - if :initializing is set in 'options' the control must keep or set its 'clean'
+#           state, and must
+#           treat the field as being untouched by the user. In particular no triggers should be
+#           applied, and no validation should take place.
+#         - controls that have components must propagate the connection, even if they have no
+#           name.
+#         - if the value of a control does not change by the connect operation, no triggers must
+#           be called (at least not now).
       def updateModel aModel, propagation
 #         tag "#{self}::updateModel(#{aModel}, #{propagation.inspect}), connector=#{connector}"
         if (cid = connector) && propagation.sender != self && propagation.changed?(cid)
@@ -630,6 +734,7 @@ module Reform
       def effectiveModel?
       end
 
+      # returns the enclosing frame (or itself, if it is a frame)
       def frame_ex
         if Frame === self then self else parent.frame_ex end
       end

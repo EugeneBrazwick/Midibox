@@ -7,15 +7,18 @@
 
 VALUE alsaClientPoolClass;
 
-/*
-void    snd_seq_client_pool_copy (snd_seq_client_pool_t *dst, const snd_seq_client_pool_t *src)
-copy one snd_seq_client_pool_t to another
+/** Document-method: RRTS::Driver::AlsaClientPool_i#copy_to
+call-seq:  copy_to([other=nil]) -> clone
+
+Parameters:
+[other] if given copy +self+ to it, otherwise create a copy and return it. This copy need
+        not be freed.
 */
 ALSA_MIDI_COPY_TO_TEMPLATE(client_pool, ClientPool)
 
-/*
-int     snd_seq_client_pool_get_client (const snd_seq_client_pool_t *info)
-Get the client id of a queue_info container.
+/** call-seq: client() -> int
+
+Returns: the client id
 */
 static VALUE
 wrap_snd_seq_client_pool_get_client(VALUE v_pool)
@@ -25,9 +28,9 @@ wrap_snd_seq_client_pool_get_client(VALUE v_pool)
   return INT2NUM(snd_seq_client_pool_get_client(pool));
 }
 
-/*
-size_t  snd_seq_client_pool_get_output_pool (const snd_seq_client_pool_t *info)
-Get the output pool size of a queue_info container.
+/** call-seq: output_pool() -> int
+
+Returns: the output pool size
 */
 static VALUE
 wrap_snd_seq_client_pool_get_output_pool(VALUE v_pool)
@@ -37,9 +40,9 @@ wrap_snd_seq_client_pool_get_output_pool(VALUE v_pool)
   return UINT2NUM(snd_seq_client_pool_get_output_pool(pool));
 }
 
-/*
-size_t  snd_seq_client_pool_get_input_pool (const snd_seq_client_pool_t *info)
-Get the input pool size of a queue_info container.
+/** call-seq: input_pool() -> int
+
+Returns: Get the input pool size
 */
 static VALUE
 wrap_snd_seq_client_pool_get_input_pool(VALUE v_pool)
@@ -49,9 +52,9 @@ wrap_snd_seq_client_pool_get_input_pool(VALUE v_pool)
   return UINT2NUM(snd_seq_client_pool_get_input_pool(pool));
 }
 
-/*
-size_t  snd_seq_client_pool_get_output_room (const snd_seq_client_pool_t *info)
-Get the output room size of a queue_info container.
+/** call-seq: output_room() -> int
+
+Returns: the output room size
 */
 static VALUE
 wrap_snd_seq_client_pool_get_output_room(VALUE v_pool)
@@ -61,9 +64,9 @@ wrap_snd_seq_client_pool_get_output_room(VALUE v_pool)
   return UINT2NUM(snd_seq_client_pool_get_output_room(pool));
 }
 
-/*
-size_t  snd_seq_client_pool_get_output_free (const snd_seq_client_pool_t *info)
-Get the available size on output pool of a queue_info container.
+/** call-seq: output_free() -> int
+
+Returns: the available size on the output pool
 */
 static VALUE
 wrap_snd_seq_client_pool_get_output_free(VALUE v_pool)
@@ -73,9 +76,9 @@ wrap_snd_seq_client_pool_get_output_free(VALUE v_pool)
   return UINT2NUM(snd_seq_client_pool_get_output_free(pool));
 }
 
-/*
-size_t  snd_seq_client_pool_get_input_free (const snd_seq_client_pool_t *info)
-Get the available size on input pool of a queue_info container.
+/** call-seq: input_free() -> int
+
+Returns: the available size in bytes on the input pool
 */
 static VALUE
 wrap_snd_seq_client_pool_get_input_free(VALUE v_pool)
@@ -85,9 +88,9 @@ wrap_snd_seq_client_pool_get_input_free(VALUE v_pool)
   return UINT2NUM(snd_seq_client_pool_get_input_free(pool));
 }
 
-/*
-void    snd_seq_client_pool_set_output_pool (snd_seq_client_pool_t *info, size_t size)
-Set the output pool size of a queue_info container.
+/** call-seq: output_pool = size
+
+Set the output pool size
 */
 static VALUE
 wrap_snd_seq_client_pool_set_output_pool(VALUE v_pool, VALUE v_sz)
@@ -98,9 +101,9 @@ wrap_snd_seq_client_pool_set_output_pool(VALUE v_pool, VALUE v_sz)
   return Qnil;
 }
 
-/*
-void    snd_seq_client_pool_set_input_pool (snd_seq_client_pool_t *info, size_t size)
-Set the input pool size of a queue_info container.
+/** call-seq:  input_pool = size
+
+Set the input pool size
 */
 static VALUE
 wrap_snd_seq_client_pool_set_input_pool(VALUE v_pool, VALUE v_sz)
@@ -111,9 +114,9 @@ wrap_snd_seq_client_pool_set_input_pool(VALUE v_pool, VALUE v_sz)
   return Qnil;
 }
 
-/*
-void    snd_seq_client_pool_set_output_room (snd_seq_client_pool_t *info, size_t size)
-Set the output room size of a queue_info container.
+/** call-seq  output_room = size
+
+Set the output room size
 */
 static VALUE
 wrap_snd_seq_client_pool_set_output_room(VALUE v_pool, VALUE v_sz)
@@ -124,13 +127,15 @@ wrap_snd_seq_client_pool_set_output_room(VALUE v_pool, VALUE v_sz)
   return Qnil;
 }
 
-/* AlsaClientPool_i
-I have no idea what the use of all this is.
-Perhaps a clientpool is the total amount of memory that can be allocated to buffers and queues.
-*/
 void
 alsa_client_pool_init()
 {
+  /** Document-class: RRTS::Driver::AlsaClientPool_i
+
+  I have no idea what the use of all this is.
+  Perhaps a clientpool is the total amount of memory that can be allocated to buffers and queues
+  for some client.
+*/
   alsaClientPoolClass = rb_define_class_under(alsaDriver, "AlsaClientPool_i", rb_cObject);
   rb_define_method(alsaClientPoolClass, "copy_to", RUBY_METHOD_FUNC(wrap_snd_seq_client_pool_copy_to), -1);
   rb_define_method(alsaClientPoolClass, "client", RUBY_METHOD_FUNC(wrap_snd_seq_client_pool_get_client), 0);

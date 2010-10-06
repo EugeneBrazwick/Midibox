@@ -1,14 +1,248 @@
 #!/usr/bin/ruby
 # test suite for nodes using rspec
-#  Please use 'rake test' to run, as this sets the pwd correctly
-# Otherwise run from toplevel (example)
-#               ruby test/ts_nodes.rb -n /identity/
-# using '-n' runs only matching 'shoulds'. n == nifty.
-require 'spec'
-require_relative '../lib/rrts/rrts'
-require_relative '../lib/rrts/node/track'
+# Otherwise run (example)
+#      spec ts_nodes_spec.rb --color --example Node::MidiFileReader
+require 'rrts/rrts'
+require 'rrts/node/track'
 include RRTS
+include Node
+
 # tag "HERE?"
+
+# The Consumer/Producer classes are not tied to midievents.
+# The only requirement is that the elements have a 'tick'
+# This can just be the time in seconds, using a floating point
+# timer with a nanosecond resolution (1_000_000_000 ns == 1 s)
+# just say Time.new.to_f - time0.to_f
+# Timestamps are relative to the start of the 'queue'. Let's say
+# the time the recording or playback started. Note that this is
+# still called 'absolute' time.
+class MockEvent
+  private
+    def initialize tick, bogo
+      @tick, @bogo = tick, bogo
+    end
+  public
+    attr :tick
+    attr_accessor :bogo
+end
+
+# since Producer is abstract it will not do a lot.
+class MockProducer  < Producer
+
+    # the events that we will produce
+    Data = {0.0001 => :hallo,
+            0.0010 => :world,
+            0.02   => :more,
+            0.043  => :great,
+            0.12   => :things,
+            0.5    => :will,
+            1.0    => :follow,
+            1.1    => 'ifyouwaitlong',
+            1.2    => 'anddontforgetthecommas',
+            1.4    => :enough
+            }
+  public
+
+    # override
+    def each
+      return to_enum unless block_given?
+      Data.each { |k, v| yield MockEvent.new(k, v) }
+    end
+end
+
+class MockConsumer < Consumer
+  private
+    def initialize producer = nil, options = nil
+      @show_events = false # options must be set to defaults BEFORE calling 'super'
+#       tag "Calling super for #{self}"
+      super
+#       tag "done"
+      @receive_count = 0
+      @data = {}
+    end
+
+    def parse_option k, v
+      case k
+      when :show_events then @show_events = v
+      else super
+      end
+    end
+
+  public
+    # override
+    def consume producer, &when_done
+      each_fiber(when_done) do |ev|
+        if ev
+          tag("Received at %.5f %s" % [Time.now.to_f, ev.inspect]) if @show_events
+          @data[ev.tick] = ev.respond_to?(:bogo) ? ev.bogo : ev
+          @receive_count += 1
+        end
+      end
+          # *IMPORTANT*: any code here is executed BEFORE the loop!!
+          # I mean to say, there should not be any code here. It must return
+          # the result from the 'each_fiber' call.
+    end
+
+    attr :data, :receive_count
+end
+
+describe Producer do
+  it 'should produce events' do
+    producer = MockProducer.new
+    producer.run
+  end
+
+  # that didn't do a lot.... It did nothing. There are no consumers!!!
+
+  it 'should produce events for some consumer' do
+    t0 = Time.new
+    producer = MockProducer.new
+    consumer = MockConsumer.new(producer)
+    producer.run
+    consumer.data.should == MockProducer::Data
+    t1 = Time.new
+    (t1 - t0).should < 1.0  #within a second
+  end
+
+  # What about the timings?
+  # The events are supposed to be enqueued in an Alsa queue. That queue is responsible for
+  # the timed delivery of the event.
+  # In our simple case the data was all 'spammed'.
+  # Fortunately we can control the 'spamming' using write_ahead and sleeptime.
+  it 'should delay events' do
+    t0 = Time.new
+    producer = MockProducer.new(write_ahead: 0.2, sleeptime: 0.1)
+    consumer = MockConsumer.new(producer)
+    producer.run
+    consumer.data.should == MockProducer::Data
+    t1 = Time.new
+    (t1 - t0).should > 1.0  #guaranteed more than a second
+  end
+end
+
+describe 'Filter' do
+  it 'should be chainable' do
+    t0 = Time.new
+    producer = MockProducer.new
+    f1 = Filter.new producer
+    f2 = Filter.new f1
+    f3 = Filter.new f2
+    f4 = Filter.new f3
+    consumer = MockConsumer.new(f4)
+    producer.run
+    consumer.data.should == MockProducer::Data
+    consumer.receive_count == MockProducer::Data.length
+    t1 = Time.new
+#     tag "This took %.6f seconds" % (t1 - t0)   # 3 ms
+  end
+
+  it 'should be splittable' do
+    t0 = Time.new
+    producer = MockProducer.new
+    f1 = Filter.new producer
+    f2 = Filter.new producer
+    f3 = Filter.new producer
+    f4 = Filter.new producer
+    consumer = MockConsumer.new([f1, f2, f3, f4])#  show_events: true)
+    producer.run
+    # CUNNING! You know, consumer received each event 4 times, but since he stores a hash
+    # the values overwrite each other.... :)
+    # Not to worry, the insertion order does not matter for Hash equality.
+    # But this is still a fixed situation since only Producer will run a thread,
+    # while Filter is passive.
+    consumer.data.should == MockProducer::Data
+    # However:
+    consumer.receive_count == MockProducer::Data.length * 4
+    t1 = Time.new
+#     tag "This took %.6f seconds" % (t1 - t0)   # 35 ms
+  end
+
+  it 'should filter something' do
+    producer = MockProducer.new
+    f1 = Filter.new producer do |event| event.bogo != :great end
+    consumer = MockConsumer.new(f1)
+    producer.run
+    consumer.data.has_value?(:great).should == false
+    consumer.receive_count == MockProducer::Data.length - 1
+    consumer.data[0.043] = :great
+    consumer.data.should == MockProducer::Data
+  end
+
+  it 'should multi thread' do
+    t0 = Time.new
+    prods = []
+    4.times do
+      prods << MockProducer.new(write_ahead: 0.5, sleeptime: 0.3)
+    end
+    consumer = MockConsumer.new(prods)#  show_events: true)
+    prods.map(&:produce).map(&:join)
+    consumer.receive_count == MockProducer::Data.length * 4
+    t1 = Time.new
+    (t1 - t0).should >= 0.8  # note there is some inaccuracy
+    # this is not a good test, since the order of the events matters.
+    # if the produce calls are not multithreaded one would expect
+    # that each producer dumps a complete list.
+    # But we receive :hallo, :hallo, :hallo, ..... :enough, 'anddontforgetthecommas', :enough
+    # So this is reasonably mixed.
+  end
+end
+
+require 'rrts/node/mapper'
+
+describe Mapper do
+  it 'can be used to alter events' do
+    producer = MockProducer.new
+    mapper = Mapper.new producer do |event| event.bogo = :ni end
+    consumer = MockConsumer.new(mapper)
+    producer.run
+#     tag "data = #{consumer.data.inspect}"
+    consumer.data.all?{|k,v| v == :ni}.should == true
+  end
+end
+
+# Splitter is same as Filter but we get a stream of OK-ed events, and another with rejects.
+# It could use a 'case' even.
+
+require 'rrts/node/splitter'
+
+describe Identity do
+  it 'is the same an "always true" filter' do
+    producer = MockProducer.new
+    ident = Identity.new(producer)
+    c1 = MockConsumer.new(ident)
+    ident2 = Identity.new(ident)
+    c2 = MockConsumer.new(ident2)
+    producer.run
+    c1.data.should == MockProducer::Data
+    c2.data.should == MockProducer::Data
+  end
+end
+
+describe Splitter do
+#   tag "HEEEEREEE!"
+  it 'is the same as a MultiFilter' do
+#     tag "HERE!!!"
+    producer = MockProducer.new
+    splitter = Splitter.new(producer)
+#     tag "assign condition 1"
+    cond1 = splitter.condition(:begins_with_vowel) do |ev|
+#       tag("ev=#{ev}")
+      ev.bogo.to_s[0] =~ /[aeiouy]/
+    end
+    cond1.should be_a(Consumer)
+#     tag "assign cond2, cond1 = #{cond1}"
+    cond2 = splitter.condition(:begins_with_w) { |ev| ev.bogo.to_s[0] == 'w' }
+    c1 = MockConsumer.new(cond1)
+    c2 = MockConsumer.new(cond2)
+    c3 = MockConsumer.new(splitter[:begins_with_vowel])
+    producer.run
+#     tag "c1.data = #{c1.data.inspect}"
+    c1.data.all?{|k,v| v.to_s[0] =~ /[eiuoay]/}.should == true
+    c2.data.all?{|k,v| v.to_s[0] == 'w' }.should == true
+    c3.data.all?{|k,v| v.to_s[0] =~ /[eiuoay]/}.should == true
+  end
+end
 
 def file_del *files
   for i in files
@@ -16,20 +250,30 @@ def file_del *files
   end
 end
 
+require 'rrts/node/midifilereader'
+require 'rrts/node/chunk'
+require 'timeout'
+
+EuroDanceMid = File.dirname(__FILE__) + '/../fixtures/eurodance.midi'
+EuroDanceYaml = File.dirname(__FILE__) + '/../fixtures/eurodance.yaml'
+
 describe MidiFileReader do
   before do
-    Node::Track::reset_key
-    require_relative '../lib/rrts/node/midifilereader'
+    Track::reset_key
     # the default is to immediately read the entire file.
     # And use 'non-spam' mode for 'each'. This means that
     # we run no more than three seconds ahead of the current time.
-    @input = Node::MidiFileReader.new('fixtures/eurodance.midi', split_channels: true,
-                                      spam: true # !
-                                    )
+    @input = MidiFileReader.new(EuroDanceMid, split_channels: true,
+                                spam: true # !
+                               )
   end
 
   it "should be able to setup properly" do
 #       STDERR.puts "yes?"
+  end
+
+  it "should split_channels must be set" do
+    @input.split_channels?.should == true
   end
 
     # the events have no track!??
@@ -40,10 +284,6 @@ describe MidiFileReader do
     @input.find_all { |ev| ControllerEvent === ev }.all? { |ev| ev.track }.should == true
   end
 
-  it "should split_channels must be set" do
-    @input.split_channels?.should == true
-  end
-
   it "should contain 1767 events" do
     # these events are NEVER processed
     @input.count.should == 1767
@@ -52,138 +292,213 @@ describe MidiFileReader do
       # also, count uses each which always 'spams' (fortunately)
   end
 
-=begin TAKES TOO LONG (18 seconds)
-    should "create a non spamming thread for 'run'" do
-      t1 = Time.now
-      @input.run
-      t2 = Time.now
-      # on very slow computers spamming or not is the same and this
-      # test will fail. Consider your machine to not be able to run this program anyway
-      assert_operator(t2 - t1, :>=, 18.0)
-    end
-=end
+  it "cannot be fooled by a fool" do
+    t0 = Time.now
 
-  it "should create 9 tracks with 985 events" do
-    require_relative '../lib/rrts/node/chunk'
-    chunk = Node::Chunk.new(@input)
-    @input.run
-    chunk.listing.count.should == 9
-    chunk.count.should == 985
-    # read: should STILL be
-    chunk.count.should == 985
+# interesting example of how things fail...
+
+    input2 = MidiFileReader.new(EuroDanceMid, split_channels: true)
+    input2.run
+
+#What's wrong with this?
+
+#The 'run' code is quite clever. There are no consumers, and as such 'running' is useless.
+#It will return immediately.
+    (Time.now - t0).should <= 0.1
   end
 
-  it "should be able to run a spamming thread quickly" do
-    t1 = Time.now
+  it "create a non spamming thread for 'run'" do
+    t0 = Time.now
+    input2 = MidiFileReader.new(EuroDanceMid, split_channels: true)
+    cons = MockConsumer.new(input2)  # kind of '/dev/null'
+    begin
+      # I tear it down. Because otherwise it takes far too long
+      Timeout::timeout(3.0) do
+        # run will read the MIDI ticks and send them in a controlled way to the consumer.
+        # But *not* exactly on time
+        # We leave that to the Alsa queue system (smart as we are)
+        # You cannot possibly think a ruby program can send realtime events
+        input2.run
+      end
+    rescue Timeout::Error
+    end
+    (Time.now - t0).should >= 3.0
+    cons.receive_count.should >= 400
+  end
+
+  it "should run a spamming thread quickly" do
+    t0 = Time.now
+    cons = MockConsumer.new(@input)  # kind of '/dev/null'
     @input.run
-    # My measured time is 0.28 seconds
-    (Time.now - t1).should <= 5.0
+    (Time.now - t0).should <= 0.5
+    cons.receive_count.should == 1767
+  end
+
+end
+
+describe Chunk do
+  it "should create 9 tracks with 985 events" do
+    input = MidiFileReader.new(EuroDanceMid, split_channels: true, spam: true)
+    chunk = Node::Chunk.new(input)
+    chunk.track.should == nil
+    input.run
+    chunk.track.should_not == nil
+    chunk.listing.count.should == 9
+    chunk.listing[0].should be_a(Track)
+    # This enumerates chunk:
+    chunk.count.should == 985
+    # read: should STILL be 985, since it calls 'each' again.
+    chunk.count.should == 985
+    # but attempt to reiterate input will fail:
+    -> do input.count end.should raise_error(IOError)
   end
 end
 
+describe MidiPipeReader do
+  it "should create 9 tracks with 985 events" do
+    input = MidiPipeReader.new('cat ' + EuroDanceMid, split_channels: true, spam: true)
+    chunk = Node::Chunk.new(input)
+    chunk.track.should == nil
+    input.run
+    chunk.track.should_not == nil
+    chunk.listing.count.should == 9
+    chunk.listing[0].should be_a(Track)
+    # This enumerates chunk:
+    chunk.count.should == 985
+    # read: should STILL be 985, since it calls 'each' again.
+    chunk.count.should == 985
+    # but attempt to reiterate input will fail:
+    -> do input.count end.should raise_error(IOError)
+  end
+end
+
+require 'rrts/node/midifilewriter'
+
 describe MidiFileWriter do
   before do
-    Node::Track::reset_key
-    require_relative '../lib/rrts/node/midifilereader'
-    @input = Node::MidiFileReader.new('fixtures/eurodance.midi', no_tampering: true,
-                                      spam: true)
-    require_relative '../lib/rrts/node/midifilewriter'
-    @output = Node::MidiFileWriter.new('/tmp/t.midi', @input)
+    Track::reset_key      # reset the trackid generator
+    @input = MidiFileReader.new(EuroDanceMid, no_tampering: true, spam: true)
+#     tag "creating @output"
+    @output = MidiFileWriter.new('/tmp/t.midi', @input)
+#     tag "OK"
   end
 
   it  "should save MIDI exactly as being read" do
+#     tag "Calling run"
     @input.run
-    `diff /tmp/t.midi fixtures/eurodance.midi`
+#     tag "Executing: diff /tmp/t.midi #{EuroDanceMid}"
+    `diff /tmp/t.midi #{EuroDanceMid}`
+#     tag "test exitstatus #{$?}"
      $?.exitstatus.should == 0
   end
 
   it "should create something that can be read" do
     @input.run
-    Node::MidiFileReader.new('/tmp/t.midi').count.should == 1767
+    MidiFileReader.new('/tmp/t.midi').count.should == 1767
   end
 end
 
-describe YamlWriter do
+require 'rrts/node/yamlwriter'
+
+describe YamlFileWriter do
   before do
-    Node::Track::reset_key
-    require_relative '../lib/rrts/node/midifilereader'
-    @input = Node::MidiFileReader.new('fixtures/eurodance.midi', no_tampering: true, spam: true)
-    require_relative '../lib/rrts/node/yamlwriter'
-    @output = Node::YamlFileWriter.new('/tmp/t.yaml', @input)
+    Track::reset_key
+    @input = MidiFileReader.new(EuroDanceMid, no_tampering: true, spam: true)
+    @output = YamlFileWriter.new('/tmp/t.yaml', @input)
   end
 
   it "should save properly" do
     @input.run
     `file --brief /tmp/t.yaml`.chomp.should =~ /ASCII text/
-    `diff /tmp/t.yaml fixtures/eurodance.yaml`
+    `diff /tmp/t.yaml #{EuroDanceYaml}`
      $?.exitstatus.should == 0
   end
 
 end
 
-describe YamlReader
+require 'rrts/node/yamlreader'
+
+describe YamlFileReader do
   before do
-    Node::Track::reset_key
-    require_relative '../lib/rrts/node/midifilereader'
-    input = Node::MidiFileReader.new('fixtures/eurodance.midi', no_tampering: true, spam: true)
-    require_relative '../lib/rrts/node/yamlwriter'
-    filter = Node::YamlFileWriter.new('/tmp/t.yaml', input)
+    file_del('/tmp/t.yaml')
+    Track::reset_key
+    input = MidiFileReader.new(EuroDanceMid, no_tampering: true, spam: true)
+    YamlFileWriter.new('/tmp/t.yaml', input)
     input.run
-    require_relative '../lib/rrts/node/yamlreader'
-    @input = Node::YamlFileReader.new('/tmp/t.yaml', spam: true)
+    @input = YamlFileReader.new('/tmp/t.yaml', spam: true)
   end
 
   it "should save properly" do
     file_del('/tmp/t2.yaml')
 #     assert(@input.consumers, 'consumers not set in producer')
-    @input.consumers.should != nil
-    output = Node::YamlFileWriter.new('/tmp/t2.yaml', @input)
+    @input.consumers.should_not == nil
+    YamlFileWriter.new('/tmp/t2.yaml', @input)
     @input.run
     File.exists?('/tmp/t2.yaml').should == true # , 'YamlFileWriter dit not write (or close?) file')
     `diff /tmp/t.yaml /tmp/t2.yaml`
     $?.exitstatus.should == 0
   end
 
+  it "should work with timing as well" do
+    t0 = Time.now
+    input = YamlFileReader.new('/tmp/t.yaml')
+    output = MockConsumer.new(input)
+    begin
+      Timeout::timeout(3.0) do
+#         tag "RUN"
+        input.run
+      end
+    rescue Timeout::Error
+    end
+    (Time.now - t0).should <= 5.0
+    output.receive_count.should < 500
+  end
+
   it "should have the same events as the midifilereader" do
     file_del('/tmp/t4.yaml')
-    c0 = Node::MidiFileReader.new('fixtures/eurodance.midi', no_tampering: true, spam: true).count
-    output = Node::YamlFileWriter.new('/tmp/t4.yaml', @input)
+    c0 = MidiFileReader.new(EuroDanceMid, no_tampering: true, spam: true).count
+    YamlFileWriter.new('/tmp/t4.yaml', @input)
     @input.run
-    assert(File.exists?('/tmp/t4.yaml'), 'YamlFileWriter dit not write (or close?) file')
-    c1 = Node::MidiFileReader.new('fixtures/eurodance.midi', no_tampering: true, spam: true).count
-    c2 = Node::YamlFileReader.new('/tmp/t4.yaml', spam: true).count
+    File.exists?('/tmp/t4.yaml').should == true
+#     tag "MACHINERY1: #{MidiFileReader.new(EuroDanceMid, no_tampering: true, spam: true).map{|ev|ev.class}.inspect}"
+    c1 = MidiFileReader.new(EuroDanceMid, no_tampering: true, spam: true).count
+#     tag "MACHINERY2: #{YamlFileReader.new(EuroDanceYaml, spam: true).map{|ev|ev.class}.inspect}"
+    c2 = YamlFileReader.new('/tmp/t4.yaml', spam: true).count
+#     tag "c1 = #{c1}, c2 = #{c2}"
     c1.should == 1767
-    c2.should == 1767
+    c2.should == c1
+    `diff /tmp/t.yaml /tmp/t4.yaml`
+    $?.exitstatus.should == 0
   end
 end
 
-describe Identity
-  include RRTS
+require_relative '../bin/node_identity'
+
+describe 'I' do
 
   before do
-    Node::Track::reset_key
+    Track::reset_key
   end
 
   it 'should create 2 identical yaml files' do
 #       tag "DELETE"
     file_del('/tmp/t6.midi', '/tmp/t5.yaml', '/tmp/t5.yaml')
-    require_relative '../bin/node_identity'
     # Why does it not understand module Nodes here???
 #       tag "create I 1"
 #       trace do
     Nodes::I.new('--spam', '--input=fixtures/eurodance.midi',
-                    '--output=/tmp/t6.midi', '--no-tampering').run
+                 '--output=/tmp/t6.midi', '--no-tampering').run
     File::exists?('/tmp/t6.midi').should == true
 #       end
 #       tag "create I 2"
-    Node::Track::reset_key
+    Track::reset_key
     Nodes::I.new('--spam', '--input=fixtures/eurodance.midi',
                   '--output=/tmp/t5.yaml', '--no-tampering').run
     File::exists?('/tmp/t5.yaml').should == true
-    Node::Track::reset_key
+    Track::reset_key
 
 #       tag "create I 3"
-    RRTS::Nodes::I.new('--spam', '--input=/tmp/t6.midi',
+    Nodes::I.new('--spam', '--input=/tmp/t6.midi',
                   '--output=/tmp/t6.yaml', '--no-tampering').run
     File::exists?('/tmp/t6.yaml').should == true
     `diff /tmp/t5.yaml /tmp/t6.yaml`
@@ -192,49 +507,23 @@ describe Identity
   end
 end
 
-describe Splitter
-  before do
-#       tag "here!!!"
-    require_relative '../lib/rrts/node/midifilereader'
-    # ANY node is automatically a 'splitter'. Just connect
-    # multiple consumers on top
-    @input = Node::MidiFileReader.new('fixtures/eurodance.midi', spam: true)
-#       require_relative '../lib/rrts/node/splitter'
-#       @splitter = Node::Splitter.new(@input)
-    # currently it is fuzzy about what should go in lib/rrts/node
-    # and what is a script (like node_splitter.rb)
-    # will be moved later then
-  end
-
-  it "should be able to setup properly" do
-  end
-
-  it "should be able to accept a filter" do
-    filter = Node::Filter.new(@input) { |ev| ev.channel == 1 }
-    require_relative '../lib/rrts/node/yamlwriter'
-    Node::YamlFileWriter.new('/tmp/t7.yaml', filter)
-    @input.run
-    File.exists?('/tmp/t7.yaml').should == true
-  end
-
-  it "should be able to accept multiple filters" do
-    filter = []
-    filter << Node::Filter.new(@input) { |ev| ev.channel.nil? }
-    (1..16).each do |i|
-      # closures are super!  (But do NOT use a 'for' loop here (you will be sorry))
-      filter << Node::Filter.new(@input) { |ev| ev.channel == i }
-    end
-    require_relative '../lib/rrts/node/yamlwriter'
-    Node::YamlFileWriter.new('/tmp/chnil.yaml', filter[0])
-    for i in 1..16
-      Node::YamlFileWriter.new("/tmp/ch#{i}.yaml", filter[i])
-    end
-    @input.run
-    File.exists?('/tmp/chnil.yaml').should == true
-    for i in 1..16
-      `diff /tmp/ch#{i}.yaml fixtures/split/ch#{i}.yaml`
-      $?.exitstatus.should == 0
-    end
+# Some patience is required, it takes about 30 seconds....
+require 'rrts/node/player'
+# require 'rrts/midievent'
+describe Player do
+  it 'should send stuff to a midi port' do
+#     producer = MidiFileReader.new(EuroDanceMid)
+=begin IMPORTANT NOTICE
+if you get bugged with Syck::Objects
+then he could not find the classes to instantiate.  MidiEvent etc. must be 'required'!!
+=end
+    producer = YamlFileReader.new(EuroDanceYaml, spam: true)
+    producer.should be_spamming # This is OK, but no use here.  Apparently queueing up events will block the
+      # sequencer anyway....
+    player = Player.new('Midi Through Port-0', producer)# , spam: true)
+#     player.should be_spamming     # That works  BUT IS UTTERLY STUPID!  the player is a consumer!!!
+#     player = Player.new('UM-2 MIDI 2', producer)
+    producer.run
   end
 end
 

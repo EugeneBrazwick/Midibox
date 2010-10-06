@@ -1,36 +1,37 @@
--0001  wo feb 24 11:40:47 CET 2010 TODO event_output MidiEvent support
-       za mrt  6 22:48:43 CET 2010 DONE
--0002  do feb 25 22:22:53 CET 2010 TODO make rplaymidi++ work as a two step system
+-0001  Wed Feb 24 11:40:47 CET 2010 TODO event_output MidiEvent support
+       Sat Mar  6 22:48:43 CET 2010 DONE
+-0002  Thu Feb 25 22:22:53 CET 2010 TODO make rplaymidi++ work as a two step system
                                        a) build an in-memory chunk     NODE -> midifile->chunk
                                        b) play the tracks in the chunk NODE -> chunk -> device[s]
-       vr mrt 19 21:00:38 CET 2010 more or less, by virtue of midifilereader + -writer.
--0003 za feb 27 21:50:12 CET 2010 BUG rplaymidi reads a NoteOn without a NoteOff
+       Fri Mar 19 21:00:38 CET 2010 more or less, by virtue of midifilereader + -writer.
+-0003 Sat Feb 27 21:50:12 CET 2010 BUG rplaymidi reads a NoteOn without a NoteOff
          in fixtures/eurodance.midi.  Note 12, Rhythm track. I believe this was recorded
          with arecordmidi. So who's to blame? Is there an official midi file dumper somewhere?
-      di mrt 16 20:26:02 CET 2010 FIXED. At least in midifilereader.rb
-0004 do mrt  4 23:20:06 CET 2010 BUG rmidiroute.rb:14:in `block in midi_route': undefined method `set_subs'
--0005 do mrt  4 23:24:01 CET 2010 TODO writing ev: param := ':modwheel', reading same event -> param == 1.
+      Tue Mar 16 20:26:02 CET 2010 FIXED. At least in midifilereader.rb
+0004 Thu Mar  4 23:20:06 CET 2010 BUG rmidiroute.rb:14:in `block in midi_route': undefined method `set_subs'
+    NOTE TO SELF: the subscription API was incomplete, but this has been mended.
+-0005 Thu Mar  4 23:24:01 CET 2010 TODO writing ev: param := ':modwheel', reading same event -> param == 1.
                                       This is an inconsistency. Must be mapped back.
-     za mrt  6 22:48:43 CET 2010 DONE
--0006 ma mrt  8 21:08:06 CET 2010 BUG emptying the buffers is no good enough to avoid hanging notes.
+      Sat Mar  6 22:48:43 CET 2010 DONE
+-0006 Mon Mar  8 21:08:06 CET 2010 BUG emptying the buffers is no good enough to avoid hanging notes.
                                      NoteOns may already have arrived in a device so we MUST send the NoteOffs.
                                      First make sure we use MidiEvent.
           I noticed the following: the INT-handler truly gets first. So we flush the queue.
           After that NoteOff's for hanging notes are sent, but to no avail
           Finally we get in the ensure of the Sequencer constructor.
           No problem, use rb_thread_blocking_region and SignalException
-      ma mrt 29 17:29:03 CEST 2010
--0007 do mrt 11 21:39:48 CET 2010 BUG using alsa mallocs causes a critical condition since it uses
+      Mon Mar 29 17:29:03 CEST 2010
+-0007 Thu Mar 11 21:39:48 CET 2010 BUG using alsa mallocs causes a critical condition since it uses
           malloc (probably) and not the ruby wrappers.  ALLOC or ALLOC_N.
           Also a failure should raise NoMemError. The least I can do is make sure these all go
           trough one container.
-     za mrt 27 21:40:51 CET 2010
--0008 do mrt 11 23:36:01 CET 2010 TODO: queue_timer interface is lacking...
-     ma mrt 15 19:00:52 CET 2010 DONE
--0009 ma mrt 15 19:01:17 CET 2010 BUG: merging events through pipes cannot work since notes will
+      Sat Mar 27 21:40:51 CET 2010
+-0008 Thu Mar 11 23:36:01 CET 2010 TODO: queue_timer interface is lacking...
+      Mon Mar 15 19:00:52 CET 2010 DONE
+-0009 Mon Mar 15 19:01:17 CET 2010 BUG: merging events through pipes cannot work since notes will
           be out of order.
-     ma mrt 15 20:13:17 CET 2010 FIXED
--0010 wo mrt 24 23:41:10 CET 2010 TODO: snd_seq_event_output should signal a possible block.
+     Mon Mar 15 20:13:17 CET 2010 FIXED
+-0010 Wed Mar 24 23:41:10 CET 2010 TODO: snd_seq_event_output should signal a possible block.
         Also we should take care in not sending half messages. So we must make sure ahead that there
         will be enough space. Compare SYSEX handling where outputbuffer is sometimes increased.
         Problem: sometimes we send 2 or 3 events. Could be bad if ev1 is send and then 2 fails.
@@ -40,17 +41,18 @@
         All that is left is to use trap on INT etc. to execute remove stuff on the queue.
         See miniarp.
         The entire way blocking woks has been reviewed
-    ma mrt 29 17:29:03 CEST 2010
--0011 za mrt 27 18:18:19 CET 2010 FIXME: I discovered rb_thread_blocking_region.
+      Mon Mar 29 17:29:03 CEST 2010
+-0011 Sat Mar 27 18:18:19 CET 2010 FIXME: I discovered rb_thread_blocking_region.
         This means there is really no problem using blocking after all.
         Should wrap ALL potentially blocking calls. I don't know for sure if this is the case...
-     za mrt 27 21:41:42 CET 2010
-0012 ma mrt 29 17:30:34 CEST 2010 TODO: missing events in alsa_seq.cpp event_output
+      Sat Mar 27 21:41:42 CET 2010
+0012 Mon Mar 29 17:30:34 CEST 2010 TODO: missing events in alsa_seq.cpp event_output
       queue messages and alsa connection messages are blatantly missing.
       To see this disconnect two ports using kaconnect, and player complains.
-0013 ma mrt 29 17:33:12 CEST 2010 TODO: checking impact GC on realtime filters
+      NOTE TO SELF:  these events are sent on port 'SYSTEM ANNOUNCE'. It probably works.
+0013 Mon Mar 29 17:33:12 CEST 2010 TODO: checking impact GC on realtime filters
       There is a GC.count method that tells you how many times the GC has run.
-0014 ma mrt 29 21:21:36 CEST 2010 HOWTO implement splitter.
+-0014 Mon Mar 29 21:21:36 CEST 2010 HOWTO implement splitter.
       The next task is to split a recording into its separate channels and save these
       and then to play them back simultaneously (which is the reverse process).
         I) could make a node with an outputconnector per channel and then connect the yamlwriters
@@ -75,7 +77,8 @@
       on an event that is possible. The query would obviously be a ruby block.
       Indentity can be seen as a Splitter with { |ev| true } as its condition.
       A Splitter must be given names + conditions to setup its output structure.
-0015 do apr  1 10:40:41 CEST 2010 TODO: review 'combine' and split options. Currently only active
+   Fri Oct  8 21:28:25 CEST 2010 FIXED
+0015 Thu Apr 1 10:40:41 CEST 2010 TODO: review 'combine' and split options. Currently only active
     in Chunk#consume which is stupid and the wrong place.  The previous version had major problems
     with blocking but that is no longer the case.  So this can be done by filters.
     Well, 'split_channels' really only applies to Chunk at the moment. All producers
@@ -85,12 +88,12 @@
     still delays the original noteon message!  So it depends on the situation. And it is not
     a big deal if disfunctional! YamlWriter should be able to use it though. And MidiFileReader
     could use it.  Workaround: use a chunk filter.
-0016 do apr  1 23:10:40 CEST 2010 FIXME: CTRL-C + Player -> small delay shutting down
+0016 Thu Apr 1 23:10:40 CEST 2010 FIXME: CTRL-C + Player -> small delay shutting down
     This can be avoided by sending a special InterruptEvent if the caller is interrupted (which
     is now more likely then Player itself). In fact Player cannot be interrupted since it calls
     each_fiber which does not return (it's weird). On receipt of this event we clean
     the queue (but no close yet)
--0017 do apr  1 23:14:14 CEST 2010 BUG: Player + threads deadlocks. But it strange since basicly,
+-0017 Thu Apr 1 23:14:14 CEST 2010 BUG: Player + threads deadlocks. But it's strange since basicly,
     there is only one extra thread, because the main process is just calling 'join'.
     It may also be event_output hanging. But why? What have threads got to do with this?
     It is now certain that event_output() hangs (the wrapper in alsa_midi.so)
@@ -98,10 +101,24 @@
     callback. What is likely happening is that the GIL somehow got locked.
     This could then be fixed by putting it in a more precise spot. It now embraces too much code,
     that would not block anyway.
-     vr apr  2 12:24:10 CEST 2010
-0018 vr apr  2 10:36:35 CEST 2010 FIXME: Chunk as a producer does not create the TrackEvents and
+     Fri Apr 2 12:24:10 CEST 2010
+0018 Fri Apr 2 10:36:35 CEST 2010 FIXME: Chunk as a producer does not create the TrackEvents and
     the initial tempo may also be missing.
-0019 Wed Sep 29 19:59:26 CEST 2010 BUG: rrecordmidi++ does not understand '-?' for --help
-0020 Wed Sep 29 20:13:13 CEST 2010 bin/node_identity.rb --output='UM-2 MIDI 2' --input=/tmp/t.yaml GIVES:
+-0019 Wed Sep 29 19:59:26 CEST 2010 BUG: rrecordmidi++ does not understand '-?' for --help
+    Wed Oct  6 15:49:47 CEST 2010
+-0020 Wed Sep 29 20:13:13 CEST 2010 bin/node_identity.rb --output='UM-2 MIDI 2' --input=/tmp/t.yaml GIVES:
     /home/ara/Midibox/lib/rrts/midiqueue.rb:88:in `set_queue_tempo':
     wrong argument type RRTS::Driver::AlsaQueueTempo_i (expected Data) (TypeError)
+        from /home/ara/Midibox/lib/rrts/midiqueue.rb:94:in `tempo='
+        from /home/ara/Midibox/lib/rrts/midiqueue.rb:53:in `initialize'
+        from /home/ara/Midibox/lib/rrts/sequencer.rb:494:in `new'
+        from /home/ara/Midibox/lib/rrts/sequencer.rb:494:in `create_queue'
+        from /home/ara/Midibox/lib/rrts/node/player.rb:145:in `block in consume'
+        from /home/ara/Midibox/lib/rrts/node/node.rb:64:in `block (3 levels) in each_fiber'
+        from /usr/lib/ruby/1.9.1/monitor.rb:201:in `mon_synchronize'
+        from /home/ara/Midibox/lib/rrts/node/node.rb:62:in `block (2 levels) in each_fiber'
+        from /home/ara/Midibox/lib/rrts/node/node.rb:61:in `loop'
+        from /home/ara/Midibox/lib/rrts/node/node.rb:61:in `block in each_fiber'
+    It seems that AlsaQueueTempo_i is never seen as originating from snd_seq_queue_tempo_malloc??
+    Fri Oct  8 21:26:52 CEST 2010 FIXED
+0021 Fri Oct  8 21:26:01 CEST 2010.  Change 'skew' consistently into a float.

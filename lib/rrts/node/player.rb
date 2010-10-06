@@ -22,43 +22,54 @@ module RRTS
       NonBlocking = true
 
       private
-=begin rdoc
-Create a new player
-If _input_node_ is not nil it immediately serve as input. The constructor will then not
-return until the input is exhausted.
-The +producer+ can be nil (default) or a single inputnode, or an array of inputnodes.
-
-*important*: I noticed delays if a Recorder node is present with a different client_name.
-Valid options are:
-  [ name ]  Name of the client, default is 'rplayer'
-  [ clientname ] Alias for _name_.
-  [ client_name ] Alias for _name_.
-  [ end_delay ] Sleeptime when quiting, default nil (== not). Do not pass 0.
-  [ blockingmode ] Blocking is the default
-  [ full_throttle ] Spam the output queue if true. This disabled the write_ahead and is default false
-  [ write_ahead ] In seconds. Default 3.0. Time to write ahead. Using tempo and ticks to keep
-      in sync. When the next is scheduled beyond this time we perform sleep(1).
-      This is ignored in _spam_ mode.
-  [ spam ] Same as full_throttle
-=end
+# Create a new player
+# If _input_node_ is not nil it immediately serves as input. The constructor will then not
+# return until the input is exhausted.
+# The +producer+ can be nil (default) or a single inputnode, or an array of inputnodes.
+#
+# *important*: I noticed delays if a Recorder node is present with a different client_name.
+#
+# Parameters:
+# [dest_port_specifier] Any valid port specification like '14:0' or 'UM-2 MIDI 1' or a MidiPort (etc)
+# [producer] optional parameter, can be replaced with +options+. If set it is the source for our data.
+#            See Consumer::new
+# [options] (can also be argument 2). Valid options are:
+#           [ name ]  Name of the client, default is 'rplayer'
+#           [ clientname ] Alias for _name_.
+#           [ client_name ] Alias for _name_.
+#           [ end_delay ] Sleeptime when quiting, default +nil+ (== not). Do not pass 0.
+#           [ blockingmode ] can be +:blocking+ or +:nonblocking+ (or the constants Blocking/NonBlocking)
+#                            +:blocking+ is the default
+#           [ full_throttle ] Spam the output queue if +true=. This disables the +write_ahead+ and is default false
+#           [ write_ahead ] In seconds. Default 3.0. Time to write ahead. Using tempo and ticks to keep
+#                           in sync. When the next is scheduled beyond this time we perform sleep(1).
+#                           This is ignored in _spam_ mode.
+#           [ spam ] Same as full_throttle
       def initialize dest_port_specifier, producer = nil, options = nil
         (options, producer = producer, nil) if Hash === producer
 #         tag "Player.new, options=#{options.inspect}"
         # candidate option:
         # [ threaded ] Create the sequencer in a thread.
-        @dest_port_specifier = dest_port_specifier
+        # IMPORTANT: defaults of options must be set BEFORE super is called
         @client_name = 'rplayer' # name for the client
         @end_delay = nil
-        @blockingmode = Blocking
-        super(options)
-        connect_from(producer) if producer
+        @blockingmode = :blocking
+#         tag "Calling super with options: #{options.inspect}"
+        super(producer, options)
+#         tag "spamming  = #{spamming?}, spam=#@spam"
+        @dest_port_specifier = dest_port_specifier
       end
 
       def parse_option k, v
         case k
         when :name, :clientname, :client_name then @client_name = v
         when :end_delay then @end_delay = v
-        when :blockingmode then @blockingmode = v
+        when :blockingmode
+          case v
+          when Blocking then @blockingmode = :blocking
+          when NonBlocking then @blockingmode = :nonblocking
+          else @blockingmode = v
+          end
         else super
         end
       end
@@ -127,6 +138,7 @@ Valid options are:
           end
         end # lambda
         each_fiber when_done do |event|
+          next unless event  # nil == EOD
           # handle event
 #           tag "receiving event #{event}"
           event.sender_queue = queue
@@ -141,7 +153,7 @@ Valid options are:
           when TempoEvent
 #             tag "got TempoEvent #{event}"
             unless queue
-#               tag "setting up the queue, now we have the tempo"
+#               tag "setting up the queue, now we have the tempo, event.usecs_per_beat: #{event.usecs_per_beat}"
               queue = seq.create_queue(@client_name + '_q', tempo: event.usecs_per_beat)
               queue.start
               next  # the first Tempo event just starts the queue.
@@ -167,7 +179,7 @@ Valid options are:
 #           tag "return to producer"
 #           end
         end
-      end # connect_to
+      end # def consume
     end # class Player
   end # Node
 end # RRTS
@@ -178,7 +190,7 @@ if __FILE__ == $0
   include Node
   producer = MidiFileReader.new('../../../fixtures/eurodance.midi', threads: true)
       # threads: true locks up in 'event_output()'
-  Player.new('20:1', producer, blockingmode: Player::NonBlocking, client_name: 'test')
+  Player.new('20:1', producer, blockingmode: :nonblocking, client_name: 'test')
   begin
     producer.run
   rescue Interrupt

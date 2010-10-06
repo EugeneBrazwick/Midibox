@@ -9,9 +9,9 @@ In that case, read on:
 requirements:
     - ruby1.9.2 or higher, including rdoc, gem etc.
     - libasound2-dev (on Ubuntu at least), alsa development headers
-    - shoulda, testing machinery (sudo gem install shoulda)
-    - graphviz, for documentation (optional)
-    - the GNU 'make' program
+    - rspec, testing machinery (sudo gem install rspec)
+    - darkfish-rdoc, for documentation (optional)
+    - the GNU 'make' program, cmake and qt4-qmake
     - the environment variable $RUBYLIB should contain the 'lib' dir, for example:
     export RUBYLIB=/home/eugene/Midibox/lib:/usr/local/lib/site_ruby/1.9.1:/usr/local/lib/site_ruby/1.9.1/x86_64-linux
 
@@ -19,14 +19,14 @@ BUILD: just run
     rake
 in the toplevel dir.
 
-INSTALL: cannot be done yet
+INSTALL: cannot be done yet. But isn't really required at the moment.
 
-Current state (sep 29 2010)
-    rjack -> DEAD code
+Current state (oct 6 2010)
     Rakefile - seems to do its task OK (if the requirements are met)
     lib/rrts/driver - the low level ALSA wrapper. Only contains sequencer/MIDI related API.
                       But it should work.
     lib/rrts - higher level ruby ALSA sequencer interface. The basics are finished.
+    lib/rrts/node - even higher level API based on message passing threads and fibers.
     lib/reform - qt GUI declarative interface. Still a running target. Very busy playing and tinkering with it.
     bin - contains working examples of literal implementations of C tools like rrecordmidi and rplaymidi,
           and the rrts powered versions rrecordmidi++ and rplaymidi++ along asorted goodies like 'panic'

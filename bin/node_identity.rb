@@ -4,7 +4,7 @@ module RRTS
 
   module Nodes
 
-    require_relative '../lib/rrts/node/node'
+    require 'rrts/node/node'
 
 =begin SOME THOUGHTS
 
@@ -14,25 +14,23 @@ It seems that creating an Alsa sequencer X will close a previous seq X
 Or we should 'dip in' the namespace and use X instead of recreating it.
 =end
 
-=begin rdoc
-
-Identity is a class that just attaches an input to an output.
-Functionality is gained by using specific input- and outputoptions
-
-Examples:
-  Identity.new '--input=song.yaml', '--output='20:1'
-  Identity.new '--input=UM-2 MIDI 1', '--output=song.yaml.gz'
-  Identity.new '--input=song.midi', '--output=song.ygz'
-
-Extensions understood:
-    .mid
-    .midi
-    .yaml
-    .yaml.gz
-    .ygz
-
-Anything else is treated as a portidentifier.
-=end
+#
+# Identity is a class that just attaches an input to an output.
+# Functionality is gained by using specific input- and outputoptions
+#
+# Examples:
+#   Identity.new '--input=song.yaml', '--output='20:1'
+#   Identity.new '--input=UM-2 MIDI 1', '--output=song.yaml.gz'
+#   Identity.new '--input=song.midi', '--output=song.ygz'
+#
+# Extensions understood:
+#     .mid
+#     .midi
+#     .yaml
+#     .yaml.gz
+#     .ygz
+#
+# Anything else is treated as a portidentifier.
     class Identity < Node::Filter
       private
       def initialize *options

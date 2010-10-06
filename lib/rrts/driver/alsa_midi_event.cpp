@@ -995,8 +995,9 @@ alsaMidiEventClass_set_source_port(VALUE v_ev, VALUE v_portid)
 
 /** call-seq: queue_skew() -> [skewvalue, base]
 
-Returns: the queue skew as a tuple value + base
-I have no idea what a queue skew is at this point. See Alsa docs (but they won't tell you)
+Returns: the queue skew as a tuple value + base.
+This is the relative queue speed (ie skewvalue.to_f / base.to_f).
+So by doubling the skewvalue the queue will play at double speed.
 */
 static VALUE
 alsaMidiEventClass_queue_skew(VALUE v_ev)
@@ -1008,7 +1009,9 @@ alsaMidiEventClass_queue_skew(VALUE v_ev)
 
 /** call-seq: queue_skew = [value, base]
 
-You can also pass a splat.
+You can also pass a splat or a double. This basically tweaks the queuespeed.
+This can be convenient if you have a recording in realtime. To play it at
+a different speed, instead of tweaking all timestamps, the skew of the queue can be altered instead.
 */
 static VALUE
 alsaMidiEventClass_set_queue_skew(int argc, VALUE *argv, VALUE v_ev)
@@ -1024,8 +1027,20 @@ alsaMidiEventClass_set_queue_skew(int argc, VALUE *argv, VALUE v_ev)
     }
   snd_seq_event_t *ev;
   Data_Get_Struct(v_ev, snd_seq_event_t, ev);
-  ev->data.queue.param.skew.value = NUM2UINT(v_val);
-  ev->data.queue.param.skew.base = NUM2UINT(v_base);
+  if (FIXNUM_P(v_val))
+    {
+      ev->data.queue.param.skew.value = NUM2UINT(v_val);
+      ev->data.queue.param.skew.base = NUM2UINT(v_base);
+    }
+  else
+    {
+      VALUE v_skewdbl = rb_check_float_type(v_val);
+      if (!RTEST(v_skewdbl))
+        RAISE_MIDI_ERROR_FMT0("API call error: bad skew format");
+      const double t = NUM2DBL(v_skewdbl);
+      ev->data.queue.param.skew.value = int(t * 0x10000);
+      ev->data.queue.param.skew.base = 0x10000;
+    }
   return Qnil;
 }
 
@@ -1405,7 +1420,9 @@ wrap_snd_seq_ev_set_broadcast(VALUE v_ev)
 
 Specify that the event does not use a queue and is send immediately.
 If neither a schedule is performed, and 'direct' is not set, then the event
-will be buffered and will only be send on a flush
+will be buffered and will only be send on a flush.
+
+This is not a setter since 'direct = false' cannot be done.
 */
 static VALUE
 wrap_snd_seq_ev_set_direct(VALUE v_ev)
@@ -1458,7 +1475,9 @@ wrap_snd_seq_ev_set_variable(VALUE v_ev, VALUE v_data)
 
 /** call-seq: set_varusr(data) -> self
 
-set a varusr event's data, making it a VARUSR event
+set a varusr event's data, making it a VARUSR event.
+This is the same as a SYSEX event except that the data is not copied
+to kernelspace. Because of this it can only be sent in _direct_ mode!
 */
 static VALUE
 wrap_snd_seq_ev_set_varusr(VALUE v_ev, VALUE v_data)
@@ -1612,8 +1631,8 @@ the following extra type checking methods exist:
 -  fixed_type?
 -  variable_type?
 -  varusr_type?
--  abstime?   , is the time absolute
--  reltime?   , or relative
+-  abstime?   , is the time absolute (relative to starttime of q)
+-  reltime?   , or relative (relative to current time of q)
 -  direct?    , bypass buffers when sending
 -  reserved?  , stay off
 -  prior?     , is it a high-priority event

@@ -30,7 +30,10 @@ wrap_snd_seq_client_pool_get_client(VALUE v_pool)
 
 /** call-seq: output_pool() -> int
 
-Returns: the output pool size
+Returns: the output pool size. This is the total kernelspace reserved for this client for
+buffering events sent to other clients.
+This is a pool in the sense that ports share this space. If a single port fills the
+outputpool then other ports cannot write either.
 */
 static VALUE
 wrap_snd_seq_client_pool_get_output_pool(VALUE v_pool)
@@ -42,7 +45,8 @@ wrap_snd_seq_client_pool_get_output_pool(VALUE v_pool)
 
 /** call-seq: input_pool() -> int
 
-Returns: Get the input pool size
+Returns: Get the input pool size. This is the total amount of kernelspace
+for events waiting to be read by a client.
 */
 static VALUE
 wrap_snd_seq_client_pool_get_input_pool(VALUE v_pool)
@@ -66,7 +70,7 @@ wrap_snd_seq_client_pool_get_output_room(VALUE v_pool)
 
 /** call-seq: output_free() -> int
 
-Returns: the available size on the output pool
+Returns: the available free space on the output pool in bytes
 */
 static VALUE
 wrap_snd_seq_client_pool_get_output_free(VALUE v_pool)
@@ -116,7 +120,9 @@ wrap_snd_seq_client_pool_set_input_pool(VALUE v_pool, VALUE v_sz)
 
 /** call-seq  output_room = size
 
-Set the output room size
+Set the output room size. According to Eugene this is the watermark to wake up a
+client that got blocked when writing data, because the output pool was full.
+
 */
 static VALUE
 wrap_snd_seq_client_pool_set_output_room(VALUE v_pool, VALUE v_sz)

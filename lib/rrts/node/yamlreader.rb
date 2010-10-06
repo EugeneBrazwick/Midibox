@@ -13,7 +13,7 @@ module RRTS
         super(options)
         @io = io # to read from
         require 'yaml'
-        @yaml_stream = YAML.load_stream(@io)
+#         @yaml_stream = YAML.load_stream(@io)  # THIS IS FAKE. it just chunks in the document...
       end
 
       def parse_option k, v
@@ -25,9 +25,11 @@ module RRTS
 
       public
       def each &block
-        return @yaml_stream.documents.to_enum unless block
+        return to_enum unless block
         begin
-          @yaml_stream.documents.each &block
+          YAML::parse_documents(@io) do |yaml_basenode|
+            block.call(yaml_basenode.transform)
+          end
         ensure
           @io.close if !@io.closed? && @auto_close
         end
@@ -47,7 +49,7 @@ module RRTS
       def initialize io = nil, options = nil
         case io
         when nil
-          tag("READING FROM STDIN !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+          STDERR.puts("READING FROM STDIN !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
           io = STDIN
         when String, Array, Integer
           tag "popen #{@io.inspect}"

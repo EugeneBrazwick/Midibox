@@ -426,10 +426,9 @@ alsa_midi_port_init()
   }
   /** Document-class: RRTS::Driver::AlsaPortInfo_i
 
-  This class represents a 'port' ie, an Alsa connection. Ports have an associated
+  This class represents a 'port' ie, the halve of an Alsa connection. Ports have an associated
   client (like the sequencer itself).
-  Ports cannot be directly used to read or write events from/to, you need RRTS::Driver::AlsaSequencer_i
-  for that.
+  Ports cannot be directly used to read or write events from/to, you need to connect of them.
 
   This class merely functions as a way to retrieve information about a certain port.
   Example:

@@ -34,11 +34,11 @@ end # App
 
 describe Frame do
   before do
-    tag "calling app"
+#     tag "calling app"
     Reform::app {
-      tag "GIVE IT 200ms"
+#       tag "GIVE IT 200ms"
       giveIt200ms
-      tag "calling edit"
+#       tag "calling edit"
       edit { name :myEdit }
     }
   end

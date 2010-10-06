@@ -3,8 +3,8 @@
 # The reverse of yamlreader
 module RRTS #namespace
 
-  require_relative '../rrts'
-  require_relative 'node'
+  require 'rrts/rrts'
+  require 'rrts/node/node'
 
   module Node
 
@@ -27,8 +27,11 @@ module RRTS #namespace
           @io.close
           yield if block_given?
         end do |event|
-          @io.write event.to_yaml
-          @io.flush unless producer.spamming?
+          if event  # due to a change in the API all consumer now receive the closing nil.
+            # this makes LastEvent a bit superfluous
+            @io.write event.to_yaml
+            @io.flush unless producer.spamming?
+          end
         end
       end
 

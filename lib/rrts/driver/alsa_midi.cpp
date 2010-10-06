@@ -27,6 +27,7 @@ initialization method that defines all other classes.
 #include "alsa_client_pool.h"
 #include "alsa_system_info.h"
 #include "alsa_midi_timer.h"
+#include "alsa_query_subscribe.h"
 
 #if defined(DUMP_API)
 #define DUMP_STREAM stderr
@@ -104,6 +105,22 @@ wrap_snd_seq_client_info_malloc(VALUE v_module)
 #endif
   return Data_Wrap_Struct(alsaClientInfoClass, 0/*mark*/, snd_seq_client_info_free/*free*/,
                           XMALLOC(snd_seq_client_info));
+}
+
+/** call-seq: query_subscribe_malloc() -> AlsaQuerySubscribe_i
+
+Returns: an empty AlsaQuerySubscribe_i instance.
+
+The returned instance is automatically freed when the object goes out of scope.
+*/
+static VALUE
+wrap_snd_seq_query_subscribe_malloc(VALUE v_module)
+{
+#if defined(DUMP_API)
+  fprintf(DUMP_STREAM, "snd_seq_query_subscribe_malloc(null)\n");
+#endif
+  return Data_Wrap_Struct(alsaQuerySubscribeClass, 0/*mark*/, snd_seq_query_subscribe_free/*free*/,
+                          XMALLOC(snd_seq_query_subscribe));
 }
 
 /** call-seq: system_info_malloc() -> AlsaSystemInfo_i
@@ -235,7 +252,7 @@ wrap_snd_seq_client_pool_malloc(VALUE v_mod)
                           XMALLOC(snd_seq_client_pool));
 }
 
-/** call-seq: strerror(errno) -> string
+/** call-seq: snd_strerror(errno) -> string
 
 Returns: the errorstring for the given system- or alsa-error.
 */
@@ -423,7 +440,7 @@ kernel_sleep_eintr_test(VALUE v_kernel)
       if (r < 0)
         {
           if (errno == EINTR)
-            rb_raise(alsaMidiError, "EINTR....");
+            RAISE_MIDI_ERROR_FMT0("EINTR....");
         }
       else
           break;
@@ -433,122 +450,68 @@ kernel_sleep_eintr_test(VALUE v_kernel)
 }
 #endif
 
+static VALUE error_handler_block_proc = Qnil;
+
+static void
+my_error_handler(const char *file, int line, const char *function, int err, const char *fmt, ...)
+{
+  va_list arg;
+  char *buffer = 0;
+  try
+    {
+      va_start(arg, fmt);
+      if (vasprintf(&buffer, fmt, arg) < 0)
+        {
+          va_end(arg);
+          RAISE_MIDI_ERROR_FMT1("Internal problem, could not vasprintf... errno=%d", errno);
+        }
+      va_end(arg);
+      rb_funcall(error_handler_block_proc, rb_intern("call"), 5, rb_str_new2(file),
+                  INT2NUM(line), rb_str_new2(function), INT2NUM(err), rb_str_new2(buffer));
+    }
+  catch (...)
+    {
+      free(buffer);
+      throw;
+    }
+  free(buffer);
+}
+
+/** call-seq: snd_lib_error_set_handler do |file, line, funcname, errcode, errtext| ... end
+I don't know when this is triggered but it seems a good idea to not use it.
+Or at least to raising AlsaMidiError from it.
+I assume it is called if snd_lib_error is called which occurs a lot in the overall Alsa code, but
+rarely in the sequencer part (12 calls to SNDERR in total).
+
+This function sets a new error handler, or (if handler is NULL) the default one which prints the error messages to stderr.
+
+Note that the parameters differ from the C version as fmt + args is already formatted into errtext.
+
+FIXME: it seems to work better if RAISE_MIDI_ERROR would be replaced with SNDERR, and that
+we would always set a handler to raise a ruby exception.
+However, does the alsa lib handle exceptions correctly?
+
+*/
+static VALUE
+wrap_snd_lib_error_set_handler(VALUE v_driver)
+{
+  if (!rb_block_given_p())
+    {
+      snd_lib_error_set_handler(0);
+      error_handler_block_proc = Qnil;
+    }
+  else
+    {
+      if (error_handler_block_proc == Qnil) // first call
+        snd_lib_error_set_handler(my_error_handler);
+      error_handler_block_proc = rb_block_proc();
+    }
+}
+
 extern "C" void
 Init_alsa_midi()
 {
-/** Document-class: RRTS
-
-This module is the namespace for the entire MIDI API.
-
-RRTS originally stood for Ruby RealTime Sequencer. But how RT can it be?
-Currently it contains the Alsa (Advanced Linux Sound Architecture) MIDI Driver
-plus supporter classes, in particular Sequencer.
-
-The following rules were used:
-- This is a literal implementation of the almost full alsa snd_seq API
-- functions have been made methods by using arg0 as +self+.
-- the +snd_seq_+ prefix was removed for methods, but not for constants.
-- special case seq_open for snd_seq_open, since just +open+ would conflict with
-  Kernel#open.
-- the support classes have methods that do not require the Alsa constants anymore,
-  however theses constants are still available in the RRTS::Driver namespace.
-- obvious default values for parameters are applied, whereas the original API is C,
-  which has no defaults to begin with.
-- where values are often used as pairs (or even a c-struct) as in client+port=address
-  I allow passing these as a tuple (array with elements at 0 and 1).
-- similarly, instances of the Driver classes can be used, or even the higher level
-  classes (not always) where the original API expects the id or handle to be passed.
-  This is always the case for queueids, where AlsaMidiQueue_i can be used, or for portids
-  where AlsaMidiPort_i can be used.
-- methods starting with 'set_' (snd_seq_..._set) with a single (required) argument have been
-  replaced by the equivalent setter in ruby (as 'port=')
-- +set+ methods with 0 or 2 or more arguments still remain
-- for methods starting with 'get_' this prefix has been removed as well.
-- names for getters that return a boolean are suffixed with '?'.
-- errors became exceptions, in particular AlsaMidiError and ENOSPC somewhere.
-  Exceptions on this rule are methods used in finalizers, since exceptions in finalizers
-  are really not funny. So close/free/clear or whatever return their original value.
-  This also implies the errorcode returnvalue was abolished.
-- integer arguments and returnvalues that could be (or should be) clearly interpreted as booleans
-  have been replaced by true booleans.
-- methods with a argumentaddress in C (Like 'int f(int *result)') are altered to return this parameter
-  (so f -> [int, int]).
-  In some cases this leads to returning a tuple.
-- methods that would always return nil (though the original may not) now return +self+.
-- in some cases, some parameters became meaningless.
-- normally in C, you would operate on the event object direct, using the structure definition.
-  As in 'event.value = 23'
-  This is no longer possible, but where names where unique within the union they became
-  setters and getters. So event.value = 23 is still valid ruby.
-  For ambiguous situations, the same approach is chosen, but the backend uses
-  the type as set in the event.
-  So:
-     ev = ev_malloc
-     ev.channel = 7
-  is wrong as the type is not yet set and we must choose between ev.data.note.channel or
-  ev.data.control.channel.
-  But:
-     ev = ev_malloc
-     ev.note = 63
-  is perfectly OK, since the +note+ selector is unambiguous (ev.data.note.note).
-  The solution for the 'channel' case would then be:
-     ev = ev_malloc
-     ev.type = SND_SEQ_EVENT_NOTE
-     ev.channel = 7
-- in some cases, alsa uses ambiguous names. For example, the macro +snd_seq_ev_set_source+ only sets
-  the port, and not the client.
-  This has been renamed to +source_port+, and +source_client+ is similar. Then the +source+
-  setter and getter remain and they refer to the tuple client plus port.
-  However for 'queue' this would not work, so
-  +ev.queue+ refers to the queue on which the event was send or received while
-  +ev.queue_queue+ refers to the queue as a subject of a queue control event
-- all other queue params have a 'queue_' prefix, including value.
-  Example: +ev.data.queue.param.value+  should be replaced with +ev.queue_value+.
-- I have decided that nonblocking IO will cause the +EAGAIN+ systemerror to be raised, whenever this is
-  appropriate. However the +output_event+ call can't always do this since it would cause events
-  to be partly transmitted in some cases. So this call will always block.
-  All functions that may block now (read: should) use +rb_thread_blocking_region+. Blocking mode
-  should therefore really be on, as this is much easier, and I don't really see any use of
-  nonblocking mode anymore.
-  Here is a list of all blocking methods:
-  - snd_seq_event_input
-  - snd_seq_event_output
-  - snd_seq_drain_output
-
-*IMPORTANT*: using this API as is, will not be the most efficient way to deal with
-alsa_midi.so.  Please use the ruby classes and additional methods in this library.
-See alsa_midi++.cpp
-This yields in particular for the MidiEvent API since the only way to write or read
-a field is through a wrapped method. Even more, the C API has a lot of macros that
-are now implemented as ruby methods. Again, this is not efficient.
-However, it implies that existing programs can easily be ported, see for instance
-rrecordmidi.rb which is a 1 on 1 port of arecordmidi.c.
-Same for rplaymidi.rb
-
-The 'revents' method is rather vague and the examples do not use it. What is the timeout?
-Or isn't there any?  Anyway, the result is made consistent with that of poll.
-
-===Some things about certain parameters
-
-====connections
-
-represented by RRTS::MidiPort or by a splat or tuple [clientid, portid]
-or by a string that uses the port name like 'MIDI UM-2'.
-
-====realtimes
-
-represented by a float which is simple the number of seconds, or by a tuple
-or splat [seconds, nanoseconds]
-
-Note that some methods also except times in ticks if the value is an integer.
-So 35 is that much ticks, and not that much seconds, that would be 35.0(!)
-
-=== ids
-
-In case a method accepts an id, it always accepts the representing instance also.
-So you can pass a RRTS::MidiQueue where a queueid is expected etc..
-
-*/
+  rb_global_variable(&error_handler_block_proc);
   VALUE rrtsModule = rb_define_module("RRTS");
   /** Document-class: RRTS::Driver
 
@@ -588,9 +551,14 @@ So you can pass a RRTS::MidiQueue where a queueid is expected etc..
   rb_define_module_function(alsaDriver, "remove_events_malloc", RUBY_METHOD_FUNC(wrap_snd_seq_remove_events_malloc), 0);
   rb_define_module_function(alsaDriver, "client_pool_malloc", RUBY_METHOD_FUNC(wrap_snd_seq_client_pool_malloc), 0);
   rb_define_module_function(alsaDriver, "system_info_malloc", RUBY_METHOD_FUNC(wrap_snd_seq_system_info_malloc), 0);
+  rb_define_module_function(alsaDriver, "query_subscribe_malloc", RUBY_METHOD_FUNC(wrap_snd_seq_query_subscribe_malloc), 0);
   rb_define_module_function(alsaDriver, "ev_malloc", RUBY_METHOD_FUNC(ev_malloc), 0);
   rb_define_module_function(alsaDriver, "param2sym", RUBY_METHOD_FUNC(param2sym_v), 1);
+  rb_define_module_function(alsaDriver, "snd_strerror", RUBY_METHOD_FUNC(wrap_snd_strerror), 1);
   rb_define_module_function(alsaDriver, "strerror", RUBY_METHOD_FUNC(wrap_snd_strerror), 1);
+  // I only made this because aconnect uses it, but in fact this is stupid. Just catch the exceptions I guess.
+  rb_define_module_function(alsaDriver, "snd_lib_error_set_handler", RUBY_METHOD_FUNC(wrap_snd_lib_error_set_handler), 0);
+//   rb_define_module_function(alsaDriver, "snderr", RUBY_METHOD_FUNC(wrap_snderr), 1); DREADFULL SIN
   rb_define_module_function(alsaDriver, "parse_address", RUBY_METHOD_FUNC(wrap_snd_seq_parse_address), 1);
 
 #if defined(DEBUG)
@@ -610,5 +578,6 @@ So you can pass a RRTS::MidiQueue where a queueid is expected etc..
   alsa_client_pool_init();
   alsa_system_info_init();
   alsa_midi_timer_init();
+  alsa_query_subscribe_init();
   alsa_midi_plusplus_init();
 }

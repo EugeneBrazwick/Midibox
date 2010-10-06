@@ -54,7 +54,8 @@ wrap_snd_seq_queue_info_set_flags(VALUE v_qi, VALUE v_flags)
 /** call-seq: locked = bool
 
 I believe that queues are created locked, but you may lock or unlock them
-with this method. But what does it do?? The Alsa documentation says nothing...
+with this method. This means that other clients can not alter its parameters,
+like the timer
 */
 static VALUE
 wrap_snd_seq_queue_info_set_locked(VALUE v_qi, VALUE v_locked)
@@ -187,8 +188,8 @@ wrap_snd_seq_queue_tempo_get_queue(VALUE v_tempo)
 
 /** call-seq: skew() -> int
 
-Get the timer skew value, whatever it is. Probably you can program some fixed delay
-on the queue ?
+Get the timer skew value. The skew_value/skew_base form the relative speed of the
+queue and this ratio is normally 1
 See RRTS::Driver::AlsaQueueTempo_i#skew_base
 */
 static VALUE
@@ -201,7 +202,7 @@ wrap_snd_seq_queue_tempo_get_skew(VALUE v_tempo)
 
 /** call-seq: skew_base() -> int
 
-Get the timer skew base value of a queue_status container.
+Get the timer skew base value. By default this is 0x10000
 See RRTS::Driver::AlsaQueueTempo_i#skew.
 */
 static VALUE
@@ -240,17 +241,31 @@ wrap_snd_seq_queue_tempo_set_ppq(VALUE v_tempo, VALUE v_ppq)
 }
 
 /** call-seq: skew = value
+Change the skew value if value is an int. If it is a double then both
+skew value and skew base are set so that skew/base == value.
 */
 static VALUE
 wrap_snd_seq_queue_tempo_set_skew(VALUE v_tempo, VALUE v_skew)
 {
   snd_seq_queue_tempo_t *tempo;
   Data_Get_Struct(v_tempo, snd_seq_queue_tempo_t, tempo);
-  snd_seq_queue_tempo_set_skew(tempo, NUM2UINT(v_skew));
+
+  VALUE v_dbl = rb_check_float_type(v_skew);
+  if (RTEST(v_dbl))
+    {
+      const double t = NUM2DBL(v_dbl);
+      snd_seq_queue_tempo_set_skew(tempo, int(t * 0x10000));
+      snd_seq_queue_tempo_set_skew_base(tempo, 0x10000);
+    }
+  else
+      snd_seq_queue_tempo_set_skew(tempo, NUM2UINT(v_skew));
   return Qnil;
 }
 
 /** call-seq: skew_base = value
+
+Normally this is set to 0x10000. The ratio skew_value/skew_base is the relative speed of the
+queue.
 */
 static VALUE
 wrap_snd_seq_queue_tempo_set_skew_base(VALUE v_tempo, VALUE v_skew)
@@ -333,6 +348,7 @@ wrap_snd_seq_queue_status_get_real_time(VALUE v_status)
 /** call-seq: status() -> int
 
 Returns: something. 'status bits' says the Alsa doc. But which?
+According to Eugene it is != 0 for a running queue.
 */
 static VALUE
 wrap_snd_seq_queue_status_get_status(VALUE v_status)
@@ -340,6 +356,18 @@ wrap_snd_seq_queue_status_get_status(VALUE v_status)
   snd_seq_queue_status_t *status;
   Data_Get_Struct(v_status, snd_seq_queue_status_t, status);
   return UINT2NUM(snd_seq_queue_status_get_status(status));
+}
+
+/** call-seq: running?() -> bool
+
+Returns: status() != 0.
+*/
+static VALUE
+wrap_snd_seq_queue_status_get_status_ex(VALUE v_status)
+{
+  snd_seq_queue_status_t *status;
+  Data_Get_Struct(v_status, snd_seq_queue_status_t, status);
+  return INT2BOOL((int)snd_seq_queue_status_get_status(status));
 }
 
 void
@@ -362,18 +390,22 @@ alsa_midi_queue_init()
   A queue can operate as a recording or playback device. You can use queueevents to operate on the
   queue to start, pause and continue it, or you can set the position (time) to a specific value
   causing events to be skipped or replayed.
+
+  To get a queueinfo use RRTS::Driver::AlsaSequencer_i#queue_info
   */
   alsaQueueInfoClass = rb_define_class_under(alsaDriver, "AlsaQueueInfo_i", rb_cObject);
 
   /** Document-class: RRTS::Driver::AlsaQueueTempo_i
 
-  This wrapper is used for setting and retrieving tempo information
+  This wrapper is used for setting and retrieving tempo information.
+  To get the tempo use RRTS::Driver::AlsaSequencer_i#queue_tempo
   */
   alsaQueueTempoClass = rb_define_class_under(alsaDriver, "AlsaQueueTempo_i", rb_cObject);
 
   /** Document-class: RRTS::Driver::AlsaQueueStatus_i
 
   This wrapper is used for retrieving the current 'time' of the queue.
+  To get the tempo use RRTS::Driver::AlsaSequencer_i#queue_status
   */
   alsaQueueStatusClass = rb_define_class_under(alsaDriver, "AlsaQueueStatus_i", rb_cObject);
 
@@ -406,5 +438,6 @@ alsa_midi_queue_init()
   rb_define_method(alsaQueueStatusClass, "tick_time", RUBY_METHOD_FUNC(wrap_snd_seq_queue_status_get_tick_time), 0);
   rb_define_method(alsaQueueStatusClass, "real_time", RUBY_METHOD_FUNC(wrap_snd_seq_queue_status_get_real_time), 0);
   rb_define_method(alsaQueueStatusClass, "status", RUBY_METHOD_FUNC(wrap_snd_seq_queue_status_get_status), 0);
+  rb_define_method(alsaQueueStatusClass, "running?", RUBY_METHOD_FUNC(wrap_snd_seq_queue_status_get_status_ex), 0);
   rb_define_method(alsaQueueStatusClass, "copy_to", RUBY_METHOD_FUNC(wrap_snd_seq_queue_status_copy_to), -1);
 }

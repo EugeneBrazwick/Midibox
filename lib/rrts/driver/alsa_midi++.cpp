@@ -34,7 +34,7 @@ alsaMidiEventClass_populate(VALUE v_ev, VALUE v_sequencer, VALUE v_midievent)
   // required to locate or construct ports and queues, but maybe the caller should do this?
   // 2, read out snd_seq_event_t and use instance_variable_set on v_midievent
 //   fprintf(stderr, "ev.type=%d, evtpnam='%s', CLOCK=%d\n", ev->type, evtypename[ev->type] ? evtypename[ev->type] : "null", SND_SEQ_EVENT_CLOCK);
-  if (ev->type < 256 && evtypename[ev->type])
+  if (/* unsigned char so always true: ev->type < 256 && */evtypename[ev->type])
     {
       const char * const nam = evtypename[ev->type]; // enum SYSTEM .. NONE. Each has a specific datatype
 //       fprintf(stderr, "using symbol '%s'\n", nam);

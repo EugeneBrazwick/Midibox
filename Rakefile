@@ -8,13 +8,20 @@ rescue
   RSPEC = false
 end
 
-begin
-  gem 'darkfish-rdoc'
-  require 'darkfish-rdoc'
-  DARKFISH = true
-rescue
+if RUBY_VERSION =~ /^1\.9\.[01]/
+  begin
+    gem 'darkfish-rdoc'
+    require 'darkfish-rdoc'
+    DARKFISH = true
+  rescue
+    require 'rake/rdoctask'
+    DARKFISH = false
+  end
+else
   require 'rake/rdoctask'
   DARKFISH = false
+  # apart from that, it still says: 'Generating Darkfish...'
+  # maybe rdoc already uses it if installed. That may explain why it does not work if 'required' by hand
 end
 
 ALSALIB='lib/rrts/driver/alsa_midi.so'
@@ -26,10 +33,10 @@ CLOBBER.include('*.log')
 
 # automatically create an rdoc task, + rerdoc [+ clobber_rdoc]
 Rake::RDocTask.new do |rd|
-  rd.main = 'lib/rrts/rrts.rb'
   rd.rdoc_files.include('LICENSE', 'README', '**/*.rb', '**/*.cpp')
-  rd.title = 'Midibox'
-  rd.options << %q[--exclude="bin/|,v|Makefile|\.yaml|\.css|\.html|\.dot|\.rid|\.log"]
+  rd.options << %q[--exclude="bin/|,v|Makefile|\.yaml|\.css|\.html|\.dot|\.rid|\.log"] <<
+                '--main=lib/rrts/rrts.rb' <<
+                '--title=Midibox'
   DARKFISH and
     rd.options << '--format=darkfish'
 end
@@ -37,12 +44,14 @@ end
 if RSPEC
   desc "Run all rspec_test"
   Spec::Rake::SpecTask.new(:rspec_tests) do |t|
+    t.spec_opts = ['--color']
+    t.ruby_opts = ['-W0']
     t.spec_files = FileList['test/**/*_spec.rb']
   end
 
   task :test=>:rspec_tests do
-    require 'rake/runtest'
-    Rake.run_tests 'test/ts_*.rb'
+ #    require 'rake/runtest'
+  #  Rake.run_tests 'test/**/*_spec.rb'
   end
 end
 

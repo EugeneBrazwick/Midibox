@@ -22,7 +22,7 @@ module RRTS
 # * Driver::AlsaPortInfo_i#synth_voices
 # * Driver::AlsaPortInfo_i#port_specified?
 #
-# To retrieve port info for queriying use Sequencer#port
+# To retrieve external port info for querying use Sequencer#port
 class MidiPort
 include Comparable
 include Driver
@@ -71,7 +71,6 @@ private
 # Open a new port.
 #
 # Parameters:
-# [portinfo]  internal reference. Please use Sequencer.ports
 # [sequencer] owning Sequencer
 # [name]      name of the port to be
 # [params] a hash with any one of the following symbols (use 'true' as value):
@@ -112,6 +111,7 @@ private
 #          [:synth_voices] number of synth voices supported, may leave this 0
 #          [:port] portnumber to use, sets port_specified as well
 #          [:port_id] same as +port+
+#          [:broadcast] makes this port a pseudo port, to broadcast to all ports within the client.
 #          [:port_specified] passed on as is, might be overwritten by setting port, so do not use this.
 #          [:simple] true, make it a simple port without buffering or queueing
 #          [:direct] same as +simple+
@@ -139,8 +139,9 @@ public
   def open sequencer, name, params = nil
     close
     @sequencer = sequencer
-    @seq_handle = sequencer.instance_variable_get(:@handle)
+    @seq_handle = sequencer && sequencer.instance_variable_get(:@handle)
     if params and params[:client_id]
+      params[:port] = SND_SEQ_ADDRESS_BROADCAST  if params[:broadcast]
       @client_id = params[:client_id]
       @port = params[:port] || params[:port_id]
       # sort of lightweight portref.  It can be used to connect
@@ -158,13 +159,14 @@ public
       @simple = false
       @port = nil
       if params
+        params[:port] = SND_SEQ_ADDRESS_BROADCAST  if params[:broadcast]
         for k, v in params
           case k
           when :simple, :direct
             raise RRTSError.new("Invalid parameters specified for simple MidiPort") if @handle
             @simple = v
           when :port, :port_id
-            tag "port #{v} supplied by user"
+#             tag "port #{v} supplied by user"
             @port = v
           else
             if lu = CapsBitsMap[k]
@@ -236,6 +238,8 @@ public
   # the portid, either supplied or given by the system
   attr :port
 
+  alias :id :port
+
   # Two port instances are the same if they have the same client- and portid
   def <=> other
     t = @client_id <=> other.client_id
@@ -250,9 +254,11 @@ public
     [@client_id, @port]
   end
 
+  alias :addr :address
+
   # returns a name usefull for debugging
   def to_s
-    "#@client_id:#@port(#{@handle.name})"
+    "#@client_id:#@port(#{@handle && @handle.name})"
   end
 
 #  connect to another MidiPort
@@ -266,9 +272,12 @@ public
 #  Because in 1) +a+ is supposedly the active port, and in 2) it is +b+.
 #  As Eugene sees it, connect_to connects to an output port to send events
 #  while connect_from connects to an input port to receive events.
-#  So the lefthand side is a port created using MidiPort#new, while
-#  the righthand side is a port which comes from Sequencer#ports (so an.
+#  So the lefthand side is an internal port created using MidiPort#new, while
+#  the righthand side is an external port which comes from Sequencer#ports (so an.
 #  external port)
+#
+#  But not always, it is very well possible of connecting two external ports to
+# each other.
   def connect_to port
     @seq_handle.connect_to self, port
   end

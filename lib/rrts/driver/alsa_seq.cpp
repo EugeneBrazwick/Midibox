@@ -583,7 +583,12 @@ static inline uint
 PARAM_IS_MSB_LSB_PAIR(uint param)
 {
   trace("PARAM_IS_MSB_LSB_PAIR")
+  // Compiler will complain, since MIDI_CTL_MSB_BANK is actually 0.
+#if MIDI_CTL_MSB_BANK == 0
+  if (param <= MIDI_CTL_MSB_GENERAL_PURPOSE4)
+#else
   if (param >= MIDI_CTL_MSB_BANK && param <= MIDI_CTL_MSB_GENERAL_PURPOSE4)
+#endif
     return param + (MIDI_CTL_LSB_BANK - MIDI_CTL_MSB_BANK);
   switch (param)
     {
@@ -633,7 +638,8 @@ WRITE_TIME_IN_CHANNEL_i(VALUE v_time, snd_seq_event_t &ev, bool have_sender_queu
 // depending on ev.flags we use tick or tv_sec/tv_nsec tuple (array)
 #define WRITE_TIME_IN_CHANNEL(t, e) WRITE_TIME_IN_CHANNEL_i(t, e, have_sender_queue)
 
-static uint decode_a_note(const char *pat)
+static uint
+decode_a_note(const char *pat)
 {
   int base; // 0..11  where C == 0 , C#==Db == 1 upto B=11
   //int oct; // 0..9. 12*oct+base is the midi notenr. Max 12*9+11 = 119
@@ -668,8 +674,16 @@ static uint decode_a_note(const char *pat)
   return (pat[i] - '0') * 12 + base;
 }
 
+static VALUE
+wrap_decode_a_note(VALUE v_driver, VALUE v_str)
+{
+  const char * const str = StringValueCStr(v_str);
+  return UINT2NUM(decode_a_note(str));
+}
+
 // helper. To be called if blocking is simply required
-static int help_snd_seq_drain_output(snd_seq_t *seq)
+static int
+help_snd_seq_drain_output(snd_seq_t *seq)
 {
   for (;;)
     {
@@ -1042,7 +1056,7 @@ wrap_snd_seq_query_next_client(VALUE v_seq, VALUE v_client_info)
   const int r = snd_seq_query_next_client(seq, client_info);
 //   fprintf(stderr, "snd_seq_query_next_client -> %d\n", r);
   if (r == -ENOENT) return Qfalse;
-  if (r < 0) rb_raise(alsaMidiError, "%s", snd_strerror(r));
+  if (r < 0) RAISE_MIDI_ERROR("querying client", r);
   return Qtrue;
 }
 
@@ -1073,12 +1087,15 @@ wrap_snd_seq_query_next_port(VALUE v_seq, VALUE v_port_info)
 /** call-seq: alloc_named_queue(name) -> int
 
 allocate a queue with the specified name.
-According to aplaymidi.c this queue is _locked_ (which is just fine, but what does it mean)
+This queue is _locked_ by default, which means other clients can not use
+it. You can make it public though.
 
 Parameters:
 [name] the name of the new queue
 
 Returns: the queue id (zero or positive) on success, throws RRTS::AlsaMidiError otherwise
+The queue should be freed using RRTS::Driver::AlsaSequencer_i#free_queue.
+
 */
 static VALUE
 wrap_snd_seq_alloc_named_queue(VALUE v_seq, VALUE v_name)
@@ -1090,7 +1107,7 @@ wrap_snd_seq_alloc_named_queue(VALUE v_seq, VALUE v_name)
   return INT2NUM(r);
 }
 
-/** call-seq: subscribe_port(subinfo) -> subinfo
+/** call-seq: subscribe_port(subinfo) -> AlsaPortSubscribe_i
 
 Parameters:
 [subinfo] subscription information
@@ -1230,7 +1247,7 @@ wrap_snd_seq_parse_address(VALUE v_seq, VALUE v_arg)
   snd_seq_t *seq;
   Data_Get_Struct(v_seq, snd_seq_t, seq);
   snd_seq_addr_t ret;
-  const char *const arg = StringValuePtr(v_arg);
+  const char *const arg = StringValueCStr(v_arg);
   const int r = snd_seq_parse_address(seq, &ret, arg);
   if (r < 0) RAISE_MIDI_ERROR_FMT2("Invalid port '%s' - %s", arg, snd_strerror(r));
   return rb_ary_new3(2, INT2NUM(ret.client), INT2NUM(ret.port));
@@ -1580,11 +1597,13 @@ wrap_snd_seq_query_named_queue(VALUE v_seq, VALUE v_name)
 
 /** call-seq: start_queue(queue) -> self
 
-start the specified queue
+start the specified queue. Note that this just sends an event to the output. You still
+need to flush the buffer before it takes effect.
 
 Parameters:
 [queue] queueid or RRTS::MidiQueue to start
 [ev]    optional event record (see snd_seq_control_queue)   CURRENTLY NOT SUPPORTED!
+        This event can be used to schedule the start event.
 
 See also RRTS::MidiQueue#start
 */
@@ -1618,12 +1637,12 @@ wrap_snd_seq_stop_queue(VALUE v_seq, VALUE v_qid)
   return Qnil;
 }
 
-/** call-seq: queue_usage(queue) -> bool
+/** call-seq: queue_usage?(queue) -> bool
 
 Parameters:
 [queue]       queueid or RRTS::MidiQueue
 
-Returns: true if client is allowed to access the queue, false if not allowed,
+Returns: true if other clients are allowed to access the queue, false if not allowed,
          on errors it raises RRTS::AlsaMidiError
 */
 static VALUE
@@ -2184,7 +2203,98 @@ wrap_snd_seq_system_info(int argc, VALUE *argv, VALUE v_seq)
   return v_info;
 }
 
-void alsa_seq_init()
+/* call-seq: get_port_subscription(sub) -> AlsaPortSubsription_i|nil
+
+obtain subscription information
+
+Parameters:
+[sub]    the subscription information to be fetched, an AlsaPortSubsription_i with +sender+
+         and +dest+ set.
+
+Returns:
+    the argument +sub+ itself, unless not found in which case it returns nil.
+
+See also:
+    RRTS::Driver::AlsaQuerySubscribe_i#port(), RRTS::Driver::AlsaSequencer_i#query_port_subscribers() and
+    RRTS::Driver::AlsaSequencer_i#port_subscription?
+*/
+static VALUE
+wrap_snd_seq_get_port_subscription(VALUE v_seq, VALUE v_sub)
+{
+  snd_seq_t *seq;
+  Data_Get_Struct(v_seq, snd_seq_t, seq);
+  snd_seq_port_subscribe_t *sub;
+  Data_Get_Struct(v_sub, snd_seq_port_subscribe_t, sub);
+  const int r = snd_seq_get_port_subscription(seq, sub);
+  if (r == -ENOENT) return Qnil;
+  if (r < 0) RAISE_MIDI_ERROR("retrieving port subscription", r);
+  return v_sub;
+}
+
+/* call-seq: port_subscription?(sub) -> bool
+
+Does the given subscription (connection) exist? Basicly identical to Driver::AlsaSequencer_i#port_subscription()
+
+Parameters:
+[sub]    the subscription information to be tested, an AlsaPortSubsription_i with +sender+
+         and +dest+ set.
+
+Returns:
+    true if we could return it, and false if we got errno -2 (ENOENT)
+
+*/
+static VALUE
+wrap_snd_seq_get_port_subscription_p(VALUE v_seq, VALUE v_sub)
+{
+  snd_seq_t *seq;
+  Data_Get_Struct(v_seq, snd_seq_t, seq);
+  snd_seq_port_subscribe_t *sub;
+  Data_Get_Struct(v_sub, snd_seq_port_subscribe_t, sub);
+  const int r = snd_seq_get_port_subscription(seq, sub);
+  if (r == -ENOENT) return Qfalse;
+  if (r < 0) RAISE_MIDI_ERROR("retrieving port subscription", r);
+  return Qtrue;
+}
+
+/** call-seq: query_port_subscribers(subs) -> bool
+
+query port subscriber list
+
+Parameters:
+[subs]    subscription to query
+
+Returns:
+    false if no more entries are available. True otherwise. Raises AlsaMidiError on errors.
+
+Queries the subscribers accessing to a port. The query information is specified in subs argument.
+
+At least, the client id, the port id, the index number and the query type must be set to perform a proper query.
+As the query type, SND_SEQ_QUERY_SUBS_READ or SND_SEQ_QUERY_SUBS_WRITE can be specified to check whether the
+readers or the writers to the port. To query the first subscription, set 0 to the index number. To list up all
+the subscriptions, call this function with the index numbers from 0 until this returns +false+.
+
+Whatever the type is, if you iterate over all ports you will get all subscriptions. But if you
+say SND_SEQ_QUERY_SUBS_READ you get them as 'X connects to Y' while using SND_SEQ_QUERY_SUBS_WRITE will
+list them in the form 'Y connects from X'.
+
+See also:
+    RRTS::Driver::AlsaSequencer_i#port_subscription()
+*/
+static VALUE
+wrap_snd_seq_query_port_subscribers(VALUE v_seq, VALUE v_subs)
+{
+  snd_seq_t *seq;
+  Data_Get_Struct(v_seq, snd_seq_t, seq);
+  snd_seq_query_subscribe_t *subs;
+  Data_Get_Struct(v_subs, snd_seq_query_subscribe_t, subs);
+  const int r = snd_seq_query_port_subscribers(seq, subs);
+  if (r == -ENOENT) return Qfalse;
+  if (r < 0) RAISE_MIDI_ERROR("querying port subscribers", r);
+  return Qtrue;
+}
+
+void
+alsa_seq_init()
 {
   WRAP_CONSTANT(POLLIN);
   WRAP_CONSTANT(POLLOUT);
@@ -2218,6 +2328,9 @@ void alsa_seq_init()
 
       However, you probably want to use RRTS::Sequencer instead
 
+      The following page provides global information about the Alsa Sequencer API:
+
+          http://www.alsa-project.org/alsa-doc/alsa-lib/seq.html
   */
   alsaSequencerClass = rb_define_class_under(alsaDriver, "AlsaSequencer_i", rb_cObject);
   /** Document-class: RRTS::Driver::AlsaPollFds_i
@@ -2265,11 +2378,12 @@ void alsa_seq_init()
   rb_define_method(alsaSequencerClass, "stop_queue", RUBY_METHOD_FUNC(wrap_snd_seq_stop_queue), 1);
   rb_define_method(alsaSequencerClass, "query_named_queue", RUBY_METHOD_FUNC(wrap_snd_seq_query_named_queue), 1);
   rb_define_method(alsaSequencerClass, "queue_usage?", RUBY_METHOD_FUNC(wrap_snd_seq_get_queue_usage), 1);
-  rb_define_method(alsaSequencerClass, "queue_usage=", RUBY_METHOD_FUNC(wrap_snd_seq_set_queue_usage), 2);
+  rb_define_method(alsaSequencerClass, "set_queue_usage", RUBY_METHOD_FUNC(wrap_snd_seq_set_queue_usage), 2);
   rb_define_method(alsaSequencerClass, "next_client", RUBY_METHOD_FUNC(wrap_snd_seq_query_next_client), 1);
   rb_define_method(alsaSequencerClass, "next_port", RUBY_METHOD_FUNC(wrap_snd_seq_query_next_port), 1);
   rb_define_method(alsaSequencerClass, "query_next_client", RUBY_METHOD_FUNC(wrap_snd_seq_query_next_client), 1);
   rb_define_method(alsaSequencerClass, "query_next_port", RUBY_METHOD_FUNC(wrap_snd_seq_query_next_port), 1);
+  rb_define_method(alsaSequencerClass, "query_port_subscribers", RUBY_METHOD_FUNC(wrap_snd_seq_query_port_subscribers), 1);
   rb_define_method(alsaSequencerClass, "alloc_named_queue", RUBY_METHOD_FUNC(wrap_snd_seq_alloc_named_queue), 1);
   rb_define_method(alsaSequencerClass, "poll_descriptors_count", RUBY_METHOD_FUNC(wrap_snd_seq_poll_descriptors_count), 1);
   rb_define_method(alsaSequencerClass, "poll_descriptors", RUBY_METHOD_FUNC(wrap_snd_seq_poll_descriptors), -1);
@@ -2291,7 +2405,11 @@ void alsa_seq_init()
   rb_define_method(alsaSequencerClass, "reset_pool_output", RUBY_METHOD_FUNC(wrap_snd_seq_reset_pool_output), 0);
   rb_define_method(alsaSequencerClass, "reset_pool_input", RUBY_METHOD_FUNC(wrap_snd_seq_reset_pool_input), 0);
   rb_define_method(alsaSequencerClass, "system_info", RUBY_METHOD_FUNC(wrap_snd_seq_system_info), -1);
+  // this is not a true getter:
+  rb_define_method(alsaSequencerClass, "get_port_subscription", RUBY_METHOD_FUNC(wrap_snd_seq_get_port_subscription), 1);
+  rb_define_method(alsaSequencerClass, "port_subscription?", RUBY_METHOD_FUNC(wrap_snd_seq_get_port_subscription_p), 1);
 #if defined(DEBUG)
   rb_define_method(alsaSequencerClass, "dump_notes=", RUBY_METHOD_FUNC(AlsaSequencer_set_dump_notes), 1);
 #endif
+  rb_define_module_function(alsaDriver, "decode_a_note", RUBY_METHOD_FUNC(wrap_decode_a_note), 1);
 }

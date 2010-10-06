@@ -135,11 +135,6 @@ wrap_snd_seq_port_subscribe_get_time_update(VALUE v_port_subs)
   return INT2BOOL(snd_seq_port_subscribe_get_time_update(port_subs));
 }
 
-#define FETCH_ADDRESSES() \
-VALUE v_clientid, v_portid; \
-rb_scan_args(argc, argv, "11", &v_clientid, &v_portid); \
-solve_address(v_clientid, v_portid)
-
 /** call-seq: dest = addressspecification
 
 Set destination address of a port_subscribe container.
@@ -261,11 +256,17 @@ port_subscription_init()
   }
   /** Document-class: RRTS::Driver::AlsaPortSubscription_i
 
-   Ones you subscribe for an Alsa connection between two ports you receive events from that
+   Once you subscribe for an Alsa connection between two ports you receive events from that
    connection, and you can write events to it as well.
    A queue can be associated with the connection and timestamping can be switched on.
 
    See: http://www.alsa-project.org/~tiwai/alsa-subs.html
+
+  Note that AlsaSequencer_i#connect_to and AlsaSequencer_i#connect_from also create subscriptions!
+  However they cannot be exclusive, and they do not convert timestamps if the two clients use
+  different timing systems.
+
+  Currently this class has no higher level representation in RRTS.
   */
   alsaPortSubscriptionClass = rb_define_class_under(alsaDriver, "AlsaPortSubscription_i", rb_cObject);
   rb_define_method(alsaPortSubscriptionClass, "dest", RUBY_METHOD_FUNC(wrap_snd_seq_port_subscribe_get_dest), 0);

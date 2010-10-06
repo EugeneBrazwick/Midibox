@@ -78,7 +78,7 @@ wrap_snd_seq_client_info_get_name(VALUE v_client_info)
 
 /** call-seq:  broadcast_filter?() -> bool
 
-Returns: the broadcast filter usage of a client_info container.
+Returns: the broadcast filter usage
 */
 static VALUE
 wrap_snd_seq_client_info_get_broadcast_filter(VALUE v_client_info)
@@ -90,7 +90,7 @@ wrap_snd_seq_client_info_get_broadcast_filter(VALUE v_client_info)
 
 /** call-seq: error_bounce?() -> bool
 
-Returns: the error-bounce usage of a client_info container. But what is it?
+Returns: the error-bounce usage. But what is it?
 */
 static VALUE
 wrap_snd_seq_client_info_get_error_bounce(VALUE v_client_info)

@@ -418,7 +418,7 @@ end
 require 'optparse'
 opts = OptionParser.new
 opts.banner = "Usage: #$PROGRAM_NAME [options] outputfile|-"
-opts.on('-h', '--help', 'this help') { puts opts.to_s; exit 1 }
+opts.on('-h', '-?', '--help', 'this help') { puts opts.to_s; exit 1 }
 opts.on('-V', '--version', 'show version') { STDERR.puts("rrecordmidi version #{SND_UTIL_VERSION_STR}"); exit }
 opts.on('-l', '--list', 'list input ports') do
   puts(" Port    Client name                      Port name")
@@ -497,7 +497,7 @@ opts.on('-s', '--[no-]channel-split') { |val| @channel_split = val }
 # trace
 
 #       open sequencer
-require_relative '../lib/rrts/sequencer'
+require 'rrts/sequencer'
 include RRTS
 Sequencer.new('rrecordmidi') do |seq|
   @sequencer = seq # export ....

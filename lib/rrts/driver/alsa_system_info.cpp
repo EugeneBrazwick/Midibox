@@ -117,6 +117,8 @@ alsa_system_info_init()
 
   This is basicly a module that returns system information like the maximum number
   of clients etc..
+
+  To get the info use RRTS::Driver::AlsaSequencer_i#system_info
   */
   alsaSystemInfoClass = rb_define_class_under(alsaDriver, "AlsaSystemInfo_i", rb_cObject);
   rb_define_method(alsaSystemInfoClass, "copy_to", RUBY_METHOD_FUNC(wrap_snd_seq_system_info_copy_to), -1);

@@ -1,15 +1,15 @@
+
+require 'rstore/rstore'
 require 'spec'
 
-require_relative '../lib/rstore/rstore'
-
-class Test
+class TestMe
   private
-  def initialize
-    @text = 'Hallo world'
-  end
+    def initialize
+      @text = 'Hallo world'
+    end
   public
-  attr :text
-end  #class Test
+    attr :text
+end  #class TestMe
 
 describe RStore do
 

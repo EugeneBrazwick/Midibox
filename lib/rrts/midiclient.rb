@@ -53,6 +53,8 @@ public
   # the internal clientid
   attr :client
 
+  alias :id :client
+
   def_delegators :@handle, :name, :broadcast_filter?, :error_bounce?, :event_lost, :events_lost,
                            :num_ports, :num_open_ports, :type
 

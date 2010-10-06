@@ -13,31 +13,29 @@ be designated using InternalEvent or so.  These events are then never subjected
 to filtering so we need not to worry about them.
 =end
 
-=begin rdoc
-Mapper is a filter (and its filter can be set using the +condition+ option)
-where you can pass an event mapper method.  It receives a copy of the original
-event, and may change that freely, then it must call +super+, to send the
-event to all registered receivers.
-
-In using it you would probably like to include a filter condition. For example you
-can reroute events by changing channel. However, the ProgChanges on the original
-channel will also be passed.
-=end
+# Mapper is a Filter (and its filter can be set using the +condition+ option)
+# where you can pass an event mapper method.  It receives a copy of the original
+# event, and may change that freely, then it must call +super+, to send the
+# event to all registered receivers.
+#
+# In using it you would probably like to include a filter condition. For example you
+# can reroute events by changing channel. However, the ProgChanges on the original
+# channel will also be passed.
     class Mapper < Filter
       private
-      # create a new mapper. A condition lambda could be passed within options.
-      # See Filter#new
+      # create a new Mapper. A condition-lambda could be passed within options.
+      # See Filter::new
       def initialize producer = nil, options = nil, &mapper
 #         tag "Mapper.new"
         @mapper = mapper
 #         tag "Calling super WITHOUT mapper"
-#         super(producer, options)  it DOES send mapper!!!!
+#         super(producer, options)  it DOES send mapper!!!!                     RUBY MAYHEM
         super(producer, options) { |ev| true }
       end
 
       # override
       def handle_event ev, cons
-        @mapper.call(ev = ev.dup) # if the event is frozen clone will not unfreeze it
+        @mapper.call(ev = ev.dup) if ev # if the event is frozen clone will not unfreeze it
         super
       end
 

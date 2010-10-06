@@ -30,6 +30,20 @@ module RRTS
 #           [:qpm]
 #           [:frames]
 #           [:ticks]
+#
+#  Delegates to:
+#  - Driver::AlsaQueueInfo_i#locked?
+#  - Driver::AlsaQueueInfo_i#name
+#  - Driver::AlsaQueueInfo_i#owner
+#  - Driver::AlsaQueueStatus_i#events
+#  - Driver::AlsaQueueStatus_i#real_time
+#  - Driver::AlsaQueueStatus_i#tick_time
+#  - Driver::AlsaQueueStatus_i#running?
+#  - Driver::AlsaQueueTempo_i#ppq
+#  - Driver::AlsaQueueTempo_i#usecs_per_beat
+#
+# There is currently no way of picking up queues from other clients
+#
     def initialize sequencer, name, params = nil
       @sequencer = sequencer
       @seq_handle = sequencer.instance_variable_get(:@handle)
@@ -68,7 +82,7 @@ module RRTS
 
     public
 
-    # DO NOT USE.  Used by rrecordmidi++ to identify a queue.
+    # AVOID.  Used by rrecordmidi++ to identify a queue.
     attr :id
 
     # free the queue. If it is still running it is stopped first
@@ -91,6 +105,7 @@ module RRTS
         require_relative 'tempo'
         tmpo = Tempo.new beats, tmpo
       end
+#       tag "#@seq_handle.set_queue_tempo(#@id, #{tmpo})"
       @seq_handle.set_queue_tempo @id, tmpo
     end
 
@@ -109,18 +124,25 @@ module RRTS
       @seq_handle.queue_info @id
     end
 
-    # start the queue. Returns self
-    def start
+    # Used to make several assignments to this structure more efficient. But there really is not much to assign anyway
+    def info= value
+      @seq_handle.set_queue_info(@id, value)
+    end
+
+    # start the queue. Returns self. You would normally pass +:flush+ as an argument here.
+    def start flush = nil
 #       puts "#{File.basename(__FILE__)}:#{__LINE__}:running? -> #{running?}"
       @seq_handle.start_queue @id
+      @seq_handle.drain_output if flush
 #       puts "#{File.basename(__FILE__)}:#{__LINE__}:Started. running? -> #{running?}"
       self
     end
 
-    # stop the queue, returns self
-    def stop
+    # stop the queue, returns self.  You would normally pass +:flush+ as an argument here.
+    def stop flush = nil
 #       puts "#{File.basename(__FILE__)}:#{__LINE__}:running? -> #{running?}"
       @seq_handle.stop_queue @id
+      @seq_handle.drain_output if flush
 #       puts "#{File.basename(__FILE__)}:#{__LINE__}:Stopped, running? -> #{running?}"
       self
     end
@@ -132,7 +154,7 @@ module RRTS
 
     # (dis)allow usage
     def usage= bool
-      @seq_handle.queue_usage = bool
+      @seq_handle.set_queue_usage(@id, bool)
     end
 
     # returns true if the queue has been started
@@ -209,15 +231,59 @@ module RRTS
     # returns the owning Sequencer instance
     attr :sequencer
 
-    # short for status.tick_time
-    def tick_time
-      status.tick_time
+    def queue
+      @id
     end
 
-    # short for status.real_time
-    def real_time
-      status.real_time
+      # NOTE: each call leads to an allocation. So using these is not efficient.
+      # Compare:
+      #    x = queue.locked?
+      #    y = queue.name
+      # with:
+      #    info = queue.info
+      #    x, y = info.locked?, info.name
+    def_delegators :info, :locked?, :name, :owner
+    def_delegators :status, :events, :real_time, :tick_time, :running? # , :status not going to work :)
+    def_delegators :tempo, :ppq, :usecs_per_beat  # and 'tempo' is ambiguous as well
+
+    # this now returns a floating point, which is an accurate representation of the skewvalue/skewbase
+    def skew
+      i = @seq_handle.queue_tempo @id
+      i.skew.to_f / i.skew_base.to_f
     end
+
+    # See skew. Both setter and getter work like floats, and are not compatible
+    # with the underlying tempo.skew (which can be set as a float, but it returns the 'value' only (the numerator))
+    def skew= float
+      i = @seq_handle.queue_tempo @id
+      i.skew = float
+      @seq_handle.set_queue_tempo(@id, i)
+    end
+
+    def usecs_per_beat= int
+      i = @seq_handle.queue_tempo @id
+      i.usecs_per_beat = int
+      @seq_handle.set_queue_tempo(@id, i)
+    end
+
+    def ppq= int
+      i = @seq_handle.queue_tempo @id
+      i.ppq = int
+      @seq_handle.set_queue_tempo(@id, i)
+    end
+
+    def name= newname
+      @sequencer.renameQueue self, newname
+    end
+
+    def locked= bool
+      i = @seq_handle.queue_info @id
+      i.locked = bool
+      @seq_handle.set_queue_info(@id, i)
+    end
+
+    # setting the owner is not supported
+
   end # MidiQueue
 
 end # RRTS

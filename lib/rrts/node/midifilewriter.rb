@@ -4,8 +4,8 @@ module RRTS #namespace
 
   module Node
 
-    require_relative '../rrts'
-    require_relative 'node'
+    require 'rrts/rrts'
+    require 'rrts/node/node'
 
 =begin
     100% the reverse of the MidifileParser.
@@ -25,10 +25,9 @@ module RRTS #namespace
   Create a new MidiIOWriter that will write to io, reading from producer.
 =end
       def initialize io, producer = nil
-        super()
+        super(producer)
         @io = io
         @last_command = 0 # for 'running status'
-        producer >> self if producer
       end
 
       # Used to create the constants below at class-parse-time
@@ -45,7 +44,7 @@ module RRTS #namespace
 
       # writes a fixed-size big-endian number
       def write_int value, bytes = 4
-#         tag "write_int #{value}, using #{bytes} bytes"
+#         tag "write_int #{value}, using #{bytes} bytes at pos #{@io.pos} : [#{value >> 24},#{(value >> 16) & 0xff},#{(value >> 8) & 0xff},#{value & 0xff}]"
         @io.putc(value >> 24) if bytes == 4
         @io.putc((value >> 16) & 0xff) if bytes >= 3
         @io.putc((value >> 8) & 0xff) if bytes >= 2
@@ -116,7 +115,7 @@ module RRTS #namespace
         status = event.status
         ch = event.channel ? event.channel - 1 : 0
         command = (status << 4) + ch
-#         tag "status = #{status}, ch = #{ch}, event.class=#{event.class}, command=#{command}"
+#         tag "status = #{status}, ch = #{ch}, event.class=#{event.class}, command=#{command}, pos = #{@io.pos}"
         case event
         when NoteOnEvent, NoteOffEvent, KeyPressEvent
 #           tag "NoteO[n|ff]Event, KeyPressEvent"
@@ -218,10 +217,11 @@ module RRTS #namespace
           write_var sysex.length - i
           @io.write(sysex[i..-1])
         when TempoEvent
+#           tag "Writing tempo event 0xff 0x51 0x03 #{event.value}in 3 bytes"
           @tick += write_var(delta_ticks)
           @io.putc(0xff) # meta
           @io.putc(0x51) # tempo
-          write_var 3 # len !!
+          @io.putc(0x03) # len = 3
           write_int event.value, 3
         when LastEvent
           @tick += write_var(delta_ticks)
@@ -229,19 +229,20 @@ module RRTS #namespace
           @io.putc(0x2f) # EOT
           write_var 0 # len !!
         when TimeSignatureEvent
+#           tag "Writing TimeSignatureEvent at pos #{@io.pos} delta 0xff 0x58 0x04 #{event.num} #{event.denom} #{event.clocks_per_beat} 0"
           @tick += write_var(delta_ticks)
           @io.putc(0xff)
           @io.putc(0x58) # time sig
-          write_var 4 # length of meta
+          @io.putc(0x04) #write_var 4 # length of meta
           @io.putc event.num
           @io.putc event.denom
           @io.putc event.clocks_per_beat
-          @io.putc 0  # 32s per 24 clocks  Unclear....
+          @io.putc event.something  # 32s per 24 clocks  Unclear....
         when KeySignatureEvent
           write_var 0  # delta
           @io.putc(0xff)
           @io.putc(0x59)
-          write_var 2 # length of meta
+          @io.putc(0x02) # write_var 2 # length of meta
           @io.putc MapKey2Byte[event.key]
           @io.putc(if event.major? then 1 else 0 end)
         else
@@ -290,6 +291,7 @@ module RRTS #namespace
         write_meta_string track.copyright, 0x2
         write_meta_string track.name, 0x3
         write_meta_string track.intended_device, 0x9
+#         tag "after meta's pos = #{@io.pos}"
         for event in track
 #           tag "put event #{event.class} in track at pos #{@io.pos}"
           raise RRTSError.new("Can't record MIDI file from realtime events") unless Integer === event.time
@@ -331,18 +333,21 @@ module RRTS #namespace
    public
       # Dump the events to @io, using the Midi file format
       def consume producer
+#         tag "kludge alert"
         # this is a kludge.  The MIDI format is not necessarily streamable
         # Not the events are written, but the tracks.
         # if there is only one track it wouldn't matter, but let's create a more
         # general solution.  Just create a Chunk and dump that.
-        if chunk = producer.chunk
+        if chunk = producer.to_chunk
           dump chunk
           nil
         else
+#           tag "creating chunk then"
           require_relative 'chunk'
           chunk = Chunk.new
           # the options for the chunk should be supplied by producer.
           # now create a fiber for the chunk and return that.
+#           tag "forward 'consume' call:"
           chunk.consume producer do
             # after loading, do this:
             raise RRTSError, 'Corrupted chunk, has no track' unless chunk.track

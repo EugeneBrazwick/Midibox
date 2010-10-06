@@ -472,7 +472,7 @@ SND_UTIL_VERSION_STR = '1.0'
 require 'optparse'
 opts = OptionParser.new
 opts.banner = "Usage: #$PROGRAM_NAME [options] inputfile ..."
-opts.on('-h', '--help', 'this help') { puts opts.to_s; exit 1; }
+opts.on('-h', '-?', '--help', 'this help') { puts opts.to_s; exit 1; }
 opts.on('-V', '--version', 'show version') do
   puts "rplaymidi version " + SND_UTIL_VERSION_STR
   exit 0

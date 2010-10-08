@@ -3,14 +3,13 @@ module Reform
 
 require_relative '../model'
 
-=begin
-
-Assuming we have a simple mapped array, how do we apply changes to the model using
-insert delete and update of a single row?
-
-It seems more appropriate to call connectModel 'updateModel' instead. Were we pass in
-'options' what we actually changed since last time.
-=end
+# Assuming we have a simple mapped array, how do we apply changes to the model using
+# insert delete and update of a single row?
+#
+# Support for simple arrays that consist of other Model entries.
+# For a pure array + hash structure use Structure
+# These two classes probably should merge as their intention is the same:
+# 'wrap' around ordinary ruby data.
   class SimpleModel < AbstractModel
     include Enumerable
 
@@ -18,20 +17,19 @@ It seems more appropriate to call connectModel 'updateModel' instead. Were we pa
 
       def initialize parent, qtc = nil, val = nil
         super(parent, qtc)
+        STDERR.puts("DEPRECATED: SimpleModel, use Structure instead")
         value val         # this is OK...
       end
 
     public
 
-=begin
-    we accept hash or array with elements that are models: el.is_a?(Model) yields true.
-    or any object. In all cases we behave like an Enumerable of Models.
-
-    However, a hash is an ambiguous thing.  Is it the list we are interested in,
-    or maybe it is meant as a single record!
-
-    So the new policy is to use 'structure' for simple non-list like hashes
-=end
+#     we accept hash or array with elements that are models: el.is_a?(Model) yields true.
+#     or any object. In all cases we behave like an Enumerable of Models.
+#
+#     However, a hash is an ambiguous thing.  Is it the list we are interested in,
+#     or maybe it is meant as a single record!
+#
+#     So the new policy is to use 'structure' for simple non-list like hashes
       def value(*v)
         return instance_variable_defined?(:@value) ? @value : nil if v.nil?
         @value = v.length == 1 ? v[0] : v
@@ -42,7 +40,8 @@ It seems more appropriate to call connectModel 'updateModel' instead. Were we pa
           if @value
             to_invert = if Hash === @value then @value.keys else @value end
             to_invert.each_with_index do |w, idx|
-              key = Model::enum2i(w.respond_to?(:key) ? w.key : w)
+              tag "building key2index, w=#{w.inspect}, idx=#{idx}"
+              key = Model::enum2i((w.respond_to?(:[]) && w[:key]) ? w[:key] : w.respond_to?(:key) ? w.key : w)
               @key2index[key] ||= idx
             end
           end

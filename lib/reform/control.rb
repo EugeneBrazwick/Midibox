@@ -3,38 +3,7 @@
 
 require 'reform/app'
 
-class Fixnum
-  # create an instance of Reform::Milliseconds
-  def seconds
-    Reform::Milliseconds.new(self * 1000)
-  end
-
-  alias :s :seconds
-
-  # create an instance of Reform::Milliseconds
-  def milliseconds
-    Reform::Milliseconds.new(self)
-  end
-
-  alias :ms :milliseconds
-
-end
-
 module Reform
-
-  # A class specifically representing a duration in milliseconds
-  # See Fixnum#seconds and Fixnum#milliseconds
-  class Milliseconds
-    private
-      def initialize val
-        @val = val
-      end
-    public
-      attr :val
-      alias :value :val # required for Qt::Variant interaction etc/
-  end
-
-  MilliSeconds = Milliseconds
 
 # Control instances are reform wrappers around the Qt(ruby) elements.
 # We extend QObject (Qt::Object) itself to enable slots and signals
@@ -420,6 +389,8 @@ module Reform
       # the owner form.
       attr :containing_form
 
+      alias :containingForm :containing_form
+
       # Qt control that is wrapped
       attr :qtc
 
@@ -561,9 +532,9 @@ module Reform
 #         want_data!            this is a toplevel call. There is no need to do this.
 # and it wrong for comboboxes or lists that are assigned local data.
         unless @model.equal? control
-          @model.removeObserver_i(self) if @model
+          @model.removeObserver(self) if @model
           @model = control
-          @model.addObserver_i(self) if @model
+          @model.addObserver(self) if @model
         end
         added control
       end

@@ -3,14 +3,14 @@ module Reform
 
   require_relative 'widget'
 
-=begin rdoc
-
-a Frame is a widget that may contain others.
-
-Note I changed 'containing_frame to the Qt 'parent' of the object.
-And so 'all_children' becomes simply 'children'.
-However, in the previous version a form had 'containing_frame' being the form itself.
-=end
+# a Frame is a widget that may contain others.
+#
+# Note I changed 'containing_frame to the Qt 'parent' of the object.
+# And so 'all_children' becomes simply 'children'.
+# However, in the previous version a form had 'containing_frame' being the form itself.
+#
+# NOTE: the name clashes with Qt::Frame. This is not a Qt::Frame!!
+# Use 'bordered' or 'framed' to get a Qt::Frame....
   class Frame < Widget
     include ControlContext
 
@@ -80,9 +80,11 @@ However, in the previous version a form had 'containing_frame' being the form it
         mod = aModel.apply_getter(cid)
         applyModel mod, aModel
         aModel = mod
+        propagateModel aModel, propagation.apply_getter(cid)
+      else
+        propagateModel aModel, propagation
       end
 #       tag "delegate model to children"
-      propagateModel aModel, propagation
     end
 
     def columnCount value

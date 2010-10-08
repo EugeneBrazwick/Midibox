@@ -43,6 +43,8 @@ module Reform
         # supported is a color or else a brushstyle
       when Qt::Enum then if value.type == 'Qt::GlobalColor' then value = Qt::Brush.new(value) end
       when String then value = Qt::Brush.new(Qt::Color.new(value))
+      when Qt::Brush
+      else value = make_brush(value)
       end
       method_missing(:brush=, value)
     end
@@ -50,6 +52,8 @@ module Reform
     def pen= value
       case value
       when Qt::Enum then if value.type == 'Qt::GlobalColor' then value = Qt::Color.new(value) end
+      when Qt::Pen
+      else value = make_pen(value)
       end
 #       tag "pen := #{value.inspect}"
       method_missing(:pen=, value)

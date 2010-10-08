@@ -22,10 +22,41 @@ of a model.
       end
 
       # default is false, set it to true only if items are indeed all of equal size
-      define_simple_setter :uniformItemSizes
+      define_simple_setter :uniformItemSizes,
+                           :dragEnabled, :dropIndicatorShown,
+                           :spacing
 
-      def viewMode vm
+      def iconSize x = nil, y = nil
+        return @qtc.iconSize unless x
+        case x
+        when Qt::Size then @qtc.setIconSize(x)
+        when Array then @qtc.setIconSize(Qt::Size.new(*x))
+        else @qtc.setIconSize(Qt::Size.new(x, y || x))
+        end
+      end
+
+      def gridSize x = nil, y = nil
+        return @qtc.gridSize unless x
+        case x
+        when Qt::Size then @qtc.setGridSize(x)
+        when Array then @qtc.setGridSize(Qt::Size.new(*x))
+        else @qtc.setGridSize(Qt::Size.new(x, y || x))
+        end
+      end
+
+      MovementMap = { static: Qt::ListView::Static, free: Qt::ListView::Free, snap: Qt::ListView::Snap }
+
+      def movement mv = nil
+        case mv
+        when nil then return @qtc.movement
+        when Symbol then @qtc.movement = MovementMap[mv] || Qt::ListView::Static
+        else @qtc.movement = mv
+        end
+      end
+
+      def viewMode vm = nil
         case vm
+        when nil then return @qtc.viewMode
         when :list then vm = Qt::ListView::ListMode
         when :icon, :icons then vm = Qt::ListView::IconMode
         end
@@ -44,7 +75,7 @@ of a model.
       def addModel aModel, hash, &block
         (sm = @qtc.selectionModel) and sm.deleteLater
         super
-#         tag "addModel"
+        tag "addModel #{aModel}, qtc = #{aModel.qtc}"
 #         tag "aModel.length = #{aModel.length}, aModel.empty?= #{aModel.empty?}"
         unless aModel.empty?
           @qtc.currentIndex = @qtc.model.index(0)

@@ -25,15 +25,18 @@ module Reform
             end
           end
         end
-        connect(@qtc, SIGNAL('toggled(bool)')) do |value|
+        connect(@qtc, SIGNAL('toggled(bool)')) do |checked|
           rfRescue do
             if (cid = connector) && (model = effectiveModel)
-              value = @value if value && instance_variable_defined?(:@value)
+              value = checked && instance_variable_defined?(:@value) ? @value : checked
   #             tag "toggled. apply_setter #{cid} on model #{model}, connector=#{connector} -> value = #{value}"
   #             tag "stack=#{caller.join("\n")}"
               model.apply_setter(cid, value)
             end
           end
+        end
+        connect(@qtc, SIGNAL('toggled(bool)')) do |checked|
+          rfCallBlockBack(checked, &@whenToggled) if instance_variable_defined?(:@whenToggled)
         end
       end
 
@@ -52,18 +55,79 @@ module Reform
         @qtc.enabled = false
       end
 
-      Sym2Shortcut = { quit: Qt::KeySequence::Quit,
+      Sym2Shortcut = { addTab: Qt::KeySequence::AddTab,
+                       back: Qt::KeySequence::Back,
+                       bold: Qt::KeySequence::Bold,
+                       close: Qt::KeySequence::Close,
+                       copy: Qt::KeySequence::Copy,
+                       cut: Qt::KeySequence::Cut,
+                       delete: Qt::KeySequence::Delete,
+                       deleteEndOfLine: Qt::KeySequence::DeleteEndOfLine,
+                       deleteEndOfWord: Qt::KeySequence::DeleteEndOfWord,
+                       deleteStartOfWord: Qt::KeySequence::DeleteStartOfWord,
+                       find: Qt::KeySequence::Find,
+                       findNext: Qt::KeySequence::FindNext,
+                       findPrevious: Qt::KeySequence::FindPrevious,
+                       forward: Qt::KeySequence::Forward,
+                       helpContents: Qt::KeySequence::HelpContents,
+                       insertLineSeparator: Qt::KeySequence::InsertLineSeparator,  # ie a new line
+                       insertParagraphSeparator: Qt::KeySequence::InsertParagraphSeparator,
+                       italic: Qt::KeySequence::Italic,
+                       moveToEndOfBlock: Qt::KeySequence::MoveToEndOfBlock,
+                       moveToEndOfDocument: Qt::KeySequence::MoveToEndOfDocument,
+                       moveToEndOfLine: Qt::KeySequence::MoveToEndOfLine,
+                       moveToNextChar: Qt::KeySequence::MoveToNextChar,
+                       moveToNextLine: Qt::KeySequence::MoveToNextLine,
+                       moveToNextPage: Qt::KeySequence::MoveToNextPage,
+                       moveToNextWord: Qt::KeySequence::MoveToNextWord,
+                       moveToPreviousChar: Qt::KeySequence::MoveToPreviousChar,
+                       moveToPreviousLine: Qt::KeySequence::MoveToPreviousLine,
+                       moveToPreviousPage: Qt::KeySequence::MoveToPreviousPage,
+                       moveToPreviousWord: Qt::KeySequence::MoveToPreviousWord,
+                       moveToStartOfBlock: Qt::KeySequence::MoveToStartOfBlock,
+                       moveToStartOfDocument: Qt::KeySequence::MoveToStartOfDocument,
+                       moveToStartOfLine: Qt::KeySequence::MoveToStartOfLine,
                        new: Qt::KeySequence::New,
-                       undo: Qt::KeySequence::Undo,
+                       nextChild: Qt::KeySequence::NextChild,
+                       open: Qt::KeySequence::Open,
+                       paste: Qt::KeySequence::Paste,
+                       preferences: Qt::KeySequence::Preferences,
+                       previousChild: Qt::KeySequence::PreviousChild,
                        print: Qt::KeySequence::Print,
-                       save: Qt::KeySequence::Save
+                       quit: Qt::KeySequence::Quit,
+                       redo: Qt::KeySequence::Redo,
+                       refresh: Qt::KeySequence::Refresh,
+                       replace: Qt::KeySequence::Replace,
+                       save: Qt::KeySequence::Save,
+                       saveAs: Qt::KeySequence::SaveAs,
+                       selectAll: Qt::KeySequence::SelectAll,
+                       selectEndOfBlock: Qt::KeySequence::SelectEndOfBlock,
+                       selectEndOfDocument: Qt::KeySequence::SelectEndOfDocument,
+                       selectEndOfLine: Qt::KeySequence::SelectEndOfLine,
+                       selectNextChar: Qt::KeySequence::SelectNextChar,
+                       selectNextLine: Qt::KeySequence::SelectNextLine,
+                       selectNextPage: Qt::KeySequence::SelectNextPage,
+                       selectNextWord: Qt::KeySequence::SelectNextWord,
+                       selectPreviousChar: Qt::KeySequence::SelectPreviousChar,
+                       selectPreviousLine: Qt::KeySequence::SelectPreviousLine,
+                       selectPreviousPage: Qt::KeySequence::SelectPreviousPage,
+                       selectPreviousWord: Qt::KeySequence::SelectPreviousWord,
+                       selectStartOfBlock: Qt::KeySequence::SelectStartOfBlock,
+                       selectStartOfDocument: Qt::KeySequence::SelectStartOfDocument,
+                       selectStartOfLine: Qt::KeySequence::SelectStartOfLine,
+                       underline: Qt::KeySequence::Underline,
+                       undo: Qt::KeySequence::Undo,
+                       unknownKey: Qt::KeySequence::UnknownKey,
+                       whatsThis: Qt::KeySequence::WhatsThis,
+                       zoomIn: Qt::KeySequence::ZoomIn,
+                       zoomOut: Qt::KeySequence::ZoomOut
                      }
 
       # it is possible that an Qt::Enum value is passed. pe: Qt::KeySequence::Quit
-      # understood symbols: :quit
+      # understood symbols: all enum-elements, with first character lowercase.
       def shortcut x
 #         tag "setShortcut(#{x.class} #{x.inspect})"
-        x = Sym2Shortcut[x] if Symbol === x        # first !!
+        x = Sym2Shortcut[x] || Qt::KeySequence::UnknownKey if Symbol === x        # first !!
         x = Qt::KeySequence.new(x) if x.is_a?(Qt::Enum)
 #         tag "x is now #{x.inspect}"
         @qtc.shortcut = x
@@ -72,7 +136,7 @@ module Reform
       # similar for an splat of shortcuts
       def shortcuts *x
         @qtc.shortcuts = x.map do |el|
-          t = Symbol === el ? Sym2Shortcut[el] : el
+          t = Symbol === el ? (Sym2Shortcut[el] || Qt::KeySequence::UnknownKey): el
           t.is_a?(Qt::Enum) ? Qt::KeySequence.new(t) : t
         end
       end
@@ -101,7 +165,7 @@ module Reform
       def whenToggled &block
         if block
           @qtc.checkable = true
-          connect(@qtc, SIGNAL('toggled(bool)'), self) { |checked| rfCallBlockBack(checked, &block) }
+          @whenToggled = block
         else
 #           tag "explicit whenToggled call"
           @qtc.toggled(@qtc.checked?)

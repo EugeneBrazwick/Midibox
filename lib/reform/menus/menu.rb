@@ -18,6 +18,12 @@ module Reform
     end
 
     public
+
+      def postSetup
+        STDERR.puts("warning: menu has no title!") unless @qtc.title
+        super
+      end
+
 #     def self.contextsToUse
 #       MenuContext
 #     end

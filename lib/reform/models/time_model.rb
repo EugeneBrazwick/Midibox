@@ -24,7 +24,8 @@ module Reform
             self.frameNr += 1
 #             tag "self.current := .... "
             self.current = Qt::Time::currentTime
-            tran.dependencies_changed :to_s, :toString
+            tran.addDependencyChange :to_s
+            tran.addDependencyChange :toString
           end
         end
   #       tag "creating timer"

@@ -27,7 +27,7 @@ module Reform
       @containing_form.qcentralWidget = @containing_form.qtc.centralWidget = @qtc
     end
 
-    define_simple_setter :locale, :autoFillBackground, :fixedWidth
+    define_simple_setter :locale, :autoFillBackground, :fixedWidth, :acceptDrops
 
     # if x is integer the size is meant, like fixedSize 200 == fixedSize 200, 200
     # otherwise, if x MUST be 'true' and it sets the policy to :fixed (and 'y' is ignored as well)
@@ -51,7 +51,7 @@ module Reform
 
     # enforce that parent is a layout
     def check_grid_parent tocheck
-      require_relative 'gridlayout' # needed anyway
+      require 'reform/controls/gridlayout' # needed anyway
       if parent.layout?
         if !parent.is_a?(GridLayout)
           raise ReformError, tr("'#{tocheck}' only works with a gridlayout container!")

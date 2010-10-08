@@ -1,6 +1,8 @@
 
 # Copyright (c) 2010 Eugene Brazwick
 
+require 'reform/widget'
+
 module Reform
 
   class Label < Widget

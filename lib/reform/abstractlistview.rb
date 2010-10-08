@@ -3,12 +3,20 @@
 
 module Reform
 
+  # this module implements combobox and listbox functionality
+  # by using a Qt::AbstractListModel interface
+  # Internally we use a 'local' model to supply the list with values.
+  # This can be added by instantiating a model within a list or combo.
   module AbstractListView
 
+      # this class forms the hinge between 'list' (or 'combo' etc) and any 'model' (like ruby_model/simpledata)
       class QModel < Qt::AbstractListModel
         private
-          def initialize model
+          # the parent is a Reform Model.
+          def initialize model, local_conn, deco_conn
             super(model)
+            @local_conn = local_conn # not nil
+            @deco_conn = deco_conn # can be nil
 #             tag "QModel.new(#{model})"
           end
 
@@ -61,7 +69,9 @@ Not supported yet
             case role
             when Qt::DisplayRole, Qt::EditRole
 #               tag "DATA-> #{local_model[index.row]}"
-              Qt::Variant.new(local_model[index.row])
+              Qt::Variant.from_value(local_model[index.row].apply_getter(@local_conn))
+            when Qt::DecoratorRole
+              @deco_conn ? Qt::Variant.from_value(local_model[index.row].apply_getter(@deco_conn)) : Qt::Variant.new
             else
               # an example would be Qt::SizeHintRole
               Qt::Variant.new # aka invalid or 'I don't care'
@@ -97,6 +107,11 @@ Not supported yet
         @qtc.model.local_model.data_at(idx)
       end
 
+      # def override the class. I need not even be a QModel...
+#       def qModel klass
+#         @qmodel = QModel
+#       end
+
       def setLocalModel aModel
 #         clearList
         # key2index contains the map from key to index, in case we have keys.
@@ -104,8 +119,9 @@ Not supported yet
         # keys is the map from index to key. If not nil we use it. And we are in the case where
         # local model is a hash with stringvalues
 #         @index2key = nil
-#         local_connector = instance_variable_defined?(:@local_connector) && @local_connector || :to_s
-        @qtc.model = QModel.new(aModel)
+        local_connector = instance_variable_defined?(:@local_connector) && @local_connector || :to_s
+        deco_connector = instance_variable_defined?(:@deco_connector) && @decol_connector
+        @qtc.model = aModel.qtc || QModel.new(aModel, local_connector, deco_connector)
       end
 
       #override. Select the correct index in the view based on the single value

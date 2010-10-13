@@ -150,6 +150,16 @@ end
 #
 module Reform
 
+    autoload :Graphical, 'reform/graphical'
+    autoload :Widget, 'reform/widget'
+    autoload :QWidget, 'reform/widget'
+    autoload :Propagation, 'reform/model'
+    autoload :GridLayout, 'reform/widgets/gridlayout'
+    autoload :Painter, 'reform/painter'
+    autoload :Structure, 'reform/models/structure'
+    autoload :AbstractModel, 'reform/model'
+    autoload :Control, 'reform/control'
+
     # A class specifically representing a duration in milliseconds
     # See Fixnum#seconds and Fixnum#milliseconds
     class Milliseconds
@@ -214,7 +224,7 @@ module Reform
         # For internal use only (hence _i suffix)
         def registerControlClassProxy_i name, thePath
           name = name.to_sym
-    #       tag "#{self}::registerControlClassProxy_i(#{name}, #{thePath})"
+#           tag "#{self}::registerControlClassProxy_i(#{name}, #{thePath})"
           # to avoid endless loops we must consider that by loading some classes it is possible
           # that we already loaded the file.
           if Symbol === thePath
@@ -232,7 +242,7 @@ module Reform
               # this is done by the require which executes createInstantiator_i.
               # IMPORTANT ruby1.9.2 corrupts name2 somehow.  Using name3 does the trick however
               unless @@instantiator[name]
-      #           tag "arrived in #{self}##{name}"
+#                 tag "arrived in #{self}##{name}"
                 require_relative thePath
                 # the loaded module should call createInstantiator (and so registerControlClass) which alters
                 # @@instantiator
@@ -242,7 +252,7 @@ module Reform
               reform_class = instantiator[:reform_class]
               options = instantiator[:options]
               qt_implementor_class = instantiator[:qt_implementor_class]
-              raise ArgumentError, 'Bad hash passed to instantiator' unless quicky == nil || Hash === quicky
+              raise ArgumentError, "Bad hash #{quicky} passed to instantiator '#{name}'" unless quicky == nil || Hash === quicky
   #             tag "quicky hash = #{quicky.inspect}"
               # It's important to use parent_qtc_to_use, since it must be a true widget.
               # Normally, 'qparent' would be '@qtc' itself
@@ -273,7 +283,7 @@ module Reform
     #         raise 'CANTHAPPEN' if qparent && qparent.inherits('QGraphicsScene')
     #         tag "instantiate #{qt_implementor_class} with parent #{ctrl}/#{qparent}"
               newqtc = qt_implementor_class &&
-                      ctrl.instantiate_child(reform_class, qt_implementor_class, qparent)
+                       ctrl.instantiate_child(reform_class, qt_implementor_class, qparent)
       #         tag "#{reform_class}.new(#{ctrl}, #{newqtc})"
               c2 = reform_class.new ctrl, newqtc
       #           tag "instantiated c=#{c}, parent is a #{ctrl.class}"
@@ -323,12 +333,13 @@ module Reform
 
         # shortcut. You can then say simple_data 'hallo', 'world'
         def simple_data *val
+          STDERR.puts "DEPRECATED, use 'struct' iso simple_data/simpledata"
           ruby_model value: if val.length == 1 then val[0] else val end
         end
 
         alias :simpledata :simple_data
 
-        def simplestruct *val
+        def struct *val
           structure value: if val.length == 1 then val[0] else val end
         end
 
@@ -496,7 +507,7 @@ module Reform
           if File.symlink?(file)
             symlinks[basename.to_sym] = File.basename(File.readlink(file), '.rb').to_sym
           else
-            send("registerKlassProxy", klass, basename, dir + '/' + basename)
+            send("registerKlassProxy", klass, basename, "#{dirprefix}/#{dir}/#{basename}")
           end
         end # Dir scan
         symlinks.each { |key, value| send("registerKlassProxy", klass, key, value) }
@@ -512,14 +523,9 @@ module Reform
       end
     end
 
-    # some forwards, for the ultimate lazy programming:
-    class Control < Qt::Object; end
     class GraphicsControl < Control; end
-    class Widget < Control;  end
     class Frame < Widget; end
     class Layout < Control; end
-    module Model; end
-    class AbstractModel < Control; end
     class Animation < Control; end
     class AbstractState < Control; end
     class AbstractAction < Control; end
@@ -530,7 +536,7 @@ module Reform
     # I abuse the fact that some Models are not (and need not be by design) AbstractModels...
     # As long as they include Model. So anything unknown becomes a Model....
     Contexts = { Widget=>[ControlContext, AppMacroContext],
-                AbstractModel=>[ModelContext, AppMacroContext],
+                AbstractModel=>[ModelContext],
                 Object=>[ModelContext],
                 GraphicsControl=>[GraphicContext, SceneFrameMacroContext],
                 Animation=>[AnimationContext, SceneFrameMacroContext],
@@ -611,17 +617,18 @@ module Reform
   # It is however possible to construct any Widget, AbstractState, Animation and AbstractModel.
   # # in that case we construct an implicit form and put everything in there.
     class App < Qt::Application
-      include AppMacroContext
+      include AppMacroContext, ModelContext
       private
 
         # shortcut. You can then say simple_data 'hallo', 'world'
         def simple_data *val
+          STDERR.puts "simple_data is DEPRECATED, use 'struct'"
           ruby_model value: if val.length == 1 then val[0] else val end
         end
 
         alias :simpledata :simple_data
 
-        def simplestruct *val
+        def struct *val
           structure value: if val.length == 1 then val[0] else val end
         end
 
@@ -659,7 +666,7 @@ module Reform
           # array of all forms
           @all_forms = []
           # title is used as caption
-          @title = nil
+          @title = @model = nil
           # instantiate a 'autoform' if no form has been given, default true
           @autoform = :form
           @doNotRun = false
@@ -696,6 +703,13 @@ module Reform
 
       public # methods of Application
 
+        def addModel control, hash, &block
+          raise Error, tr('A model was already set on the application') if @model
+          control.parent = self
+          control.setup hash, &block
+          @model = control
+        end
+
         # hash of all named(!!!) forms.
         attr :forms
 
@@ -705,6 +719,21 @@ module Reform
         # set when the first form is defined. This serves as the main window.
         # Do not use
         attr :firstform
+
+        attr :model
+
+        def parent_qtc_to_use_for reform_class
+          # reform_class can only be a Model
+          self
+        end
+
+        def containing_form
+          self          # what else???
+        end
+
+        def add child, quickyhash, &block
+          child.addTo(self, quickyhash, &block)
+        end
 
         # for use with rspec tests:
         def doNotRun v = nil
@@ -730,6 +759,16 @@ module Reform
             geometry.moveTopLeft topleft / 2
             hello.geometry = geometry
             hello.show
+          end
+          if @model
+            updateModel(@model, Propagation.new(self, nil, true))
+          end
+        end
+
+        def updateModel(model, propa)
+          for form in @all_forms
+#             tag "calling #{form}.updateModel"
+            form.updateModel(model, propa)
           end
         end
 
@@ -764,6 +803,12 @@ module Reform
         def [](formname)
           @forms[formname]
         end
+
+        def instantiate_child(reform_class, qt_implementor_class, qparent)
+          reform_class.new_qt_implementor(qt_implementor_class, self, qparent)
+        end
+
+
     end # class App
 
     # create an application, passing ARGV to it, then run it

@@ -1,7 +1,7 @@
 
 module Reform
 
-  require_relative '../controls/spinbox'
+  require 'reform/widgets/spinbox'
 
   class QIconSizeSpinBox < Qt::SpinBox
 =begin

@@ -41,7 +41,7 @@ module Reform
         @qcentralWidget = nil
         @control_index = {} # hash name=>widget
         # main model in the form, frames can override this locally though
-        @model = nil
+#         @model = nil
   #       tag "calling registerForm #{self}"
         $qApp.registerForm self
   #       tag "ReForm.new EXECUTED"
@@ -93,7 +93,7 @@ module Reform
         if block
           @whenClosed = block
         else
-          @whenClosed.call if @whenClosed
+          rfCallBlockBack(&@whenClosed) if @whenClosed
         end
       end
 
@@ -103,7 +103,7 @@ module Reform
         if block
           @whenCanceled = block
         else
-          @whenCanceled.call if @whenCanceled
+          rfCallBlockBack(&@whenCanceled) if @whenCanceled
         end
       end
 
@@ -114,7 +114,7 @@ module Reform
         if block
           @whenShown = block
         else
-          @whenShown.call if @whenShown
+          rfCallBlockBack(&@whenShown) if @whenShown
         end
       end
 
@@ -160,17 +160,17 @@ module Reform
       end # ReForm#run
 
       # override
-      def updateModel aModel, options = nil
-        if aModel && name = aModel.name
-          registerName name, aModel
-        end
-        super
-      end
+#       def updateModel aModel, options = nil
+#         if aModel && (name = aModel.name)
+#           registerName name, aModel
+#         end
+#         super
+#       end
 
       # override
-      def effectiveModel
-        @model
-      end
+#       def effectiveModel
+#         @model
+#       end
 
       #override, can be used to reregister a name with a different control
       def registerName aName, aControl
@@ -190,7 +190,7 @@ module Reform
         @control_index[symbol] or raise ReformError, tr("control '#{symbol}' does not exist")
       end
 
-      attr_writer :model
+#       attr_writer :model
 
   end # class ReForm
 

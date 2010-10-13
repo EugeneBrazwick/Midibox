@@ -1,4 +1,5 @@
 
+require 'reform/app'
 require 'reform/models/structure'
 
 include Reform
@@ -56,7 +57,7 @@ describe Structure do
   end
 
   # this observer 'records' the change it sees
-  class MyObserver
+  class MyObserver < Qt::Object
 
     def updateModel model, propa
       @model, @propa = model, propa
@@ -68,23 +69,23 @@ describe Structure do
   it "should collect changes and report these when the tran is committed" do
     s = Structure.new a: 24, b: 345, c: 'hallo', d: 'world'
     o = MyObserver.new
-    s.addObserver(o)
+    s.parent = o
+    s.parent.should == o
     s.transaction do
       s.a = 184
       s.c = 'ohayou'
       s.d = 'kono sekai'
     end
-    # obviously:
-    o.model.should == s
+    o.propa.should be_a Propagation
     # attr_index is the record of the changed indexpaths.
     # Each path is an array of keys that should be applied chainlike on the model.
     # So  [:a, 323, :b] as key indicates that s.a[323].b  has been altered
-    (keys = o.propa.attr_index.keys).should == [[:a], [:c], [:d]]
-    (pc = o.propa.attr_index[keys[0]]).should be_a Transaction::PropertyChange
+    (keys = o.propa.keypaths.keys).should == [[:a], [:c], [:d]]
+    (pc = o.propa.keypaths[keys[0]]).should be_a Transaction::PropertyChange
     pc.keypath.should == [:a]
     pc.oldval.should == 24
-    o.propa.attr_index[keys[1]].oldval == 'hallo'
-    o.propa.attr_index[keys[2]].oldval == 'world'
+    o.propa.keypaths[keys[1]].oldval == 'hallo'
+    o.propa.keypaths[keys[2]].oldval == 'world'
   end
 
   it "should be possible to abort hash changes" do
@@ -128,24 +129,22 @@ describe Structure do
   it "should collect more complicated changes" do
     s = Structure.new x: 24, y: [23, 'hallo', {i: :interesting}]
     o = MyObserver.new
-    s.addObserver(o)
+    s.parent = o
     s.transaction do
       s.x *= 2
       s.y[2] = {i: :strange, j: 'one more key'}
       s.y[2].j = 88
     end
-    # obviously:
-    o.model.should == s
     # attr_index is the record of the changed indexpaths.
     # Each path is an array of keys that should be applied chainlike on the model.
     # So  [:a, 323, :b] as key indicates that s.a[323].b  has been altered
-    (keys = o.propa.attr_index.keys).should == [[:x], [:y, 2], [:y, 2, :j]]
-    (pc = o.propa.attr_index[keys[2]]).should be_a Transaction::PropertyChange
+    (keys = o.propa.keypaths.keys).should == [[:x], [:y, 2], [:y, 2, :j]]
+    (pc = o.propa.keypaths[keys[2]]).should be_a Transaction::PropertyChange
     pc.keypath.should == [:y, 2, :j]
     pc.oldval.should == 'one more key'
-    (pc = o.propa.attr_index[keys[1]]).should be_a Transaction::PropertyChange
+    (pc = o.propa.keypaths[keys[1]]).should be_a Transaction::PropertyChange
     pc.keypath.should == [:y, 2]
-    pc.oldval.should == {i: :interesting}
+    pc.oldval.value.should == {i: :interesting}
   end
 
   it "should shortcut splices" do
@@ -163,12 +162,22 @@ describe Structure do
   it "should shortcut splices on deeper levels" do
     s = Structure.new x: 1, y: 2, z: [3, 4, 5, 6]
     s.z[2, 5] = 'hall', 'o', 'worl', 'd'
-    s.value.should == { x: 1, y: 2, z: [3, 4,  'hall', 'o', 'worl', 'd']}
+    s.value[:x].should == 1
+    s.value[:y].should == 2
+    s.value[:z].should be_a(Structure)
+    s.value[:z].value.should == [3, 4,  'hall', 'o', 'worl', 'd']
+    s.z[1].should == 4
     s.transaction do |tran|
       s.z[2, 4] = []
-      s.value.should == { x: 1, y: 2, z: [3, 4] }
+      s.value[:x].should == 1
+      s.value[:y].should == 2
+      s.value[:z].value.should == [3, 4]
       tran.abort
-      s.value.should == { x: 1, y: 2, z: [3, 4,  'hall', 'o', 'worl', 'd']}
+      s.value[:x].should == 1
+      s.value[:y].should == 2
+      s.value[:z].should be_a(Structure)
+      s.value[:z].value.should == [3, 4,  'hall', 'o', 'worl', 'd']
+      s.z[1].should == 4
     end
   end
 
@@ -200,7 +209,10 @@ describe Structure do
 
   it "should work correctly with appending" do
     s = Structure.new 1, 2, 3, 4
+    s.respond_to?(:<<).should == true
+#     tag "CALLING #{s.class}#<<"
     s << 5
+#     tag "CALLED #{s.class}#<<"
     s.value.should == [1,2,3,4,5]
     s.push(6, 7)
     s.value.should == [1,2,3,4,5,6,7]

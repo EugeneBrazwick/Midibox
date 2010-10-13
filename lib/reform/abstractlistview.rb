@@ -1,22 +1,69 @@
 
 # Copyright (c) 2010 Eugene Brazwick
 
+require 'reform/abstractitemview'
+
 module Reform
 
+=begin
+  DESIGN ERROR.
+  Only if the connector value changes will the view get new data (see Control::updateModel)
+  This means that the values for some of the role-connectors may change but we will
+  never know it...
+
+  This is in particular true for the model_connector!
+
+  This means that updateModel has to be changed considerably
+=end
   # this module implements combobox and listbox functionality
   # by using a Qt::AbstractListModel interface
   # Internally we use a 'local' model to supply the list with values.
   # This can be added by instantiating a model within a list or combo.
-  module AbstractListView
+  class AbstractListView < AbstractItemView
+    extend Forwardable
+
+      module QAbstractListModel
+        include AbstractItemView::QAbstractItemModel
+      end
 
       # this class forms the hinge between 'list' (or 'combo' etc) and any 'model' (like ruby_model/simpledata)
+      # It is meant to work with Structure
       class QModel < Qt::AbstractListModel
+        include QAbstractListModel
+
         private
           # the parent is a Reform Model.
-          def initialize model, local_conn, deco_conn
-            super(model)
-            @local_conn = local_conn # not nil
-            @deco_conn = deco_conn # can be nil
+          def initialize reformmodel, reformview
+            super(reformmodel)
+            @localmodel = reformmodel # apparently.
+            @view = reformview
+            # connectors is a hash with these optional entries:
+            # :model                    to be applied on the connecting model, the result is the listmodel
+            # @connector itself:        let's say we have a list with colors, where each color is retrieved using :col
+            #                           but the connecting model use :bordercolor.
+            #                           In that case @connectors[:display] == :col while @connector == :bordercolor
+            #                           Also accessible as view.connectors[:external]
+            # :external                 Same as @connector
+            # :display                  to be applied to a record in the list. defaults to 'to_str', then 'to_s' , must be a string
+            #                           Formerly known as local_connector
+            # :editor                   same, defaults to :display, -> string
+            # :decoration               "", but default nil, must be color, icon or pixmap (why not a brush?)
+            # :tooltip                  idem, must be a string
+            # :statustip                ""
+            # :whatsthis                ""
+            # :sizehint                 "" -> Qt::Size or tuple [x,y]
+            # :font                     "" must be a Qt::Font
+            # :alignment (of text)      "" must be a Qt::AlignmentFlag
+            # :background (brush)       "" must be a Qt::Brush
+            # :foreground (say textcolor or fill)   idem
+            # :checked                  "", must be Qt::CheckState
+            # :accessibletext
+            # :accessibledescription
+#             @connectors = {}
+            # this means that instead of a fixed property of that kind, we apply the connector
+            # to the passed model instead (the row/record).
+            # Syntax:  connectors local: .., display:
+            # And connector x is the same as connectors display: x
 #             tag "QModel.new(#{model})"
           end
 
@@ -28,7 +75,7 @@ module Reform
         - modelvalue array
         - stringvalue hash
 
-  the hash order is the ruby sequential order. So we use local_model[local_model.keys[i]] to get the value
+  the hash order is the ruby sequential order. So we use localmodel[localmodel.keys[i]] to get the value
 
   However, the ListView wants only strings for data (and icons).
 
@@ -56,41 +103,45 @@ Not supported yet
 =end
         public
 
-          def local_model
-            parent
-          end
+#           def itemData index
+#             super.tag{|r| tag "itemData -> #{r.inspect}"}
+#           end
+#
+#           def modelReset
+#             tag "modelReset emitted"
+#             super
+#           end
 
-          def rowCount parent
-            local_model.length # .tap {|l| tag "rowCount->#{l}"}
-          end
-
-          def data index, role = Qt::DisplayRole
-#             tag "data at #{index.row}, role = #{role} DisplayRole=#{Qt::DisplayRole}, EditRole=#{Qt::EditRole}"
-            case role
-            when Qt::DisplayRole, Qt::EditRole
-#               tag "DATA-> #{local_model[index.row]}"
-              Qt::Variant.from_value(local_model[index.row].apply_getter(@local_conn))
-            when Qt::DecoratorRole
-              @deco_conn ? Qt::Variant.from_value(local_model[index.row].apply_getter(@deco_conn)) : Qt::Variant.new
-            else
-              # an example would be Qt::SizeHintRole
-              Qt::Variant.new # aka invalid or 'I don't care'
-            end
-          end
+#           def reset
+#             tag "reset called"
+#             super
+#           end
+#
+#           def roleNames
+#             super.tag{|r| tag "roleNames -> #{r.inspect}"}
+#           end
 
       end # class QModel
 
-    private
+  private # methods of AbstractListView
 
-      def initAbstractListView
-        @hash_based = false # hash with stringvalues only.
+      def initialize parent, qtc   #  prev: initAbstractListView
+        super
+        column
       end
 
-      # the 'local' connector, that connects to the local 'model'
-      # and if set is applied as 'getter' to fetch the strings belonging to each object
-      # within the model
-      def local_connector sym
-        @local_connector = sym
+      def col0
+        @col0 ||= col(0)
+      end
+
+      def_delegators :col0, :local_connector, :display_connector, :display,
+                            :itemdecoration, :decoration, :decorator,
+                            :itemtooltip, :itemstatustip, :whatsthis, :itemfont,
+                            :itembackground, :itemcolor, :itemchecked,
+                            :connector, :connectors
+
+      def createQModel
+        QModel.new(@localmodel, self)
       end
 
 =begin
@@ -98,40 +149,28 @@ Not supported yet
   In that case it is pretty useless. Maybe handy for debugging
 =end
       def activated model, cid, idx, data_idx = nil
-#         tag "YES, 'activated'!!!, idx = #{idx}, cid=#{cid}, model=#{model}, data_to_transmit=#{data_at(idx).inspect}"
-        model.apply_setter cid, data_at(idx), self
+#         tag "YES, 'activated'!!!, idx = #{idx}, cid=#{cid}, model=#{model}, data_to_transmit=#{@localmodel.index2value(idx, self).inspect}"
+        model.apply_setter cid, @localmodel.index2value(idx, col0), self
       end
 
       # where idx is numeric
-      def data_at idx
-        @qtc.model.local_model.data_at(idx)
-      end
+#       def data_at idx
+#         @localmodel.row(idx).apply_getter(@connectors[:display] || :to_s)
+#       end
 
       # def override the class. I need not even be a QModel...
 #       def qModel klass
 #         @qmodel = QModel
 #       end
 
-      def setLocalModel aModel
-#         clearList
-        # key2index contains the map from key to index, in case we have keys.
-#         @key2index = nil
-        # keys is the map from index to key. If not nil we use it. And we are in the case where
-        # local model is a hash with stringvalues
-#         @index2key = nil
-        local_connector = instance_variable_defined?(:@local_connector) && @local_connector || :to_s
-        deco_connector = instance_variable_defined?(:@deco_connector) && @decol_connector
-        @qtc.model = aModel.qtc || QModel.new(aModel, local_connector, deco_connector)
-      end
-
       #override. Select the correct index in the view based on the single value
       # that we connect to.
-      def applyModel value, aModel
-#         tag "apply_model #{value.inspect}, #{aModel}, cid='#{connector}'"
-        if instance_variable_defined?(:@model_connector)
+      def applyModel value
+#         tag "#{self}::apply_model #{value.inspect}, #{@model}, cid=#{connector.inspect}"
+        if modcon = col0.connectors[:model]
           # change the contents first
 #           tag "applying model_connector #@model_connector"
-          setLocalModel aModel.apply_getter(@model_connector)
+          setLocalModel @model.apply_getter(modcon)#.tap{|r| tag "setLocalModel(#{r.value.inspect})!!!!!!!!!!!!!!!!!!!!!!!!!!!!!" }
         end
 #         tag "getter '#{cid}' located"
         # it's not entirely clear when the events are triggered
@@ -142,18 +181,25 @@ Not supported yet
         # capabilities that operate on the local model.
         # Note that the setter is supposed to accept the VALUE at the given index
         # and the getter receives the VALUE too.
-        i = @qtc.model.local_model.value2index(value)
-        raise "#{aModel}.value2index(#{value.inspect}) -> #{i}???" unless Fixnum === i
+#         tag "calling value2index(#{value}, use_as_id = #{use_as_id}"
+        if i = @localmodel.value2index(value, col0)
+          raise "#{@model}.value2index(#{value.inspect}) -> #{i}???, caller=#{caller.join("\n")}" unless Fixnum === i
 #         tag "Calling setCurrentIndex(#{i})"
-        setCurrentIndex i
+          setCurrentIndex i
+        else
+#           STDERR.puts tr("Warning: could not locate value %s in %s") % [value.inspect, self.to_s]
+          setCurrentIndex 0
+        end
       end # def apply_model
 
-    public
-
-      def addModel aModel, quickyhash, &block
-#         tag "addModel(#{aModel})"
-        super
-        setLocalModel(aModel) if aModel
+      # override
+      def check_propagation_change propagation, cid
+#         tag "check_propagation_change @connectors[:model] = #{@connectors[:model]}, propagation.keypaths = #{propagation.changed_keys.inspect}"
+        propagation.get_change(cid) ||
+        (modcon = col0.connectors[:model]) && propagation.get_change(modcon)
       end
-  end # module AbstractListView
+
+    public # methods of AbstractListView
+
+  end # class AbstractListView
 end

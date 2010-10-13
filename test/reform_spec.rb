@@ -5,8 +5,8 @@
 require 'rubygems'
 require 'spec'
 
-require_relative '../lib/reform/app'
-require_relative '../lib/reform/controls/widget'
+require 'reform/app'
+require 'reform/widget'
 
 include Reform
 

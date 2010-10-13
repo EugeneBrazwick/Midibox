@@ -85,9 +85,16 @@ However it must be in postSetup.
     def self.parent_qtc parent_control, parent_effective_qtc
     end
 
-#     def self.contextsToUse
-#       [ControlContext, App] # actually only in frames...
-#     end
+    def stretch v = nil, w = nil
+      return (instance_variable_defined?(:@stretch) ? @stretch : nil) unless v
+      if w
+#         check_grid_parent 'stretch'
+        @stretch = v, w
+      else
+#         check_boxparent 'stretch'
+        @stretch = v
+      end
+    end
 
   end # Layout
 

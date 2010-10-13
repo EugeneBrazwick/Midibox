@@ -42,9 +42,9 @@
 =end
 
 require 'reform/app'
-require_relative '../../controls/widget'
-require_relative '../../model'
-require_relative '../../graphical'
+require 'reform/widget'
+require 'reform/model'
+require 'reform/graphical'
 
 # FAILING: penwidth and transformed properties.   Seem disconnected completely. FIXED
 # FAILING SHAPES: drawPolyline, points FIXED

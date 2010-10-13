@@ -54,7 +54,7 @@ Bummer...
 =end
 
 require 'reform/app'
-require 'reform/controls/list'
+require 'reform/widgets/list'
 require 'yaml'
 
 module Reform

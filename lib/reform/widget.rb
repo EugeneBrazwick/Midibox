@@ -51,7 +51,6 @@ module Reform
 
     # enforce that parent is a layout
     def check_grid_parent tocheck
-      require 'reform/controls/gridlayout' # needed anyway
       if parent.layout?
         if !parent.is_a?(GridLayout)
           raise ReformError, tr("'#{tocheck}' only works with a gridlayout container!")
@@ -362,7 +361,6 @@ module Reform
     def paintEvent event
 #       tag "paintEvent_i(#{event})"
       if instance_variable_defined?(:@_reform_hack) && @_reform_hack.whenPainted?
-        require 'reform/painter'
 #         tag "Creating Reform::Painter passing #{self}"
         painter = Painter.new(paint_target)
 #         painter.event = event

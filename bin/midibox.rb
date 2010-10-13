@@ -140,7 +140,7 @@ module Prelims
     end
 
     def self.check_libdev_and_opt_apt_get(incl, package, target) # for example: 't.h', 'pack-dev', 'qtruby'
-      until File.exists?("#{PREFIX}/#{incl}")
+      until File.exists?(incl[0] == '/' ? incl : "#{PREFIX}/#{incl}")
 #         STDERR.puts "#{PREFIX}/#{incl} does NOT EXIST!!!"
         aptget incl, package,target
       end
@@ -201,16 +201,25 @@ module Prelims
 
       # Qt must work...
       begin
+# I got this:   /FindQt4.cmake:728 (MESSAGE): Could NOT find QtCore header
+# What now?????  I linked /usr/include/qt4/Qt* right in /usr/include ....
+# But why?? It never was there? How does it decide that???
+# It also means you cannot put a debug version somewhere, or you have to chroot or use a virtual host.
+
+# WHO MADE THAT CRAP CMAKE SHIT?????? HE SHOULD BE HANGED!!!!
+
         verb, $VERBOSE = $VERBOSE, false
         require 'Qt4'
         $VERBOSE = verb
       rescue LoadError
+        puts "Failed to load Qt4, attempt to build it right here and now"
         @@build_something = true
 =begin
   the make requires 'cmake' to be present.
 =end
 #         puts "Checking for cmake, CALLING check_exe_and_opt_apt_get!!!!!!!!!!!!!!"
         # check                 binary   aptpackagename  currenttarget
+
         ENV['CMAKE'] = check_exe_and_opt_apt_get('cmake', 'cmake', 'qtruby')
         ENV['CXX'] = check_exe_and_opt_apt_get('g++', 'g++', 'qtruby')
         ENV['QMAKE'] = check_exe_and_opt_apt_get('qmake', 'qt4-qmake', 'qtruby')
@@ -218,6 +227,7 @@ module Prelims
         check_libdev_and_opt_apt_get("include/ruby-#{RUBYVERSION}/ruby.h", "ruby#{RUBYVERSION}-dev", 'qtruby')
         check_libdev_and_opt_apt_get('include/qt4/Qt/qglobal.h', 'libqt4-dev', 'qtruby')
         check_gem(nil, QTRUBYGEMNAME, 'qtruby')
+        puts "Retry!"
         retry  # !
       end
 
@@ -276,7 +286,8 @@ then we can continue
       check_exe_and_opt_apt_get('g++', 'g++', 'qtruby')
       check_exe_and_opt_apt_get('qmake', 'qt4-qmake', 'qtruby')
       check_libdev_and_opt_apt_get("include/ruby-#{RUBYVERSION}/ruby.h", "ruby#{RUBYVERSION}-dev", 'qtruby')
-      check_libdev_and_opt_apt_get('include/qt4/Qt/qglobal.h', 'libqt4-dev', 'qtruby')
+      qtdir = ENV['QTDIR']
+      check_libdev_and_opt_apt_get((qtdir ? qtdir + '/include' : 'include/qt4') + '/Qt/qglobal.h', 'libqt4-dev', 'qtruby')
       check_gem(nil, QTRUBYGEMNAME, 'qtruby')
       check_gem('spec', 'rspec', 'alsa_midi.so')
       check_gem(nil, 'darkfish-rdoc', 'htmldocs', optional: true)

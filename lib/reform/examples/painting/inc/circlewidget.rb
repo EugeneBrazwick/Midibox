@@ -41,8 +41,9 @@
  ****************************************************************************/
 =end
 
+require 'reform/widget'
+
 module Reform
-  require_relative '../../../controls/widget'
   class QCircleWidget < QWidget
   private
     def initialize(parent)

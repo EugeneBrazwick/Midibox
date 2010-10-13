@@ -42,7 +42,7 @@
 =end
 
 # IMPORTANT, widget.rb MUST be loaded, since we use it implicitely in 'createInstantiator'
-require_relative '../controls/widget.rb'
+require 'reform/widget.rb'
 
 module Reform
 

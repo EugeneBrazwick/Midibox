@@ -59,6 +59,9 @@ module Reform
         end
       end
 
+      def self.colorkeys
+        @@color.keys
+      end
 
       # returns a Qt::Color. The heart of colorknowledge on earth
       def color colorsym, g = nil, b = nil, a = nil
@@ -101,9 +104,11 @@ module Reform
         when Float then Qt::Color.new((colorsym * 255.0).floor, (g * 255.0).floor, (b * 255.0).floor,
                                     ((a || 1.0) * 255.0).floor)
         when Symbol then @@color[colorsym]
-        else raise Error, tr("invalid color #{colorsym}, #{g}, #{b}, #{a}")
+        else raise Error, "invalid color #{colorsym}, #{g}, #{b}, #{a}"
         end
       end
+
+      alias :make_color :color
 
       generateColorConverter :color2pen, Qt::Pen, @@pen     # DEPRECATED
       generateColorConverter :color2brush, Qt::Brush, @@solidbrush # DEPRECATED
@@ -133,7 +138,7 @@ module Reform
         when nil, false then @@solidbrush[:none] ||= Qt::Brush.new(Qt::NoBrush)
         when Symbol
     #       tag "locating :#{colorsym}, working through @@color #{@@color.inspect}"
-          col = @@color[colorsym] or raise Error, tr(":#{colorsym} is not a valid colorsymbol")
+          col = @@color[colorsym] or raise Error, ":#{colorsym} is not a valid colorsymbol, use #{@@color.keys.inspect}"
           @@solidbrush[colorsym] ||= Qt::Brush.new(col) #) .tap{|b| tag "returning #{b}"}
         when Qt::RadialGradient, Qt::LinearGradient, Qt::ConicalGradient then Qt::Brush.new(colorsym)
         when String

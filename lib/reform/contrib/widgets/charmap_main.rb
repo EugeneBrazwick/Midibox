@@ -48,7 +48,7 @@
  ****************************************************************************
 =end
 
-require_relative '../controls/mainwindow'
+require 'reform/widgets/mainwindow'
 
 module Reform
 

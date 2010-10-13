@@ -39,7 +39,7 @@ module Reform
     private
       # Parameters:
       # [sender] original instance that started the transaction
-      # [attr_index] index of changed attribs, the index of the stack of propertychanges. Example:
+      # [keypaths] index of changed attribs, the index of the stack of propertychanges. Example:
       #                 s[4][:x] = 4
       #              would add [4, :x] => PropertyChange(s, 4, :x, s[4][:x]) to the index
       #
@@ -47,31 +47,73 @@ module Reform
       #              would add [:x] => PropertyChange(s, :x, s[:x].clone)  to the index
       #              we can only change simple indices like a fixnum or a hashsymbol.
       # [init] if true this is considered a new structure completely
-      def initialize sender, attr_index, init = false, current_path = nil
-        @sender, @attr_index, @init = sender, attr_index, init
-        # current_path could be nil or [4] or [4, :x]  etc. As connectors are applied to propagation copies
-        # it changes.
+      def initialize sender, keypaths, init = false, current_path = nil
+        @sender, @keypaths, @init = sender, keypaths, init
+        @init = true if !@keypaths || @keypaths[[]] # the root changed.
         @current_path = current_path
+#         tag "Propagation.new SENDER ====  #{sender}, caller =#{caller.join("\n")}!!!!!!!!!!!!!!!!!!!"
       end
 
     public
-      attr :sender, :attr_index
+      attr :sender, :keypaths
 #       attr_accessor :current_path
 
-      def changed? connector
+#  Suppose I listen to keypath  [:x, 4], this means my cid is 4
+# any [:x, 3] is in de keypaths hash.
+# This means that my parent must have cid :x. And this would set current_path to [:x]
+#
+# But now only :x has changed.
+# then [:x, 4] is not in the keypath.
+# This implies we must check all prefixes...
+#
+# Alternative:
+#
+# Changes the keypaths themselves in 'apply_getter'
+# any keypath lacking the connector as first entry can be dropped out.
+# all the others do a 'shift'
+# Checking the cid in changed? means it is present as a first entry.
+# No that is even worse.
+      def get_change connector
         return true if @init || Proc === connector
-        path = @current_path ? [connector] : @current_path + [connector]
-        @attr_index[path]
+        ch = @keypaths[[]] and return ch                # shortcut same as 'init'
+        path = case connector
+        when Array
+          if connector[0] == :root
+            connector[1..-1]
+          elsif connector[-1] == :self
+            connector[0...-1]
+          else
+            connector
+          end
+        when :self then []
+        else [connector]
+        end
+        path = @current_path + path if @current_path
+#           tag "get_change, @keypaths = #{@keypaths.keys.inspect}, current_path = #{@current_path.inspect}"
+        subpath = []
+        path.each do |cid|
+          return true if Proc === cid
+          subpath << cid
+          ch = @keypaths[subpath] and return ch
+        end
+        nil
       end
 
+      # true if the whole model should be considered changed...
       def init?
         @init
+      end
+
+      # for debugging
+      def changed_keys
+        @keypaths && @keypaths.keys
       end
 
       # returns a new Propagation with one link (connector) added to the active/current path.
       # Used by Frame to pass on a model to its children
       def apply_getter connector
-        Propagation.new(@sender, @attr_index, @init, (@current_path || []) + [connector])
+        return self if @init || Proc === connector   # it does not matter
+        Propagation.new(@sender, @keypaths, @init, (@current_path || []) + [connector])
       end
   end # class Propagation
 
@@ -113,21 +155,21 @@ transaction that is immediately committed (and at that point propagation starts)
         end
 
         private
-          def initialize root, keypath, oldval = nil
+          def initialize model, keypath, oldval = nil
   #           super()
 #             tag "New #{self} (#{model}, #{index.inspect}, #{oldval})"
             # note this clone may tragically fail for many Qt classes....
-            @root, @keypath, @oldval = root, keypath, oldval
+            raise "BOGO path, caller = #{caller.join("\n")}" if keypath == [nil]
+            @model, @keypath, @oldval = model, keypath, oldval
           end
 
           def locate
-            @keypath[0...-1].inject(@root, &:apply_getter)
+            @keypath && @keypath.length > 1 ?  @model.apply_getter(@keypath[0...-1]) : @model
           end
 
           # certain operations have no attribute
           def locate_full
-            return @root unless @keypath
-            @keypath.inject(@root, &:apply_getter)
+            @keypath ? @model.apply_getter(@keypath) : @model
           end
 
         public
@@ -136,7 +178,31 @@ transaction that is immediately committed (and at that point propagation starts)
             locate.apply_setter @keypath[-1] || :self, @oldval
           end
 
-          attr :oldval, :root, :keypath
+          attr :oldval, :keypath
+
+          def model
+#             tag "#{self}::model, model = #@model"
+            @model or raise 'TOTAL CORRUPTION'
+          end
+
+          def adds_or_deletes?
+            !updated?
+          end
+
+          alias :inserted_or_deleted? :adds_or_deletes?
+
+          # as in 'from value X to value Y'
+          def updated?
+            true
+          end
+
+          # the property did not exist before the operation
+          def inserted?
+          end
+
+          # the property no longer exists
+          def deleted?
+          end
       end # class PropertyChange
 
 
@@ -151,6 +217,11 @@ transaction that is immediately committed (and at that point propagation starts)
 #             tag "#{self}::UNDO, locate[#{@keypath[-1]}] := #{@oldval.inspect}"
             locate.value[@keypath[-1]] = @oldval
           end
+
+          def deleted?
+            true
+          end
+
       end
 
       # only for arrays.  x = [1,2,3,4]                         x = [1,2,3,4]
@@ -177,6 +248,10 @@ transaction that is immediately committed (and at that point propagation starts)
         public
           def undo
             locate.value.slice!(@keypath[-1], @count)
+          end
+
+          def inserted?
+            true
           end
       end
 
@@ -227,9 +302,11 @@ transaction that is immediately committed (and at that point propagation starts)
         @stack = [] # UNSTABLE Qt::UndoStack.new ## cannot pass self (self) # super()
 #         tag "tran test"
         raise ProtocolError, 'Protocol error, transaction already started' if @@transaction
-#         tag "BEGIN WORK"
-        @model, @sender, @@transaction = model, sender, self
-        @attr_index = {}
+        raise "total chaos, caller=#{caller.join("\n")}" unless model
+#         tag "BEGIN WORK, SENDER IS NOW #{sender}, caller=#{caller.join("\n")}"
+        @tranmodel, @sender, @@transaction = model, sender, self
+        @root = @tranmodel.root
+        @keypaths = {}
         @committed = @aborted = false
         if block_given?
           begin
@@ -256,13 +333,22 @@ transaction that is immediately committed (and at that point propagation starts)
 
     public # Transaction methods
 
-      attr :model
+      attr :root # this is the root!!!
+      attr :tranmodel
+      attr :sender # for debugging
+
+      def changed_keys
+        @keypaths.keys
+      end
 
       # call this to add more complex changes to the undostack
       def push propch
 #         tag "Transaction#push(#{propch.inspect})"
         raise ProtocolError, 'Protocol error, no transaction' unless @@transaction
-        @attr_index[propch.keypath] = propch
+        kp = propch.keypath
+        kp = @tranmodel.keypath + kp unless @tranmodel.keypath.empty?
+        @keypaths[kp] = propch
+        @keypaths[kp[0...-1]] = propch if kp && propch.adds_or_deletes?
         @stack.push propch
         # set last_property so addDependencyChange can work with that.
         @last_property = propch
@@ -278,11 +364,14 @@ transaction that is immediately committed (and at that point propagation starts)
         # NOTE: tr() only works on Qt::Object...
         raise ProtocolError, 'Protocol error, no transaction to commit' unless @@transaction
         raise ProtocolError, 'Protocol error, transaction inactive' if @aborted || @committed
-#         tag "create Propagation"
-        model.propagateChange Propagation.new(@sender, @attr_index)
+#         tag "COMMIT WORK create Propagation, sender = #@sender, model=#{root}, root=#{model.root}, parent=#{model.parent}"
+        root.propagateChange Propagation.new(@sender, @keypaths)
+#       rescue
+#         abort         CANNOT BE DONE. After propagation the other parts of the system are already altered
+# abort does nothing about that.
       ensure
         # free memory and blocks further operations
-        @stack = @attr_index = nil
+        @stack = @keypaths = nil
         @@transaction = nil
         @committed = true
 #         tag "COMMIT WORK OK"
@@ -297,7 +386,7 @@ transaction that is immediately committed (and at that point propagation starts)
         # FIRST destroy the undo's since they will call apply_setter
         @stack.pop.undo until @stack.empty?
       ensure
-        @@transaction = @stack = @attr_index = nil
+        @@transaction = @stack = @keypaths = nil
       end
 
       alias :rollback :abort
@@ -314,19 +403,20 @@ transaction that is immediately committed (and at that point propagation starts)
         !@aborted && !@commited
       end
 
-      # common case, for updates of single keypaths
+      # common case, for updates of single keypaths.
+      # The keypath should be the *local* keypath, not the path starting at _root_
       def addPropertyChange *keypath, oldval
 #         tag "self = #{self}, @@transaction = #{@@transaction}, oldval=#{oldval}"
         keypath = keypath[0] if Array === keypath[0]
-        push(oldval == PropertyChange::NoValue ? PropertyAdded.new(@model, keypath)
-                                               : PropertyChange.new(@model, keypath, oldval))
+        push(oldval == PropertyChange::NoValue ? PropertyAdded.new(@tranmodel, keypath)
+                                               : PropertyChange.new(@tranmodel, keypath, oldval))
       end
 
       # call this method to add pseudo changes. See TimeModel source for an example.
       # Adds the @last_property changed
-      def addDependencyChange *index
-        index = index[0] if Array === index[0]
-        @attr_index[index] = @last_property
+      def addDependencyChange *keypath
+        keypath = keypath[0] if Array === keypath[0]
+        @keypaths[@tranmodel.keypath + keypath] = @last_property
       end
   end # class Transaction
 
@@ -451,7 +541,7 @@ The old rule that 'names' imply 'connectors' is dropped completely.
         if tran = Transaction.transaction
           yield(tran)
         else
-          Transaction.new(@root, sender) do |tr|
+          Transaction.new(self, sender) do |tr|
             return yield(tr)
           end
         end
@@ -469,10 +559,21 @@ The old rule that 'names' imply 'connectors' is dropped completely.
 
     public # Model methods
 
+      def root
+        @root or raise "MAYHEM, modelconstructor #{self} did not set @root!!!"
+      end
+
+      attr_writer :root
+
       def propagateChange propagation
-        (@observers ||= nil) and @observers.each do |o|
-          o.updateModel self, propagation
+#         (@observers ||= nil) and @observers.each do |o|
+#         tag "propagateChange"
+        if parent
+          parent.updateModel self, propagation
+        else
+          STDERR.puts "Warning: propagateChange is ignored if your model (#{self}) has no parent!!" if $VERBOSE
         end
+#         end
       end
 
       # set or get the name of the model
@@ -494,13 +595,13 @@ The old rule that 'names' imply 'connectors' is dropped completely.
       end
 
       # observers are always ReForms, currently
-      def addObserver observer
-        (@observers ||= []) << observer
-      end
+# #       def addObserver observer
+#         (@observers ||= []) << observer
+#       end
 
-      def removeObserver observer
-        @observers.delete observer
-      end
+#       def removeObserver observer
+#         @observers.delete observer
+#       end
 
 =begin rdoc
       returns whether name may function as 'getter' on the model
@@ -521,15 +622,17 @@ The old rule that 'names' imply 'connectors' is dropped completely.
       # Name should be a hashindex (pref. a Symbol), or an arrayindex (Fixnum)
       # The name +:self; is special.
       def apply_getter name
-        return self if name == :self
-        return name.call(self) if Proc === name
-        return nil unless (m = public_method(name)) && -1 <= m.arity && m.arity <= 0
+        case name
+        when :self then self
+        when :root then root
+        when Proc then name.call(self)
+        when Array then name.inject(self) { |v, nm| v && v.apply_getter(nm) }
+        else
+          return nil unless (m = public_method(name)) && -1 <= m.arity && m.arity <= 0
   #       tag "apply_getter #{name} to self == 'send'"
   #       if respond_to?(name)
-        send name
-  #       else
-  #         send(name.to_s + '?')
-  #       end
+          send name
+        end
       end
 
   #     def method_missing symbol, *args, &block
@@ -543,17 +646,22 @@ The old rule that 'names' imply 'connectors' is dropped completely.
           # as an unwanted feature it will call 'postSetup' on self!!!!! FIXME(?)
           # setting the model will change the observers
           # FIXME: this is WRONG!  we may be within a transaction.
-          Array.new(@observers || []).each do |o|
-            raise 'DEPRECATED: observers'
+#           Array.new(@observers || []).each do |o|
+#             raise 'DEPRECATED: observers'
   #           tag "Resetting model #{self} to observer #{o}"
-            o.updateModel value, Propagation.new(sender, nil, true)
-          end
+          parent.updateModel value, Propagation.new(sender, nil, true)
+#           end
         when Proc
           # ignore. Notice that setter? already returns false, but some bogo controls call this anyway
+        when Array
+          sub = name[0...-1].inject(self) { |v, nm| v && v.apply_getter(nm) } and
+            sub.apply_setter(name[-1], value, sender)
         else
           name = name.to_s
           name = name[0...-1] if name[-1] == '?'
-          send(name + '=', value, sender)
+          pickup_tran(sender) do        # this is only used to get the sender in
+            send(name + '=', value)#  , sender)
+          end
         end
       end
 
@@ -584,6 +692,7 @@ The old rule that 'names' imply 'connectors' is dropped completely.
       end
 
       def setupQuickyhash hash
+        raise "ARGHHH, caller = #{caller.join("\n")}" unless Hash === hash
         hash.each do |k, v|
   #         tag "send(#{k.inspect}, #{v.class} #{v})"
           send(k, v)
@@ -591,8 +700,19 @@ The old rule that 'names' imply 'connectors' is dropped completely.
       end
 
       def addTo parent, hash, &block
+#         tag "#{self}::addTo"
         parent.addModel self, hash, &block
       end
+
+      def model?
+        true
+      end
+
+      def keypath
+        @keypath || []
+      end
+
+      attr_writer :keypath
 
       # the transaction is passed to this block
       # transaction do |tran| .... end   runs the block in a transaction, if it fails halfway
@@ -614,8 +734,9 @@ The old rule that 'names' imply 'connectors' is dropped completely.
         length == 0
       end
 
-      # grab a row
-      def row(numric_idx)
+      # grab a row, can return a Model or simple data like Numeric, String etc.
+      # It should never return an Array or Hash or a complex instance that is not Model.
+      def row(numeric_idx)
         raise "#{self.class}#row is not implemented"
       end
 
@@ -633,15 +754,51 @@ The old rule that 'names' imply 'connectors' is dropped completely.
         k.is_a?(Qt::Enum) ? k.to_i : k
       end
 
+      # try to retrieve key from value by looking to a field called 'id'
+      # Unfortunately sometimes the value is not a model but a raw hash.
+      def value2key value, view # or widget
+        # note that Strings have to_i as well.
+        case value
+        when Fixnum, Qt::Enum then value.to_i
+        else
+          idid = view.key_connector || :id
+          if value.respond_to?(idid)
+            value.send(idid)
+          elsif Hash === value
+            # just respond_to(:[]) will not work properly as x[:dd] is illegal for arrays
+            value[idid]
+          else
+            nil
+          end
+        end
+      end
+
   end # module Model
 
   # This class implements Model but is also a Control.
   class AbstractModel < Control
     include Model
+    private
+      def initialize parent = nil, qtc = nil
+        super
+        @root =
+        if parent.respond_to?(:model?) && parent.model?
+          @root = parent.root
+#           tag "Parent (#{parent}).root = #{parent && parent.root}"
+          raise 'WTF' unless @root
+        else
+          @root = self
+        end
+      end
 
-    def length
-      @qtc.rowCount
-    end
+#     def length  # not likely
+#       @qtc.rowCount           # and rowCount requires an index too...
+#     end
+
+      # Model already has this but something strange is going on!!
+#       def addTo parent, hash, &block
+#         parent.addModel self, hash, &block
+#       end
   end
 
 end # module Reform

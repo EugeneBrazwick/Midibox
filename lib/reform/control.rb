@@ -1,7 +1,7 @@
 
 #  Copyright (c) 2010 Eugene Brazwick
 
-require 'reform/app'
+#       equire 'reform/app'             VERY BAD IDEA
 
 module Reform
 
@@ -37,14 +37,120 @@ module Reform
 # And you can replace the callback any time you like.
 #
   class Control < Qt::Object
-    private
+
+      class Animation < Control
+
+        private
+          # our parent is the parent of the DynamicAttribute so it could be a GraphicsItem.
+          # Which is a Qt::Object, even if Qt::GraphicsItem is not
+          def initialize attrib
+#             tag "Assigned attrib and propertyname '#{@qtc.propertyName}'"
+          end
+
+      end
+
+=begin    # it may even be a very good idea to implement to 'enabler' and 'disabler' the very same way!
+    # they are now kind of polluting the updateModel method.
+
+      windowTitle { connector { |m| m.myTitle} }
+
+      new DynamicAttribute self, :windowTitle, quicky, block
+=end
+      class DynamicAttribute < Control
+
+        private
+
+          def initialize parent, propertyname, quickyhash = nil, &block
+#             tag "DynamicAttribute.new(#{parent}, :#{propertyname})"
+            super(parent)
+            @propertyname = propertyname
+            setup(quickyhash, &block) if quickyhash || block
+          end
+
+          def through_state states2values
+            form = containing_form
+            setProperty('value', value2variant(:default))
+            states2values.each do |state, value|
+              form[state].qtc.assignProperty(self, 'value', value2variant(value))
+            end
+          end
+
+          def animation quickyhash = nil, &block
+            require_relative 'animations/attributeanimation'
+#             tag "Creating Qt::Variant of value"
+            setProperty('value', value2variant(:default))
+#             tag ("calling Animation.new")
+            AttributeAnimation.new(self, Qt::PropertyAnimation.new(self)).setup(quickyhash, &block)
+          end
+
+        public # DynamicAttribute methods
+
+          # override
+          def event e
+#             tag "#{self}.event(#{e})"
+            case e
+            when Qt::DynamicPropertyChangeEvent
+              # we may expect the value to be 'value'
+              raise "unexpected property '#{e.propertyName}'" unless e.propertyName == 'value'
+              val = property('value').value
+#               tag "applyModel(#{val.inspect})"
+              applyModel val
+#             else
+#               tag "unhandled .... #{self}.event(#{e})"
+            end
+#             super  not much use
+          end
+
+          def value2variant *value
+            case @propertyname
+            when :brush
+              color = Graphical.color(*value)
+#               tag "Qt::Variant.new(#{color})"
+              Qt::Variant::fromValue(color)
+            when :geometry
+              Qt::Variant::fromValue(case value[0]
+              when :default then Qt::Rect.new
+              when Qt::Rect then value[0]
+              else Qt::Rect.new(*value) #.tap{|r| tag "creating value(#{r.inspect})"}
+              end)
+            when :geometryF
+              Qt::Variant::fromValue(case value[0]
+              when :default then Qt::RectF.new
+              when Qt::RectF then value[0]
+              else Qt::RectF.new(*value) #.tap{|r| tag "creating value(#{r.inspect})"}
+              end)
+            else
+              raise Error, tr("Not implemented: animation for property '#@propertyname'")
+            end
+          end
+
+          # called when Qt::DynamicPropertyChangeEvent is received
+          def applyModel data, model = nil
+#             tag "#{self}::applyModel #{parent}.#@propertyname := #{data.inspect}"
+            parent.send(@propertyname.to_s + '=', data)
+          end
+
+          # the result is a symbol
+          attr :propertyname, :animprop
+
+          alias :propertyName :propertyname
+
+#           attr_accessor  :value
+
+#           properties 'value'
+
+      end # class DynamicAttribute
+
+      DynamicProperty = DynamicAttribute
+
+    private # Control methods
 
       # create a new Control, using the frame as 'owner', and qtc as the wrapped Qt::Widget
-      def initialize frame, qtc = nil
+      def initialize parent = nil, qtc = nil
   #       tag "#{self}::initialize"
-        if frame
-  #         tag "calling Qt::Object.initialize(#{frame})"
-          super(frame)
+        if parent
+#           tag "calling Qt::Object.initialize(#{parent})"
+          super(parent)
   #         tag "HERE"
               # self.parent = frame               Qt::Object constructor should do this!
   #         parent == frame or raise
@@ -56,8 +162,14 @@ module Reform
   #       tag "HERE"
         # FIXME: each control has these and only qtc is of real importance
         # containing_form can be cached in the getter and has_pos needs not be set at all
-        @containing_form, @qtc = frame && frame.containing_form, qtc
+        @containing_form, @qtc = parent && parent.containing_form, qtc
+
+        # true if a connector is on this control, or on any of its children
         @want_data = false
+
+        # the connected or set model. model.root.parent is the original container. This is a Model
+#         @model = nil
+
         # NOTE: parent may change to its definite value using 'added' See Frame::added
         # in all cases: c.parent.children.contains?(c)
       end
@@ -124,6 +236,11 @@ module Reform
 #           tag "#{self}::Executing MACRO #{macro}"
           macro.exec(receiver)
         end
+      end
+
+      # return true if applyModel should be called.
+      def check_propagation_change propagation, cid
+        propagation.get_change(cid)
       end
 
       # a ruby scope instantiator that wraps around 'Qt::Object#blockSignals'.
@@ -194,30 +311,22 @@ module Reform
         # we keep clear of children with their own 'effective' models, which means that the
         # user parked a model in it explicitely.  But note it does not apply to internal models
         # like the combobox has (it is called 'model' confusingly...)
-        if children
+#         if children
           children.each do |child|
 #             tag "PROPCONDITIONS. child=#{child}, want_data?=#{Control === child && child.want_data?}"
-            if Control === child && child.want_data?
-              child_model = child.model?
-#               tag "aModel=#{aModel}, child.model = #{child_model}"
-              if !child_model || child_model != aModel
-#                 tag "propagate"
-                child.updateModel(aModel, propagation)
-              end
-            end
+            child.updateModel(aModel, propagation) if Control === child && child.want_data?
           end
-        end
-        whenConnected aModel, propagation # if connector
+#         end
       end
 
       # data is the connector applied on the model. This is only called if we 'want data',
       # if we have a connector,
       # if the model has a getter for it, and
       # if the connector is in the 'changed' list of the propagation
-      def applyModel data, model
+      def applyModel data
       end
 
-    protected
+    protected # Control methods
 
       def want_data!
 #         tag "#{self}#want_data!, propagates up"
@@ -256,127 +365,21 @@ module Reform
         end
       end
 
-      def whenConnected model = nil, options = nil, &block
+      def whenConnected model = nil, propagation = nil, &block
   #       tag "whenConnected, model=#{model}, block=#{block}, @whenConnected=#@whenConnected"
         if block
           want_data!
           @whenConnected = block
         else
-          rfCallBlockBack(model, options, &@whenConnected) if instance_variable_defined?(:@whenConnected) && @whenConnected
+            # if whenConnected is set, it should be a block since there is no way to unset it.
+          rfCallBlockBack(model, propagation, &@whenConnected) if instance_variable_defined?(:@whenConnected)
         end
       end
 
       def added control
       end
 
-      class Animation < Control
-
-        private
-          # our parent is the parent of the DynamicAttribute so it could be a GraphicsItem.
-          # Which is a Qt::Object, even if Qt::GraphicsItem is not
-          def initialize attrib
-#             tag "Assigned attrib and propertyname '#{@qtc.propertyName}'"
-          end
-
-      end
-
-=begin    # it may even be a very good idea to implement to 'enabler' and 'disabler' the very same way!
-    # they are now kind of polluting the updateModel method.
-
-      windowTitle { connector { |m| m.myTitle} }
-
-      new DynamicAttribute self, :windowTitle, quicky, block
-=end
-      class DynamicAttribute < Control
-
-        private
-
-          def initialize parent, propertyname, quickyhash = nil, &block
-#             tag "DynamicAttribute.new(#{parent}, :#{propertyname})"
-            super(parent)
-            @propertyname = propertyname
-            setup(quickyhash, &block) if quickyhash || block
-          end
-
-          def through_state states2values
-            form = containing_form
-            setProperty('value', value2variant(:default))
-            states2values.each do |state, value|
-              form[state].qtc.assignProperty(self, 'value', value2variant(value))
-            end
-          end
-
-          def animation quickyhash = nil, &block
-            require_relative 'animations/attributeanimation'
-#             tag "Creating Qt::Variant of value"
-            setProperty('value', value2variant(:default))
-#             tag ("calling Animation.new")
-            AttributeAnimation.new(self, Qt::PropertyAnimation.new(self)).setup(quickyhash, &block)
-          end
-
-        public
-
-          # override
-          def event e
-#             tag "#{self}.event(#{e})"
-            case e
-            when Qt::DynamicPropertyChangeEvent
-              # we may expect the value to be 'value'
-              raise "unexpected property '#{e.propertyName}'" unless e.propertyName == 'value'
-              val = property('value').value
-#               tag "applyModel(#{val.inspect})"
-              applyModel val
-#             else
-#               tag "unhandled .... #{self}.event(#{e})"
-            end
-#             super  not much use
-          end
-
-          def value2variant *value
-            case @propertyname
-            when :brush
-              color = Graphical.color(*value)
-#               tag "Qt::Variant.new(#{color})"
-              Qt::Variant::fromValue(color)
-            when :geometry
-              Qt::Variant::fromValue(case value[0]
-              when :default then Qt::Rect.new
-              when Qt::Rect then value[0]
-              else Qt::Rect.new(*value) #.tap{|r| tag "creating value(#{r.inspect})"}
-              end)
-            when :geometryF
-              Qt::Variant::fromValue(case value[0]
-              when :default then Qt::RectF.new
-              when Qt::RectF then value[0]
-              else Qt::RectF.new(*value) #.tap{|r| tag "creating value(#{r.inspect})"}
-              end)
-            else
-              raise Error, tr("Not implemented: animation for property '#@propertyname'")
-            end
-          end
-
-          # called when Qt::DynamicPropertyChangeEvent is received
-          def applyModel data, model = nil
-#             tag "#{parent}.#@propertyname := #{data.inspect}"
-            parent.send(@propertyname.to_s + '=', data)
-          end
-
-          # the result is a symbol
-          attr :propertyname, :animprop
-
-          alias :propertyName :propertyname
-
-#           attr_accessor  :value
-
-#           properties 'value'
-
-      end # class DynamicAttribute
-
-      DynamicProperty = DynamicAttribute
-
-    public
-
-      attr_writer :connector
+    public # Control methods
 
       # Once a control sets a connector it then returns true here, and so will
       # all its parents, up to (but excluding) the containing form.
@@ -386,20 +389,13 @@ module Reform
         @want_data
       end
 
-      # the owner form.
-      attr :containing_form
-
-      alias :containingForm :containing_form
-
-      # Qt control that is wrapped
-      attr :qtc
+#       def parent val = nil
+#         return super() unless val
+#         setParent(val)
+#       end
 
       # tuple w,h   as set in last call of setSize/setGeometry
 #       attr :requested_size
-
-      # an Array of macros,   we may need a separate index for named macros but
-      # I forgot what needed that. Probably broken now.
-      attr :macros
 
 =begin  **************** PARENTING SYSTEM *********************************
 
@@ -466,6 +462,7 @@ module Reform
       we proceed.
 =end
       def add child, quickyhash, &block
+#         tag "Calling #{child}::addTo, child.public_methods = #{child.public_methods.inspect}"
         child.addTo(self, quickyhash, &block)
   #       added child
       end
@@ -527,15 +524,16 @@ module Reform
 
       # :nodoc: called by +add+ if the control was a model
       def addModel control, hash, &block
-        @model ||= nil
+#         @model ||= nil
         control.setup hash, &block
 #         want_data!            this is a toplevel call. There is no need to do this.
 # and it wrong for comboboxes or lists that are assigned local data.
-        unless @model.equal? control
-          @model.removeObserver(self) if @model
-          @model = control
-          @model.addObserver(self) if @model
-        end
+#         unless @model.equal? control
+#           @model.removeObserver(self) if @model
+        @model = control
+#           @model.addObserver(self) if @model
+#         end
+        control.parent = self
         added control
       end
 
@@ -585,7 +583,7 @@ module Reform
           parent.registerName aSymbol, self
         else
   #         raise "#{self} has no @qtc. SHINE!" unless @qtc               Spacer has no Qt complement, maybe more
-          objectName.to_sym
+          objectName && objectName.to_sym       # can be nil (STRANGE??)
         end
       end
 
@@ -621,9 +619,14 @@ module Reform
       def postSetup
 #         tag "#{self}#postSetup, model=#@model"
         executeMacros
-        if instance_variable_defined?(:@model)
-#           tag "start model propagation"
-          require 'reform/model'
+        # this is a dirty trick, but if a @localmodel is set (combo/list/table/ etc)
+        # then these have @model == @localmodel (initially at least)
+        # and we don't want to propagate the internal model to themselves.
+        # It could even be that an external model already did propagate and then we
+        # are doing again.
+        # So this code may very well be wrong
+        if instance_variable_defined?(:@model) && !instance_variable_defined?(:@localmodel)
+          STDERR.puts "warning: #{self}: start model propagation from postSetup (probably OK)" if $VERBOSE
           updateModel(@model, Propagation.new(self, nil, true))
         end
       end
@@ -654,6 +657,11 @@ module Reform
 
       #Returns true if the control is a layout  Better use Layout === x
       def layout?
+      end
+
+      # Model === x will not work, since Model is not a class. Maybe it should be now we move to Structure
+      # as interface??
+      def model?
       end
 
         # better use AbstractAction === x.
@@ -687,23 +695,42 @@ module Reform
 #           be called (at least not now).
       def updateModel aModel, propagation
 #         tag "#{self}::updateModel(#{aModel}, #{propagation.inspect}), connector=#{connector}"
-        if (cid = connector) && propagation.sender != self && propagation.changed?(cid)
-    #           tag "apply cid #{cid} on model #{mod}"
-    #           tag "DynamicAttribute activated: #{parent}.#@propertyname := #{mod.apply_getter(cid)}"
-
-          applyModel aModel.apply_getter(cid), aModel
+#         raise 'WTF' unless Model === aModel
+        do_callback = instance_variable_defined?(:@whenConnected)
+        if cid = connector
+          # really important, if nothing changes for us, so also not for our children.
+          return unless check_propagation_change(propagation, cid)
+          do_apply = propagation.sender != self
+#           tag "#{self}::updateModel, do_apply = #{do_apply}, sender = #{propagation.sender}, cid = #{cid} change = #{propagation.get_change(cid)}"
+          return unless do_apply || children || do_callback
+          data = aModel.apply_getter(cid)
+          # for simple fields the connected model is the container.
+          # For example Edit.model is set to the record, same for Combo etc.
+          # But if the result of cid is in fact a model, then we use that as that is the thing we gonna need.
+          # This happens for frames and forms.
+#             tag "applied cid #{cid.inspect} on model #{aModel}-> #{data.inspect}"
+#             tag "data.value = #{data.respond_to?(:value) && data.value.inspect}"
+          @model = if (is_model = data.respond_to?(:model?) && data.model?) then data else aModel end
+#             tag "applied #{cid} on #@model -> #{data.inspect}, calling #{self}::applyModel"
+          applyModel data if do_apply # , aModel the callee can use @model
+          return unless is_model && (children || do_callback)
+        else
+          data = aModel
         end
-        propagateModel aModel, propagation
+        # if there is no cid (common case) we must propagate to all children
+        propagation = propagation.apply_getter(cid) if cid
+        propagateModel aModel, propagation if children
+        rfCallBlockBack(aModel, propagation, &@whenConnected) if do_callback
       end
 
       # return the model of the containing frame or form, traveling upwards until one is found.
-      def effectiveModel
-        parent.effectiveModel
-      end
+#       def effectiveModel
+#         parent.effectiveModel
+#       end
 
       # true if model is set on this control. Can only be true for forms or frames
-      def effectiveModel?
-      end
+#       def effectiveModel?
+#       end
 
       # returns the enclosing frame (or itself, if it is a frame)
       def frame_ex
@@ -713,6 +740,7 @@ module Reform
       # as a replacement for findChildren. Note that klass is a Reform class!
       # it works recursively.
       # However, it also enumerates itself, if the condition applies.
+      # Works as iterator, the controls located are passed to the block
       def find klass = nil, name = nil, &block
         return to_enum(:find, klass, name) unless block
         if (!klass || klass === self) && (!name || name === @qtc.name)
@@ -724,14 +752,33 @@ module Reform
 
       alias :findChildren :find
 
-      # can be used as a bool too.
-      def model?
-        instance_variable_defined?(:@model) ? @model : nil
-      end
+      # can be used as a bool too. For comboboxes and tables this may be set, while effectiveModel is nil.
+#       def model
+#         instance_variable_defined?(:@model) ? @model : nil
+#       end
 
       def geometry=(*value)
         @qtc.geometry = *value
       end
+
+      # connected model or nil
+      attr :model
+
+      # note we already have the reader above somewhere
+      attr_writer :connector
+
+      # the owner form.
+      attr :containing_form
+
+      alias :containingForm :containing_form
+
+      # Qt control that is wrapped
+      attr :qtc
+
+      # an Array of macros,   we may need a separate index for named macros but
+      # I forgot what needed that. Probably broken now.
+      attr :macros
+
   end # class Control
 
 end # Reform

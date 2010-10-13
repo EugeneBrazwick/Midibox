@@ -1,6 +1,6 @@
 
 
-require 'reform/controls/combobox.rb'
+require 'reform/widgets/combobox.rb'
 
 module Reform
 

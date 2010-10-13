@@ -43,7 +43,7 @@
 
 require 'Qt'
 require 'reform/graphical'
-require 'reform/controls/canvas'
+require 'reform/widgets/canvas'
 
 # see otherwise 'sub attack' for a PixmapItem class
 # NOTE: I remove Qt::Object so Pixmap may lack important functionality

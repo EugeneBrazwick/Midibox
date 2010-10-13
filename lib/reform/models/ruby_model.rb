@@ -71,7 +71,7 @@ require_relative '../model'
       end
 
         # returns the models value at given numeric index
-      def data_at idx
+      def index2value numeric_idx
         if Hash === @value then @index2key[idx] else @value[idx] end
       end
 
@@ -136,14 +136,18 @@ require_relative '../model'
 
       attr_writer :value
 
-      def self.value2key value
-        Model::enum2i(value.respond_to?(:key) ? value.key : value)
+      def self.value2key value, view
+        if Model::enum2i(value.respond_to?(idid = view.key_connector)
+          value.send(idid)
+        else
+          value
+        end
       end
 
-      def value2index value
+      def value2index value, view
 #         tag "value2index(#{value}) -> key #{SimpleModel::value2key(value).inspect}"
 #         tag "@key2index=#{@key2index.inspect}. Since @value = #@value"
-        if @key2index then @key2index[SimpleModel::value2key(value)] else 0 end
+        if @key2index then @key2index[SimpleModel::value2key(value, view)] else 0 end
       end
 
   end # class SimpleModel

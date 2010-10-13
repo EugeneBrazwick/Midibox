@@ -1,7 +1,7 @@
 
 module Reform
 
-  require_relative 'widget'
+  require 'reform/widget'
 
 # a Frame is a widget that may contain others.
 #
@@ -50,6 +50,10 @@ module Reform
       layout
     end
 
+    def autolayout value
+      @autolayout = value
+    end
+
     def added control
       control.parent = self
     end
@@ -61,7 +65,7 @@ module Reform
     # array of all controls, widgets, layouts, menus, actions, models etc..
 #     attr :autolayout
 
-=begin rdoc
+=begin
     connect a model (may be nil) to the frame.
     The rules are as follows:
         - if the frame has a connector and that name is also a public method of model,
@@ -72,6 +76,7 @@ module Reform
           it will take no action by itself,
           but the connect propagates to each control that is a direct child
 =end
+=begin
     def updateModel aModel, propagation
 #       tag "#{self}::updateModel"
 #       tag "connector=#{connector}(getter?:#{aModel.getter?(connector)}), aModel = #{aModel}"
@@ -86,6 +91,7 @@ module Reform
       end
 #       tag "delegate model to children"
     end
+=end
 
     def columnCount value
 #       tag "#{self}, value=#{value}, induce 'gridlayout'"

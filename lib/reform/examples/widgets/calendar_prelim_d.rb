@@ -1,7 +1,7 @@
 
 require 'reform/app'
 require_relative '../../models/calendar_model'
-require_relative '../../controls/calendarwidget'
+require_relative '../../widgets/calendarwidget'
 
 Reform::app {
   groupbox { # generalOptionsGroupBox

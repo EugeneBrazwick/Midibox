@@ -29,9 +29,8 @@ See examples/models/demo03.rb
 
 
 =end
-  class ComboBox < LabeledWidget
-
-    include ModelContext, AbstractListView
+  class ComboBox < AbstractListView
+    include LabeledWidget::Implementation
 
     private
 
@@ -40,12 +39,11 @@ See examples/models/demo03.rb
         # @index and @data represent the local model as set with the 'model' (or specific model instantiator)
         # method.  Alternatively data becomes available through the application of @model_connector to
         # the connectedModel
-        initAbstractListView
   #       @model_connector = nil
         connect(@qtc, SIGNAL('activated(int)'), self) do |idx|
           rfRescue do
 #             tag "Activated(#{idx})"
-            if (model = effectiveModel) && (cid = connector) && model.setter?(cid)
+            if model && (cid = connector) && model.setter?(cid)
               activated(model, cid, idx)
             end
           end

@@ -5,17 +5,38 @@ module Reform
     include ActionContext
 
     private
-    define_simple_setter :title
-    alias :text :title
 
-    def quiter
-      action {
-        label tr('E&xit')
-        shortcut :quit
-        statustip tr('Quit the application')
-        whenTriggered { $qApp.quit }
-      }
-    end
+      define_simple_setter :title
+      alias :text :title
+
+      def quiter
+        action {
+          label tr('E&xit')
+          shortcut :quit
+          statustip tr('Quit the application')
+          whenTriggered { $qApp.quit }
+        }
+      end
+
+      alias :quit :quiter
+
+      def fileopen fs
+        action {
+          title tr('&Open...')
+          shortcut :open
+          statustip fs.open_caption
+          whenClicked { fs.open(self) }
+        }
+      end
+
+      def saveas fs
+        action {
+          title tr('&Save As...')
+          shortcut :saveas
+          statustip fs.saveas_caption
+          whenClicked { fs.saveas(self) }
+        }
+      end
 
     public
 

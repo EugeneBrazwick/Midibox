@@ -1,8 +1,9 @@
 
+# Copyright (c) 2010 Eugene Brazwick
 
 class Array
   def has_key? i
-    Fixnum === i && (i >= 0 && i < length) || (i < 0 && -i <= length)
+    Fixnum === i && (i >= 0 && i < length || i < 0 && -i <= length)
   end
 end
 
@@ -113,54 +114,7 @@ mock:
     s[3]=x,y is the same as s[3,0] =x,y or s[3,0] = [x,y]
     It differs whether the righthand side is an array or not. And s[0] = [3,2] is different from s[0,0] = [3,2] !
 =end
-  class Structure
-    include Model
-
-=begin
-      class ArrayWrapper
-        private
-#           def self.def_single_delegators(accessor, *methods)
-#             methods.delete("__send__")
-#             methods.delete("__id__")
-#             for method in methods
-#               def_single_delegator(accessor, method)
-#             end
-#           end
-
-          # this is complicated. We must add to the Transaction, implying that we
-          # must be able to undo it.
-          def self.def_single_delegator(accessor, method, ali = method)
-            line_no = __LINE__; str = %<
-              def #{ali}(*args, &block)
-                raise 'NOTIMPLEMENTED'
-                begin
-                  tag "DELEGATION, method = '#{method}'"
-                  #{accessor}.__send__(:#{method}, *args, &block)
-                  @root.dynamicPropertyChanged @propname
-                rescue Exception
-                  # hack the backtrace to not include "structure.rb" references
-                  $@.delete_if{|s| %r"#{Regexp.quote(__FILE__)}"o =~ s} unless Forwardable::debug
-                  ::Kernel::raise
-                end
-              end
-            >
-            instance_eval(str, __FILE__, line_no)
-          end
-
-        public
-
-
-          # next thing: all stuff returning array elements must wrap them, if they are a plain hash or
-          # an array themselves...
-          def [] idx
-            @@root.wrap(@ar.send(:[], idx), idx, @keypath)
-          end
-
-          def method_missing sym, *args, &block
-            @ar.send(sym, *args, &block)
-          end
-      end # class ArrayWrapper
-=end
+  class Structure < AbstractModel
 
     private # methods of Structure
 
@@ -173,24 +127,56 @@ mock:
       #           nil (default) is equivalent with [].
       #           Only applies when a root is given
       def initialize *args
+#         tag "new #{self}, args = #{args.inspect}"
+        if args.length == 1 && Control === args[0]
+          super(args[0])
+          raise "TOTAL CORRUPTION" unless !args[0].model? || args[0].root
+          @root = if args[0].model? then args[0].root else self end
+        else
+          super(nil)
+          @root = self
+        end
 #         tag "INITIALIZE ,args = #{args.inspect}"
         if args.length == 1
           args = args[0]
-          if Hash === args && args[:keypath]
+          if Hash === args && args.has_key?(:keypath)
   #         tag "#{self}.new(#{parent.inspect}, gp=#{qtc}"
-            @value = args[:value]
-            raise 'TRYING TO MAKE A MESS????' if @value.nil?
-            @root = args[:root]
-            @keypath = args[:keypath]
-            return
+            @root = args[:root] || self
+            @keypath = args[:keypath] || []
+            assign :self, args[:value]
+            raise "BOGO keypath, caller = #{caller.join("\n")}" if @keypath == [nil] || !(Array === @keypath)
+            raise 'TRYING TO MAKE A MESS????, keypath given but not value' if @value.nil?
+          else
+            @keypath = []
+            assign :self, args
+          end
+        else
+#         @root = self
+# #         tag "setup @value := #{args}"
+          @keypath = []
+          assign :self, args
+        end
+        raise 'TRYING TO MAKE A MESS????' if @value.nil?
+        raise 'TRYING TO MAKE A MESS????' if @value.respond_to?(:model?) && @value.model?
+        raise 'TRYING TO MAKE A MESS????' if @root.nil? || @root != root
+#         tag "INIT #{self} OK, @root = #@root, root = #{self.root}"
+      end
+
+      def inter value, key
+        case value
+        when Hash, Array then Structure.new(value: value, keypath: @keypath + [key], root: @root)
+        when Numeric, FalseClass, TrueClass, NilClass, String, Symbol then value
+        else
+          if value.respond_to?(:model?) && value.model?
+            # incorporate the model by setting parent + root + keypath
+            value.root = @root
+            value.keypath = @keypath + [key]
+            value.parent = self
+            value
+          else
+            Structure.new(value: value, keypath: @keypath + [key], root: @root)
           end
         end
-        @root = self
-#         tag "setup @value := #{args}"
-        @value = args
-        raise 'TRYING TO MAKE A MESS????' if @value.nil?
-        @keypath = nil
-#         tag "INIT OK"
       end
 
       def assign key, value, org_symbol = nil
@@ -199,20 +185,31 @@ mock:
         when :self
 #           tag "#{self} ASSIGN self @value := #{value}"
           @value = value
+          case @value
+          when Hash
+            @value.each do |k, v|
+              @value[k] = inter(v, k)
+            end
+          when Array
+            @value.each_with_index do |v, k|
+              @value[k] = inter(v, k)
+            end
+          end
           raise 'TRYING TO MAKE A MESS????' if @value.nil?
         when Array
-          @value[*key] = value
+          @value[*key] = inter(value, key)
         else
           org_symbol ||= (key.to_s + '=').to_sym      # the caller sometimes knows this, so we could pass it as option
 #           tag "does #@value (class #{@value.class}) respond_to #{org_symbol.inspect}"
           if org_symbol != :[]= && @value.respond_to?(org_symbol)
 #             tag "YES, send it"
-            @value.send(org_symbol, value)
+            @value.send(org_symbol, inter(value, org_symbol))
           else
 #             tag "NO, apply index @value[#{key}] := #{value}"
-            @value[key] = value
+            @value[key] = inter(value, key)
           end
         end
+#         tag "Assigned #{value}, value is now #{@value.inspect}"
       end
 
       def calc_prev name
@@ -253,29 +250,6 @@ mock:
         # We support Hash, or Array or anything simple
       end
 
-      def wrap value, key
-#         tag "wrap #{value.class}:#{value}, key = #{key.inspect}, keypath=#{@keypath.inspect}, v.id=#{value.object_id},@v.id=#{@value.object_id}"
-        case value
-        when Model then value
-        when Hash, Array
-          return self if value.object_id == @value.object_id
-          key = nil if key == :self
-          Structure.new(value: value,
-                        root: key == :_root ? value : @root,
-                        keypath: key && ((@keypath || []) + [key]))
-#         when Array then ArrayWrapper.new(@root, key, value, key && ((@keypath || []) + [key]))
-        when FalseClass, TrueClass, NilClass, Numeric, String, Symbol
-#           tag "RETURNING simpleval #{value.inspect}"
-          value
-        else
-          return self if value.object_id == @value.object_id
-          raise 'oops' if key == :_root
-          Structure.new(value: value,
-                        root: @root,
-                        keypath: key && ((@keypath || []) + [key]))
-        end
-      end
-
       Corrupteron = [:<<, :clear, :delete, :delete_at, :delete_if, :fill, :insert, :keep_if,
                      :pop, :push, :replace, :shift, :unshift,
                      :store, :update
@@ -310,7 +284,7 @@ mock:
               raise 'oops' unless args.length == 2
               key, value = args
               prev = calc_prev key
-              undo_path = (@keypath || []) + [key]
+              undo_path = @keypath + [key]
             end
           else  # other setter like             x.field = value
             if args.length > 1 || !@value.respond_to?(:[]=) && !@value.respond_to?(symbol)
@@ -322,7 +296,7 @@ mock:
             value = args[0]
             prev = calc_prev key
 #             tag "other setter (#{key.inspect}), newval = #{value}, prev = #{prev}, @value= #{@value.inspect}"
-            undo_path = (@keypath || []) + [key]
+            undo_path = @keypath + [key]
           end
           pickup_tran do |tran|
 #             tag "recording transaction log"
@@ -357,7 +331,7 @@ mock:
                 return @value.delete_at(idx) if tran.aborted?
                 prev = @value[idx]
                 result = @value.delete_at idx
-                tran.push(Transaction::PropertySpliced.new(@root, (@keypath ||= []) + [idx], prev))
+                tran.push(Transaction::PropertySpliced.new(@root, @keypath + [idx], prev))
                 return result # , :_root)               if you want to use as struct use your own constructor
               when :delete
                 raise 'oops' unless args.length == 1
@@ -369,7 +343,7 @@ mock:
                   return @value.delete(idx, &block) if tran.aborted?
                   prev = @value[idx]
                   result = @value.delete(idx, &block)
-                  tran.push(Transaction::PropertyDeleted.new(@root, (@keypath ||= []) + [idx], prev))
+                  tran.push(Transaction::PropertyDeleted.new(@root, @keypath + [idx], prev))
                   return result # , :_root)               if you want to use as struct use your own constructor
                 end
               when :pop
@@ -406,24 +380,23 @@ mock:
                 return @value.insert(*args) if tran.aborted?
                 idx, elcount = args[0], args.length - 1
                 @value.insert(*args)
-                tran.push(Transaction::PropertyAdded.new(@root, (@keypath ||= []) + [idx], elcount))
+                tran.push(Transaction::PropertyAdded.new(@root, @keypath + [idx], elcount))
                 return self
               end
               return @value.send(symbol, *args, &block) if tran.aborted?
               prev = @value.clone
-              result = wrap(@value.send(symbol, *args, &block), :_root)
+              result = @value.send(symbol, *args, &block)
               tran.addPropertyChange(@keypath, prev)
               result
             end
           else
             return super unless args.empty?
+            return apply_getter(:self) if symbol == :self
             key = last_char == '?' ? symbol[0...-1].to_sym : symbol
 #             tag "Apply GETTER #{symbol.inspect}, value=#@value"
-            if symbol == :self
-              return self if Hash === @value   # spare an unwrap + wrap on a common case
-              wrap(@value, symbol)
-            elsif @value.respond_to?(symbol) then wrap(@value.send(symbol, *args, &block), symbol)
-            else wrap(@value[key], key)
+            if @value.respond_to?(:has_key?) && @value.has_key?(symbol) then @value[key]
+            elsif @value.respond_to?(symbol) then @value.send(symbol, *args, &block)
+            else nil
             end
           end
         end
@@ -441,14 +414,33 @@ mock:
       # To apply the getter, this method must be used.
       def apply_getter name
 #         tag "apply_getter(#{name.inspect}), value=#@value"
-        if name == :self
-          wrap(@value, name)
-        elsif Proc === name
+        case name
+        when :self
+          Array === @value || Hash === @value ? self : @value
+        when :root then root
+        when Proc
           #applying method on the structure (not on hash)
-          wrap(name.call(@value), name)
+          name.call(@value)
   #         tag "apply getter proc -> #{r.inspect}"
+        when Symbol
+          if @value.respond_to?(name)
+            @value.send(name)
+          else
+            begin
+              @value[name]
+            rescue TypeError
+              raise Error, tr("Bad getter '#{name.inspect}' on #{@value.class} value, caller = #{caller.join("\n")}")
+            end
+#             nil
+          end
+        when Array
+          # using recursion
+          name.inject(self) do |v, nm|
+#             tag "Apply #{nm} on #{(v.respond_to?(:value) ? v.value : v).inspect}, v.root= #{v && v.root}"
+            (v && v.apply_getter(nm))#.tap{|r| tag " :#{nm} ---> #{(r.respond_to?(:value) ? r.value : r).inspect}"}
+          end
         else
-          wrap(@value[name], name)
+          @value[name]
         end
       end
 
@@ -462,20 +454,27 @@ mock:
       end
 
       def apply_setter name, value, sender = nil
-#         tag "apply_setter(#{name.inspect}, #{value})"
+#         tag "apply_setter(#{name.inspect}, #{value}, sender = #{sender})"
   #         name = name.to_s
   #         name = name[0...-1] if name[-1] == '?'
-        pickup_tran do |tran|
+        if Array === name
+          sub = name[0...-1].inject(self) { |v, nm| v && v.apply_getter(nm) } and
+            sub.apply_setter(name[-1], value, sender)
+          return
+        end
+        pickup_tran(sender) do |tran|
           if tran.aborted?
             assign(name, value)
           else
             prev = calc_prev(name)
             assign(name, value)
-            tran.addPropertyChange(name == :self ? @keypath : (@keypath || []) + [name], prev)
+#             tag "ADDING PROPCHANGE"
+            tran.addPropertyChange(name == :self ? @keypath : @keypath + [name], prev)
           end
         end
       end
 
+      # override
       def length
         @value.respond_to?(:length) ? @value.length : 1
       end
@@ -484,20 +483,20 @@ mock:
       # If you use each_with_index on a hash we get el = [key0,value0] and index 0  etc.
       def each_with_index &block
         return to_enum(:each_with_index) unless block
-        path = @keypath || []
+        path = @keypath
         if @value.respond_to?(:each_pair)
 #           tag "#{@value.inspect} behaves Hash-like, using each_pair"
           index = 0
           @value.each_pair do |key, el|
 #             tag "each_pair iteration -> #{index.inspect}, #{el}"
-            yield wrap(el, key), index
+            yield el, index
             index += 1
           end
         elsif @value.respond_to?(:each_with_index)
 #           tag "#@value behaves Array-like"
-          @value.each_with_index do |el, index|
+          @value.each_with_index do |el2, index2|
 #             tag "YIELD a new Structure on #{el.inspect}, index = #{index}"
-            yield wrap(el, index), index
+            yield el2, index2
           end
         else
           yield self, 0
@@ -509,14 +508,14 @@ mock:
         if @value.respond_to?(:each_pair)
           i = 0
           @value.each_pair do |k, v|
-            return wrap(v, k) if i == numeric_key
+            return v if i == numeric_key
             i += 1
           end
         end
         if @value.respond_to?(:[])
-          wrap(@value[numeric_key], numeric_key)
+          @value[numeric_key]
         else
-          numeric_key == 0 ? @value : nil
+          numeric_key == 0 ? self : nil
         end
       end
 
@@ -526,29 +525,101 @@ mock:
 #           if key == :self
 #             Hash === @value ? self : wrap(@value, :self)
 #           else
-          wrap(@value[key], key)
+          @value[key]
 #           end
         else
-          wrap(@value[*args], args)
+          @value[*args]
         end
       end
 
-      def value2index value
-        if @value.respond_to?(:each_pair)
-          i = 0
-          @value.each_pair do |k, v|
-            return i if v == value
-            i += 1
+#       def value2index value
+#         if @key2index then @key2index[SimpleModel::value2key(value)] else 0 end
+#       end
+
+      # this method is used to set the proper row, if 'value' is connected to it.
+      # Now the problem is that Hashes and Arrays can connect to their index or their value.
+      #
+      # IMPORTANT saying 'key_connector:id' is not the same as leaving it the default (also :id)
+      # Because this switches on locating the value by key
+      #
+      def value2index value, view
+        return 0 if value.nil?
+        key_connector = view.key_connector
+        key = value2key(value, view) or
+          key ||= value if key_connector # if key-lookup is enforced,
+#         tag "value2index, key_connector=#{key_connector}, key = #{key.inspect}, value was #{(value.respond_to?(:value) ? value.value : value).inspect}"
+        if @value.respond_to?(:each_key)
+#           tag "HASH case"
+          if key
+            @value.each_key.find_index(key)
+          elsif @value.respond_to?(:each_pair)
+#             tag "Using each_pair"
+            @value.each_pair.find_index { |k, v| v == value }
           end
-          nil
+          @value.each_key.find_index(value)
         elsif @value.respond_to?(:find_index)
-          @value.find_index(value)
+#           tag "ARRAY case"
+          return nil if @value.empty?
+          key = value if !key && value2key(@value[0], view) # force the use of a key if this seems to be how it should be done.
+              # but it is higher heuristics
+          if key
+            return key if key_connector == :numeric_index
+            @value.find_index do |value|
+#               tag "Comparing value2key #{value2key(value, view).inspect}, with key #{key.inspect}"
+              value2key(value, view) == key
+            end #.tap{|r|tag "find_index -> #{r.inspect}"}
+          else
+            @value.find_index(value)
+          end
         else
           0
         end
       end
 
-  end
+      # Qt::Base overrides this, so we must overoverride it
+      def << value
+        self.method_missing(:<<, value)
+      end
+
+      # returns the data to send to the external connector if the index changes
+      # In case of arrays this is the value, UNLESS the record has a method id.
+      # In case of a hash this is the value, only if the values have a method 'id'
+      #
+      # This is the reverse of value2index
+      #
+      # REASONING: if a hash than probably a hash mapping this key to its instance. But if the instance
+      # supports 'id' than passing that instance back and forth seems reasonable.
+      # Only if the value has no apparent key do I fallback to the one the hash supplies
+      # For example { green: 'yes', red: 'no' }
+      # But if is is an array with values it probably OK to use the values as is.
+      # But maybe not.
+      # In that case use setting key_connector will force passing the key, if it does not exist then the numeric_idx is used as
+      # a final solution
+      # For hashes, 'key_connector :someid' will tweak the keymethod to use
+      def index2value numeric_idx, view
+        if @value.respond_to?(:keys)
+          key = @value.keys[numeric_idx]
+          r = @value[key]
+#           tag "keys detected, r = #{r}, value2key(#{r}) == #{value2key(r,view)} index2value[#{numeric_idx}] -> #{value2key(r,view) ? r : key}"
+          value2key(r, view) ? r : key
+        elsif @value.respond_to?(:[])
+          return numeric_idx if view.key_connector == :numeric_index
+#           tag "arraylike, index2value[#{numeric_idx}] -> #{@value[numeric_idx]}"
+          r = @value[numeric_idx]
+          view.key_connector ? value2key(r, view) || numeric_idx : r
+#           value2key(r, view) ? numeric_idx : r
+        else
+#           tag "non enumerable value, return #@value as is"
+          @value
+        end
+      end
+
+      # important override
+      def respond_to? symbol
+        # only the getters are really covered here.
+        @value.respond_to?(symbol) || Hash === @value && @value[symbol] || super
+      end
+  end # class Structure
 
   createInstantiator File.basename(__FILE__, '.rb'), nil, Structure
 
@@ -731,23 +802,3 @@ Now d will be [34, 23, 3543] again but is no longer equal to c!
 Even more c will be equal to [35, 24, 3544]
 
 These are features....
-
-Wrapping and assigning
-========================
-
-There is already an identity problem here.
-I can say:
-  s = x: x, y: y, z: [1,2,3,4]
-  s.z[2, 2] = 5
-In this case 's.z' returns actually a wrapper around [1,2,3,4] (say s2)
-And the assignment will change s2.value which is s.z. However,
-internally this records as a change of 'self'. So an abort will reassign
-s2.value itself and therefore not s.z
-More direct:
-  s = x: x, y: y, z: [1,2,3,4]
-  s.z.map!{|x|x+1}
-
-That's wrong. What is stored is a keypath and it measures within the rootmodel.
-So the abort always works on 's'.  The only problem is the evaluation of the keypath.
-The keypath is recorded as [:z, :self]
-But obviously it should have been [:z]. Similar that [:self] is really an empty path ([]).

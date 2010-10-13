@@ -3,7 +3,7 @@
 
 module Reform
 
-  require_relative '../controls/button'
+  require 'reform/widgets/button'
 
   class QSpacyToolButton < Qt::ToolButton
 

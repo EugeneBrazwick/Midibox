@@ -67,7 +67,7 @@ Currently the bitmap itself is actually transferred. There is no original bitmap
 =end
 
 require 'reform/app'
-require 'reform/controls/list'
+require 'reform/widgets/list'
 require 'reform/painter'
 
 module Reform

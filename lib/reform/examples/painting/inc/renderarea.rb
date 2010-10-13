@@ -43,7 +43,7 @@
 
 # I LIED AGAIN!!! too much trouble for such a simple paintevent.
 module Reform
-  require_relative '../../../controls/widget'
+  require 'reform/widget'
 
  #include "renderarea.h"
 

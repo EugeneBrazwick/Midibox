@@ -43,7 +43,7 @@
 
 # this is a quite literal translation of the C++ code
 
-require_relative '../controls/widget'
+require 'reform/widget'
 
 module Reform
   class QCodeEditor < Qt::PlainTextEdit

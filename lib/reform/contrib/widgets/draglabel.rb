@@ -2,7 +2,7 @@
 module Reform
 
   require 'Qt'
-  require 'reform/controls/label'
+  require 'reform/widgets/label'
 
 #   class DragLabel < Label
 #     private

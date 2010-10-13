@@ -3,7 +3,7 @@
 
 module Reform
 
-  require_relative '../controls/combobox'
+  require 'reform/widgets/combobox'
 
   # this would be better if it supported all basic colors.
   # Now it is a completely unusable thingamabob

@@ -1,7 +1,7 @@
 
 module Reform
 
-  require 'reform/controls/widget'
+  require 'reform/widget'
 
   class ShadeWidget < Widget
   private

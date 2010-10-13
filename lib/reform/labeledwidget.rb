@@ -14,20 +14,22 @@ module Reform
 =end
   class LabeledWidget < Widget
 
-    public
-    # when added to a parent, some measures should be taken, but in some cases
-    # the parent will handle it, like formlayout.addWidget
-    # currently this only works ok when using a formlayout!!
-    # NOTE: label is BANNED from being used as a function, since it already is an instantiator!!
-    def labeltext value = nil
-      return (instance_variable_defined?(:@label) ? @label : nil) unless value
-      @label = value
+    module Implementation
+      # when added to a parent, some measures should be taken, but in some cases
+      # the parent will handle it, like formlayout.addWidget
+      # currently this only works ok when using a formlayout!!
+      # NOTE: label is BANNED from being used as a function, since it already is an instantiator!!
+      def labeltext value = nil
+        return (instance_variable_defined?(:@label) ? @label : nil) unless value
+        @label = value
+      end
+
+      def auto_layouthint
+  #       tag "auto_layouthint -> :formlayout"
+        :formlayout
+      end
     end
 
-    def auto_layouthint
-#       tag "auto_layouthint -> :formlayout"
-      :formlayout
-    end
-
+    include Implementation
   end
 end

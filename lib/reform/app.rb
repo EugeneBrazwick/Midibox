@@ -159,6 +159,7 @@ module Reform
     autoload :Structure, 'reform/models/structure'
     autoload :AbstractModel, 'reform/model'
     autoload :Control, 'reform/control'
+    autoload :Prelims, 'reform/prelims'
 
     # A class specifically representing a duration in milliseconds
     # See Fixnum#seconds and Fixnum#milliseconds
@@ -284,7 +285,7 @@ module Reform
     #         tag "instantiate #{qt_implementor_class} with parent #{ctrl}/#{qparent}"
               newqtc = qt_implementor_class &&
                        ctrl.instantiate_child(reform_class, qt_implementor_class, qparent)
-      #         tag "#{reform_class}.new(#{ctrl}, #{newqtc})"
+#               tag "#{reform_class}.new(#{ctrl}, #{newqtc})"
               c2 = reform_class.new ctrl, newqtc
       #           tag "instantiated c=#{c}, parent is a #{ctrl.class}"
                 # add will execute block, and then also call postSetup
@@ -339,8 +340,13 @@ module Reform
 
         alias :simpledata :simple_data
 
-        def struct *val
-          structure value: if val.length == 1 then val[0] else val end
+        def struct *val, &block
+#           tag "struct"
+          if block
+            addModel(Structure.new.build(&block))
+          else
+            structure value: if val.length == 1 then val[0] else val end
+          end
         end
 
     end # module ModelContext
@@ -628,8 +634,13 @@ module Reform
 
         alias :simpledata :simple_data
 
-        def struct *val
-          structure value: if val.length == 1 then val[0] else val end
+        def struct *val, &block
+          tag "struct"
+          if block
+            addModel(Structure.new.build(&block))
+          else
+            structure value: if val.length == 1 then val[0] else val end
+          end
         end
 
   # You would normally pass ARGV here (not *ARGV). However the way to create a reform application is:
@@ -670,6 +681,22 @@ module Reform
           # instantiate a 'autoform' if no form has been given, default true
           @autoform = :form
           @doNotRun = false
+          @whenExiting = nil
+          # slightly experimental
+          @lang = (ENV['LANG'] || 'en').split('_')[0]
+          @lang = 'en' if lang == 'C'
+          @lang = lang.to_sym
+          begin
+            require 'linguistics'
+          rescue LoadError
+#             tag "loading Linguistics failed"
+            Prelims::check_gem(nil, 'linguistics', 'midibox')
+#             tag "gem not present, retry"
+            Gem::refresh
+            retry
+          end
+          Linguistics::use(lang) # , installProxy: lang) fails in 1.9.2
+          # used by filesystem to change stuff like 'open an item/create a new thing'
         end
 
   # +autoform+ is normally true and indicates that the application will create
@@ -703,7 +730,17 @@ module Reform
 
       public # methods of Application
 
-        def addModel control, hash, &block
+        attr :lang # twoletter code only, not a replacement for ENV['LANG']
+
+        def whenExiting &block
+          if block
+            @whenExiting = block
+          else
+            @whenExiting[] if @whenExiting
+          end
+        end
+
+        def addModel control, hash = nil, &block
           raise Error, tr('A model was already set on the application') if @model
           control.parent = self
           control.setup hash, &block
@@ -826,7 +863,10 @@ module Reform
       $qApp.instance_eval(&block) if block
   #     tag "CALLING app.exec"
       $qApp.setupForms
-      $qApp.exec unless $qApp.doNotRun
+      unless $qApp.doNotRun     # only debugger would set it
+        $qApp.exec
+        $qApp.whenExiting
+      end
     end # app method
 end # module Reform
 

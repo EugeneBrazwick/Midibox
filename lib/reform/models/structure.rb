@@ -115,6 +115,7 @@ mock:
     It differs whether the righthand side is an array or not. And s[0] = [3,2] is different from s[0,0] = [3,2] !
 =end
   class Structure < AbstractModel
+    include ModelContext
 
     private # methods of Structure
 
@@ -209,6 +210,8 @@ mock:
             @value[key] = inter(value, key)
           end
         end
+      rescue TypeError => err
+        raise err.class, tr("when assigning '#{key}': #{err}"), err.backtrace + caller
 #         tag "Assigned #{value}, value is now #{@value.inspect}"
       end
 
@@ -618,6 +621,18 @@ mock:
       def respond_to? symbol
         # only the getters are really covered here.
         @value.respond_to?(symbol) || Hash === @value && @value[symbol] || super
+      end
+
+      def build &block
+        @value = {}
+#         tag "build"
+        instance_eval(&block)
+        self
+      end
+
+      def to_yaml(*args)
+        # sooo sneaky...
+        @value.to_yaml(*args)
       end
   end # class Structure
 

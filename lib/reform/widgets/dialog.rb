@@ -11,6 +11,10 @@ a QDialog wrapper
   class Dialog < ReForm
   end # class Dialog
 
-  createInstantiator File.basename(__FILE__, '.rb'), Qt::Dialog, Dialog, form: true
+  class QDialog < Qt::Dialog
+    include QFormHackContext
+  end
+
+  createInstantiator File.basename(__FILE__, '.rb'), QDialog, Dialog, form: true
 
 end # module Reform

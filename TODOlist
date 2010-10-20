@@ -1,3 +1,5 @@
+Add below. Lines starting with - are done. It would be nice if each fix was done with a
+dedicated git-branch, with remark starting with 'fix0001:' etc.
 -0001  Wed Feb 24 11:40:47 CET 2010 TODO event_output MidiEvent support
        Sat Mar  6 22:48:43 CET 2010 DONE
 -0002  Thu Feb 25 22:22:53 CET 2010 TODO make rplaymidi++ work as a two step system
@@ -122,3 +124,16 @@
     It seems that AlsaQueueTempo_i is never seen as originating from snd_seq_queue_tempo_malloc??
     Fri Oct  8 21:26:52 CEST 2010 FIXED
 0021 Fri Oct  8 21:26:01 CEST 2010.  Change 'skew' consistently into a float.
+0022 Thu Oct 21 21:35:36 CEST 2010. Building the system when Qt works really needs a busy-bar.
+I can see something is being done but a user will be confused if a gem install takes a long time.
+-0023 Thu Oct 21 21:41:30 CEST 2010. check_gem loops and causes 100% CPU load!!!
+      Thu Oct 21 21:48:43 CEST 2010. FIXED
+0024 Thu Oct 21 22:38:59 CEST 2010. If you load and quit, you get a 'save as' box. Or it saves
+     even if nothings changes.  How do we keep a 'dirty' flag for such external data?
+     And if dirty (idea: set @dirty on the @root maybe) is set, what is the condition
+     that it is clean again.  This relies very much on what a 'save' of a model instance means.
+     So it should probably be part of the Model module.
+0025 Thu Oct 21 22:45:36 CEST 2010. If it asks to save the data, when closing down, it must be
+     with a 'save|do not save|cancel' dialog. And if I cancel the form must not be closed.
+
+

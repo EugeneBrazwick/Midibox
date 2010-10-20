@@ -52,12 +52,12 @@ module Reform
 
       # a view may override the scene background, this is however not very much advised. DEPRECATED??
       # IMPORTANT: the background only works if there is in fact a scene present!!! So we make it
-      def background brush
+      def background *brush
   #       if brush.respond_to?(:to_str)
   #         # load the image, where the path is given.
   #         brush = Qt::Brush.new(Qt::Pixmap.new(brush))
   #       end
-        scene.backgroundBrush = make_brush(brush)
+        scene.backgroundBrush = make_brush(*brush)
       end
 
       alias :backgroundBrush :background

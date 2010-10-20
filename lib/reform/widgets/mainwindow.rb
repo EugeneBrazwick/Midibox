@@ -110,7 +110,8 @@ module Reform
 
   class QMainWindow < Qt::MainWindow
     # make sure we grog resizeEvent (and paintEvent too for that matter)
-    include QWidgetHackContext
+    include QFormHackContext
+
   end
 
   createInstantiator File.basename(__FILE__, '.rb'), QMainWindow, MainWindow, form: true

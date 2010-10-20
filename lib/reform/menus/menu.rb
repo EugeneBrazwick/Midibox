@@ -6,35 +6,72 @@ module Reform
 
     private
 
+      def initialize parent, qtc
+        super
+        @fs = nil
+      end
+
+      def filesystem value
+        @fs = value
+      end
+
       define_simple_setter :title
       alias :text :title
 
+# IMPORTANT $qApp.quit bypasses closing of forms.
       def quiter
         action {
+          name :fileQuitAction
           label tr('E&xit')
           shortcut :quit
           statustip tr('Quit the application')
-          whenTriggered { $qApp.quit }
+          whenTriggered { $qApp.quit if whenCanceled }
         }
       end
 
       alias :quit :quiter
+      alias :fileQuit :quiter
 
-      def fileopen fs
+# it would be possible to make a class for each and put them in 'actions/'
+# but that seems a waste of classes
+      # you must supply the file-model, or set it first using 'filesystem'
+      def fileOpen fs = @fs
         action {
+          name :fileOpenAction
           title tr('&Open...')
           shortcut :open
           statustip fs.open_caption
-          whenClicked { fs.open(self) }
+          whenClicked { fs.fileOpen(self) }
         }
       end
 
-      def saveas fs
+      def fileNew fs = @fs
         action {
+          name :fileNewAction
+          title tr('&New')
+          shortcut :new
+          statustip fs.new_caption
+          whenClicked { fs.fileNew }  # fileNew never interacts
+        }
+      end
+
+      def fileSave fs = @fs
+        action {
+          name :fileSaveAction
+          title tr('&Save')
+          shortcut :save
+          statustip fs.save_caption
+          whenClicked { fs.fileSave(self) }
+        }
+      end
+
+      def fileSaveAs fs = @fs
+        action {
+          name :fileSaveAsAction
           title tr('&Save As...')
           shortcut :saveas
           statustip fs.saveas_caption
-          whenClicked { fs.saveas(self) }
+          whenClicked { fs.fileSaveAs(self) }
         }
       end
 

@@ -12,12 +12,8 @@ module Reform
           super()
           setup(parent)
         else
-          if Hash === qtc
-            super(parent)
-            hash = qtc
-          else
-            hash = {}
-          end
+          super(parent)
+          hash = Hash === qtc ? qtc : {}
 #           if parent && parent.model?
 #             @root = parent.root
 #             @keypath = ?????
@@ -28,39 +24,31 @@ module Reform
         end
       end
 
-      def setup hash
-        @dirname = Dir::getwd
-        @filename = nil
-        @itemname = tr('an item')
-        reset_captions
-        @file = nil
-        @reg = { }
-        hash.each do |k, v|
-          case k
-          when :dirname then @dirname = v
-          when :filename then @filename = v
-          when :itemname then @itemname = v
-          when :pattern, :filter then @pattern = v
-          when :open_caption then @open_caption = v
-          when :save_caption then @save_caption = v
-          when :saveas_caption then @saveas_caption = v
-          when :register then @reg.merge!(v)
-          else
-            raise ArgumentError, "Bad arg '#{k}'"
-          end
-        end
-      end
-
+      # dir. from where to start
       def dirname value = nil
         return @dirname unless value
         @dirname = value
         @file = nil
       end
 
+      # class to instantiate by dynamic loaders (loader-specific)
+      def klass value = nil
+        return @klass unless value
+        @klass = value
+      end
+
+      # basename of file
       def filename value = nil
         return @filename unless value
         @filename = value
         @file = nil
+      end
+
+      # file to load if 'filename' is nil.
+      # However filename is not set.  This is used for 'fileNew'
+      def default_filename value = nil
+        return @default_filename unless value
+        @default_filename = value
       end
 
       # If the opened file matches some pattern, the klass is used to load it by calling
@@ -79,12 +67,19 @@ module Reform
       end
 
       def load
-        return unless @filename
+        unless @filename
+          return unless @default_filename
+          filename = @default_filename
+        else
+          filename = @filename
+        end
         for pattern, klass in @reg
-          if @filename =~ pattern
-            model = klass::load(path)
+          if filename =~ pattern
+            model = klass::load(build_path(filename))
+#             tag "Loaded #{model.inspect} through #{klass}"
             unless model.respond_to?(:model?) && model.model?
-              model = Structure.new(value: model, keypath: [])
+#               tag "Not a model!!! WRAPPING"
+              model = (@klass || Structure).new(value: model, keypath: [])
             end
             return @file = model
           end
@@ -99,6 +94,8 @@ module Reform
         dirname, filename = splitPath(aPath)
         for pattern, klass in @reg
           if filename =~ pattern
+#             tag "Calling #{klass}::store #{@file.inspect}"
+            raise Error, tr("Refusing to save nil to #{aPath}, this must be some terrible mistake") unless @file
             klass::store(@file, aPath)
             @dirname, @filename = dirname, filename
             return
@@ -107,10 +104,46 @@ module Reform
         raise Error, tr("No storage class registered for '%s'") % filename
       end
 
+      def build_path filename
+        "#@dirname#{@dirname[-1] == '/' || filename && filename[0] == '/' ? '' : '/'}#{filename}"
+      end
+
     public
 
+      def setup hash, &block
+        @dirname = Dir::getwd
+        @filename = @default_filename = nil
+        @itemname = tr('an item')
+        reset_captions
+        @file = @klass = nil
+        require 'reform/yamlloader'
+        @reg = { /.yaml.gz$/ => CompressedYamlLoader,
+                 /.yaml$/ => YamlLoader
+               }
+        if hash
+          hash.each do |k, v|
+            case k
+            when :dirname then @dirname = v
+            when :filename then @filename = v
+            when :default_filename then @default_filename = v
+            when :itemname then @itemname = v
+            when :pattern, :filter then @pattern = v
+            when :open_caption then @open_caption = v
+            when :klass then @klass = v
+            when :save_caption then @save_caption = v
+            when :saveas_caption then @saveas_caption = v
+            when :register then @reg.merge!(v)
+            else
+              raise ArgumentError, "Bad arg '#{k}'"
+            end
+          end
+        elsif block
+          instance_eval(&block)
+        end
+      end
+
       def path
-        "#@dirname#{@dirname[-1] == '/' || @filename && @filename[0] == '/' ? '' : '/'}#@filename"
+        build_path(@filename)
       end
 
 #       attr_accessor :dirname, :filename
@@ -134,13 +167,21 @@ module Reform
 
       alias :filter :pattern            # this is how FileDialog calls it
 
+      def new_caption value = nil
+        if value
+          @new_caption = value
+        else
+          @new_caption || tr('Create a new %s') % @itemname
+        end
+      end
+
       # use this to set the whole caption for the file-open dialog
       # do not set itemname afterwards, that will erase it.
       def open_caption value = nil
         if value
           @open_caption = value
         else
-          @open_caption || tr('Pick %s') % @itemname
+          @open_caption || tr('Pick %s') % @itemname.send($qApp.lang).a
         end
       end
 
@@ -148,7 +189,7 @@ module Reform
         if value
           @save_caption = value
         else
-          @save_caption || tr('Save %s') % @itemname
+          @save_caption || tr('Save %s') % @itemname.send($qApp.lang).a
         end
       end
 
@@ -156,7 +197,8 @@ module Reform
         if value
           @saveas_caption = value
         else
-          @saveas_caption || @save_caption || tr('Save %s') % @itemname
+          @saveas_caption || @save_caption || tr('Save %s as a different file') %
+                                              @itemname.send($qApp.lang).a
         end
       end
 
@@ -180,10 +222,16 @@ module Reform
         end
       end
 
+      # reverse of save. Just open the file as set
+      def open_file
+        load
+      end
+
         # shows FileDialog to open a file and assign the contents to _file_
       def open parent = nil
-#         tag "apply_setter path, sender = #{parent}"
-        apply_setter(:path, Qt::FileDialog.getOpenFileName(parent && parent.qtc, open_caption, @dirname, @pattern),
+#         tag "open dirname=#@dirname, filename=#@filename"
+        apply_setter(:path, Qt::FileDialog.getOpenFileName(parent && parent.qtc, open_caption,
+                                                           @dirname, @pattern),
                      parent)
       end
 
@@ -197,6 +245,23 @@ module Reform
         pth = Qt::FileDialog.getSaveFileName(parent && parent.qtc, saveas_caption, path, @pattern) or return
         store(pth)
       end
+
+      def save parent = nil
+        return saveas unless @filename
+        store(path)
+      end
+
+      def exists?
+        File.exists?(path)
+      end
+
+      attr_writer :file
+
+      # for use in prefab actions in the file menu!
+      alias :fileNew :open_file         # no interaction
+      alias :fileOpen :open
+      alias :fileSave :save             # interaction if file was new
+      alias :fileSaveAs :saveas
   end
 
   createInstantiator File.basename(__FILE__, '.rb'), nil, FileSystem

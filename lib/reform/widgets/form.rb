@@ -100,10 +100,11 @@ module Reform
       # default whenCanceled handler returns nil always. So the form closes
       # Not implemented yet
       def whenCanceled &block
+#         tag "whenCanceled"
         if block
           @whenCanceled = block
         else
-          rfCallBlockBack(&@whenCanceled) if @whenCanceled
+          !@whenCanceled || rfCallBlockBack(&@whenCanceled)
         end
       end
 
@@ -194,12 +195,30 @@ module Reform
 
   end # class ReForm
 
+  module QFormHackContext
+    include QWidgetHackContext
+      def closeEvent event
+#         tag "#{self}::closeEvent(#{event.inspect})"
+        if @_reform_hack.whenCanceled
+          event.accept
+          @_reform_hack.whenClosed
+        else
+          event.ignore
+        end
+      end
+  end
+
   # using Qt::MainWindow is tempting, but MainWindow is rather stubborn.
   # you cannot add a layout for instance.
   # So form == generic toplevel widget
   #    mainwindow = mainwindow of application
   #    dialog == fixed size toplevel widget
   # Event though it is a QWidget, minimumSizeHint never seems to be called for the toplevel widget....(?)
-  createInstantiator File.basename(__FILE__, '.rb'), QWidget, ReForm, form: true
+  class QForm < Qt::Widget
+    include QFormHackContext
+  end
+
+
+  createInstantiator File.basename(__FILE__, '.rb'), QForm, ReForm, form: true
 
 end # module Reform

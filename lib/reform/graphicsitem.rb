@@ -20,7 +20,7 @@ module Reform
 
       def movable onoff = nil, &block
         case onoff
-        when Hash, Proc then DynamicAttribute.new(self, :movable, onoff, &block)
+        when Hash, Proc then DynamicAttribute.new(self, :movable, TrueClass, onoff, &block)
         else @qtc.setFlag Qt::GraphicsItem::ItemIsMovable, onoff
         end
       end
@@ -31,8 +31,8 @@ module Reform
       def geometry x = nil, y = nil, w = nil, h = nil, &block
         return @qtc.geometry unless x || w || block
         case x
-        when nil then DynamicAttribute.new(self, :geometryF).setup(nil, &block)
-        when Hash, Proc then DynamicAttribute.new(self, :geometryF).setup(x, &block)
+        when nil then DynamicAttribute.new(self, :geometryF, Qt::RectF).setup(nil, &block)
+        when Hash, Proc then DynamicAttribute.new(self, :geometryF, Qt::RectF).setup(x, &block)
         else self.geometry = x, y, w, h
         end
       end
@@ -56,9 +56,9 @@ module Reform
         return @qtc.brush unless brush || block
         case brush
         when Symbol then @qtc.brush = frame_ex.registeredBrush(brush) || make_brush(brush, g, b, a)
-        when Hash, Proc then DynamicAttribute.new(self, :brush).setup(brush, &block)
+        when Hash, Proc then DynamicAttribute.new(self, :brush, Qt::Brush).setup(brush, &block)
         when Qt::Brush then @qtc.brush = brush
-        when nil then DynamicAttribute.new(self, :brush).setup(&block)
+        when nil then DynamicAttribute.new(self, :brush, Qt::Brush).setup(&block)
         else @qtc.brush = make_brush(brush, g, b, a)
         end
       end
@@ -67,9 +67,11 @@ module Reform
         return @qtc.pen unless pen || block
         case pen
         when Symbol then @qtc.pen = frame_ex.registeredPen(pen) || make_pen(pen, g, b, a)
-        when Hash, Proc then DynamicAttribute.new(self, :pen, pen, &block)
+        when Hash, Proc
+          tag "#{self}::stroke + Hash/Proc -> DynamicAttribute"
+          DynamicAttribute.new(self, :pen, Qt::Pen, pen, &block)
         when Qt::Pen then @qtc.pen = pen
-        when nil then PenRef.new(self).setup(&block)
+        when nil then Pen.new(self).setup(&block)
         else
   #       tag "stroke #{pen.inspect}"
           @qtc.pen = make_pen(pen, g, b, a)

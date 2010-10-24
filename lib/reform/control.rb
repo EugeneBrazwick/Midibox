@@ -58,12 +58,12 @@ module Reform
 =end
       class DynamicAttribute < Control
 
-        private
+        private # DynamicAttribute methods
 
-          def initialize parent, propertyname, quickyhash = nil, &block
+          def initialize parent, propertyname, klass, quickyhash = nil, &block
 #             tag "DynamicAttribute.new(#{parent}, :#{propertyname})"
             super(parent)
-            @propertyname = propertyname
+            @propertyname, @klass = propertyname, klass
             setup(quickyhash, &block) if quickyhash || block
           end
 
@@ -73,6 +73,12 @@ module Reform
             states2values.each do |state, value|
               form[state].qtc.assignProperty(self, 'value', value2variant(value))
             end
+          end
+
+          def sequence quickyhash = nil, &block
+            require_relative 'animations/sequentialanimation'
+            setProperty('value', value2variant(:default))
+            SequentialAnimation.new(self, Qt::SequentialAnimationGroup.new(self)).setup(quickyhash, &block)
           end
 
           def animation quickyhash = nil, &block
@@ -102,25 +108,31 @@ module Reform
           end
 
           def value2variant *value
-            case @propertyname
-            when :brush
+            case
+            when @klass == Qt::Brush
               color = Graphical.color(*value)
 #               tag "Qt::Variant.new(#{color})"
               Qt::Variant::fromValue(color)
-            when :geometry
+            when @klass == Qt::Rect
               Qt::Variant::fromValue(case value[0]
               when :default then Qt::Rect.new
               when Qt::Rect then value[0]
               else Qt::Rect.new(*value) #.tap{|r| tag "creating value(#{r.inspect})"}
               end)
-            when :geometryF
+            when @klass == Qt::RectF
               Qt::Variant::fromValue(case value[0]
               when :default then Qt::RectF.new
               when Qt::RectF then value[0]
               else Qt::RectF.new(*value) #.tap{|r| tag "creating value(#{r.inspect})"}
               end)
+            when @klass == Float
+#               debug Qt::DebugLevel::High do
+                f = value[0] == :default ? 0.0 : value[0]
+#                 tag "value2variant, value = #{value.inspect}, f = #{f.inspect}, #{f.class}"
+                Qt::Variant::new(f)
+#               end
             else
-              raise Error, tr("Not implemented: animation for property '#@propertyname'")
+              raise Error, tr("Not implemented: animation for property '#@propertyname', klass=#@klass")
             end
           end
 
@@ -138,6 +150,10 @@ module Reform
 #           attr_accessor  :value
 
 #           properties 'value'
+
+          def dynamicParent
+            self
+          end
 
       end # class DynamicAttribute
 
@@ -194,8 +210,7 @@ module Reform
         q = effective_qwidget
         return q.geometry unless x || w || block
         case x
-        when nil then DynamicAttribute.new(self, :geometry).setup(nil, &block)
-        when Hash, Proc then DynamicAttribute.new(self, :geometry).setup(x, &block)
+        when nil, Hash, Proc then DynamicAttribute.new(self, :geometry, Qt::Rect).setup(x, &block)
         else
 #           @requested_size = w, h
           if x or y
@@ -252,6 +267,14 @@ module Reform
         ensure
           @qtc.blockSignals old_blockSig
         end
+      end
+
+      def debug level
+        old = Qt::debug_level
+        Qt::debug_level = level
+        yield
+      ensure
+        Qt::debug_level = old
       end
 
       # shortcut. executes the block every ms milliseconds
@@ -771,6 +794,11 @@ module Reform
       attr :containing_form
 
       alias :containingForm :containing_form
+
+      # same as containingForm
+      def dynamicParent
+        parent.dynamicParent
+      end
 
       # Qt control that is wrapped
       attr :qtc

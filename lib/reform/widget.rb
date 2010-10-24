@@ -137,11 +137,11 @@ module Reform
 
     # notice: these can no longer be queried....
     def enabler value = nil, &block
-      DynamicAttribute.new(self, :enabled, value, &block)
+      DynamicAttribute.new(self, :enabled, TrueClass, value, &block)
     end
 
     def disabler value = nil, &block
-      DynamicAttribute.new(self, :disabled, value, &block)
+      DynamicAttribute.new(self, :disabled, TrueClass, value, &block)
     end
 
   public
@@ -204,7 +204,7 @@ module Reform
       case title_or_hash
       when String then @qtc.windowTitle = title_or_hash
       else
-        DynamicAttribute.new(self, :windowTitle, title_or_hash, &block)
+        DynamicAttribute.new(self, :windowTitle, String, title_or_hash, &block)
       end
     end
 

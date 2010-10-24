@@ -88,6 +88,7 @@ module Reform
 
       def infused_scene!
         scene
+#         tag "infused_scene! -> #@infused_scene"
         @infused_scene
       end
 
@@ -104,7 +105,9 @@ module Reform
   #     def addGraphicsItem control, quickyhash = nil, &block
   #       scene.addGraphicsItem(control, quickyhash, &block)
   #     end
-      def_delegators :infused_scene!, :addGraphicsItem, :pen, :brush, :stroke, :fill, :registeredBrush,
+
+        # NOTE: this methods must be public!!
+      def_delegators :infused_scene!, :addGraphicsItem, :registeredBrush,
                     :registeredPen, :area, :addAnimation, :addState
 
       def calc_matrix
@@ -112,7 +115,7 @@ module Reform
         @@i ||= Qt::Transform.new
         @@i.reset
         @@i.rotate(@rotation) if @rotation
-        @@i.scale(@scale) if @scale
+        @@i.scale(@scale, @scale) if @scale
         @@i.translate(*@translation) if @translation
         @@i
       end
@@ -131,6 +134,14 @@ module Reform
 
     public
 
+      def_delegators :infused_scene!, :brush, :stroke, :fill #, :pen
+
+      # FIXME this is a delegator too:
+      def pen *args, &block
+#         tag "calling #{infused_scene!}.pen()"
+        infused_scene!.pen(*args, &block)
+      end
+
       # rotate clockwise around center of the canvas.
       def rotate deg
         self.rotation = @rotation + deg
@@ -139,6 +150,12 @@ module Reform
       # change rotation only
       def rotation= deg
         @rotation = deg
+        @qtc.transform = calc_matrix
+      end
+
+      def scale value = nil
+        return @scale || 1.0 unless value
+        @scale = value
         @qtc.transform = calc_matrix
       end
 

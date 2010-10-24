@@ -11,7 +11,8 @@ module Reform
       def initialize parent, qtc
         super
 #         tag "#{self}.new(#{parent}, #{qtc}), setting propertyName of anim to 'value'"
-        @qtc.setTargetObject(parent)
+        @qtc.setTargetObject(dynamicParent)
+#         tag "TargetObject = #{@qtc.targetObject}"
         @qtc.propertyName = 'value' # See DynamicAttribute
       end
 
@@ -32,17 +33,32 @@ module Reform
         end
       end
 
+      # it seems to me that easing should be set per statevalue. And Qt uses the trajectory
+      # between states...
+      EasingMap = { linear: Qt::EasingCurve::Linear,
+                    quad: Qt::EasingCurve::InOutQuad,
+                    cubic: Qt::EasingCurve::InOutCubic,
+                    sine: Qt::EasingCurve::InOutSine,
+                    elastic: Qt::EasingCurve::OutElastic,
+                    back: Qt::EasingCurve::OutBack,
+                    bounce: Qt::EasingCurve::OutBounce
+                    }
+
       def easing v
-        @qtc.easingCurve = Qt::EasingCurve::OutElastic
+        @qtc.easingCurve = case v
+        when Qt::EasingCurve then v
+        when Symbol then Qt::EasingCurve.new(EasingMap[v] || Qt::EasingCurve::Linear)
+        else Qt::EasingCurve.new(v)
+        end
       end
 
       def startValue *value
 #             tag "start, attrib=#@attrib"
-        @qtc.startValue = parent.value2variant(*value)
+        @qtc.startValue = @qtc.targetObject.value2variant(*value)
       end
 
       def stopValue *value
-        @qtc.endValue = parent.value2variant(*value)
+        @qtc.endValue = @qtc.targetObject.value2variant(*value)
       end
 
 #       alias :startValue :start

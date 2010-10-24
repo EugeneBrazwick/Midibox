@@ -9,7 +9,95 @@ module Reform
   # these will be used when rendering shapes on a graphicsitem, canvas or scene.
   module Graphical
     extend Graphical
-    private
+
+    class Brush < Control
+        include Graphical
+      private
+        def initialize
+          super(nil, Qt::Brush.new)
+        end
+
+        # makes it a solid brush
+        def color *args
+          @qtc = make_brush(make_color(*args))
+        end
+
+      public
+        def name aName = nil # not supported since Qt::Brush is not a Qt::Object at all. And we already index them too
+        end
+
+      end # class Brush
+
+      class Pen < Control
+        include Graphical
+        def initialize
+          super(nil, Qt::Pen.new)
+        end
+
+        def color *args
+          @qtc = make_pen(make_color(*args))
+        end
+
+        define_simple_setter :widthF
+
+#         # width can be used with a float. If 0.0 the pen is cosmetic
+        def width value
+          case value
+          when Fixnum then @qtc.width = value
+          else @qtc.widthF = value
+          end
+        end
+
+        alias :size :width
+
+        # make the size 1 pixel, independent of scale
+        def cosmetic v_true = true
+          @qtc.widthF = 0.0
+        end
+
+        JoinMap = { :miter => Qt::MiterJoin, :bevel => Qt::BevelJoin, :roundjoin => Qt::RoundJoin,
+                    :round => Qt::RoundJoin }
+
+        def joinStyle value
+          value = JoinMap[value] || Qt::MiterJoin if Symbol === value
+          @qtc.joinStyle = value
+        end
+
+        alias :join :joinStyle
+
+        CapMap = { :square => Qt::SquareCap, :flat => Qt::FlatCap, :round => Qt::RoundCap,
+                   :roundcap => Qt::RoundCap }
+
+        def capStyle value
+          @qtc.capStyle = Symbol === value ? CapMap[value] || Qt::FlatCap : value
+        end
+
+        StyleMap = { :solid => Qt::SolidLine, :dash => Qt::DashLine, :dot => Qt::DotLine,
+                     :dashdot => Qt::DashDotLine, :dashdotdot => Qt::DashDotDotLine,
+                     :custemdash => Qt::CustomDashLine }
+
+        # example: style :roundjoin, :roundcap, :solid
+        # which is the same as style :round, :solid
+        def style *values
+          values.each do |value|
+            case value
+            when Symbol
+              v = JoinMap[value] and @qtc.joinStyle = v
+              v = CapsMap[value] and @qtc.capStyle = v
+              v = StyleMap[value] and @qtc.style = v
+            else
+              @qtc.style = value
+            end
+          end
+        end
+
+      public
+        def name aName = nil
+        end
+      end # class Pen
+
+
+  private # Graphical methods
 
       Qt::Color::allowX11ColorNames = true #rescue nil
 
@@ -22,7 +110,7 @@ module Reform
           when Symbol
             cache[colorsym] ||= klass.new(@@color[colorsym])
           else
-            klass.new(color(colorsym, *more))
+            klass.new(make_color(colorsym, *more))
           end
         end
       end
@@ -64,7 +152,7 @@ module Reform
       end
 
       # returns a Qt::Color. The heart of colorknowledge on earth
-      def color colorsym, g = nil, b = nil, a = nil
+      def make_color colorsym, g = nil, b = nil, a = nil
         case colorsym
     #     when Qt::Color, Qt::ConicalGradient, Qt::LinearGradient, Qt::RadialGradient then colorsym
         when Qt::Color then colorsym
@@ -108,7 +196,7 @@ module Reform
         end
       end
 
-      alias :make_color :color
+      alias :color :make_color
 
       generateColorConverter :color2pen, Qt::Pen, @@pen     # DEPRECATED
       generateColorConverter :color2brush, Qt::Brush, @@solidbrush # DEPRECATED
@@ -118,36 +206,58 @@ module Reform
       #           make_pen :blue
       #           make_pen blue
       # The symbol param is the only one that caches the result.
-      def make_pen colorsym, *more
-        colorsym = colorsym.qtc if colorsym.respond_to?(:qtc)
-        case colorsym
-        when Qt::Pen then colorsym
-        when nil, false then @@pen[:none] ||= Qt::Pen.new(Qt::NoPen)
-        when Symbol then @@pen[colorsym] ||= Qt::Pen.new(@@color[colorsym])
-        else Qt::Pen.new(color(colorsym, *more))
+      def make_pen *args, &block
+        args = args[0] if args.length <= 1
+        args = args.qtc if args.respond_to?(:qtc)
+        case args
+        when Qt::Pen then args
+        when false, :none, :no_pen then @@pen[:none] ||= Qt::Pen.new(Qt::NoPen)
+        when nil
+          if block
+            Pen.new.setup(nil, &block).qtc
+          else
+            @@pen[:none] ||= Qt::Pen.new(Qt::NoPen)
+          end
+        when Symbol
+          col = @@color[args] or raise Error, ":#{args} is not a valid colorsymbol, use #{@@color.keys.inspect}"
+          @@pen[args] ||= Qt::Pen.new(col)
+        when Hash then Pen.new.setup(args, &block).qtc
+        when Array then Qt::Pen.new(make_color(*args))
+        when Qt::Color then Qt::Pen.new(args)
+        else Qt::Pen.new(make_color(args))
         end
       end
 
       # convert anything into a Qt::Brush
-      def make_brush colorsym, *more
+      def make_brush *args, &block
+        args = args[0] if args.length <= 1
     #     tag "make_brush #{colorsym}, #{more.inspect}"
-        colorsym = colorsym.qtc if colorsym.respond_to?(:qtc)
+        args = args.qtc if args.respond_to?(:qtc)
     #     tag "colorsym = #{colorsym.inspect}"
-        case colorsym
-        when Qt::Brush then colorsym
-        when nil, false then @@solidbrush[:none] ||= Qt::Brush.new(Qt::NoBrush)
+        case args
+        when Qt::Brush then args
+        when false, :none, :no_brush then @@solidbrush[:none] ||= Qt::Brush.new(Qt::NoBrush)
+        when nil
+          if block
+            Brush.new.setup(nil, &block).qtc
+          else
+            @@solidbrush[:none] ||= Qt::Brush.new(Qt::NoBrush)
+          end
         when Symbol
     #       tag "locating :#{colorsym}, working through @@color #{@@color.inspect}"
-          col = @@color[colorsym] or raise Error, ":#{colorsym} is not a valid colorsymbol, use #{@@color.keys.inspect}"
-          @@solidbrush[colorsym] ||= Qt::Brush.new(col) #) .tap{|b| tag "returning #{b}"}
-        when Qt::RadialGradient, Qt::LinearGradient, Qt::ConicalGradient then Qt::Brush.new(colorsym)
+          col = @@color[args] or raise Error, ":#{args} is not a valid colorsymbol, use #{@@color.keys.inspect}"
+          @@solidbrush[args] ||= Qt::Brush.new(col) #) .tap{|b| tag "returning #{b}"}
+        when Qt::RadialGradient, Qt::LinearGradient, Qt::ConicalGradient then Qt::Brush.new(args)
+        when Hash then Brush.new.setup(args, &block).qtc
         when String
-          if colorsym[0, 7] == 'file://'
-            Qt::Brush.new(Qt::Pixmap.new(colorsym[7..-1]))
+          if args[0, 7] == 'file://'
+            Qt::Brush.new(Qt::Pixmap.new(args[7..-1]))
           else
-            Qt::Brush.new(color(colorsym))
+            Qt::Brush.new(make_color(args))
           end
-        else Qt::Brush.new(color(colorsym, *more))
+        when Array then Qt::Brush.new(make_color(*args))
+        when Qt::Color then Qt::Brush.new(args)
+        else Qt::Brush.new(make_color(args))
         end
       end
 
@@ -157,12 +267,12 @@ module Reform
       # with a single color it is that color to black (left to right)
       def gradient w, *brushes
         g = Qt::LinearGradient.new(0.0, 0.0, w, 0.0)
-        brushes[0] = color(:white) if brushes.empty?
-        brushes[1] = color(:black) if brushes.length < 2
+        brushes[0] = make_color(:white) if brushes.empty?
+        brushes[1] = make_color(:black) if brushes.length < 2
         d = 1.0 / brushes.length
         j = 0.0
         brushes.each do |b|
-          g.setColorAt j, color(b)
+          g.setColorAt j, make_color(b)
           j += d
         end
         Qt::Brush.new g
@@ -178,7 +288,7 @@ module Reform
 
         def stop hash # FIXME: 1-liner
           offset = [[hash[:offset] || 0.0, 0.0].max, 1.0].min
-          col = color(hash[:color] || :white)
+          col = make_color(hash[:color] || :white)
           @qtc.setColorAt(offset, col)
         end
 
@@ -189,12 +299,12 @@ module Reform
             # using setStops is very problematic
             hash.each do |pt, col|
     #           tag "#@qtc.setColorAt(#{pt}, #{col})"
-              @qtc.setColorAt(pt, color(col))
+              @qtc.setColorAt(pt, make_color(col))
             end
           else
     #         tag "setColor 0000000 to fffffff"
-            @qtc.setColorAt(0.0, color(:white)) # Qt::Color::fromRgba(0x00000000))
-            @qtc.setColorAt(1.0, color(:black)) # Qt::Color::fromRgba(0x00ffffff))
+            @qtc.setColorAt(0.0, make_color(:white)) # Qt::Color::fromRgba(0x00000000))
+            @qtc.setColorAt(1.0, make_color(:black)) # Qt::Color::fromRgba(0x00ffffff))
             # AARGHH ArgumentError: Cannot handle 'const QVector<QPair<double,QColor> >&' as argument of QGradient::setStops
             #@qtc.stops = [0.0, Qt::Color::fromRgba(0x00000000)], [1.0, Qt::Color::fromRgba(0xffffffff)]]
 

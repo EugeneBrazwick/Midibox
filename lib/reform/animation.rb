@@ -33,7 +33,14 @@ module Reform
         end
       end
 
-    protected
+      define_simple_setter :loopCount
+
+      def looping
+        @qtc.loopCount = -1
+      end
+
+    protected # Animation methods
+
       attr_writer :autostart
 
       def autostart value = nil
@@ -44,13 +51,17 @@ module Reform
       def autostart?
         @autostart
       end
-    public
+
+    public # Animation methods
+
       def addTo parent, hash, &block
         parent.addAnimation self, hash, &block
       end
 
       def addAnimation anim, hash, &block
         super
+#         tag "appending #{anim.qtc} to group #@qtc"
+        @qtc.addAnimation(anim.qtc)
         anim.autostart = false
       end
 
@@ -59,5 +70,5 @@ module Reform
       end
 
 
-  end
-end
+  end #class Animation
+end # module Reform

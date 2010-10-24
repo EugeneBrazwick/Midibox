@@ -38,6 +38,30 @@ module Reform
       parent.addGraphicsItem @qtc.toFillPolygon, hash, &block
     end
 
+    # the block is passed two arguments, the element and if a curve
+    # the element info.
+    # Unfortunately we cannot use it to make alterations, since
+    # the internal structure of the curve-info is unknown, nor is
+    # there a way to replay the curve-elements on another painterpath.
+    # Note that for straight lines such replay is very well possible.
+    def each &block
+      return to_enum unless block
+      i, n = 0, @qtc.elementCount
+      while i < n
+        el = @qtc.elementAt(i)
+        if el.curveTo?
+          i += 1
+          info = @qtc.elementAt(i)
+          yield el, info
+        else
+          yield el, nil
+        end
+        i += 1
+      end
+    end
+
+    alias :each_element :each
+
 #     def self.contextsToUse
 #       GraphicContext
 #     end

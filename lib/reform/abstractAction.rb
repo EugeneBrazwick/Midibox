@@ -20,11 +20,11 @@ module Reform
 
     # notice: these can no longer be queried....
     def enabler value = nil, &block
-      DynamicAttribute.new(self, :enabled, value, &block)
+      DynamicAttribute.new(self, :enabled, TrueClass, value, &block)
     end
 
     def disabler value = nil, &block
-      DynamicAttribute.new(self, :disabled, value, &block)
+      DynamicAttribute.new(self, :disabled, TrueClass, value, &block)
     end
 
     public

@@ -19,6 +19,10 @@ BUILD: just run
     rake
 in the toplevel dir.
 
+Hm.. qtruby4.6.3.1 contains a bug. A simple 'Qt::Variant::new(0.0)' immediately fails!
+To fix patch it:
+  sudo patch -p0 -E < qtruby4631.patch
+
 INSTALL: cannot be done yet. But isn't really required at the moment.
 
 Current state (oct 6 2010)

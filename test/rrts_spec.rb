@@ -2,9 +2,8 @@
 # test suite for nodes using rspec
 # Run through rake or from toplevel
 # Example:
-#   spec rrts_spec.rb --color --example Sequencer
+#   rspec rrts_spec.rb --color --pattern Sequencer
 
-require 'spec'
 require 'rrts/sequencer'
 require 'rrts/midiqueue'
 

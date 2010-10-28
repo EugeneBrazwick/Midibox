@@ -330,7 +330,7 @@ describe MidiFileReader do
     t0 = Time.now
     cons = MockConsumer.new(@input)  # kind of '/dev/null'
     @input.run
-    (Time.now - t0).should <= 0.5
+    (Time.now - t0).should <= 0.7
     cons.receive_count.should == 1767
   end
 

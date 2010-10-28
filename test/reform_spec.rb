@@ -2,9 +2,6 @@
 # this requires rspec:                  sudo gem install rspec
 # docs: http://rspec.info/
 # spec does not need these, but rcov does!
-require 'rubygems'
-require 'spec'
-
 require 'reform/app'
 require 'reform/widget'
 

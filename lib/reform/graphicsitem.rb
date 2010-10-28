@@ -141,6 +141,6 @@ module Reform
         self.size  = Qt::Size.new(value[2],  value[3])
       end
 
-  end # GraphicsItem
+  end # class GraphicsItem
 
 end # Reform

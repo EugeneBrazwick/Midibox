@@ -1,12 +1,9 @@
 
+require 'rake'
 require 'rake/clean'
-
-begin
-  require 'spec/rake/spectask'
-  RSPEC = true
-rescue
-  RSPEC = false
-end
+require 'rspec/core/rake_task' # as in Upgrade.markdown
+#require '/var/lib/gems/1.9.1/gems/rspec-core-2.0.1/lib/rspec/core/rake_task'
+RSPEC = true
 
 if RUBY_VERSION =~ /^1\.9\.[01]/
   begin
@@ -43,10 +40,10 @@ end
 
 if RSPEC
   desc "Run all rspec_test"
-  Spec::Rake::SpecTask.new(:rspec_tests) do |t|
-    t.spec_opts = ['--color']
+  RSpec::Core::RakeTask.new(:rspec_tests) do |t|
+    t.rspec_opts = ['--color']
     t.ruby_opts = ['-W0']
-    t.spec_files = FileList['test/**/*_spec.rb']
+    t.pattern = FileList['test/**/*_spec.rb']
   end
 
   task :test=>:rspec_tests do
@@ -57,7 +54,7 @@ end
 
 file ALSALIB => FileList['lib/rrts/driver/*.cpp'] do
   Dir.chdir 'lib/rrts/driver' do
-    sh 'ruby ./extruby.rb && make && rm -f *.o mkmf.log'
+    sh "#{ENV['RUBY']} ./extruby.rb && make && rm -f *.o mkmf.log"
   end
 end
 

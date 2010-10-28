@@ -16,14 +16,27 @@ while [ -z "$RUBY" ]; do
     case "$answer" in
     ([Yy]*|'')
       if [ "$(which apt-get)" ]; then
+	if [ ! "$(which aptitude)" ]; then
+	  sudo apt-get --yes install aptitude
+ 	  if [ ! "$(which aptitude)" ]; then
+	    echo "Could not install aptitude"
+	    exit 3 
+          fi
+	fi
 #         echo "ATTEMPT 3, using aptitude"
-        export RUBY=$(aptitude search --display-format '%p' '^ruby[0-9\.]+$' | \
-                      sort --general-numeric-sort | tail --lines 1 | sed 's/ *$//')
+        export RUBY="$PREFIX"/bin/$(aptitude search --display-format '%p' '^ruby[0-9\.]+$' | \
+                                    sort --general-numeric-sort | tail --lines 1 | sed 's/ *$//')
         [ "$RUBY" ] || { echo "could not locate latest ruby version for apt"; exit 3; }
-#         echo "RUBY=$RUBY, check for a 'full' version"
+        #echo "RUBY=$RUBY, check for a 'full' version"
         package=$(aptitude search --display-format '%p' '^'"$RUBY"'-full$' | sed 's/ *$//')
+        #echo "package=$package"
         [ "$package" ] || package=$RUBY
-        sudo apt-get install "$package"
+        echo sudo apt-get --yes install "$package"
+        sudo apt-get --yes install "$package"
+	# now it seems maverick has ruby1.9.2 but it is still /usr/bin/ruby1.9.1 ....
+	if [ "$RUBY" == "$PREFIX"/bin/ruby1.9.2 -a ! "$(which $RUBY)" -a "$(which "$PREFIX"/bin/ruby1.9.1)" ]; then
+	  RUBY="$PREFIX"/bin/ruby.1.9.1
+        fi
       else
         echo "Unfortunately, you will have to install it yourself"
         exit 2

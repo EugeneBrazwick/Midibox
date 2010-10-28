@@ -2,7 +2,6 @@
 # test suite for alsa mappings using rspec
 # Run through rake or from toplevel (example)
 #   spec rrts_alsa_driver_spec.rb --color --example AlsaQueueInfo_i
-require 'spec'
 require 'rrts/driver/alsa_midi'
 include RRTS
 include Driver

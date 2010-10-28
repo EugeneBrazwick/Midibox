@@ -1,7 +1,9 @@
 
+# Copyright (c) 2010 Eugene Brazwick
+
 module Reform
 
-  require_relative '../graphicsitem'
+  require 'reform/graphicsitem'
 
 # tag "LOADING Circle class"
 

@@ -204,8 +204,8 @@ then we can continue
         # rake is part of the 'ruby' core package. But let's get the correct version.
         @@rakecmd = check_exe_and_opt_apt_get('rake', 'CANTHAPPEN', 'alsa_midi.so')
         # We need the rspec gem first.
-        ENV['RSPEC'] = check_gem('spec', 'rspec', 'alsa_midi.so')
-        check_gem(nil, 'darkfish-rdoc', 'htmldocs', optional: true)
+        ENV['RSPEC'] = check_gem('rspec', 'rspec', 'alsa_midi.so')
+#         check_gem(nil, 'darkfish-rdoc', 'htmldocs', optional: true)
 #         check_gem(nil, 'shoulda', 'testing', optional: true)          no longer used
         check_libdev_and_opt_apt_get('include/alsa/asoundlib.h', 'libasound2-dev', 'alsa_midi.so')
         @@handler::busy do
@@ -270,7 +270,7 @@ then we can continue
       check_libdev_and_opt_apt_get((qtdir ? qtdir + '/include' : 'include/qt4') + '/Qt/qglobal.h', 'libqt4-dev', 'qtruby')
       check_gem(nil, QTRUBYGEMNAME, 'qtruby')
       check_gem('spec', 'rspec', 'alsa_midi.so')
-      check_gem(nil, 'darkfish-rdoc', 'htmldocs', optional: true)
+#       check_gem(nil, 'darkfish-rdoc', 'htmldocs', optional: true)
       check_libdev_and_opt_apt_get('include/alsa/asoundlib.h', 'libasound2-dev', 'alsa_midi.so')
       check_gem(nil, 'linguistics', 'midibox')
     end

@@ -557,6 +557,12 @@ The old rule that 'names' imply 'connectors' is dropped completely.
 # #         @@root
 #       end
 
+      def setupQuickyhash hash
+        hash.each do |k, v|
+          send(k, v) unless k == :postSetup || k == :qtparent # and other hacks!!
+        end
+      end
+
     public # Model methods
 
       def root
@@ -771,6 +777,28 @@ The old rule that 'names' imply 'connectors' is dropped completely.
             nil
           end
         end
+      end
+
+      # Hm,... there are more classes that use these very basic methods.
+
+      # this is dangerous but makes models work properly as 'controls'
+      # since otherwise I get severe yaml load errors (SEGV's etc)
+      # It seems Qt::Object does not yaml very well.
+      def parent_qtc_to_use_for reform_class
+        #reform_class.respond_to?(:parent_qtc) &&
+        reform_class.parent_qtc(self, effective_qwidget)
+      end
+
+      # Same here, duplicating Control API
+      def add child, quickyhash, &block
+        child.addTo(self, quickyhash, &block)
+      end
+
+      def setup hash = nil, &initblock
+        instance_eval(&initblock) if initblock
+        setupQuickyhash(hash) if hash
+        postSetup
+        self
       end
 
   end # module Model

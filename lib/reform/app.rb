@@ -241,14 +241,14 @@ module Reform
             rfRescue do
               # are we registered at this point?
               # this is done by the require which executes createInstantiator_i.
-              # IMPORTANT ruby1.9.2 corrupts name2 somehow.  Using name3 does the trick however
               unless @@instantiator[name]
-#                 tag "arrived in #{self}##{name}"
+#                 tag "arrived in #{self}##{name}, first time, loading file, just in time style"
                 require_relative thePath
                 # the loaded module should call createInstantiator (and so registerControlClass) which alters
                 # @@instantiator
                 raise "'#{name}' did not register an instantiator!!!" unless @@instantiator[name]
               end
+#               tag "HERE"
               instantiator = @@instantiator[name]
               reform_class = instantiator[:reform_class]
               options = instantiator[:options]
@@ -285,7 +285,7 @@ module Reform
     #         tag "instantiate #{qt_implementor_class} with parent #{ctrl}/#{qparent}"
               newqtc = qt_implementor_class &&
                        ctrl.instantiate_child(reform_class, qt_implementor_class, qparent)
-#               tag "#{reform_class}.new(#{ctrl}, #{newqtc})"
+#               tag "c2 := #{reform_class}.new(#{ctrl}, #{newqtc})"
               c2 = reform_class.new ctrl, newqtc
       #           tag "instantiated c=#{c}, parent is a #{ctrl.class}"
                 # add will execute block, and then also call postSetup
@@ -293,7 +293,8 @@ module Reform
               ctrl.add(c2, quicky, &block)
               c = c2
             end
-    #         tag "IMPORTANT: method '#{name}' return the control #{c}"
+#             tag "IMPORTANT: method '#{name}' return the control #{c} (class:#{c.class})"
+            raise "Instantiator '#{name}' failed to construct a control!" unless c
             c
           end  # define_method
 
@@ -635,7 +636,7 @@ module Reform
         alias :simpledata :simple_data
 
         def struct *val, &block
-          tag "struct"
+#           tag "struct"
           if block
             addModel(Structure.new.build(&block))
           else

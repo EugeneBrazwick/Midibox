@@ -5,14 +5,14 @@
 # you could pass it as 'qtc'. That way a FileSystem could be immediately
 # displayed in a QTreeView for example.
 module Reform
-  class FileSystem < AbstractModel
+  class FileSystem #            < AbstractModel         havoc with yaml
+    include Model
     private
       def initialize parent, qtc = nil
+#         tag "FileSystem.new"
         if Hash === parent
-          super()
           setup(parent)
         else
-          super(parent)
           hash = Hash === qtc ? qtc : {}
 #           if parent && parent.model?
 #             @root = parent.root
@@ -67,20 +67,25 @@ module Reform
       end
 
       def load
+#         tag "Load, filename = #@filename"
         unless @filename
           return unless @default_filename
           filename = @default_filename
+#           dirty = true # new records are always dirty. Yes, but new records can always be easily
+      # remade. Do not bug the user with 'save' boxes if he did not alter the empty record.
         else
           filename = @filename
         end
         for pattern, klass in @reg
           if filename =~ pattern
+#             tag "Loading #@filename through #{klass}"
             model = klass::load(build_path(filename))
-#             tag "Loaded #{model.inspect} through #{klass}"
+#             tag "loaded model #{model.inspect}"
             unless model.respond_to?(:model?) && model.model?
 #               tag "Not a model!!! WRAPPING"
               model = (@klass || Structure).new(value: model, keypath: [])
             end
+            @dirty = false
             return @file = model
           end
         end
@@ -95,13 +100,14 @@ module Reform
         for pattern, klass in @reg
           if filename =~ pattern
 #             tag "Calling #{klass}::store #{@file.inspect}"
-            raise Error, tr("Refusing to save nil to #{aPath}, this must be some terrible mistake") unless @file
+            raise Error, $qApp.tr("Refusing to save nil to #{aPath}, this must be some terrible mistake") unless @file
             klass::store(@file, aPath)
             @dirname, @filename = dirname, filename
+            @dirty = false
             return
           end
         end
-        raise Error, tr("No storage class registered for '%s'") % filename
+        raise Error, $qApp.tr("No storage class registered for '%s'") % filename
       end
 
       def build_path filename
@@ -113,7 +119,7 @@ module Reform
       def setup hash, &block
         @dirname = Dir::getwd
         @filename = @default_filename = nil
-        @itemname = tr('an item')
+        @itemname = $qApp.tr('an item')
         reset_captions
         @file = @klass = nil
         require 'reform/yamlloader'
@@ -171,7 +177,7 @@ module Reform
         if value
           @new_caption = value
         else
-          @new_caption || tr('Create a new %s') % @itemname
+          @new_caption || $qApp.tr('Create a new %s') % @itemname
         end
       end
 
@@ -181,7 +187,7 @@ module Reform
         if value
           @open_caption = value
         else
-          @open_caption || tr('Pick %s') % @itemname.send($qApp.lang).a
+          @open_caption || $qApp.tr('Pick %s') % @itemname.send($qApp.lang).a
         end
       end
 
@@ -189,7 +195,7 @@ module Reform
         if value
           @save_caption = value
         else
-          @save_caption || tr('Save %s') % @itemname.send($qApp.lang).a
+          @save_caption || $qApp.tr('Save %s') % @itemname.send($qApp.lang).a
         end
       end
 
@@ -197,7 +203,7 @@ module Reform
         if value
           @saveas_caption = value
         else
-          @saveas_caption || @save_caption || tr('Save %s as a different file') %
+          @saveas_caption || @save_caption || $qApp.tr('Save %s as a different file') %
                                               @itemname.send($qApp.lang).a
         end
       end
@@ -262,6 +268,19 @@ module Reform
       alias :fileOpen :open
       alias :fileSave :save             # interaction if file was new
       alias :fileSaveAs :saveas
+
+      def to_yaml_properties
+        %w[ @dirname @filename @default_filename @itemname @pattern @open_caption
+            @klass @save_caption @saveas_caption
+          ]
+      end
+
+      attr_accessor :parent
+
+      # true if the contents was changed, after loading or saving.
+      def dirty?
+        @dirty
+      end
   end
 
   createInstantiator File.basename(__FILE__, '.rb'), nil, FileSystem

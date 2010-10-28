@@ -114,8 +114,9 @@ mock:
     s[3]=x,y is the same as s[3,0] =x,y or s[3,0] = [x,y]
     It differs whether the righthand side is an array or not. And s[0] = [3,2] is different from s[0,0] = [3,2] !
 =end
-  class Structure < AbstractModel
-    include ModelContext
+  class Structure
+        # AbstractModel                 yaml does not really work nice with Qt objects....
+    include Model, ModelContext
 
     private # methods of Structure
 
@@ -130,11 +131,10 @@ mock:
       def initialize *args
 #         tag "new #{self}, args = #{args.inspect}"
         if args.length == 1 && Control === args[0]
-          super(args[0])
+          @parent = @args[0]
           raise "TOTAL CORRUPTION" unless !args[0].model? || args[0].root
           @root = if args[0].model? then args[0].root else self end
         else
-          super(nil)
           @root = self
         end
 #         tag "INITIALIZE ,args = #{args.inspect}"
@@ -164,14 +164,18 @@ mock:
       end
 
       def inter value, key
+#         tag "inter value #{value.inspect}, klass:#{value.class} for key :#{key}"
         case value
         when Hash, Array then Structure.new(value: value, keypath: @keypath + [key], root: @root)
         when Numeric, FalseClass, TrueClass, NilClass, String, Symbol then value
         else
           if value.respond_to?(:model?) && value.model?
+#             raise 'blerk' if value.disposed?
             # incorporate the model by setting parent + root + keypath
             value.root = @root
             value.keypath = @keypath + [key]
+#             tag "#{value}.parent := #{self}"
+#             tag "oldparent was #{value.parent}"
             value.parent = self
             value
           else
@@ -181,7 +185,7 @@ mock:
       end
 
       def assign key, value, org_symbol = nil
-#         tag "Assign #{key.inspect}, #{value}, currentvalue=#{@value.inspect}, keypath=#{@keypath.inspect}"
+#         tag "Assign #{key.inspect}, #{value}, currentvalue=#{@value.inspect}, keypath=#{@keypath.inspect}, value:=#{value.inspect}"
         case key
         when :self
 #           tag "#{self} ASSIGN self @value := #{value}"
@@ -189,6 +193,7 @@ mock:
           case @value
           when Hash
             @value.each do |k, v|
+#               tag "Checking hash key #{k.inspect}, value = #{v.inspect}"
               @value[k] = inter(v, k)
             end
           when Array
@@ -246,6 +251,8 @@ mock:
       end
 
     public  # methods of Structure
+
+      attr_accessor :parent
 
       def value v = nil
         return @value if v.nil?
@@ -625,15 +632,27 @@ mock:
 
       def build &block
         @value = {}
-#         tag "build"
+#         tag "build, value := {}, + instance eval"
         instance_eval(&block)
         self
       end
 
       def to_yaml(*args)
         # sooo sneaky...
+        tag "#{@value.inspect}::to_yaml"
         @value.to_yaml(*args)
       end
+
+      def addModel control, hash, &block
+        control.setup hash, &block
+#         want_data!            this is a toplevel call. There is no need to do this.
+# and it is wrong for comboboxes or lists that are assigned local data.
+        @model = control
+        control.parent = self
+#         added control
+      end
+
+
   end # class Structure
 
   createInstantiator File.basename(__FILE__, '.rb'), nil, Structure

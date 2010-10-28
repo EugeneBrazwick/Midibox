@@ -5,10 +5,12 @@ module Midibox
   class Config < Reform::Structure
     extend Forwardable
     private
-      def initialize parent = nil, qtc = nil
+      def initialize *args
         super
-        @value = {} # smart
+        @value = {}
+#         tag "new config"
         self.last_song = nil # 'default' is dangerous because not really the name to be saved
+#         tag "creating filesystem for song"
         self.songfile = filesystem {
           dirname Dir::home + '/.midibox'
           default_filename 'default.mdb.yaml.gz'
@@ -18,7 +20,7 @@ module Midibox
             File.open(fnam, 'w') { |f| }
           end
           filename nil
-          itemname tr('Midibox Song')
+          itemname $qApp.tr('Midibox Song')
           pattern '*.mdb.yaml.gz *.mdb.yaml'
         }
       end

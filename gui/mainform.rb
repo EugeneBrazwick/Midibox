@@ -4,7 +4,7 @@ require 'midibox/config' # it's unavoidable anyway
 
 Reform::app {
   struct {
-#       tag "executing block to struct, basicly executed in the Structure"
+#     tag "executing block to struct, basicly executed in the Structure, self = #{self}"
     self.configfile = filesystem {
 #         tag "creating filesystem model"
       dirname Dir::home + '/.midibox'
@@ -12,6 +12,7 @@ Reform::app {
       klass Midibox::Config # used by yamlloader
       filename '/config.yaml.gz'
     }
+#     tag "self.configfile is now #{self.configfile.inspect}"
     self.config = if configfile.exists?
       configfile.open_file
     else
@@ -28,9 +29,10 @@ Reform::app {
     whenCanceled do
 #       tag "Save configfile"
       begin
-        fileSaveAction.whenClicked
+        cfg = $qApp.model.configfile
+        fileSaveAction.whenClicked if cfg.dirty?
       ensure
-        $qApp.model.configfile.save
+        cfg.save if cfg.dirty?
       end
       true
     end

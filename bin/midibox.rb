@@ -1,7 +1,8 @@
 #!/usr/bin/ruby
 
 # Copyright (c) 2010 Eugene Brazwick
-# verified with clean Ubuntu version on Oct 2 2010.
+# verified with clean Lucid Ubuntu version on Oct 2 2010.
+# Verified with even cleaner Maverick on Oct 27 2010.
 # However some backtracking was done.
 
 =begin
@@ -33,6 +34,24 @@ collect2: ld returned 1 exit status
 make[3]: *** [ruby/qtruby/src/libqtruby4shared.so.2.0.0] Error 1
 Bad linking flags???? No that stupid configure never built any .so's..... WTF?
 ./configure --prefix=/usr --exec-prefix=/usr --localstatedir=/var --sysconfdir=/etc --enable-shared
+
+============================
+Maverick: qtbindings is made except for this lib:
+-- Skip SMOKE bindings: QtMultimedia
+....
+cp: cannot stat `ext/build/smoke/qtmultimedia/libsmokeqtmultimedia.*': No such file or directory
+
+Why does it skip it? Is something missing?
+Actually, the only thing failing is the 'install' at the end.
+
+Workaround (experimental)
+During build remove lines with libsmokeqtmultimedia from the Makefile. 
+Multimedia stuff will obviously not work.
+
+kdebindings mailing list: https://mail.kde.org/mailman/listinfo/kde-bindings
+
+/usr/include/qt4/QtMultimedia (or something like it) does not exist. Is that the problem?
+And it does exist in qt4.6...  See github qtbindings. This is precisely it!
 
 =end
 

@@ -135,5 +135,20 @@ I can see something is being done but a user will be confused if a gem install t
      So it should probably be part of the Model module.
 0025 Thu Oct 21 22:45:36 CEST 2010. If it asks to save the data, when closing down, it must be
      with a 'save|do not save|cancel' dialog. And if I cancel the form must not be closed.
-
+0026 Wed Oct 27 23:02:59 CEST 2010. midibox crashes (upgraded to maverick. Qt4.7)
+/home/ara/Midibox/lib/reform/models/structure.rb:175: [BUG] Segmentation fault
+	ruby 1.9.2p0 (2010-08-18 revision 29036) [x86_64-linux]
+	-- control frame ----------
+	c:0045 p:---- s:0167 b:0167 l:000166 d:000166 CFUNC  :method_missing
+	c:0044 p:0212 s:0165 b:0165 l:000164 d:000164 METHOD /home/ara/Midibox/lib/reform/models/structure.rb:175
+	c:0043 p:0022 s:0160 b:0157 l:000147 d:000156 BLOCK  /home/ara/Midibox/lib/reform/models/structure.rb:192
+	c:0042 p:---- s:0153 b:0153 l:000152 d:000152 FINISH
+	c:0041 p:---- s:0151 b:0151 l:000150 d:000150 CFUNC  :each
+	c:0040 p:0219 s:0148 b:0148 l:000147 d:000147 METHOD /home/ara/Midibox/lib/reform/models/structure.rb:191
+	c:0039 p:0251 s:0141 b:0141 l:000140 d:000140 METHOD /home/ara/Midibox/lib/reform/models/structure.rb:147
+	c:0038 p:---- s:0137 b:0137 l:000136 d:000136 FINISH
+	c:0037 p:---- s:0135 b:0135 l:000134 d:000134 CFUNC  :new
+	c:0036 p:0296 s:0131 b:0131 l:000130 d:000130 METHOD /home/ara/Midibox/lib/reform/models/structure.rb:168
+	c:0035 p:0022 s:0126 b:0123 l:000113 d:000122 BLOCK  /home/ara/Midibox/lib/reform/models/structure.rb:192
+Strange.
 

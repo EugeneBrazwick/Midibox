@@ -1,6 +1,5 @@
 
 require 'rstore/rstore'
-require 'spec'
 
 class TestMe
   private

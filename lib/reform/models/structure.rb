@@ -114,9 +114,9 @@ mock:
     s[3]=x,y is the same as s[3,0] =x,y or s[3,0] = [x,y]
     It differs whether the righthand side is an array or not. And s[0] = [3,2] is different from s[0,0] = [3,2] !
 =end
-  class Structure
-        # AbstractModel                 yaml does not really work nice with Qt objects....
-    include Model, ModelContext
+  class Structure #< AbstractModel       #          yaml does not really work nice with Qt objects....
+     include Model, ModelContext
+#      include ModelContext
 
     private # methods of Structure
 
@@ -129,6 +129,7 @@ mock:
       #           nil (default) is equivalent with [].
       #           Only applies when a root is given
       def initialize *args
+        super() ##!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 #         tag "new #{self}, args = #{args.inspect}"
         if args.length == 1 && Control === args[0]
           @parent = @args[0]
@@ -163,6 +164,7 @@ mock:
 #         tag "INIT #{self} OK, @root = #@root, root = #{self.root}"
       end
 
+      # It is very dangerous storing keypaths within an array, as the indices may shift!!
       def inter value, key
 #         tag "inter value #{value.inspect}, klass:#{value.class} for key :#{key}"
         case value
@@ -325,13 +327,15 @@ mock:
               case symbol # special cases
               when :<<
                 raise 'oops' unless args.length == 1 || block
-                @value << args[0]
+                @value << inter(args[0], @value.length)
                 tran.push(Transaction::PropertyPushed.new(@root, @keypath)) unless tran.aborted?
                 return self
               when :push # not the same as <<, you cannot << 1,2 but you can push(1,2)
                 raise 'oops' if block
                 return self if args.empty?
-                @value.push(*args)
+                args.each do |el|
+                  @value.push(inter(el, @value.length))
+                end
                 tran.push(Transaction::PropertyPushed.new(@root, @keypath, args.length)) unless tran.aborted?
                 return self
               when :delete_at
@@ -339,11 +343,13 @@ mock:
                 idx = args[0]
                 return self unless @value.has_key?(idx)
                 return @value.delete_at(idx) if tran.aborted?
+                # BUG 0027 applies here. May destroy integrity
                 prev = @value[idx]
                 result = @value.delete_at idx
                 tran.push(Transaction::PropertySpliced.new(@root, @keypath + [idx], prev))
                 return result # , :_root)               if you want to use as struct use your own constructor
               when :delete
+                # BUG 0027 applies here. May destroy integrity
                 raise 'oops' unless args.length == 1
                 # 'delete' works differently for arrays and hashes!
                 if Hash === @value
@@ -365,6 +371,7 @@ mock:
                 tran.push(Transaction::PropertyPopped.new(@root, @keypath, prev))
                 return result # see delete_at
               when :shift # comparable with pop, but then in front
+                # BUG 0027 applies here. May destroy integrity
                 raise 'oops' unless args.length <= 1 || block
                 count = args[0] || 1
                 return @value.shift(count) if tran.aborted?
@@ -375,6 +382,7 @@ mock:
               when :unshift # comparable with push, but then in front
                 raise 'oops' if block
                 return self if args.empty?
+                STDERR.puts "array integrity goes down the drain. BUG 0027 strikes!"
                 @value.unshift(*args)
                 tran.push(Transaction::PropertyUnshifted.new(@root, @keypath, args.length)) unless tran.aborted?
                 return self
@@ -388,6 +396,7 @@ mock:
                 #  x.insert(-2, 5, 6) -> [1, 2, 3, 5, 6, 4]
                 # the slice is then  x.slice!(at - elcount + 1, elcount)
                 return @value.insert(*args) if tran.aborted?
+                STDERR.puts "array integrity goes down the drain. BUG 0027 strikes!"
                 idx, elcount = args[0], args.length - 1
                 @value.insert(*args)
                 tran.push(Transaction::PropertyAdded.new(@root, @keypath + [idx], elcount))
@@ -486,6 +495,7 @@ mock:
 
       # override
       def length
+#         tag "#{self}::length, @value=#{@value.inspect}"
         @value.respond_to?(:length) ? @value.length : 1
       end
 
@@ -637,9 +647,15 @@ mock:
         self
       end
 
+      #override
+      def mimeType
+        tag "#{self}::mimeType, getter? #{getter?(:mimeType)}, value=#{@value.inspect}"
+        getter?(:mimeType) ? apply_getter(:mimeType) : super
+      end
+
       def to_yaml(*args)
         # sooo sneaky...
-        tag "#{@value.inspect}::to_yaml"
+#         tag "#{@value.inspect}::to_yaml"
         @value.to_yaml(*args)
       end
 
@@ -651,7 +667,6 @@ mock:
         control.parent = self
 #         added control
       end
-
 
   end # class Structure
 

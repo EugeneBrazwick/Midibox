@@ -718,8 +718,6 @@ The old rule that 'names' imply 'connectors' is dropped completely.
         @keypath || []
       end
 
-      attr_writer :keypath
-
       # the transaction is passed to this block
       # transaction do |tran| .... end   runs the block in a transaction, if it fails halfway
       # the original state of @root is restored (more or less)
@@ -801,6 +799,46 @@ The old rule that 'names' imply 'connectors' is dropped completely.
         self
       end
 
+      attr_writer :keypath
+      attr_accessor :parent
+      attr :qtc
+
+      def clean?
+        !@dirty
+      end
+
+      def dirty?
+        @dirty
+      end
+
+      def clean!
+        @dirty = false
+      end
+
+      def dirty!
+        @dirty = true
+      end
+
+      def draggable?
+      end
+
+      # the model should override this to something more distinguishable
+      def mimeType
+        'text/plain'
+      end
+
+      def mimeData records
+        res = Qt::MimeData.new
+        itemData = Qt::ByteArray.new
+        dataStream = Qt::DataStream.new(itemData, Qt::IODevice::WriteOnly)
+#         tag "store yaml #{text} in stream"
+        records.each do |rec|
+#           tag "packing record #{rec.inspect}"
+          dataStream << rec.to_yaml
+        end
+        res.setData mimeType, itemData
+        res
+      end
   end # module Model
 
   # This class implements Model but is also a Control.

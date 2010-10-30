@@ -23,10 +23,10 @@ Reform::app {
         connector :self
       }
       canvas {
-        circle {
+         circle {
           # same principle here. It will be red, but clicking the list will change it.
-          brush connector: :self
-        }
+           brush connector: :self
+         }
       }
     }
   }

@@ -152,7 +152,18 @@ module Reform
       end
 
       # returns a Qt::Color. The heart of colorknowledge on earth
+      # first arg can be
+      #   - symbol, like :white, These values (and these only) are cached.
+      #   - Qt::Color (as is)
+      #   - Qt::Brush, using its color
+      #   - a String like #rgb or #rrggbb or #rrrrggggbbbb or #rgba, (and similar) or a color name
+      #   - Qt::Color enum member like Qt::white
+      #   - Array [r, g, b] or [r,g,b,a]
+      #   - int for red, and then arg2 = greenm arg3 is blue, and arg4 is default 255 (alpha aka opaqueness)
+      #         all values must be between 0 and 255
+      #   - float. similar, but all values must be between 0.0 and 1.0
       def make_color colorsym, g = nil, b = nil, a = nil
+#         tag "make_color(#{colorsym}, #{g}, #{b}, #{a})"
         case colorsym
     #     when Qt::Color, Qt::ConicalGradient, Qt::LinearGradient, Qt::RadialGradient then colorsym
         when Qt::Color then colorsym
@@ -188,9 +199,10 @@ module Reform
           end
         when Qt::Enum then Qt::Color.new(colorsym)
         when Array then Qt::Color.new(*colorsym)
-        when Integer then Qt::Color.new(colorsym, g, b, a || 255)
-        when Float then Qt::Color.new((colorsym * 255.0).floor, (g * 255.0).floor, (b * 255.0).floor,
-                                    ((a || 1.0) * 255.0).floor)
+        when Integer then Qt::Color.new(colorsym, g || colorsym, b || colorsym, a || 255)
+        when Float then Qt::Color.new((colorsym * 255.0).floor, ((g || colorsym) * 255.0).floor,
+                                      ((b || colorsym) * 255.0).floor,
+                                      ((a || 1.0) * 255.0).floor)
         when Symbol then @@color[colorsym]
         else raise Error, "invalid color #{colorsym}, #{g}, #{b}, #{a}"
         end
@@ -211,7 +223,7 @@ module Reform
         args = args.qtc if args.respond_to?(:qtc)
         case args
         when Qt::Pen then args
-        when false, :none, :no_pen then @@pen[:none] ||= Qt::Pen.new(Qt::NoPen)
+        when false, :none, :nopen, :no_pen then @@pen[:none] ||= Qt::Pen.new(Qt::NoPen)
         when nil
           if block
             Pen.new.setup(nil, &block).qtc
@@ -236,7 +248,7 @@ module Reform
     #     tag "colorsym = #{colorsym.inspect}"
         case args
         when Qt::Brush then args
-        when false, :none, :no_brush then @@solidbrush[:none] ||= Qt::Brush.new(Qt::NoBrush)
+        when false, :none, :nobrush, :no_brush then @@solidbrush[:none] ||= Qt::Brush.new(Qt::NoBrush)
         when nil
           if block
             Brush.new.setup(nil, &block).qtc

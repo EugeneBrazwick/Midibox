@@ -9,6 +9,14 @@ module Reform
 
 a ListView gives you the view on a single column (if applicable, and default the first)
 of a model.
+
+To populate a list:
+  - add a model to it
+  - add a 'model_connector' that retrieves a model from the passed datastructure.
+
+to get icons:
+  set iconSize or viewMode and set the 'decorator' connector
+
 =end
   class ListView < AbstractListView
 
@@ -19,28 +27,24 @@ of a model.
 #         initAbstractListView
 #       end
 
+#       def postSetup
+#         super
+#         tag "ListView::postSetup, qtc.model = #{@qtc.model}"
+#       end
+
       # override
       def setLocalModel aModel
+#         tag "#{self}::setLocalModel(#{aModel})"
         m = @qtc.selectionModel
         m.dispose if m
         super
+        raise 'MAYHEM' unless @qtc.model
       end
 
       # default is false, set it to true only if items are indeed all of equal size
       define_simple_setter :uniformItemSizes,
                            :dragEnabled, :dropIndicatorShown,
                            :spacing
-
-      # set the size of icons
-      def iconSize x = nil, y = nil
-        return @qtc.iconSize unless x
-        viewMode :icons
-        case x
-        when Qt::Size then @qtc.setIconSize(x)
-        when Array then @qtc.setIconSize(Qt::Size.new(*x))
-        else @qtc.setIconSize(Qt::Size.new(x, y || x))
-        end
-      end
 
       # activate the grid (invisible)
       def gridSize x = nil, y = nil
@@ -51,6 +55,8 @@ of a model.
         else @qtc.setGridSize(Qt::Size.new(x, y || x))
         end
       end
+
+      alias :gridsize :gridSize
 
       MovementMap = { static: Qt::ListView::Static, free: Qt::ListView::Free, snap: Qt::ListView::Snap }
 
@@ -65,6 +71,7 @@ of a model.
 
       # set the viewmode, can be :list or :icons
       def viewMode vm = nil
+#         tag "viewMode(#{vm})"
         case vm
         when nil then return @qtc.viewMode
         when :text, :list then vm = Qt::ListView::ListMode
@@ -75,14 +82,52 @@ of a model.
 
       # sets the current index. Argument can be an integer
       def currentIndex n
+        raise 'BOGO???? see setCurrentIndex() below!!!'
         n = @qtc.model.index[n] if Fixnum === n
         @qtc.currentIndex = n
       end
 
       alias :currentIndex= :currentIndex
 
+      DragModeMap = { :none => Qt::AbstractItemView::NoDragDrop,
+                      :dragonly => Qt::AbstractItemView::DragOnly,
+                      :droponly => Qt::AbstractItemView::DropOnly,
+                      :dragdrop => Qt::AbstractItemView::DragDrop,
+                      :internalmove => Qt::AbstractItemView::InternalMove }
+
+    # confusing, better set dragMode
+#       def draggable value = true
+#         @qtc.dragEnabled = value
+#       end
+#
+#       alias :dragEnabled :draggable
+#
+      def dragDropMode mode
+#         tag "dragDropMode(#{mode})"
+        mode = DragModeMap[mode] || Qt::AbstractItemView::DragOnly if Symbol === mode
+#         tag "set #@qtc::dragEnabled to #{mode != Qt::AbstractItemView::NoDragDrop} + dragDropMode"
+        if (@qtc.dragEnabled = mode != Qt::AbstractItemView::NoDragDrop)
+          @qtc.setDropIndicatorShown true
+          @qtc.setAcceptDrops true
+#                         @qtc.setSelectionMode Qt::AbstractItemView::ExtendedSelection  DOES NOT MAKE SENSE
+        end
+        @qtc.dragDropMode = mode
+      end
+
     public
 
+      # set the size of icons
+      def iconSize x = nil, y = nil
+        return @qtc.iconSize unless x
+        viewMode :icons
+        case x
+        when Qt::Size then @qtc.setIconSize(x)
+        when Array then @qtc.setIconSize(Qt::Size.new(*x))
+        else @qtc.setIconSize(Qt::Size.new(x, y || x))
+        end
+      end
+
+      alias :iconsize :iconSize
       # override        TOO SOON!!!
 #       def setLocalModel aModel
 #         (sm = @qtc.selectionModel) and sm.deleteLater
@@ -109,7 +154,7 @@ of a model.
       end
 
       def setCurrentIndex idx
-#         tag "Calling #{qmodel}.index(#{idx}, #{@qtc.modelColumn})"
+        tag "#{self}(qtc:#@qtc)::setCurrentIndex(#{idx}), modcol = #{@qtc.modelColumn}, qtc.model=#{@qtc.model}"
         idx = @qtc.model.index(idx, @qtc.modelColumn)
         @qtc.currentIndex = idx if idx.valid?
       end
@@ -134,6 +179,16 @@ of a model.
       def currentChanged current, previous
 #         tag "currentChanged to #{current.row} from #{previous.row}"
         @_reform_hack.whenCurrentChanged(current, previous) #if instance_variable_defined?(:@_reform_hack)
+      end
+
+      def model= x
+        super
+        raise "MORON!" unless x
+      end
+
+      def setModel x
+        super
+        raise "MORON!" unless x
       end
   end
 

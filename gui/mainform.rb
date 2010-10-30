@@ -2,6 +2,9 @@
 require 'reform/app'
 require 'midibox/config' # it's unavoidable anyway
 
+# tag "CALLING internalize_dir"
+Reform::internalize_dir File.absolute_path(File.dirname(__FILE__) + '/plugins')
+
 Reform::app {
   struct {
 #     tag "executing block to struct, basicly executed in the Structure, self = #{self}"
@@ -31,15 +34,14 @@ Reform::app {
       begin
         cfg = $qApp.model.configfile
         fileSaveAction.whenClicked if cfg.dirty?
+        raise 'progerror' unless cfg.clean?
       ensure
         cfg.save if cfg.dirty?
       end
       true
     end
     sizeHint 800, 600
-    canvas {
-      backgroundBrush 241, 252, 126, 211
-    }
+    soundcanvas
     whenShown { fileNewAction.whenClicked }
     menuBar {
       menu {
@@ -67,6 +69,16 @@ Reform::app {
       name :nodePalette
       title 'Available Nodes'
       viewmenu :viewMenu
+      list {
+        IconSize = 72
+        iconsize IconSize
+#         gridsize IconSize + 10  # Note that the grid must allow for the caption
+  # to fit as well. So 'IconSize' is a bad choice.
+        availablemidiboxnodes
+        display :classname
+        decorator :iconpath
+        dragDropMode :dragonly
+      }
     }
   }
 }

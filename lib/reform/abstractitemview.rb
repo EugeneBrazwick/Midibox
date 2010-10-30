@@ -38,12 +38,16 @@ module Reform
 
           def rowCount parent = Qt::ModelIndex.new
 #             tag "#{self}.rowCount, lmodel = #{localmodel}"
-            localmodel.length#.tap {|l| tag "#{self}::rowCount->#{l}"} # works fine
+            localmodel.length #.tap {|l| tag "#{self}::rowCount->#{l}"} # works fine
           end
 
           def columnCount parent = Qt::ModelIndex.new
-            @view.columnCount#.tap{|r|tag "columnCount->#{r}"}
+            @view.columnCount #.tap{|r|tag "columnCount->#{r}"}
           end
+
+          # is it possible to use a bogo variant constant??
+          # it seems, yes, you can
+          ##            Bogo = Qt::Variant.new   CAUSES MAYHEM (sometimes??)
 
           # this is rather trigger. The enums cannot be used as a hashkey.  But I noticed that already
           # when attempting to use them as key in combobox setups...
@@ -74,7 +78,7 @@ module Reform
             return Qt::Variant.new if record.nil?
             # it is far too dangerous defaulting this
 #             tag "Qt::SizeHintRole = #{Qt::SizeHintRole.inspect}, to_i -> #{Qt::SizeHintRole.to_i}"
-            connectorname = Role2ConnMap[role.to_i] or raise ReformError, "Role #{role} not located in Role2ConnMap"
+            connectorname = Role2ConnMap[role.to_i] or return Qt::Variant.new # raise ReformError, "Role #{role} not located in Role2ConnMap"           14,15,16,17.... ?
             connector = @view.col(index.column).connectors[connectorname]
 #             tag "connectorname = #{connectorname}, connector = #{connector.inspect}"
             # we cannot use defaults for the others unless we would know that application of the getter would
@@ -94,8 +98,17 @@ module Reform
               case value
               when String
                 if value[0, 7] == 'file://'
-                  value = Qt::Image.new
-                  value.load(value[7..-1])
+                  sz = @view.iconSize
+                  img = Qt::Image.new(sz, Qt::Image::Format_ARGB32_Premultiplied)     # useless setting size
+#                   tag "requested size = #{sz.inspect}"
+                  # it loads 'svg' OK. But can you preset the size?
+                  # otherwise it must be scaled.
+                  img.load(value[7..-1])
+                  raise Error, tr("Could not load image from file '#{value[7..-1]}'") if img.null?
+#                   tag "actual size = #{img.size.inspect}"
+                  value = if img.size == sz then img else img.scaled(sz, Qt::KeepAspectRatioByExpanding,
+                                                                     Qt::SmoothTransformation) end
+#                   raise Error, tr("Could not scale img") if value.null?
                 else
                   value = Graphical::color(value)
                 end
@@ -143,6 +156,30 @@ module Reform
             createIndex(row, column)
           end
 
+          # 'override'
+          def supportedDropActions
+#             tag "#{self}::supportedDropActions -> copy"
+            Qt::CopyAction | Qt::MoveAction
+          end
+
+          # 'override'
+          def flags index
+            defaultFlags = super
+            if index.valid? then Qt::ItemIsDragEnabled | Qt::ItemIsDropEnabled | defaultFlags
+            else Qt::ItemIsDropEnabled | defaultFlags
+            end
+          end
+
+          def mimeTypes
+            tag "mimeTypes"
+            [localmodel.mimeType]
+          end
+
+          def mimeData indexes
+            tag "mimeData"
+            return nil if indexes.empty?
+            localmodel.mimeData(indexes.map { |i| localmodel.row(i.row) })
+          end
       end # module QAbstractItemModel
 
       class QItemModel < Qt::AbstractItemModel
@@ -223,7 +260,7 @@ module Reform
           end
 
           def var2data variant
-#             tag "var2data, type = #{@type.inspect}"
+            tag "var2data, type = #{@type.inspect}"
             # IMPORTANT: String === String results in false!!!
             case @type.to_s
             when 'String' then variant.to_string
@@ -269,6 +306,7 @@ module Reform
 
       def initialize parent, qtc
         super
+#         tag "AbstractItemView.new"
         # columns are controls
 #         @columns = []         So we don't really need this
       end
@@ -302,6 +340,7 @@ module Reform
       end
 
       def createColumnRef
+#         tag "createColumnRef"
         ColumnRef.new(self)
       end
 
@@ -319,10 +358,14 @@ module Reform
 
       def setLocalModel aModel
         raise 'WTF' unless aModel.model?
-#         tag "applying local model #{aModel}" #, caller = #{caller.join("\n")}"
+#         tag "applying local model #{aModel}!!!!!!!!!!!!" #, caller = #{caller.join("\n")}"
         @localmodel = aModel
-        # note: Qt::ComboBox has no 'selectionModel'. Only ListView and TableView.
+#          note: Qt::ComboBox has no 'selectionModel'. Only ListView and TableView.
         qm = @qtc.model = @localmodel.qtc || createQModel
+#         tag "qm.parent = #{qm.parent}, localmodel = #@localmodel, self = #{self}, qtc=#@qtc"
+        qm.parent = @qtc # fix 0028???  YES. For unknown reasons qm is somewhere freed...
+        # since it is 'local' it is probably not wrong to set the parent.
+#         tag "#@qtc.model is now #{@qtc.model}"
         @qtc.respond_to?(:dataChanged) && @qtc.dataChanged(Qt::ModelIndex.new, Qt::ModelIndex.new)      #this is stupid but
             # required for ORIGINAL pieview component...
         # qm.index(0,0), qm.index(qm.rowCount - 1, qm.columnCount - 1))
@@ -330,10 +373,12 @@ module Reform
       end
 
       def createQModel
+        tag "createQModel"
         QItemModel.new(@localmodel, self)
       end
 
       def column quickyhash = nil, &initblock
+        tag "column"
         ref = createColumnRef
         if quickyhash
           ref.setupQuickyhash(quickyhash)
@@ -381,5 +426,4 @@ module Reform
 
   end # class AbstractItemView
 
-end
-
+end # module Reform

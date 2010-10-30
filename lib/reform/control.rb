@@ -486,6 +486,7 @@ module Reform
 =end
       def add child, quickyhash, &block
 #         tag "Calling #{child}::addTo, child.public_methods = #{child.public_methods.inspect}"
+        raise "an idiot is trying to add nil as child!" unless child
         child.addTo(self, quickyhash, &block)
   #       added child
       end
@@ -553,6 +554,7 @@ module Reform
 # and it wrong for comboboxes or lists that are assigned local data.
 #         unless @model.equal? control
 #           @model.removeObserver(self) if @model
+        tag "#{self}::addModel(#{control})"
         @model = control
 #           @model.addObserver(self) if @model
 #         end

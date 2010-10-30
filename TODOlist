@@ -135,8 +135,8 @@ I can see something is being done but a user will be confused if a gem install t
      So it should probably be part of the Model module.
 0025 Thu Oct 21 22:45:36 CEST 2010. If it asks to save the data, when closing down, it must be
      with a 'save|do not save|cancel' dialog. And if I cancel the form must not be closed.
-0026 Wed Oct 27 23:02:59 CEST 2010. midibox crashes (upgraded to maverick. Qt4.7)
-/home/ara/Midibox/lib/reform/models/structure.rb:175: [BUG] Segmentation fault
+-0026 Wed Oct 27 23:02:59 CEST 2010. midibox crashes (upgraded to maverick. Qt4.7)
+    /home/ara/Midibox/lib/reform/models/structure.rb:175: [BUG] Segmentation fault
 	ruby 1.9.2p0 (2010-08-18 revision 29036) [x86_64-linux]
 	-- control frame ----------
 	c:0045 p:---- s:0167 b:0167 l:000166 d:000166 CFUNC  :method_missing
@@ -150,5 +150,19 @@ I can see something is being done but a user will be confused if a gem install t
 	c:0037 p:---- s:0135 b:0135 l:000134 d:000134 CFUNC  :new
 	c:0036 p:0296 s:0131 b:0131 l:000130 d:000130 METHOD /home/ara/Midibox/lib/reform/models/structure.rb:168
 	c:0035 p:0022 s:0126 b:0123 l:000113 d:000122 BLOCK  /home/ara/Midibox/lib/reform/models/structure.rb:192
-Strange.
-
+    Strange.
+     Fri Oct 29 22:43:52 CEST 2010
+0027 Sat Oct 30 15:33:21 CEST 2010. Design error. Specific for Structure::unshift, and changing array order.
+    Each structure has a 'keypath' stating how to get to it from the root. But if the record is in an array
+    then the keys can easily change by inserts in the middle or the unshift operation.
+    Workaround: don't do this then... If each structure has a parent, then we do not need to store the keypaths but only
+    the key. And we could use 0 for all array elements indicating that we must lookup the index in the parent.
+    That could be slow though. But the keypaths are not used that much anyway.
+-0028 Sat Oct 30 21:48:37 CEST 2010. lib/reform/examples/models/demo03.rb is broken. And so is midibox.
+    I changed Structure to not be a Control (yaml problems -> SEGV, bug 0026). This changes the parenting, and a structure may not
+    have a parent. It may go unreferenced and then ruby may delete the QModel (if it has parent nil).
+    Note that setting a model in a view does NOT set the parent (as models count as shared).
+    Diagnostics: List has a model, but when setCurrentIndex(4) arrives it says:  undefined method `index' for nil:NilClass
+    This can be fixed by deleting the 'circle' in the canvas (or the entire canvas). But this can't ever have anything to
+    do with it. Adding/removing tags also changes the pattern.
+    Sat Oct 30 22:08:04 CEST 2010

@@ -45,9 +45,9 @@ module Kernel
         return yield
   #       rescue LocalJumpError
         # ignore
-      rescue IOError, RuntimeError => exception
+      rescue IOError => exception
         msg = "#{exception.message}\n"
-      rescue StandardError => exception
+      rescue StandardError, RuntimeError => exception
         msg = "#{exception.class}: #{exception}\n" + exception.backtrace.join("\n")
       end
       # this must be fixed using an alert, but it may depend on the kind of exception...
@@ -234,7 +234,7 @@ module Reform
             return
           end
           return if private_method_defined?(name)
-  #         tag "Defining method #{self}.#{name}"  # It may return nil on exceptions... THis is by design
+#           tag "Defining method #{self}.#{name}"  # It may return nil on exceptions... This is by design
     # failing components do not stop the setup process.
           define_method name do |quicky = nil, &block|
             c = nil
@@ -248,7 +248,7 @@ module Reform
                 # @@instantiator
                 raise "'#{name}' did not register an instantiator!!!" unless @@instantiator[name]
               end
-#               tag "HERE"
+#               tag "HERE, name = #{name}"
               instantiator = @@instantiator[name]
               reform_class = instantiator[:reform_class]
               options = instantiator[:options]
@@ -287,9 +287,10 @@ module Reform
                        ctrl.instantiate_child(reform_class, qt_implementor_class, qparent)
 #               tag "c2 := #{reform_class}.new(#{ctrl}, #{newqtc})"
               c2 = reform_class.new ctrl, newqtc
-      #           tag "instantiated c=#{c}, parent is a #{ctrl.class}"
+              raise "MAYHEM #{reform_class}.new returned nil ????????????? " if c2.nil?
+#               tag "instantiated c2=#{c2}, parent is a #{ctrl.class}"
                 # add will execute block, and then also call postSetup
-      #           tag "CALLING #{ctrl}.add(#{c})"
+#               tag "CALLING #{ctrl}.add(#{c2})"
               ctrl.add(c2, quicky, &block)
               c = c2
             end
@@ -342,8 +343,9 @@ module Reform
         alias :simpledata :simple_data
 
         def struct *val, &block
-#           tag "struct"
+          tag "struct(#{val.inspect})"
           if block
+            tag "using block"
             addModel(Structure.new.build(&block))
           else
             structure value: if val.length == 1 then val[0] else val end
@@ -501,123 +503,6 @@ module Reform
                                               options: options }
         end # App::createInstantiator_i
     end # module AppMacroContext
-
-
-  private # methods of Reform
-
-    def self.internalize dirprefix, hash
-      dirprefix = File.dirname(__FILE__) + '/' + dirprefix if dirprefix[0] != '/'
-      hash.each do |dir, klass|
-        symlinks = {}
-        for file in Dir["#{dirprefix}/#{dir}/*.rb"]
-          basename = File.basename(file, '.rb')
-          if File.symlink?(file)
-            symlinks[basename.to_sym] = File.basename(File.readlink(file), '.rb').to_sym
-          else
-            send("registerKlassProxy", klass, basename, "#{dirprefix}/#{dir}/#{basename}")
-          end
-        end # Dir scan
-        symlinks.each { |key, value| send("registerKlassProxy", klass, key, value) }
-      end # each
-    end
-
-    def self.internalize_dir *dirs
-      dirs = dirs[0] if dirs.length == 1 && Array === dirs[0]
-      dirs.each do |dir|
-        internalize dir, 'widgets'=>Widget, 'actions'=>AbstractAction,
-                         'menus'=>Menu, 'graphics'=>GraphicsControl, 'models'=>AbstractModel,
-                         'animations'=>Animation, 'states'=>AbstractState
-      end
-    end
-
-    class GraphicsControl < Control; end
-    class Frame < Widget; end
-    class Layout < Control; end
-    class Animation < Control; end
-    class AbstractState < Control; end
-    class AbstractAction < Control; end
-    class Menu < Control; end
-    class App < Qt::Application; end
-
-    # My idea was to keep these outside the real classes to avoid repeating myself
-    # I abuse the fact that some Models are not (and need not be by design) AbstractModels...
-    # As long as they include Model. So anything unknown becomes a Model....
-    Contexts = { Widget=>[ControlContext, AppMacroContext],
-                AbstractModel=>[ModelContext],
-                Object=>[ModelContext],
-                GraphicsControl=>[GraphicContext, SceneFrameMacroContext],
-                Animation=>[AnimationContext, SceneFrameMacroContext],
-                AbstractState=>[StateContext, SceneFrameMacroContext, AppMacroContext],
-                Menu=>[MenuContext],
-                AbstractAction=>[ActionContext]
-                }
-
-    def self.getContext4 klass
-  #     tag "getContext4(#{klass})"
-      Contexts[klass] || getContext4(klass.superclass)
-    end
-
-    # delegator. see App::registerControlClassProxy
-    #  we add the X classProxy to those contexts in which we want the plugins
-    # to become available.
-    def self.registerKlassProxy klass, id, path = nil
-      Contexts[klass].each { |ctxt| ctxt::registerControlClassProxy_i id, path }
-    end
-
-    # two in one if you want to use a class already loaded.
-    #
-    # Example:
-    #
-    #     registerKlass Widget, :mywidget, QMyWidget, MyWidget
-    #
-    # Parameters:
-    # [abstractklass] Gives the baseclass (normally the directory would hint this). Can be one of:
-    #                 - Widget
-    #                 - AbstractModel
-    #                 - GraphicsControl
-    #                 - Animation
-    #                 - AbstractState
-    #                 - Menu
-    #                 - AbstractAction
-    #                 - Object, if all else fails
-    # [id] string or symbol (preferred)
-    # [qclass] the Qt implementor, may be nil
-    # [effectiveklass] the Reform implementor, default is +Widget+
-    #
-    def self.registerKlass abstractklass, id, qclass, effectiveklass = abstractklass
-      registerKlassProxy abstractklass, id
-      createInstantiator id, qclass, effectiveklass
-    end
-
-    # delegator.
-    # Called from all plugins, who in turn are loaded by a method created using register*Proxy_i
-    #
-    # Parameters:
-    # [name] a string that should be File.basename(__FILE__, '.rb') in all cases
-    # [qt_implementor_class] the Qt class to use. This may be nil
-    # [reform_class] the reform class to use. The default is Widget
-    # [options] Named parameters, with valid keys:
-    #           [:form] boolean if the class is a ReForm or subclass. This is only
-    #                   because sometimes the ReForm class is not known here so reform_class <= ReForm
-    #                   will fail.
-    def self.createInstantiator name, qt_implementor_class, reform_class = Widget, options = {}
-  #     tag "createInstantiator(#{name.inspect})"
-      # 'Widget' is implicit (since the default), and this 'require' avoids having to load it, as the caller may
-      # be unaware of the fact that it is needed
-      require 'reform/widget.rb' if reform_class == Widget && !reform_class.method_defined?(:whenPainted)
-  #     tag "createInstantiator '#{name}' implementor=#{qt_implementor_class}, klass=#{reform_class}"
-      # this can be done using classmethods in reform_class.
-      # Also we can have ToplevelContext, included by App itself
-      getContext4(reform_class).each do |ctxt|
-  #     contextsToUse
-  #     if contextsToUse.respond_to?(:each)
-  #       contextsToUse.each do |ctxt|
-        ctxt::createInstantiator_i name, qt_implementor_class, reform_class, options
-      end
-  #     else
-  #       contextsToUse::createInstantiator_i name, qt_implementor_class, reform_class, options
-  #     end
-    end
 
   # the App is a basic Qt::Application extension. So see the qt docs as well.
   # Within an app there are 1 or more forms.
@@ -846,8 +731,134 @@ module Reform
           reform_class.new_qt_implementor(qt_implementor_class, self, qparent)
         end
 
-
     end # class App
+
+  private # methods of Reform
+
+    def self.internalize dirprefix, hash
+#       tag "internalize"
+      dirprefix = File.dirname(__FILE__) + '/' + dirprefix if dirprefix[0] != '/'
+      located = false
+      hash.each do |dir, klass|
+        symlinks = {}
+#         tag "GLOBBING #{dirprefix}/#{dir}/*.rb"
+        for file in Dir["#{dirprefix}/#{dir}/*.rb"]
+          basename = File.basename(file, '.rb')
+#           tag "INTERNALIZE #{basename} from #{file}"
+          if File.symlink?(file)
+            symlinks[basename.to_sym] = File.basename(File.readlink(file), '.rb').to_sym
+          else
+            send("registerKlassProxy", klass, basename, "#{dirprefix}/#{dir}/#{basename}")
+          end
+          located = true
+        end # Dir scan
+        symlinks.each { |key, value| send("registerKlassProxy", klass, key, value) }
+      end # each
+      # cannot use tr, since $qApp has not been made yet
+      raise Error, "incorrect plugin directory '#{dirprefix}'" unless located
+    end
+
+    class GraphicsControl < Control; end
+    class Frame < Widget; end
+    class Layout < Control; end
+    class Animation < Control; end
+    class AbstractState < Control; end
+    class AbstractAction < Control; end
+    class Menu < Control; end
+    class App < Qt::Application; end
+
+    # My idea was to keep these outside the real classes to avoid repeating myself
+    # I abuse the fact that some Models are not (and need not be by design) AbstractModels...
+    # As long as they include Model. So anything unknown becomes a Model....
+    Contexts = { Widget=>[ControlContext, AppMacroContext],
+                AbstractModel=>[ModelContext],
+                Object=>[ModelContext],
+                GraphicsControl=>[GraphicContext, SceneFrameMacroContext],
+                Animation=>[AnimationContext, SceneFrameMacroContext],
+                AbstractState=>[StateContext, SceneFrameMacroContext, AppMacroContext],
+                Menu=>[MenuContext],
+                AbstractAction=>[ActionContext]
+                }
+
+    def self.getContext4 klass
+  #     tag "getContext4(#{klass})"
+      Contexts[klass] || getContext4(klass.superclass)
+    end
+
+    # delegator. see App::registerControlClassProxy
+    #  we add the X classProxy to those contexts in which we want the plugins
+    # to become available.
+    def self.registerKlassProxy klass, id, path = nil
+      Contexts[klass].each { |ctxt| ctxt::registerControlClassProxy_i id, path }
+    end
+
+    # two in one if you want to use a class already loaded.
+    #
+    # Example:
+    #
+    #     registerKlass Widget, :mywidget, QMyWidget, MyWidget
+    #
+    # Parameters:
+    # [abstractklass] Gives the baseclass (normally the directory would hint this). Can be one of:
+    #                 - Widget
+    #                 - AbstractModel
+    #                 - GraphicsControl
+    #                 - Animation
+    #                 - AbstractState
+    #                 - Menu
+    #                 - AbstractAction
+    #                 - Object, if all else fails
+    # [id] string or symbol (preferred)
+    # [qclass] the Qt implementor, may be nil
+    # [effectiveklass] the Reform implementor, default is +Widget+
+    #
+    def self.registerKlass abstractklass, id, qclass, effectiveklass = abstractklass
+      registerKlassProxy abstractklass, id
+      createInstantiator id, qclass, effectiveklass
+    end
+
+    # delegator.
+    # Called from all plugins, who in turn are loaded by a method created using register*Proxy_i
+    #
+    # Parameters:
+    # [name] a string that should be File.basename(__FILE__, '.rb') in all cases
+    # [qt_implementor_class] the Qt class to use. This may be nil
+    # [reform_class] the reform class to use. The default is Widget
+    # [options] Named parameters, with valid keys:
+    #           [:form] boolean if the class is a ReForm or subclass. This is only
+    #                   because sometimes the ReForm class is not known here so reform_class <= ReForm
+    #                   will fail.
+    def self.createInstantiator name, qt_implementor_class, reform_class = Widget, options = {}
+  #     tag "createInstantiator(#{name.inspect})"
+      # 'Widget' is implicit (since the default), and this 'require' avoids having to load it, as the caller may
+      # be unaware of the fact that it is needed
+      require 'reform/widget.rb' if reform_class == Widget && !reform_class.method_defined?(:whenPainted)
+  #     tag "createInstantiator '#{name}' implementor=#{qt_implementor_class}, klass=#{reform_class}"
+      # this can be done using classmethods in reform_class.
+      # Also we can have ToplevelContext, included by App itself
+      getContext4(reform_class).each do |ctxt|
+  #     contextsToUse
+  #     if contextsToUse.respond_to?(:each)
+  #       contextsToUse.each do |ctxt|
+        ctxt::createInstantiator_i name, qt_implementor_class, reform_class, options
+      end
+  #     else
+  #       contextsToUse::createInstantiator_i name, qt_implementor_class, reform_class, options
+  #     end
+    end
+
+  public
+    def self.internalize_dir *dirs
+#       tag "internalize_dir #{dirs.inspect}"
+      dirs = dirs[0] if dirs.length == 1 && Array === dirs[0]
+      dirs.each do |dir|
+#         tag "Calling internalize_dir #{dir}"
+        internalize dir, 'widgets'=>Widget, 'actions'=>AbstractAction,
+                         'menus'=>Menu, 'graphics'=>GraphicsControl, 'models'=>AbstractModel,
+                         'animations'=>Animation, 'states'=>AbstractState
+      end
+    end
+
 
     # create an application, passing ARGV to it, then run it
     # Any block passed is executed in the constructor redirecting self to $qApp.

@@ -22,9 +22,7 @@ module Reform
   class AbstractListView < AbstractItemView
     extend Forwardable
 
-      module QAbstractListModel
-        include AbstractItemView::QAbstractItemModel
-      end
+      QAbstractListModel = QAbstractItemModel
 
       # this class forms the hinge between 'list' (or 'combo' etc) and any 'model' (like ruby_model/simpledata)
       # It is meant to work with Structure
@@ -32,9 +30,14 @@ module Reform
         include QAbstractListModel
 
         private
-          # the parent is a Reform Model.
           def initialize reformmodel, reformview
-            super(reformmodel)
+            if Qt::Object === reformmodel
+              super(reformmodel)
+            else
+#               tag "creating PARENTLESS model"
+              super()
+#               tag "parent = #{parent}" # Parent is somehow a Qt::ModelIndex.  ??????????????????? WEIRD
+            end
             @localmodel = reformmodel # apparently.
             @view = reformview
             # connectors is a hash with these optional entries:
@@ -64,7 +67,7 @@ module Reform
             # to the passed model instead (the row/record).
             # Syntax:  connectors local: .., display:
             # And connector x is the same as connectors display: x
-#             tag "QModel.new(#{model})"
+#             tag "QModel.new(#{reformmodel})"
           end
 
     # #       alias :reform_model :parent
@@ -141,6 +144,7 @@ Not supported yet
                             :connector, :connectors
 
       def createQModel
+#         tag "creating QModel"
         QModel.new(@localmodel, self)
       end
 
@@ -172,7 +176,6 @@ Not supported yet
 #           tag "applying model_connector #@model_connector"
           setLocalModel @model.apply_getter(modcon)#.tap{|r| tag "setLocalModel(#{r.value.inspect})!!!!!!!!!!!!!!!!!!!!!!!!!!!!!" }
         end
-#         tag "getter '#{cid}' located"
         # it's not entirely clear when the events are triggered
         # - currentIndexChanged(int)
         # - currentIndexChanged(string)
@@ -184,7 +187,7 @@ Not supported yet
 #         tag "calling value2index(#{value}, use_as_id = #{use_as_id}"
         if i = @localmodel.value2index(value, col0)
           raise "#{@model}.value2index(#{value.inspect}) -> #{i}???, caller=#{caller.join("\n")}" unless Fixnum === i
-#         tag "Calling setCurrentIndex(#{i})"
+#           tag "Calling setCurrentIndex(#{i})"
           setCurrentIndex i
         else
 #           STDERR.puts tr("Warning: could not locate value %s in %s") % [value.inspect, self.to_s]

@@ -1,7 +1,7 @@
 module Reform
 
   require_relative 'frame'
-  require_relative '../graphical'
+  require 'reform/graphical'
 
   class GraphicsItem < Control; end             # forward
 
@@ -62,30 +62,6 @@ module Reform
 
       alias :backgroundBrush :background
 
-      # override since we must set the scene here (setScene)
-      def scene id = nil, &block
-        return @qtc.scene unless id || block || !@qtc.scene
-        case id
-        when Hash, nil
-          if instance_variable_defined?(:@infused_scene)
-            @infused_scene.setup(id, &block)
-          else
-            newqtc = Qt::GraphicsScene.new containing_form.qtc
-            require_relative 'scene'
-            @infused_scene = Scene.new(self, newqtc)
-  #           tag "#@infused_scene.addTo(#{self})"
-            @infused_scene.addTo(self, nil, &block)
-  #           tag "Added #@infused_scene to #{self}"
-            @qtc.scene = newqtc
-          end
-        else
-          raise 'scene already set' if instance_variable_defined?(:@infused_scene)
-          @infused_scene = if id.respond_to?(:qtc) then id else containing_form[id] end
-          newqtc = @infused_scene.qtc
-          @qtc.scene = newqtc
-        end
-      end
-
       def infused_scene!
         scene
 #         tag "infused_scene! -> #@infused_scene"
@@ -133,6 +109,30 @@ module Reform
       end
 
     public
+
+      # override since we must set the scene here (setScene)
+      def scene id = nil, &block
+        return @qtc.scene unless id || block || !@qtc.scene
+        case id
+        when Hash, nil
+          if instance_variable_defined?(:@infused_scene)
+            @infused_scene.setup(id, &block)
+          else
+            newqtc = Qt::GraphicsScene.new containing_form.qtc
+            require_relative 'scene'
+            @infused_scene = Scene.new(self, newqtc)
+  #           tag "#@infused_scene.addTo(#{self})"
+            @infused_scene.addTo(self, nil, &block)
+  #           tag "Added #@infused_scene to #{self}"
+            @qtc.scene = newqtc
+          end
+        else
+          raise 'scene already set' if instance_variable_defined?(:@infused_scene)
+          @infused_scene = if id.respond_to?(:qtc) then id else containing_form[id] end
+          newqtc = @infused_scene.qtc
+          @qtc.scene = newqtc
+        end
+      end
 
       def_delegators :infused_scene!, :brush, :stroke, :fill #, :pen
 

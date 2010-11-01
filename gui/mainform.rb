@@ -60,6 +60,12 @@ Reform::app {
         }
       }
       menu {
+#         name :editMenu
+        title tr('&Edit')
+        editUndo
+        editRedo
+      }
+      menu {
         name :viewMenu
         title tr('&View')
       }
@@ -72,6 +78,7 @@ Reform::app {
       list {
         IconSize = 72
         iconsize IconSize
+        gridSize 120
 #         gridsize IconSize + 10  # Note that the grid must allow for the caption
   # to fit as well. So 'IconSize' is a bad choice.
         availablemidiboxnodes

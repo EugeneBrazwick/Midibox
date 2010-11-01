@@ -95,7 +95,7 @@ module Reform
 
   end # class ActivePathItem
 
-  createInstantiator File.basename(__FILE__, '.rb'), Qt::GraphicsPathItem, ActivePathItem
+  createInstantiator File.basename(__FILE__, '.rb'), QGraphicsPathItem, ActivePathItem
 #   tag "test for Scene#circle"
 #   raise ReformError, 'oh no' unless Scene.private_method_defined?(:circle)
 

@@ -75,6 +75,14 @@ module Reform
         }
       end
 
+      def editUndo
+        @qtc.addAction($undo.createUndoAction(@qtc))
+      end
+
+      def editRedo
+        @qtc.addAction($undo.createRedoAction(@qtc))
+      end
+
     public
 
       def postSetup

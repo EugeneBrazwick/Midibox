@@ -13,9 +13,10 @@ class AvailableNodes < Reform::Structure
       Dir[File.dirname(__FILE__) + '/../nodes/*'].each do |file|
         load file
       end
+#       tag "calling nodes"
       Midibox::Node::nodes.each do |klass|
         # one would think that klass itself would be best but it cannot be yaml'ed...
-        tag "Assigning hash as next element in array @value, should be interred automagically"
+#         tag "Assigning hash as next element in array @value, should be interred automagically"
         self << { iconpath: klass.iconpath, classname: klass.name } # , mimeType: 'text/midiboxnode' }
       end
     end
@@ -23,7 +24,7 @@ class AvailableNodes < Reform::Structure
   public
 
     def mimeType
-      tag "mimeType, invent something texty"
+#       tag "mimeType, invent something texty"
       'text/midiboxnode'
     end
 end

@@ -236,6 +236,7 @@ module Reform
         when Hash then Pen.new.setup(args, &block).qtc
         when Array then Qt::Pen.new(make_color(*args))
         when Qt::Color then Qt::Pen.new(args)
+        when Qt::Brush then Qt::Pen.new(args.color)
         else Qt::Pen.new(make_color(args))
         end
       end
@@ -357,14 +358,15 @@ module Reform
 
         define_simple_setter :radius
 
-      end
+      end # class RadialGradient
 
       class LinearGradient < Gradient
       private
-        def initialize
+        def initialize aStart = [0,0], aStop=[100,0], colors = nil # p.e.: { 0.0=>:white, 1.0=>:black }
           super Qt::LinearGradient
-          start 0, 0
-          stop 100, 0
+          start aStart
+          stop aStop
+          stops colors if colors
         end
 
         def start x = nil, y = nil

@@ -17,10 +17,9 @@ module Reform
     extend Forwardable
   private
 
-    def initialize parent, qtc = nil
-      super
-      @qtc.instance_variable_set :@_reform_hack, self
-    end
+#     def initialize parent, qtc = nil
+#       super
+#     end
 
     # make it the central widget
     def central param = true

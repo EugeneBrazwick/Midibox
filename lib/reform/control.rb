@@ -179,6 +179,7 @@ module Reform
         # FIXME: each control has these and only qtc is of real importance
         # containing_form can be cached in the getter and has_pos needs not be set at all
         @containing_form, @qtc = parent && parent.containing_form, qtc
+        @qtc.instance_variable_set(:@_reform_hack, self) if @qtc
 
         # true if a connector is on this control, or on any of its children
         @want_data = false
@@ -800,6 +801,22 @@ module Reform
       # same as containingForm
       def dynamicParent
         parent.dynamicParent
+      end
+
+      def deleteLater
+        # it seems Qt::Object deleteLater is not always available. ??
+        if @qtc
+          if @qtc.respond_to?(:deleteLater)
+            @qtc.parent = nil
+            @qtc.deleteLater
+            @qtc = nil
+          else # guess it is a GraphicsItem (not a Qt::Object!)
+            @qtc.parentItem = nil
+            #@qtc.dispose               SEGV
+          end
+        end
+        self.parent = nil
+        super
       end
 
       # Qt control that is wrapped

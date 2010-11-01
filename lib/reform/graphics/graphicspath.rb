@@ -518,7 +518,11 @@ Translation and matrix mapping can also be done.
 
   end # PathItem
 
-  createInstantiator File.basename(__FILE__, '.rb'), Qt::GraphicsPathItem, PathItem
+  class QGraphicsPathItem < Qt::GraphicsPathItem
+    include QGraphicsItemHackContext
+  end
+
+  createInstantiator File.basename(__FILE__, '.rb'), QGraphicsPathItem, PathItem
 #   tag "test for Scene#circle"
 #   raise ReformError, 'oh no' unless Scene.private_method_defined?(:circle)
 

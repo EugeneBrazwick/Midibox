@@ -4,6 +4,7 @@
 module Reform
 
   require_relative 'frame'
+  require 'reform/undo'
 
 =begin rdoc
  a ReForm is a basic form. It inherits Frame
@@ -45,6 +46,8 @@ module Reform
   #       tag "calling registerForm #{self}"
         $qApp.registerForm self
   #       tag "ReForm.new EXECUTED"
+        @undostack = QUndoStack.new(self)
+        $undo.addStack(@undostack)
       end
 
       # IMPORTANT: the name becomes a method of $qApp, if and only if it ends
@@ -193,18 +196,32 @@ module Reform
 
 #       attr_writer :model
 
+      attr :undostack
+
   end # class ReForm
 
   module QFormHackContext
     include QWidgetHackContext
+
+    public
+
       def closeEvent event
 #         tag "#{self}::closeEvent(#{event.inspect})"
         if @_reform_hack.whenCanceled
           event.accept
           @_reform_hack.whenClosed
+          $undo.removeStack(@_reform_hack.undostack)
         else
           event.ignore
         end
+      end
+
+#       def focusInEvent event
+#         super
+
+      def showEvent event
+        super
+        $undo.activeStack = @_reform_hack.undostack
       end
   end
 
@@ -216,6 +233,9 @@ module Reform
   # Event though it is a QWidget, minimumSizeHint never seems to be called for the toplevel widget....(?)
   class QForm < Qt::Widget
     include QFormHackContext
+
+    private
+
   end
 
 

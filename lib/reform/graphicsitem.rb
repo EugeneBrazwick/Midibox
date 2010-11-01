@@ -141,6 +141,33 @@ module Reform
         self.size  = Qt::Size.new(value[2],  value[3])
       end
 
+      # catches Qt's 'itemChange' event. Value is the value of the Qt::Variant, not the variant
+      # Well, due to SEGV's that changed to 'sometimes'.
+      # The default does nothing, and needs not return anything. The return value is currently
+      # completely ignored...
+      # See however the Qt doc, as there are special cases for specific values.
+      def itemChange change, value
+#         tag "itemChange #{change}, #{value.inspect}"
+      end
   end # class GraphicsItem
+
+  module QGraphicsItemHackContext
+    # override
+    def itemChange change, value
+#       instance_variable_defined?(:@_reform_hack) and
+      # CALLING value on BOGO variants causes SEGV's....
+#       tag "itemChange #{change}, #{value.inspect}, null? #{value.null?}, valid? #{value.valid?}"
+      if @_reform_hack #  null if called from the constructor
+        case change
+        when Qt::GraphicsItem::ItemPositionChange, Qt::GraphicsItem::ItemPositionHasChanged,
+             Qt::GraphicsItem::ItemScenePositionHasChanged
+          @_reform_hack.itemChange(change, value.value)
+        else
+          @_reform_hack.itemChange(change, value)  # value.value crashes for some cases...
+        end
+      end
+      super
+    end
+  end
 
 end # Reform

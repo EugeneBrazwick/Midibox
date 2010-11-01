@@ -583,6 +583,8 @@ module Reform
           end
           Linguistics::use(lang) # , installProxy: lang) fails in 1.9.2
           # used by filesystem to change stuff like 'open an item/create a new thing'
+          require 'reform/undo'
+          $undo = QUndoGroup.new(self)
         end
 
   # +autoform+ is normally true and indicates that the application will create

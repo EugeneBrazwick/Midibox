@@ -1,6 +1,8 @@
 
 require 'reform/widgets/canvas'
 require 'midibox/midiboxnode'
+require 'midibox/command'
+require 'midibox/theme'
 
 # a Canvas is a frame that can contain graphic items like 'circle' etc.
 class SoundCanvas < Reform::Canvas
@@ -8,7 +10,7 @@ class SoundCanvas < Reform::Canvas
 
     def initialize p, qp, autolayout = true
       super
-      backgroundBrush Midibox::Node::Palette[:yellow]
+      backgroundBrush $theme.yellow
 #       tag "#@qtc::acceptDrops := true"
       @qtc.acceptDrops = true
       # make sure strange movements do not occur when adding items
@@ -17,10 +19,13 @@ class SoundCanvas < Reform::Canvas
 
   public
     # the pos passed is the scene position.
-    def dropNode item, qscenepos
-      scene.addItem(i = item.qtc)
-#       tag "scenepos = #{qscenepos.inspect}, mapFromScene -> #{i.mapFromScene(qscenepos).inspect}"
-      i.setPos(i.mapFromScene(qscenepos))
+    def dropNode klass, qscenepos
+      item = klass.new(self, klass.qclass.new)
+#       tag "dropNode, qscenepos=#{qscenepos.inspect}"
+      cmd = Midibox::AddNodeCommand.new(scene, item, qscenepos)
+#       tag "undo = #$undo"
+#       tag "undo.activeStack = #{$undo.activeStack}"
+      $undo.push(cmd)
     end
 end # class SoundCanvas
 
@@ -34,50 +39,53 @@ class QSoundCanvas < Reform::QGraphicsView
 
     def dragEnterEvent event
 #       tag "dragEnterEvent(#{event}), mimedata = #{event.mimeData.inspect}, formats=#{event.mimeData.formats.inspect}"
-      if event.mimeData.hasFormat(AcceptedMimeType)
-#         tag "acceptProposedAction!!!"
-        event.acceptProposedAction
-      else
-#         tag "text/midiboxnode not available!!"
-        event.ignore
+      rfRescue do
+        if event.mimeData.hasFormat(AcceptedMimeType)
+  #         tag "acceptProposedAction!!!"
+          event.acceptProposedAction
+        else
+  #         tag "text/midiboxnode not available!!"
+          event.ignore
+        end
       end
     end
 
     def dragMoveEvent event
-      return event.ignore unless (event.dropAction & Qt::CopyAction) != 0
+      rfRescue do
+        return event.ignore unless (event.dropAction & Qt::CopyAction) != 0
 #       tag "dragMove, pos=#{event.pos.inspect}"
-      event.accept
+        event.accept
+      end
     end
 
     def dropEvent event
 #       tag "dropEvent(#{event})"
-      return event.ignore unless (event.dropAction & Qt::CopyAction) != 0
-      require 'stringio'
-#       tag "event.mimeData = #{event.mimeData.inspect}"
-      data = event.mimeData.data(AcceptedMimeType)
-#       tag "got data: #{data}" # a QByteArray
-      datastream = Qt::DataStream.new(data, Qt::IODevice::ReadOnly)
-#       yamltext = ''
-#       yamltext_ohmygod = Qt::Variant.new(yamltext)
-      yamltext_ohmygod = ''
-      datastream >> yamltext_ohmygod
-#       tag "got yamltext '#{yamltext_ohmygod}'"
-      io = StringIO.new(yamltext_ohmygod)
-      require 'yaml'
-      YAML::parse_documents(io) do |yaml_basenode|
-#         tag "yaml_basenode = #{yaml_basenode}"
-        nodeinfo = yaml_basenode.transform
-#         tag "node = #{node}"
-#         tag "Accepting hash #{node.inspect}, at pos #{event.pos.inspect}"
-        klass = Kernel::const_get(nodeinfo[:classname])
-        item = klass.new(@_reform_hack, klass.qclass.new)
-        @_reform_hack.dropNode(item, mapToScene(event.pos.x, event.pos.y))
-        break # ignore other parts of the selection
+      rfRescue do
+        return event.ignore unless (event.dropAction & Qt::CopyAction) != 0
+        require 'stringio'
+  #       tag "event.mimeData = #{event.mimeData.inspect}"
+        data = event.mimeData.data(AcceptedMimeType)
+  #       tag "got data: #{data}" # a QByteArray
+        datastream = Qt::DataStream.new(data, Qt::IODevice::ReadOnly)
+  #       yamltext = ''
+  #       yamltext_ohmygod = Qt::Variant.new(yamltext)
+        yamltext_ohmygod = ''
+        datastream >> yamltext_ohmygod
+  #       tag "got yamltext '#{yamltext_ohmygod}'"
+        io = StringIO.new(yamltext_ohmygod)
+        require 'yaml'
+        YAML::parse_documents(io) do |yaml_basenode|
+  #         tag "yaml_basenode = #{yaml_basenode}"
+          nodeinfo = yaml_basenode.transform
+  #         tag "node = #{node}"
+  #         tag "Accepting hash #{node.inspect}, at pos #{event.pos.inspect}"
+          @_reform_hack.dropNode(Kernel::const_get(nodeinfo[:classname]), mapToScene(event.pos.x, event.pos.y))
+          break # ignore other parts of the selection
+        end
+        event.acceptProposedAction
       end
-      event.acceptProposedAction
     end
 
 end
 
 Reform::createInstantiator(File.basename(__FILE__, '.rb'), QSoundCanvas, SoundCanvas)
-

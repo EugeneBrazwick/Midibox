@@ -176,7 +176,7 @@ module Reform
           end
 
           def mimeData indexes
-            tag "mimeData"
+#             tag "mimeData"
             return nil if indexes.empty?
             localmodel.mimeData(indexes.map { |i| localmodel.row(i.row) })
           end
@@ -373,12 +373,12 @@ module Reform
       end
 
       def createQModel
-        tag "createQModel"
+#         tag "createQModel"
         QItemModel.new(@localmodel, self)
       end
 
       def column quickyhash = nil, &initblock
-        tag "column"
+#         tag "column"
         ref = createColumnRef
         if quickyhash
           ref.setupQuickyhash(quickyhash)

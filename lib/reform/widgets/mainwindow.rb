@@ -98,7 +98,7 @@ module Reform
       def postSetup
         super
         unless @qtc.centralWidget
-          suitable = children.find {|c| c.widget? }
+          suitable = children.find {|c| c.respond_to?(:widget?) && c.widget? }
           ctrl = suitable || button(text: tr('It Just Works!'))
           ctrl = ctrl.qtc if ctrl.respond_to?(:qtc)
   #         tag "setting centralWidget to #{ctrl}"
@@ -111,7 +111,6 @@ module Reform
   class QMainWindow < Qt::MainWindow
     # make sure we grog resizeEvent (and paintEvent too for that matter)
     include QFormHackContext
-
   end
 
   createInstantiator File.basename(__FILE__, '.rb'), QMainWindow, MainWindow, form: true

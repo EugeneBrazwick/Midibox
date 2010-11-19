@@ -15,7 +15,58 @@ module Reform
 
   class Widget < Control
     extend Forwardable
-  private
+
+    # qtc of the menu is in fact the qwidget
+    class ContextMenuRef < Control
+      include ActionContext
+      private
+#       def initialize widget, qtc
+#         super()
+#         @widget, @qtc = widget, qtc
+#       end
+
+#       def containing_form
+#         @widget.containing_form
+#       end
+
+      public
+      # override to support an array of actions iso of a real hash
+        def setupQuickyhash hash
+          return unless h0 = hash[0]
+          case h0
+          when Array then actions(h0)
+          when Hash then super(h0)
+          else actions(hash)
+          end
+        end
+
+        def addAction action, hash = nil, &block
+  #         tag "#{self} action=#{action}"
+          @qtc.contextMenuPolicy = Qt::ActionsContextMenu
+          super
+        end
+    end # class ContextMenuRef
+
+    class FontRef
+      private
+        def initialize font, hash, &initblock
+          @font = font
+          instance_eval(&initblock) if initblock
+          setupQuickyhash(hash) if hash
+        end
+
+        def setupQuickyhash hash
+          hash.each { |k, v| send(k, v) }
+        end
+
+        def pointSize pt
+          @font.pointSize = pt
+        end
+      public
+        attr :font
+    end # class FontRef
+
+  private # Widget methods
 
 #     def initialize parent, qtc = nil
 #       super
@@ -90,43 +141,20 @@ module Reform
     end
 
     # assign a font. Possible values ?? some Qt::Font
-    def font f = nil
+    # However if f is a hash, or a block is passed we use a FontRef to setup the font.
+    # and then assign the result to the widget
+    def font f = nil, &block
       return @qtc.font unless f
-      @qtc.font = f
+      if Hash === f || block
+#         tag "FontRef trickery!!!!"
+        @qtc.font = FontRef.new(@qtc.font, f, &block).font
+      else
+        @qtc.font = f
+      end
     end
 
     def_delegators :@qtc, :close, :update, :windowTitle=
 
-    # qtc of the menu is in fact the qwidget
-    class ContextMenuRef < Control
-      include ActionContext
-      private
-#       def initialize widget, qtc
-#         super()
-#         @widget, @qtc = widget, qtc
-#       end
-
-#       def containing_form
-#         @widget.containing_form
-#       end
-
-      public
-      # override to support an array of actions iso of a real hash
-      def setupQuickyhash hash
-        return unless h0 = hash[0]
-        case h0
-        when Array then actions(h0)
-        when Hash then super(h0)
-        else actions(hash)
-        end
-      end
-
-      def addAction action, hash = nil, &block
-#         tag "#{self} action=#{action}"
-        @qtc.contextMenuPolicy = Qt::ActionsContextMenu
-        super
-      end
-    end # class ContextMenuRef
 
     def contextMenu *quickyhash, &initblock
       ref = ContextMenuRef.new(self, @qtc)
@@ -143,7 +171,8 @@ module Reform
       DynamicAttribute.new(self, :disabled, TrueClass, value, &block)
     end
 
-  public
+  public # Widget methods
+
     # override
     def widget?
       true

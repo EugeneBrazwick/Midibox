@@ -235,6 +235,11 @@ public
   # the clientid, given to us, chances are this is 128
   attr :client_id
 
+  # returns true if this is a system port
+  def system?
+    @client_id == 0
+  end
+
   # the portid, either supplied or given by the system
   attr :port
 
@@ -315,7 +320,8 @@ public
   end
 
   # string full_name
-  # can be used to map ports
+  # can be used to map ports. Note however that 'name' already should be capable of doing this
+  # and the chance is it returns something like 'MidiThrough:MidiThrough Port-0'
   def full_name
     @sequencer.clients[@client_id].name + ':' + @handle.name
   end

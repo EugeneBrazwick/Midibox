@@ -3,7 +3,7 @@
 
 module Reform
 
-  require_relative '../model'
+  require 'reform/model'
 
 =begin
 

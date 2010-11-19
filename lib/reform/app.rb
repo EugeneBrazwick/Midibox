@@ -733,6 +733,12 @@ module Reform
           reform_class.new_qt_implementor(qt_implementor_class, self, qparent)
         end
 
+        # qtruby or Qt destroys the encoding.
+#       def tr text
+#         encoding = text.encoding
+#         tag "encoding = #{encoding}"
+#         super.encode(encoding)
+#       end
     end # class App
 
   private # methods of Reform
@@ -849,7 +855,8 @@ module Reform
   #     end
     end
 
-  public
+  public # Reform methods
+
     def self.internalize_dir *dirs
 #       tag "internalize_dir #{dirs.inspect}"
       dirs = dirs[0] if dirs.length == 1 && Array === dirs[0]

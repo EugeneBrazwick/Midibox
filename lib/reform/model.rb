@@ -750,10 +750,14 @@ The old rule that 'names' imply 'connectors' is dropped completely.
         (0...length).each { |row| yield(self[row]) }
       end
 
+      # to override in implementors! Note that idx need not be numeric.
+      # Array like models can use this default.
       def [](idx)
-        raise "#{self.class}#[] is not implemented"
+        row(idx)
+#         raise "#{self.class}#[] is not implemented"
       end
 
+      # helper method to handle qtruby kludges
       def self.enum2i k
         k.is_a?(Qt::Enum) ? k.to_i : k
       end
@@ -842,6 +846,8 @@ The old rule that 'names' imply 'connectors' is dropped completely.
   end # module Model
 
   # This class implements Model but is also a Control.
+  # There are however problems between YAML and Qt::Objects.
+  # Better avoid this if saving and loading of the model is required.
   class AbstractModel < Control
     include Model
     private

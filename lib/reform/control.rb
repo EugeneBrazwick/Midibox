@@ -826,6 +826,13 @@ module Reform
       # I forgot what needed that. Probably broken now.
       attr :macros
 
+#       # BROKEN in qtruby!!!
+#       def tr text
+#         encoding = text.encoding
+#         tag "encoding = #{encoding}"
+#         super.encode(encoding)
+#         super
+#       end
   end # class Control
 
 end # Reform

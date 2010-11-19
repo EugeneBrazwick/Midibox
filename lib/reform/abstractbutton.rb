@@ -8,6 +8,7 @@ module Reform
   class AbstractButton < LabeledWidget
     private
       define_simple_setter :text
+      alias :title :text
 
       def transitions trans #= nil #, &block
   #       if trans

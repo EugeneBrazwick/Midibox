@@ -32,6 +32,13 @@ module Reform
       alias :quit :quiter
       alias :fileQuit :quiter
 
+      def aboutQt
+        action {
+          label tr('About &Qt')
+          whenTriggered { $qApp.aboutQt }
+        }
+      end
+
 # it would be possible to make a class for each and put them in 'actions/'
 # but that seems a waste of classes
       # you must supply the file-model, or set it first using 'filesystem'

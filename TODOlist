@@ -180,3 +180,13 @@ Current state:
     CHECKING '/home/ara/.rvm/src/ruby-1.9.2-p0/include/ruby.h'
     etc..... load == 100%
     However a restart of the midibox script fixes it. 
+0031 Sat Nov 20 23:09:47 CET 2010 BUG:
+    /home/ara/Midibox/lib/rrts/midievent.rb:149:in `populate': undefined method `id_clients' for #<RRTS::Sequencer:0x00000002855690> (NoMethodError)
+        from /home/ara/Midibox/lib/rrts/midievent.rb:149:in `initialize'
+        from /home/ara/Midibox/lib/rrts/sequencer.rb:322:in `new'
+        from /home/ara/Midibox/lib/rrts/sequencer.rb:322:in `event_input'
+    Happens on qtrconnect after unplugging + replugging usb-midiconnector.
+    Must be a PortStartEvent then ?
+0032 Sat Nov 20 23:09:47 CET 2010
+    Another thing: a list(view) does not reload the internal model if a transaction is committed on it.
+    qtrconnect, unplug midi port. Should update list automagically.

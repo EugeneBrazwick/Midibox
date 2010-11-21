@@ -1789,7 +1789,7 @@ Get poll descriptors. If space is omitted snd_seq_poll_descriptors_count is used
 If eventmask is missing as well then +PollIn+ is used.
 
 Parameters:
-[space]      space in the poll descriptor array
+[space]      space (number of entries) in the poll descriptor array
 [eventmask]  polling events to be checked (+POLLIN+ or +POLLOUT+ or combination)
 
 Returns: a RRTS::Driver::AlsaPollFds_i instance.
@@ -1942,6 +1942,26 @@ wrapPoll(int argc, VALUE *argv, VALUE v_descriptors)
         // Or poll should be ppoll (?) and shield from immediate interrupts ??
     RAISE_MIDI_ERROR("polling descriptors", data.err);
   return r;
+}
+
+/** call-seq fd(idx) -> int
+
+Parameters:
+[idx] - index to use. An exception is raised if the index is invalid.
+
+Returns: the filedescriptor at the given index.
+*/
+static VALUE
+wrapFd(VALUE v_descriptors, VALUE v_idx)
+{
+  struct pollfd *fds;
+  Data_Get_Struct(v_descriptors, struct pollfd, fds);
+  const size_t nfds = *(size_t *)fds;
+  const int idx = NUM2INT(v_idx);
+  if (idx < 0 || (size_t)idx >= nfds)
+    RAISE_MIDI_ERROR_FMT1("Invalid index %d", idx);
+  fds = (struct pollfd *)(((size_t *)fds) + 1);
+  return INT2NUM(fds[idx].fd);
 }
 
 /** call-seq: output_buffer_size() -> int
@@ -2396,6 +2416,7 @@ alsa_seq_init()
   rb_define_method(alsaSequencerClass, "any_port_info", RUBY_METHOD_FUNC(wrap_snd_seq_get_any_port_info), 2);
   rb_define_method(alsaSequencerClass, "set_port_info", RUBY_METHOD_FUNC(wrap_snd_seq_set_port_info), 2);
   rb_define_method(alsaPollFdsClass, "poll", RUBY_METHOD_FUNC(wrapPoll), -1);
+  rb_define_method(alsaPollFdsClass, "fd", RUBY_METHOD_FUNC(wrapFd), 1);
   rb_define_method(alsaSequencerClass, "remove_events", RUBY_METHOD_FUNC(wrap_snd_seq_remove_events), -1);
   rb_define_method(alsaSequencerClass, "client_pool", RUBY_METHOD_FUNC(wrap_snd_seq_get_client_pool), -1);
   rb_define_method(alsaSequencerClass, "client_pool=", RUBY_METHOD_FUNC(wrap_snd_seq_set_client_pool), 1);

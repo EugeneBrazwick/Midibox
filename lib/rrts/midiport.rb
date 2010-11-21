@@ -115,13 +115,14 @@ private
 #          [:port_specified] passed on as is, might be overwritten by setting port, so do not use this.
 #          [:simple] true, make it a simple port without buffering or queueing
 #          [:direct] same as +simple+
+# Alternatively you can pass all boolean symbols in an array of symbols.
 #
 # *Note*: this method can also be used to 'pick up' a port, however you should use Sequencer#port and
 # Sequencer#ports for that.
-  def initialize sequencer, name, params = nil, &block
+  def initialize sequencer, name, *params, &block
     @handle = nil
     @simple = false
-    open sequencer, name, params, &block
+    open sequencer, name, *params, &block
   end
 
   def initialize_copy other
@@ -136,10 +137,19 @@ protected
 public
 
   # see MidiPort::new. Can be used to reopen a port
-  def open sequencer, name, params = nil
+  def open sequencer, name, *params
     close
     @sequencer = sequencer
     @seq_handle = sequencer && sequencer.instance_variable_get(:@handle)
+    if params.length == 1 && Hash === params[0]
+      params = params[0]
+    elsif !params.empty?
+      t = params
+      params = {}
+      t.each {|symbol| params[symbol] = true }
+    else
+      params = nil
+    end
     if params and params[:client_id]
       params[:port] = SND_SEQ_ADDRESS_BROADCAST  if params[:broadcast]
       @client_id = params[:client_id]

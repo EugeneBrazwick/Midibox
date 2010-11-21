@@ -591,11 +591,13 @@ class Sequencer
     #
     #    seq.subscribe sender1=>receiver1, ....
     #
+    # Both sender and receiver are MidiPort instances
+    #
     #    seq.subscribe any_subscribers: true, more_opts: ..., sender1=>receiver1 ,....
     #
-    # returns an array with Subscription instances, except when it is a singleton
-    # where we return the Subscription as is.
-    # You can now send events to the Subscription and this will automatically
+    # returns an array with Subscription instances, except when it is a single one
+    # where the Subscription is returned as is.
+    # You can now send events to the Subscription (using the << operator) and this will automatically
     # set the sender and receiver of the event.
     #
     # Valid options are:

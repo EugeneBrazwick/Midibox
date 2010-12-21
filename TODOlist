@@ -166,3 +166,7 @@ I can see something is being done but a user will be confused if a gem install t
     This can be fixed by deleting the 'circle' in the canvas (or the entire canvas). But this can't ever have anything to
     do with it. Adding/removing tags also changes the pattern.
     Sat Oct 30 22:08:04 CEST 2010
+0029 Tue Dec 21 21:46:41 CET 2010. Bug in undolist: you can undo and then not redo but something else. At that
+    point a part of the undo list must be erased. Since I use a shadow-copy of it this behaviour must be replicated
+0030 Tue Dec 21 21:47:48 CET 2010. Fedora14 support. Running virtual now.
+

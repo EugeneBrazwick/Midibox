@@ -37,6 +37,16 @@ while [ -z "$RUBY" ]; do
 	if [ "$RUBY" == "$PREFIX"/bin/ruby1.9.2 -a ! "$(which $RUBY)" -a "$(which "$PREFIX"/bin/ruby1.9.1)" ]; then
 	  RUBY="$PREFIX"/bin/ruby.1.9.1
         fi
+      elif [ "$(which yum)" ]; then
+	echo "su -c 'yum --assumeyes install rubygem-rvm'"
+	su -c 'yum --assumeyes install rubygem-rvm gcc-c++ patch readline readline-devel zlib
+               zlib-devel libyaml-devel libffi-devel'	
+	rvm-install --help > /dev/null 2>&1
+        source "$HOME/.rvm/scripts/bin/rvm"
+	RUBY_PACK=ruby-1.9.2-p0
+        rvm install $RUBY_PACK
+ 	rvm $RUBY_PACK --default
+	RUBY=$(which ruby)  # something like ~/.rvm/rubies/ruby-1.9.2-p0/bin/ruby
       else
         echo "Unfortunately, you will have to install it yourself"
         exit 2

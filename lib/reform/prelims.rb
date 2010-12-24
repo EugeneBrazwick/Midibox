@@ -7,80 +7,161 @@ module Prelims
     # another fine mess. If RUBY_VERSION is 1.9.2 you still need the 1.9.1 version tools
     RUBYVERSION = RUBY_VERSION == '1.9.2' ? '1.9.1' : RUBY_VERSION
 
+    QT4BIN_REDHAT_PATH = '/usr/lib/qt4/bin'
+    
+    if File.exists?(QT4BIN_REDHAT_PATH) 
+      ENV['PATH'] =~ %r{/usr/lib/qt4/bin} or
+	ENV['PATH'] += ':/usr/lib/qt4/bin'
+    end
+
+    class Packager 
+      private
+	def missing_package_critical_question package
+	  Prelims.handler::critical_question "Package missing",
+                                             "Package '#{package}' is missing but it can be " +
+					     "installed now. Do this now?"
+	end
+	  
+	def geminstall package
+	  @@handler::sudo "'#{@@gemcmd}' install '#{package}'" or
+	    @@handler::die(3, "Failed to install package '#{package}'")
+	end
+
+    end
+
+    class Aptitude < Packager  
+      public # methods of Aptitude
+	@@apt = nil
+	def install file, package, target
+	  @@apt ||= `which apt-get`.chomp
+	  missing_package_critical_question package
+	  Prelims.handler::sudo "'#{@@apt}' --assume-yes install '#{package}'" or
+	    Prelims.handler::die(3, "Failed to install package '#{package}'")
+	end 
+    end # class Aptitude
+
+    class Yum < Packager
+      public 
+	@@yum = nil
+	def install file, package, target 
+	  case package
+	  when 'qt4-qmake' then package = 'qt-devel'
+	  when 'libqt4-dev' then package = 'qt-devel'
+	  end
+	  @@yum ||= `which yum`.chomp
+# 	  puts "yum = '#{@@yum}'"
+	  missing_package_critical_question package
+	  Prelims.handler::exec %Q{su -c "'#{@@yum}' --assumeyes install '#{package}'"} or
+	    Prelims.handler::die(3, "Failed to install package '#{package}'")
+	end
+	
+	def geminstall gemcmd, package # BADLY ESCAPED. IF NOT TO SAY NOT ESCAPED AT ALL...
+	  puts ''
+	  Prelims::handler::exec %Q{'#{gemcmd}' install '#{package}'} or
+	    Prelims::handler::die(3, "Failed to install package '#{package}'")
+	end
+      end
+   
+    class PathologicalPacker < Packager 
+      public 
+	def install file, package, target
+          Prelims.handler::die 2, "There is no apt-get or yum and no '#{file}'.\n" +
+				  "Please install #{target} by hand (and good luck...)"
+	end
+    end # class PathologicalPacker
+    
+    MyPackager = if `which apt-get`.chomp.empty? 
+		   if `which yum`.chomp.empty? then PathologicalPacker
+		   else Yum
+		   end
+		 else Aptitude
+  		 end
+		 
     class UIHandler
 
-    public
-      def self.die code, msg
-        STDERR.puts msg
-        exit code
-      end
+      public 
+	def self.die code, msg
+	  STDERR.puts msg
+	  exit code
+	end
 
-      def self.critical_question title, msg
-        exit 4 unless question title, msg
-      end
+	def self.critical_question title, msg
+	  exit 4 unless question title, msg
+	end
 
-      def self.question title, msg
-        puts msg
-        print "[Yn] "
-        gets.chomp =~ /^[Yy]|^$/
-      end
+	def self.question title, msg
+	  puts msg
+	  print "[Yn] "
+	  gets.chomp =~ /^[Yy]|^$/
+	end
 
-      def self.busy
-        yield
-      end
+	def self.busy
+	  yield
+	end
 
-      def self.sudo cmd
-        `sudo #{cmd}` && $?.exitstatus == 0
-      end
+	def self.sudo cmd
+	  `sudo #{cmd}` && $?.exitstatus == 0
+	end
 
+	def self.exec cmd
+	  `#{cmd}` && $?.exitstatus == 0
+	end
     end # module UIHandler
 
     class QtUIHandler < UIHandler
 
-      def self.die code, msg
-        Qt::MessageBox::critical(nil, 'Cannot continue', msg)
-        exit code
-      end
+	def self.die code, msg
+	  Qt::MessageBox::critical(nil, 'Cannot continue', msg)
+	  exit code
+	end
 
-      def self.question title, msg
-        Qt::MessageBox::question(nil, title, msg, Qt::MessageBox::Yes | Qt::MessageBox::No,
-                                 Qt::MessageBox::Yes) == Qt::MessageBox::Yes
-      end
+	def self.question title, msg
+	  Qt::MessageBox::question(nil, title, msg, Qt::MessageBox::Yes | Qt::MessageBox::No,
+				  Qt::MessageBox::Yes) == Qt::MessageBox::Yes
+	end
 
-      def self.yesno title, msg
-        Qt::MessageBox::question(nil, title, msg, Qt::MessageBox::Yes | Qt::MessageBox::No,
-                                 Qt::MessageBox::Yes) == Qt::MessageBox::Yes
-      end
+	def self.yesno title, msg
+	  Qt::MessageBox::question(nil, title, msg, Qt::MessageBox::Yes | Qt::MessageBox::No,
+				  Qt::MessageBox::Yes) == Qt::MessageBox::Yes
+	end
 
-      # FIXME: it seems we need at least a single window (like a splash screen?)
-      def self.busy
-         $qApp.overrideCursor = Qt::Cursor.new(Qt::BusyCursor)
-         yield
-       ensure
-         $qApp.restoreOverrideCursor
-      end
+	# FIXME: it seems we need at least a single window (like a splash screen?)
+	def self.busy
+	  $qApp.overrideCursor = Qt::Cursor.new(Qt::BusyCursor)
+	  yield
+	ensure
+	  $qApp.restoreOverrideCursor
+	end
 
-      def self.sudo cmd
-         STDERR.puts %Q[gksu "#{cmd}"]  # this is really nice
-        `gksu "#{cmd}"` && $?.exitstatus == 0
-      end
+	def self.sudo cmd
+	  STDERR.puts %Q[gksu "#{cmd}"]  # this is really nice
+	  `gksu "#{cmd}"` && $?.exitstatus == 0
+	end
 
-    end
+    end # class QtUIHandler
 
+    # the constructor should not really fail
+    @@packager = MyPackager.new
     @@handler = UIHandler
+#     puts "ASSIGNING @@handler"
     @@gemcmd = @@rakecmd = nil
     @@build_something = false
 
-  private
+  private # methods of Prelim
 
+    def self.check_qt_devel_present
+      if File::exists?('/usr/include/Qt/qglobal.h')
+	qglobal_h = '/usr/include/Qt/qglobal.h'
+      else
+        qtdir = ENV['QTDIR']
+        qglobal_h = (qtdir ? qtdir + '/include' : 'include/qt4') + '/Qt/qglobal.h'
+      end
+#       STDERR.puts "!!!!!!!!!!!!!qglobal_h = '#{qglobal_h}'"
+      check_libdev_and_opt_apt_get(qglobal_h, 'libqt4-dev', 'qtruby')
+    end
+    
     def self.aptget file, package, target
-      (aptgetcmd = `which apt-get`.chomp).empty? and
-        @@handler::die 2, "There is no apt-get and no '#{file}'.\n" +
-                          "Please install #{target} by hand (and good luck...)"
-      @@handler::critical_question "Package missing",
-                                   "Package '#{package}' is missing but it can be installed now. Do this now?"
-      @@handler::sudo "'#{aptgetcmd}' --assume-yes install '#{package}'" or
-        @@handler::die(3, "Failed to install package '#{package}'")
+       @@packager.install file, package, target 
     end
 
     # similar to aptget, but
@@ -103,15 +184,14 @@ module Prelims
 #       STDERR.puts "BUSY?"
       @@handler::busy do
 #          STDERR.puts "gksu '#{@@gemcmd}' install '#{package}'"
-        @@handler::sudo "'#{@@gemcmd}' install '#{package}'" or
-          @@handler::die(3, "Failed to install package '#{package}'")
+	@@packager.geminstall @@gemcmd, package 
       end
       true
     end
 
     def self.check_libdev_and_opt_apt_get(incl, package, target) # for example: 't.h', 'pack-dev', 'qtruby'
       until File.exists?(incl[0] == '/' ? incl : "#{PREFIX}/#{incl}")
-#         STDERR.puts "#{PREFIX}/#{incl} does NOT EXIST!!!"
+        STDERR.puts "#{PREFIX}/#{incl} does NOT EXIST!!!"
         aptget incl, package,target
       end
     end
@@ -178,8 +258,14 @@ module Prelims
         ENV['CXX'] = check_exe_and_opt_apt_get('g++', 'g++', 'qtruby')
         ENV['QMAKE'] = check_exe_and_opt_apt_get('qmake', 'qt4-qmake', 'qtruby')
 # I overlooked one somehow.  Ruby-dev is required for /usr/include/ruby/ruby.h
-        check_libdev_and_opt_apt_get("include/ruby-#{RUBYVERSION}/ruby.h", "ruby#{RUBYVERSION}-dev", 'qtruby')
-        check_libdev_and_opt_apt_get('include/qt4/Qt/qglobal.h', 'libqt4-dev', 'qtruby')
+	if ENV['rvm_path']
+	  ruby_h = ENV['rvm_path'] + '/src/' + ENV['RUBY_VERSION'] + '/include/ruby.h'
+	else
+	  ruby_h = "include/ruby-#{RUBYVERSION}/ruby.h"
+	end
+	puts "CHECKING '#{ruby_h}'"
+        check_libdev_and_opt_apt_get(ruby_h, "ruby#{RUBYVERSION}-dev", 'qtruby')
+	check_qt_devel_present
         check_gem(nil, QTRUBYGEMNAME, 'qtruby')
         puts "Retry!"
         retry  # !
@@ -259,6 +345,10 @@ then we can continue
       cmd
     end
 
+    def self.handler
+      @@handler
+    end
+    
     def self.check_reqs
       # just a list of all checks, for debugging purposes. (use bin/midibox.rb --check-reqs)
       check_exe_and_opt_apt_get('gem', "rubygems#{RUBYVERSION}", 'qtruby')
@@ -266,8 +356,7 @@ then we can continue
       check_exe_and_opt_apt_get('g++', 'g++', 'qtruby')
       check_exe_and_opt_apt_get('qmake', 'qt4-qmake', 'qtruby')
       check_libdev_and_opt_apt_get("include/ruby-#{RUBYVERSION}/ruby.h", "ruby#{RUBYVERSION}-dev", 'qtruby')
-      qtdir = ENV['QTDIR']
-      check_libdev_and_opt_apt_get((qtdir ? qtdir + '/include' : 'include/qt4') + '/Qt/qglobal.h', 'libqt4-dev', 'qtruby')
+      check_qt_devel_present
       check_gem(nil, QTRUBYGEMNAME, 'qtruby')
       check_gem('spec', 'rspec', 'alsa_midi.so')
 #       check_gem(nil, 'darkfish-rdoc', 'htmldocs', optional: true)

@@ -3,7 +3,8 @@
 # verified with clean Ubuntu version on Oct 2 2010.
 [ "$PREFIX" ] || export PREFIX=/usr
 while [ -z "$RUBY" ]; do
-#   echo "ATTEMPT 1: which"
+  [ -f ~/.rvm/scripts/rvm ] && source ~/.rvm/scripts/rvm 
+#  echo "ATTEMPT 1: which, \$RUBY = $RUBY"
   export RUBY=$(which ruby)
 #   echo "RUBY=$RUBY ATTEMPT 2: ls"
   [ "$RUBY" ] || export RUBY=$(ls "$PREFIX"/bin/ruby* | tail --lines=1)
@@ -61,5 +62,5 @@ case "$RUBYLIB" in
 ('') export RUBYLIB="$PWD/lib";;
 (*) export RUBYLIB="$PWD/lib:$RUBYLIB";;
 esac
-# echo "???? RUBYLIB=$RUBYLIB"
+#echo "???? RUBYLIB=$RUBYLIB, RUBY=$RUBY"
 exec "$RUBY" bin/midibox.rb

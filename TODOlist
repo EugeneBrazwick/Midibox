@@ -169,4 +169,14 @@ I can see something is being done but a user will be confused if a gem install t
 0029 Tue Dec 21 21:46:41 CET 2010. Bug in undolist: you can undo and then not redo but something else. At that
     point a part of the undo list must be erased. Since I use a shadow-copy of it this behaviour must be replicated
 0030 Tue Dec 21 21:47:48 CET 2010. Fedora14 support. Running virtual now.
-
+Current state:
+    Failed to load Qt4, attempt to build it right here and now
+    CHECKING '/home/ara/.rvm/src/ruby-1.9.2-p0/include/ruby.h'
+    Retry!
+    Failed to load Qt4, attempt to build it right here and now
+    CHECKING '/home/ara/.rvm/src/ruby-1.9.2-p0/include/ruby.h'
+    Retry!
+    Failed to load Qt4, attempt to build it right here and now
+    CHECKING '/home/ara/.rvm/src/ruby-1.9.2-p0/include/ruby.h'
+    etc..... load == 100%
+    However a restart of the midibox script fixes it. 

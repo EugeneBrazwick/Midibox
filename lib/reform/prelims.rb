@@ -47,6 +47,7 @@ module Prelims
 	  case package
 	  when 'qt4-qmake' then package = 'qt-devel'
 	  when 'libqt4-dev' then package = 'qt-devel'
+	  when 'libasound2-dev' then package = 'alsa-lib-devel'
 	  end
 	  @@yum ||= `which yum`.chomp
 # 	  puts "yum = '#{@@yum}'"
@@ -232,9 +233,13 @@ module Prelims
 
 =end
       @@gemcmd = check_exe_and_opt_apt_get('gem', "rubygems#{RUBYVERSION}", 'qtruby')
+      attempt = 0
 
       # Qt must work...
       begin
+	# What goes wrong the very first time??
+	raise 'gem installed OK but could not be loaded. Trying again my help' if (attempt += 1) > 3 
+
 # I got this:   /FindQt4.cmake:728 (MESSAGE): Could NOT find QtCore header
 # What now?????  I linked /usr/include/qt4/Qt* right in /usr/include ....
 # But why?? It never was there? How does it decide that???
@@ -245,8 +250,8 @@ module Prelims
         verb, $VERBOSE = $VERBOSE, false
         require 'Qt4'
         $VERBOSE = verb
-      rescue LoadError
-        STDERR.puts "Failed to load Qt4, attempt to build it right here and now"
+      rescue LoadError => e
+        STDERR.puts "Failed to load Qt4 (#{e.message}), attempt to build it right here and now"
         @@build_something = true
 =begin
   the make requires 'cmake' to be present.
@@ -263,10 +268,11 @@ module Prelims
 	else
 	  ruby_h = "include/ruby-#{RUBYVERSION}/ruby.h"
 	end
-	puts "CHECKING '#{ruby_h}'"
+# 	puts "CHECKING '#{ruby_h}'"
         check_libdev_and_opt_apt_get(ruby_h, "ruby#{RUBYVERSION}-dev", 'qtruby')
 	check_qt_devel_present
         check_gem(nil, QTRUBYGEMNAME, 'qtruby')
+	gem QTRUBYGEMNAME # attempt to add the required paths?? (experimental)
         puts "Retry!"
         retry  # !
       end

@@ -1,7 +1,8 @@
 
 module Reform
 
-  require_relative '../graphicsitem'
+  require 'reform/graphicsitem'
+
   class Line < GraphicsItem
   private
 
@@ -33,6 +34,10 @@ module Reform
 
   end # Line
 
-  createInstantiator File.basename(__FILE__, '.rb'), Qt::GraphicsLineItem, Line
+  class QGraphicsLineItem < Qt::GraphicsLineItem
+    include QGraphicsItemHackContext
+  end
+
+  createInstantiator File.basename(__FILE__, '.rb'), QGraphicsLineItem, Line
 
 end # Reform

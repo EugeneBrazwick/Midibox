@@ -23,9 +23,10 @@ Reform::app {
           whenTriggered do
              # NOTE THAT tr() destroys the encoding somehow... It ruins the copyright sign...
              # This could be fixed if Qt understood &copyright; but it doesn't...
+             # Note: ruby understands 2 or more heredocs on a single line, but my editor does not...
             Qt::MessageBox::about(@qtc, tr("About QtRuby Alsa Connection Tool"),
                     tr(<<-TEXT) +
-                      <p>Inspired by <b>kaconnect</b> by Matthias Nagorni, which, in its turn
+                      <p>Inspired by <b>kaconnect</b> by Matthias Nagorni which, in its turn,
                       was based on the original <b>aconnect</b> code by Takashi Iwai.</p>
                       <p>Ported to qtruby + Qt4.7 by Eugene Brazwick.</p>
                       <p>
@@ -54,7 +55,9 @@ Reform::app {
           list {
             alsaportarray mode: :read
           }
-          label text: 'GRAPHSTUFF'
+          alsasubscriptionview {
+            alsaportarray
+          }
           list {
             alsaportarray mode: :write
           }

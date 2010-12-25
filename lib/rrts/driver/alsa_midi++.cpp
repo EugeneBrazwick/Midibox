@@ -16,7 +16,30 @@ static inline void get_channel(VALUE v_midievent, int channel)
   rb_iv_set(v_midievent, "@channel", UINT2NUM((channel & 0xf) + 1));
 }
 
-/* AlsaMidiEvent_i#populate Sequencer, MidiEvent
+/* call-seq: populate(sequencer, midievent)
+
+Parameters:
+[sequencer] used to resolv portnames and ids
+[midievent] event to populate
+
+This method copies data from the alsa event +self+ into the passed +midievent+.
+A list of the attributes:
+[type] integer, eventtype, always present
+[receiver_queue_id] queue_id of the queue on which the event was received (so +ev.queue+). Always set
+[channel] of the message. Always set, can be nil
+[velocity] for note events. Always set, can be nil
+[off_velocity] for note events. Always set, can be nil
+[duration] for note events. Always set, can be nil
+[param] name of midi parameter. Always set, can be nil
+[value] value of midi parameters, or note value or otherwise abused. Always set, can be nil, or
+        an integer or a MidiClient or a MidiPort (or ...)
+[time] of event arrival. Always set, can be nil
+[queue_id] of queue control message. Always set, can be nil
+[connect_sender] for connection events. Always set to a MidiPort instance, or nil
+[connect_dest] for connection events. Always set, can be a MidiPort instance or nil
+[source] source of the event. Always set to MidiPort instance
+[dest] destination of the event, the receiving port itself. Always set to a MidiPort instance
+
 */
 static VALUE
 alsaMidiEventClass_populate(VALUE v_ev, VALUE v_sequencer, VALUE v_midievent)
@@ -25,12 +48,6 @@ alsaMidiEventClass_populate(VALUE v_ev, VALUE v_sequencer, VALUE v_midievent)
   // 1, get alsa records
   snd_seq_event_t *ev;
   Data_Get_Struct(v_ev, snd_seq_event_t, ev);
-  /*
-  // 1b, get AlsaSequencer_i
-  VALUE v_seq = rb_ivar_get(v_sequencer, "@handle");
-  snd_seq_t *seq;
-  Data_Get_Struct(v_seq, snd_seq_t, seq);
-  */
   // required to locate or construct ports and queues, but maybe the caller should do this?
   // 2, read out snd_seq_event_t and use instance_variable_set on v_midievent
 //   fprintf(stderr, "ev.type=%d, evtpnam='%s', CLOCK=%d\n", ev->type, evtypename[ev->type] ? evtypename[ev->type] : "null", SND_SEQ_EVENT_CLOCK);
@@ -173,7 +190,7 @@ alsaMidiEventClass_populate(VALUE v_ev, VALUE v_sequencer, VALUE v_midievent)
     case SND_SEQ_EVENT_CLIENT_EXIT:
     case SND_SEQ_EVENT_CLIENT_CHANGE:
       {
-        const ID id_clients = rb_intern("id_clients");
+        const ID id_clients = rb_intern("clients");
         VALUE v_clients = rb_funcall(v_sequencer, id_clients, 0);
         rb_iv_set(v_midievent, "@value", rb_hash_aref(v_clients, UINT2NUM(ev->data.addr.client)));
         break;

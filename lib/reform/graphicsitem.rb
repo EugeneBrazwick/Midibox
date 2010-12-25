@@ -151,6 +151,7 @@ module Reform
       end
   end # class GraphicsItem
 
+  # currently only used to get the itemChange callback working
   module QGraphicsItemHackContext
     # override
     def itemChange change, value

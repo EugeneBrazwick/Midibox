@@ -34,7 +34,7 @@ module Reform
 #           @whenOops = block
 #         end
 #
-# And you can replace the callback any time you like.
+# And you can replace the callback '@whenOops' any time you like.
 #
   class Control < Qt::Object
 
@@ -64,7 +64,15 @@ module Reform
 #             tag "DynamicAttribute.new(#{parent}, :#{propertyname})"
             super(parent)
             @propertyname, @klass = propertyname, klass
-            setup(quickyhash, &block) if quickyhash || block
+            if quickyhash
+              if Hash === quickyhash
+                setup(quickyhash, &block)
+              else
+                applyModel quickyhash
+              end
+            elsif block
+              setup(quickyhash, &block)
+            end
           end
 
           def through_state states2values
@@ -246,6 +254,21 @@ module Reform
         end
       end
 
+      # create a DynamicAttribute for each element in the list.
+      # the first parameter is the kind of value, and must be an animatable value
+      def self.define_dynamic_setter klass, *list
+        list.each do |name|
+          define_method name do |hash = nil, &block|
+            return @qtc.send(name) unless hash || block
+            DynamicAttribute.new(self, name, klass, hash, &block)
+          end
+          n = (name.to_s + '=').to_sym
+          define_method n do |value|
+            @qtc.send(n, value)
+          end
+        end
+      end
+
       def executeMacros(receiver = nil)
 #         tag "#{self}#executeMacros, EXECUTE #{instance_variable_defined?(:@macros) ? @macros.length : 0} macros"
         instance_variable_defined?(:@macros) and @macros.each do |macro|
@@ -337,7 +360,9 @@ module Reform
         # like the combobox has (it is called 'model' confusingly...)
 #         if children
           children.each do |child|
-#             tag "PROPCONDITIONS. child=#{child}, want_data?=#{Control === child && child.want_data?}"
+            if propagation.debug_track?
+              STDERR.print "#{self}::propageModel child=#{child}, want_data?=#{Control === child && child.want_data?}\n"
+            end
             child.updateModel(aModel, propagation) if Control === child && child.want_data?
           end
 #         end
@@ -720,7 +745,9 @@ module Reform
 #         - if the value of a control does not change by the connect operation, no triggers must
 #           be called (at least not now).
       def updateModel aModel, propagation
-#         tag "#{self}::updateModel(#{aModel}, #{propagation.inspect}), connector=#{connector}"
+        if propagation.debug_track?
+          STDERR.print "#{self}::updateModel(#{aModel}, #{propagation.inspect}), connector=#{connector}\n"
+        end
 #         raise 'WTF' unless Model === aModel
         do_callback = instance_variable_defined?(:@whenConnected)
         if cid = connector
@@ -803,6 +830,7 @@ module Reform
         parent.dynamicParent
       end
 
+      # override
       def deleteLater
         # it seems Qt::Object deleteLater is not always available. ??
         if @qtc
@@ -826,7 +854,7 @@ module Reform
       # I forgot what needed that. Probably broken now.
       attr :macros
 
-#       # BROKEN in qtruby!!!
+#       # BROKEN in qtruby!!! (destroys encoding)
 #       def tr text
 #         encoding = text.encoding
 #         tag "encoding = #{encoding}"

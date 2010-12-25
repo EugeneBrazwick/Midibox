@@ -358,7 +358,7 @@ module Reform
 
       def setLocalModel aModel
         raise 'WTF' unless aModel.model?
-#         tag "applying local model #{aModel}!!!!!!!!!!!!" #, caller = #{caller.join("\n")}"
+        tag "#{self}::setLocalModel #{aModel}!!!!!!!!!!!!" #, caller = #{caller.join("\n")}"
         @localmodel = aModel
 #          note: Qt::ComboBox has no 'selectionModel'. Only ListView and TableView.
         qm = @qtc.model = @localmodel.qtc || createQModel
@@ -422,6 +422,14 @@ module Reform
       def model_connector value = nil
         return @model_connector unless value
         @model_connector = value
+      end
+
+      def updateModel aModel, propagation
+        if aModel == @localmodel
+          setLocalModel(aModel)  # whatever changed. This may need to be more precise
+        else
+          super
+        end
       end
 
   end # class AbstractItemView

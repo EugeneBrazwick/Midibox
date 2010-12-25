@@ -52,11 +52,17 @@ module Reform
         @init = true if !@keypaths || @keypaths[[]] # the root changed.
         @current_path = current_path
 #         tag "Propagation.new SENDER ====  #{sender}, caller =#{caller.join("\n")}!!!!!!!!!!!!!!!!!!!"
+        @debug_track = false
       end
 
     public
       attr :sender, :keypaths
-#       attr_accessor :current_path
+
+      attr_writer :debug_track
+
+      def debug_track?
+        @debug_track
+      end
 
 #  Suppose I listen to keypath  [:x, 4], this means my cid is 4
 # any [:x, 3] is in de keypaths hash.
@@ -157,7 +163,7 @@ transaction that is immediately committed (and at that point propagation starts)
         private
           def initialize model, keypath, oldval = nil
   #           super()
-#             tag "New #{self} (#{model}, #{index.inspect}, #{oldval})"
+            tag "New #{self} (#{model}, #{keypath.inspect}, #{oldval})"
             # note this clone may tragically fail for many Qt classes....
             raise "BOGO path, caller = #{caller.join("\n")}" if keypath == [nil]
             @model, @keypath, @oldval = model, keypath, oldval
@@ -173,6 +179,7 @@ transaction that is immediately committed (and at that point propagation starts)
           end
 
         public
+
           def undo
 #             tag "#{self}::UNDO, kp= #{@keypath.inspect}, @model[....][#{@keypath[-1]}] := #@oldval #######################################"
             locate.apply_setter @keypath[-1] || :self, @oldval
@@ -204,7 +211,6 @@ transaction that is immediately committed (and at that point propagation starts)
           def deleted?
           end
       end # class PropertyChange
-
 
 # IMPORTANT we use a shortcut: locate.value iso just locate
 # This is rather illegal as it assumes that the chosen operation is still valid on the wrapped element
@@ -308,6 +314,7 @@ transaction that is immediately committed (and at that point propagation starts)
         @root = @tranmodel.root
         @keypaths = {}
         @committed = @aborted = false
+        @debug_track = false
         if block_given?
           begin
             begin
@@ -337,6 +344,10 @@ transaction that is immediately committed (and at that point propagation starts)
       attr :tranmodel
       attr :sender # for debugging
 
+      def debug_track!
+        @debug_track = true
+      end
+
       def changed_keys
         @keypaths.keys
       end
@@ -364,8 +375,12 @@ transaction that is immediately committed (and at that point propagation starts)
         # NOTE: tr() only works on Qt::Object...
         raise ProtocolError, 'Protocol error, no transaction to commit' unless @@transaction
         raise ProtocolError, 'Protocol error, transaction inactive' if @aborted || @committed
-#         tag "COMMIT WORK create Propagation, sender = #@sender, model=#{root}, root=#{model.root}, parent=#{model.parent}"
-        root.propagateChange Propagation.new(@sender, @keypaths)
+        if @debug_track
+          STDERR.print "create Propagation, sender = #@sender, model=#{root}, root=#{@tranmodel.root}, parent=#{@tranmodel.parent}\n"
+        end
+        propch = Propagation.new(@sender, @keypaths)
+        propch.debug_track = true if @debug_track
+        root.propagateChange propch
 #       rescue
 #         abort         CANNOT BE DONE. After propagation the other parts of the system are already altered
 # abort does nothing about that.

@@ -197,7 +197,9 @@ Not supported yet
 
       # override
       def check_propagation_change propagation, cid
-#         tag "check_propagation_change @connectors[:model] = #{@connectors[:model]}, propagation.keypaths = #{propagation.changed_keys.inspect}"
+        if propagation.debug_track?
+          STDERR.print "#{self}::check_propagation_change, cid=#{cid} @connectors[:model]=#{@connectors[:model]}, propagation.keypaths=#{propagation.changed_keys.inspect}\n"
+        end
         propagation.get_change(cid) ||
         (modcon = col0.connectors[:model]) && propagation.get_change(modcon)
       end

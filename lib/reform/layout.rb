@@ -28,6 +28,25 @@ However it must be in postSetup.
       control.parent = self
     end
 
+    # enforce that parent is a layout. Almost a copy of Widget@check_grid_parent....
+    def check_grid_parent tocheck
+      if parent.layout?
+        if !parent.is_a?(GridLayout)
+          raise ReformError, tr("'#{tocheck}' only works with a gridlayout container!")
+        end
+      else
+        unless layout = parent.infused_layout
+          ql = Qt::GridLayout.new
+          layout = GridLayout.new(parent, ql)
+          raise 'already a layout!' if parent.qtc.layout
+          parent.qtc.layout = ql
+          parent.infused_layout = layout
+        end
+        parent = layout
+        layout.addLayout self
+      end
+    end
+
   public
 
     # override
@@ -95,6 +114,25 @@ However it must be in postSetup.
         @stretch = v
       end
     end
+
+    # see Widget::#layoutpos
+    def layoutpos col = nil, row = nil
+      check_grid_parent :layoutpos
+      return (instance_variable_defined?(:@layoutpos) ? @layoutpos : nil) unless col
+      col, row = col if Array === col
+      @layoutpos = [col, row || 0]
+    end
+
+    # this only works if the widget is inside a gridlayout
+    def span cols = nil, rows = nil
+      check_grid_parent :span
+      return (instance_variable_defined?(:@span) ? @span : nil) unless cols
+      rows ||= 1
+      @span = cols, rows
+    end
+
+    # assuming you pass it a single arg:
+    alias :colspan :span
 
   end # Layout
 

@@ -5,12 +5,20 @@ module Reform
 
   class GraphicsItem < Control; end             # forward
 
-  # a Canvas is a frame that can contain graphic items like 'circle' etc.
-  class Canvas < Frame
+=begin
+   a Canvas is a frame that displays a scene.
+
+   All items added to the canvas are actually added to the scene instead, but two canvasses
+   can share a scene. To avoid having to create a scene a canvas without an explicit scene
+   creates an implicit one internally.
+
+   the Scene can contain graphic items like 'circle' etc.
+=end
+  class Canvas < Widget
     include Graphical, GraphicContext, AnimationContext, StateContext
     private
 
-      def initialize p, qp, autolayout = true
+      def initialize p, qp #  , autolayout = true meaningless
         super
         @rotation = @scale = @translation = nil
         @qtc.setRenderHint(Qt::Painter::Antialiasing, true)
@@ -52,18 +60,14 @@ module Reform
 
       # a view may override the scene background, this is however not very much advised. DEPRECATED??
       # IMPORTANT: the background only works if there is in fact a scene present!!! So we make it
-      def background *brush
-  #       if brush.respond_to?(:to_str)
-  #         # load the image, where the path is given.
-  #         brush = Qt::Brush.new(Qt::Pixmap.new(brush))
-  #       end
-        scene.backgroundBrush = make_brush(*brush)
+      def background *brush, &block
+        qscene.backgroundBrush = make_qtbrush_with_parent(infused_scene!, *brush, &block)
       end
 
       alias :backgroundBrush :background
 
       def infused_scene!
-        scene
+        qscene
 #         tag "infused_scene! -> #@infused_scene"
         @infused_scene
       end
@@ -72,15 +76,10 @@ module Reform
   #       instance_variable_defined?(:@infused_scene) ? @infused_scene : scene
   #     end
 
-      def parent_qtc_to_use_for control
+      def parent_qtc_to_use_for controlklass
   #       tag "parent_qtc_to_use_for #{control}, control <= GraphicsItem = #{control <= GraphicsItem}"
-        if control <= GraphicsItem then nil else super end
+        if controlklass <= GraphicsItem then nil else super end
       end
-
-      # just delegation?
-  #     def addGraphicsItem control, quickyhash = nil, &block
-  #       scene.addGraphicsItem(control, quickyhash, &block)
-  #     end
 
         # NOTE: this methods must be public!!
       def_delegators :infused_scene!, :addGraphicsItem, :registeredBrush,
@@ -108,10 +107,7 @@ module Reform
         @qtc.verticalScrollBarPolicy = ver
       end
 
-    public
-
-      # override since we must set the scene here (setScene)
-      def scene id = nil, &block
+      def qscene id = nil, &block
         return @qtc.scene unless id || block || !@qtc.scene
         case id
         when Hash, nil
@@ -134,13 +130,10 @@ module Reform
         end
       end
 
-      def_delegators :infused_scene!, :brush, :stroke, :fill #, :pen
+    public
 
-      # FIXME this is a delegator too:
-      def pen *args, &block
-#         tag "calling #{infused_scene!}.pen()"
-        infused_scene!.pen(*args, &block)
-      end
+      # override since we must set the scene here (setScene)
+      def_delegators :infused_scene!, :brush, :stroke, :fill, :pen
 
       # rotate clockwise around center of the canvas.
       def rotate deg
@@ -169,6 +162,12 @@ module Reform
         # or 'super' .....
         control.setup hash, &block
         added control
+      end
+
+      # override
+      def add child, quickyhash, &block
+#         tag "#{self}::add #{child}"
+        child.addTo(infused_scene!, quickyhash, &block)
       end
 
   end # class Canvas

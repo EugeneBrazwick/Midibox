@@ -184,7 +184,7 @@ module Reform
 
     def self.new_qt_implementor(qt_implementor_class, parent, qparent)
 #       tag "replicate: instantiate a #{qt_implementor_class}"
-      q = QReplicate.new(qparent, parent.brush)
+      QReplicate.new(qparent, parent.brush)
     end
 
     # override

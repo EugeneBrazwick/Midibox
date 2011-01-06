@@ -23,11 +23,11 @@ module Reform
 
   public
 
-    def self.new_qt_implementor(qt_implementor_class, parent, qparent)
-      poly = qt_implementor_class.new(qparent)
-      poly.pen, poly.brush = parent.pen, parent.brush
-      poly
-    end
+#     def self.new_qt_implementor(qt_implementor_class, parent, qparent)
+#       poly = qt_implementor_class.new(qparent)
+#       poly.pen, poly.brush = parent.pen, parent.brush
+#       poly
+#     end
 
     # @qtc does NOT implement 'objectName'!!! This is rather onfortunate
     def name aName = nil

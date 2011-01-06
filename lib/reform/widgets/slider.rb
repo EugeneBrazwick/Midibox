@@ -6,53 +6,53 @@ module Reform
   class Slider < Widget
     private
 
-    def initialize parent, qtc
-      super
-      # I expect that changing the signal 1 tick, actually has effect immediately
-      # Otherwise another kind of control would be used.
-      connect(@qtc, SIGNAL('valueChanged(int)'), self) do |value|
-        rfRescue do
-          model = effectiveModel and cid = connector and model.apply_setter(cid, value)
+      def initialize parent, qtc
+        super
+        # I expect that changing the slider by even a little should have effect immediately
+        # Otherwise another kind of control should be used.
+        connect(@qtc, SIGNAL('valueChanged(int)'), self) do |value|
+          rfRescue do
+            mod = model and cid = connector and model.apply_setter(cid, value, self, debug_track: true)
+          end
         end
       end
-    end
 
-    # note this resembles SpinBox a lot
-    def range m, n = nil
-      if n
-        @qtc.setRange(m, n)
-      else
-        if Range === m
-          @qtc.setRange(m.min, m.max)
+      # note this resembles SpinBox a lot
+      def range m, n = nil
+        if n
+          @qtc.setRange(m, n)
         else
-          @qtc.setRange(*m)
+          if Range === m
+            @qtc.setRange(m.min, m.max)
+          else
+            @qtc.setRange(*m)
+          end
         end
       end
-    end
 
-    define_simple_setter :value
+      define_simple_setter :value
 
-    def orientation val
-      case val
-      when :horizontal then val = Qt::Horizontal
-      when :vertical then val = Qt::Vertical
-      end
-      @qtc.orientation = val
-    end
-
-    public
-
-    def updateModel model, options = nil
-      cid = connector and
-        if model && model.getter?(cid)
-          @qtc.value = model.apply_getter(cid)
-        else
-          @qtc.value = @qtc.minimum
+      def orientation val
+        case val
+        when :horizontal then val = Qt::Horizontal
+        when :vertical then val = Qt::Vertical
         end
-      super
-    end
+        @qtc.orientation = val
+      end
 
-  end
+    public # methods of Slider
+
+      def updateModel model, options = nil
+        cid = connector and
+          if model && model.getter?(cid)
+            @qtc.value = model.apply_getter(cid)
+          else
+            @qtc.value = @qtc.minimum
+          end
+        super
+      end
+
+  end # Slider
 
   createInstantiator File.basename(__FILE__, '.rb'), Qt::Slider, Slider
 

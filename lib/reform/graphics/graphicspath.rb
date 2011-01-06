@@ -32,7 +32,7 @@ In that terminology a line is just a vertex. And a vertex can be represented as 
 
 [[0,0],[1,0],[1,1]],[0,0],[-1,0],[0,-1]]
 
-I we know we are dealing with a path and not a vertex then we can also write
+If we know we are dealing with a path and not a vertex then we can also write
 [0,0, 1,0, 1,1],[0,0, -1,0, 0,-1]
 
 Then we must decide how a path is 'closed'.
@@ -511,9 +511,9 @@ Translation and matrix mapping can also be done.
       end
 
       def self.new_qt_implementor qt_implementor_class, parent, qt_parent
-        res = qt_implementor_class.new
-        res.pen, res.brush = parent.pen, parent.brush
-        res
+        qt_implementor_class.new # no parent ?? why is this ??
+#         res.pen, res.brush = parent.pen, parent.brush
+#         res
       end
 
   end # PathItem

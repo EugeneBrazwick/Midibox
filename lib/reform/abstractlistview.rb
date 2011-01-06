@@ -153,8 +153,8 @@ Not supported yet
   In that case it is pretty useless. Maybe handy for debugging
 =end
       def activated model, cid, idx, data_idx = nil
-#         tag "YES, 'activated'!!!, idx = #{idx}, cid=#{cid}, model=#{model}, data_to_transmit=#{@localmodel.index2value(idx, self).inspect}"
-        model.apply_setter cid, @localmodel.index2value(idx, col0), self
+        tag "YES, 'activated'!!!, idx = #{idx}, cid=#{cid}, model=#{model}, data_to_transmit=#{@localmodel.index2value(idx, self).inspect}, debug_track = #@debug_track"
+        model.apply_setter cid, @localmodel.index2value(idx, col0), self #, debug_track: true
       end
 
       # where idx is numeric
@@ -198,7 +198,8 @@ Not supported yet
       # override
       def check_propagation_change propagation, cid
         if propagation.debug_track?
-          STDERR.print "#{self}::check_propagation_change, cid=#{cid} @connectors[:model]=#{@connectors[:model]}, propagation.keypaths=#{propagation.changed_keys.inspect}\n"
+          STDERR.print "#{self}::check_propagation_change, cid=#{cid} @connectors[:model]= " +
+                       "#{@connectors && @connectors[:model]}, " + "propagation.keypaths=#{propagation.changed_keys.inspect}\n"
         end
         propagation.get_change(cid) ||
         (modcon = col0.connectors[:model]) && propagation.get_change(modcon)

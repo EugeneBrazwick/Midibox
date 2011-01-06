@@ -48,6 +48,7 @@ module Reform
   #       tag "ReForm.new EXECUTED"
         @undostack = QUndoStack.new(self)
         $undo.addStack(@undostack)
+        @parametermacros = {} # hash name -> macroarray
       end
 
       # IMPORTANT: the name becomes a method of $qApp, if and only if it ends
@@ -197,6 +198,7 @@ module Reform
 #       attr_writer :model
 
       attr :undostack
+      attr :parametermacros
 
   end # class ReForm
 

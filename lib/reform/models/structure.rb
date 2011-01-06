@@ -311,6 +311,7 @@ mock:
             undo_path = @keypath + [key]
           end
           pickup_tran do |tran|
+# tran.debug_track!
 #             tag "recording transaction log"
 # IMPORTANT: it is possible that we get here from an undo-operation. So 'assign' must be called, even if the
 # transaction is already aborted
@@ -472,7 +473,7 @@ mock:
         end
       end
 
-      def apply_setter name, value, sender = nil
+      def apply_setter name, value, sender = nil, more_args = nil
 #         tag "apply_setter(#{name.inspect}, #{value}, sender = #{sender})"
   #         name = name.to_s
   #         name = name[0...-1] if name[-1] == '?'
@@ -485,6 +486,7 @@ mock:
           if tran.aborted?
             assign(name, value)
           else
+            tran.debug_track! if more_args && more_args[:debug_track]
             prev = calc_prev(name)
             assign(name, value)
 #             tag "ADDING PROPCHANGE"

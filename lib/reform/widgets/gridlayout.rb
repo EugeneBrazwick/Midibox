@@ -196,10 +196,13 @@ gridlayout {
           curcol, currow = 0, currow + 1 if curcol >= colCount
         end
         # a bit of a hack, but probably what you want:
-        if children.length == 1 && children[0].layout_alignment == Qt::AlignCenter
-  #         tag "APPLYING sizehint to single centered widget in a grid"
-          @qtc.setRowMinimumHeight(0, children[0].qtc.sizeHint.height)
-          @qtc.setColumnMinimumWidth(0, children[0].qtc.sizeHint.width)
+        if children.length == 1
+          child = children[0]
+          if Widget === child && child.layout_alignment == Qt::AlignCenter
+            sizeHint = child.qtc.sizeHint
+            @qtc.setRowMinimumHeight(0, sizeHint.height)
+            @qtc.setColumnMinimumWidth(0, sizeHint.width)
+          end
         end
       end
 

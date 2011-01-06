@@ -56,6 +56,9 @@ module Kernel
 
 end
 
+# note that false is not a Boolean, so Boolean should only be used as a typeid.
+Boolean = TrueClass
+
 class Fixnum
   # create an instance of Reform::Milliseconds
   def seconds
@@ -160,6 +163,7 @@ module Reform
     autoload :AbstractModel, 'reform/model'
     autoload :Control, 'reform/control'
     autoload :Prelims, 'reform/prelims'
+    autoload :DynamicAttribute, 'reform/dynamicattribute'
 
     # A class specifically representing a duration in milliseconds
     # See Fixnum#seconds and Fixnum#milliseconds
@@ -343,9 +347,9 @@ module Reform
         alias :simpledata :simple_data
 
         def struct *val, &block
-          tag "struct(#{val.inspect})"
+#           tag "struct(#{val.inspect})"
           if block
-            tag "using block"
+#             tag "using block"
             addModel(Structure.new.build(&block))
           else
             structure value: if val.length == 1 then val[0] else val end

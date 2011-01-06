@@ -153,8 +153,7 @@ module Reform
       end
     end
 
-    def_delegators :@qtc, :close, :update, :windowTitle=
-
+    def_delegators :@qtc, :close, :update, :windowTitle=, :height, :width
 
     def contextMenu *quickyhash, &initblock
       ref = ContextMenuRef.new(self, @qtc)

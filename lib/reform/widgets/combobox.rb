@@ -70,7 +70,7 @@ See examples/models/demo03.rb
       def whenActivated &block
         if block
           connect(@qtc, SIGNAL('activated(int)'), self) do |idx|
-            tag "idx = #{idx}, data_to_transmit[idx] = #{data_at(idx).inspect}"
+#             tag "idx = #{idx}, data_to_transmit[idx] = #{data_at(idx).inspect}"
             rfCallBlockBack(data_at(idx), idx, &block)
           end
         else

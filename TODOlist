@@ -179,7 +179,7 @@ Current state:
     Failed to load Qt4, attempt to build it right here and now
     CHECKING '/home/ara/.rvm/src/ruby-1.9.2-p0/include/ruby.h'
     etc..... load == 100%
-    However a restart of the midibox script fixes it. 
+    However a restart of the midibox script fixes it.
 0031 Sat Nov 20 23:09:47 CET 2010 BUG:
     /home/ara/Midibox/lib/rrts/midievent.rb:149:in `populate': undefined method `id_clients' for #<RRTS::Sequencer:0x00000002855690> (NoMethodError)
         from /home/ara/Midibox/lib/rrts/midievent.rb:149:in `initialize'
@@ -190,3 +190,24 @@ Current state:
 0032 Sat Nov 20 23:09:47 CET 2010
     Another thing: a list(view) does not reload the internal model if a transaction is committed on it.
     qtrconnect, unplug midi port. Should update list automagically.
+0033 Sun Jan  2 13:44:08 CET 2011
+    circle pos: [30, 30], size: 30  is drawn at pos 60, 60 (center 75,75). Something is off.
+0034 Fri Jan  7 23:21:10 CET 2011
+    :: ruby1.9.1 examples/painting/cubics_demo04.rb
+    when clicking in an active vertex:
+    /home/ara/Midibox/lib/reform/graphics/activepath.rb:93:in `setVertexPos': undefined method `path' for #<Reform::PathItem::PathBuilder:0x00000001684380> (NoMethodError)
+    from /home/ara/Midibox/lib/reform/graphics/activepath.rb:34:in `itemChange'
+-0035 Sun Jan  9 14:10:28 CET 2011
+    struct does not propagate at all it seems, see lib/reform/examples/processing/data1_2b.rb
+    data1_2.rb shows a circle that is immediately 'red', however it does that because the dynamic color
+    constructor immediately assigns the proper value from the attached model.
+    However, this probably only works because the model is declared first. It should really not matter
+    and a dynamic attribute constructor should NOT assign the value to begin with.
+    Sun Jan  9 20:25:13 CET 2011
+-0036 Sun Jan  9 14:33:46 CET 2011
+    calling pen/stroke/brush/fill does not set the parent Control (not qt one). As a result putting a connector
+    in it breaks the 'want_data!' message stream and propagation will not work. See data1_2b.rb as mentioned
+    in 0035.
+    Sun Jan  9 20:25:13 CET 2011
+0037 Sun Jan  9 17:39:08 CET 2011
+    The QReplicator handles pen + brush inconsistently. Should be same as 'Empty' class.

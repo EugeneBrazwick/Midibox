@@ -40,7 +40,7 @@ module Reform
 
       class Animation < Control
 
-        private
+        private # Animation methods
           # our parent is the parent of the DynamicAttribute so it could be a GraphicsItem.
           # Which is a Qt::Object, even if Qt::GraphicsItem is not
           def initialize attrib
@@ -49,123 +49,6 @@ module Reform
 
       end
 
-=begin    # it may even be a very good idea to implement to 'enabler' and 'disabler' the very same way!
-    # they are now kind of polluting the updateModel method.
-
-      windowTitle { connector { |m| m.myTitle} }
-
-      new DynamicAttribute self, :windowTitle, quicky, block
-=end
-      class DynamicAttribute < Control
-
-        private # DynamicAttribute methods
-
-          def initialize parent, propertyname, klass, quickyhash = nil, &block
-#             tag "DynamicAttribute.new(#{parent}, :#{propertyname})"
-            super(parent)
-            @propertyname, @klass = propertyname, klass
-            if quickyhash
-              if Hash === quickyhash
-                setup(quickyhash, &block)
-              else
-                applyModel quickyhash
-              end
-            elsif block
-              setup(quickyhash, &block)
-            end
-          end
-
-          def through_state states2values
-            form = containing_form
-            setProperty('value', value2variant(:default))
-            states2values.each do |state, value|
-              form[state].qtc.assignProperty(self, 'value', value2variant(value))
-            end
-          end
-
-          def sequence quickyhash = nil, &block
-            require_relative 'animations/sequentialanimation'
-            setProperty('value', value2variant(:default))
-            SequentialAnimation.new(self, Qt::SequentialAnimationGroup.new(self)).setup(quickyhash, &block)
-          end
-
-          def animation quickyhash = nil, &block
-            require_relative 'animations/attributeanimation'
-#             tag "Creating Qt::Variant of value"
-            setProperty('value', value2variant(:default))
-#             tag ("calling Animation.new")
-            AttributeAnimation.new(self, Qt::PropertyAnimation.new(self)).setup(quickyhash, &block)
-          end
-
-        public # DynamicAttribute methods
-
-          # override
-          def event e
-#             tag "#{self}.event(#{e})"
-            case e
-            when Qt::DynamicPropertyChangeEvent
-              # we may expect the value to be 'value'
-              raise "unexpected property '#{e.propertyName}'" unless e.propertyName == 'value'
-              val = property('value').value
-#               tag "applyModel(#{val.inspect})"
-              applyModel val
-#             else
-#               tag "unhandled .... #{self}.event(#{e})"
-            end
-#             super  not much use
-          end
-
-          def value2variant *value
-            case
-            when @klass == Qt::Brush
-              color = Graphical.color(*value)
-#               tag "Qt::Variant.new(#{color})"
-              Qt::Variant::fromValue(color)
-            when @klass == Qt::Rect
-              Qt::Variant::fromValue(case value[0]
-              when :default then Qt::Rect.new
-              when Qt::Rect then value[0]
-              else Qt::Rect.new(*value) #.tap{|r| tag "creating value(#{r.inspect})"}
-              end)
-            when @klass == Qt::RectF
-              Qt::Variant::fromValue(case value[0]
-              when :default then Qt::RectF.new
-              when Qt::RectF then value[0]
-              else Qt::RectF.new(*value) #.tap{|r| tag "creating value(#{r.inspect})"}
-              end)
-            when @klass == Float
-#               debug Qt::DebugLevel::High do
-                f = value[0] == :default ? 0.0 : value[0]
-#                 tag "value2variant, value = #{value.inspect}, f = #{f.inspect}, #{f.class}"
-                Qt::Variant::new(f)
-#               end
-            else
-              raise Error, tr("Not implemented: animation for property '#@propertyname', klass=#@klass")
-            end
-          end
-
-          # called when Qt::DynamicPropertyChangeEvent is received
-          def applyModel data, model = nil
-#             tag "#{self}::applyModel #{parent}.#@propertyname := #{data.inspect}"
-            parent.send(@propertyname.to_s + '=', data)
-          end
-
-          # the result is a symbol
-          attr :propertyname, :animprop
-
-          alias :propertyName :propertyname
-
-#           attr_accessor  :value
-
-#           properties 'value'
-
-          def dynamicParent
-            self
-          end
-
-      end # class DynamicAttribute
-
-      DynamicProperty = DynamicAttribute
 
     private # Control methods
 
@@ -197,6 +80,16 @@ module Reform
 
         # NOTE: parent may change to its definite value using 'added' See Frame::added
         # in all cases: c.parent.children.contains?(c)
+      end
+
+      # a parameter block can be declared using the block. It actually is a macro.
+      # a parameter block can be executed by omitting the block
+      def parameters id, quicky = nil, &block
+        if block
+          containing_form.parametermacros[id] = Macro.new(nil, id, quicky, block)
+        else
+          containing_form.parametermacros[id].exec(self)
+        end
       end
 
       # it returns qtc.size
@@ -247,27 +140,44 @@ module Reform
       #
       def self.define_simple_setter *list
         list.each do |name|
+          n = (name.to_s + '=').to_sym
           define_method name do |value = nil|
             return @qtc.send(name) if value.nil?
-            @qtc.send(name.to_s + '=', value)
+            @qtc.send(n, value)
           end
         end
       end
 
       # create a DynamicAttribute for each element in the list.
       # the first parameter is the kind of value, and must be an animatable value
-      def self.define_dynamic_setter klass, *list
+      # defines two methods. A specific setter method is also created.
+      # since the protectionlevel is not set, they will both use the current one.
+      # So 'private ; ... define_setter '  will create two private methods.
+      # Boolean and TrueClass are the same and have defaultvalue 'true', while
+      # FalseClass has a default of 'false'. Numerics have 0 as default.
+      def self.define_setter klass, *list
         list.each do |name|
-          define_method name do |hash = nil, &block|
-            return @qtc.send(name) unless hash || block
-            DynamicAttribute.new(self, name, klass, hash, &block)
-          end
           n = (name.to_s + '=').to_sym
+          define_method name do |*args, &block|
+#             tag "DynamicAttribSetter :#{name}, args=#{args.inspect}, block = #{block}"
+            return @qtc.send(name) if args.empty? && !block
+#             tag "args[0] is a #{args[0].class}"
+            case args[0]
+            when Hash, Proc, nil
+              DynamicAttribute.new(self, name, klass, args[0], &block)
+#               tag "created DA, value -> #{value}"
+#               @qtc.send(n, value)             NO. data must come from outside.
+            else @qtc.send(n, *args)
+            end
+          end # method name
           define_method n do |value|
+#             tag "assigning dynamic result #{value.inspect}"
             @qtc.send(n, value)
-          end
+          end # method name=
         end
-      end
+      end # define_setter
+
+      #         alias :define_dynamic_setter :define_setter             CANT BE DONE EASILY WITH static methods...
 
       def executeMacros(receiver = nil)
 #         tag "#{self}#executeMacros, EXECUTE #{instance_variable_defined?(:@macros) ? @macros.length : 0} macros"
@@ -360,8 +270,10 @@ module Reform
         # like the combobox has (it is called 'model' confusingly...)
 #         if children
           children.each do |child|
+            # you can switch on tracking propagations by marking the transaction (tran.debug_track!)
+            # or by passing debug_track: true as arg4 of 'apply_setter'
             if propagation.debug_track?
-              STDERR.print "#{self}::propageModel child=#{child}, want_data?=#{Control === child && child.want_data?}\n"
+              STDERR.print "#{self}::propagateModel child=#{child}, want_data?=#{Control === child && child.want_data?}\n"
             end
             child.updateModel(aModel, propagation) if Control === child && child.want_data?
           end
@@ -378,16 +290,19 @@ module Reform
     protected # Control methods
 
       def want_data!
-#         tag "#{self}#want_data!, propagates up"
+#         tag "#{self}#want_data!, propagates up (with a bit of luck)"
         unless @want_data
           @want_data = true
           # NOTE for dummies: 'parent' is a Qt Widget probably. So we must apply a hack here...
           # NOTE for bigger dummies: 'parent' is NOT a Qt Widget. WHY ?????
 #           p = parent.instance_variable_get(:@_reform_hack) rescue nil
-          if (p = parent).respond_to?(:want_data!)
+#           tag "parent is a #{parent.class}"
+          if (p = parent) && p.respond_to?(:want_data!)
             p.want_data!
-          else
-            tag "INFO: propagation of want_data! blocks at #{self}, parent #{p} lacks want_data!" unless ReForm === self
+          else # this can only happen if the parent is no Control. Expected for ReForm since they have no parent.
+            unless ReForm === self
+              STDERR.print "INFO: propagation of want_data! blocks at #{self}, parent #{p} lacks 'want_data!'\n"
+            end
           end
         end
       end
@@ -429,6 +344,12 @@ module Reform
       end
 
     public # Control methods
+
+      def debug_track v = nil
+        return @debug_track if v.nil?
+        tag "#{self}::debug_track := #{v}"
+        @debug_track = v
+      end
 
       # Once a control sets a connector it then returns true here, and so will
       # all its parents, up to (but excluding) the containing form.
@@ -497,9 +418,11 @@ module Reform
       # here we 'execute' the block or the hash, whichever was given
       # and then we call postSetup
       def setup hash = nil, &initblock
-        instance_eval(&initblock) if initblock
-        setupQuickyhash(hash) if hash
-        postSetup
+        rfRescue do
+          instance_eval(&initblock) if initblock
+          setupQuickyhash(hash) if hash
+          postSetup
+        end
         self
       end
 
@@ -580,7 +503,7 @@ module Reform
 # and it wrong for comboboxes or lists that are assigned local data.
 #         unless @model.equal? control
 #           @model.removeObserver(self) if @model
-        tag "#{self}::addModel(#{control})"
+#         tag "#{self}::addModel(#{control})"
         @model = control
 #           @model.addObserver(self) if @model
 #         end
@@ -752,10 +675,18 @@ module Reform
         do_callback = instance_variable_defined?(:@whenConnected)
         if cid = connector
           # really important, if nothing changes for us, so also not for our children.
-          return unless check_propagation_change(propagation, cid)
+          unless check_propagation_change(propagation, cid)
+            STDERR.print "#{self}::updMod, check_propagation_change FAILS\n" if propagation.debug_track?
+            return
+          end
           do_apply = propagation.sender != self
 #           tag "#{self}::updateModel, do_apply = #{do_apply}, sender = #{propagation.sender}, cid = #{cid} change = #{propagation.get_change(cid)}"
-          return unless do_apply || children || do_callback
+          unless do_apply || children || do_callback
+            if propagation.debug_track?
+              STDERR.print "#{self}::updMod, I am sender, and have no children, and do_callback is not set\n"
+            end
+            return
+          end
           data = aModel.apply_getter(cid)
           # for simple fields the connected model is the container.
           # For example Edit.model is set to the record, same for Combo etc.
@@ -766,7 +697,12 @@ module Reform
           @model = if (is_model = data.respond_to?(:model?) && data.model?) then data else aModel end
 #             tag "applied #{cid} on #@model -> #{data.inspect}, calling #{self}::applyModel"
           applyModel data if do_apply # , aModel the callee can use @model
-          return unless is_model && (children || do_callback)
+          unless is_model && (children || do_callback)
+            if propagation.debug_track?
+              STDERR.print "#{self}::updMod, applied model, but no propagation, since I have no children, and do_callback is not set\n"
+            end
+            return
+          end
         else
           data = aModel
         end
@@ -800,7 +736,7 @@ module Reform
 #           tag "find, klass=#{klass}, #{self} is a #{klass}, req. name = #{name}. Calling block!"
           block[self]
         end
-        children.tap{ |chlds| chlds and chlds.each { |child| Control === child and child.find(klass, name, &block) } }
+        chlds = children and chlds.each { |child| Control === child and child.find(klass, name, &block) }
       end
 
       alias :findChildren :find
@@ -817,7 +753,9 @@ module Reform
       # connected model or nil
       attr :model
 
-      # note we already have the reader above somewhere
+      # note we already have the reader above somewhere, Even with attr_writer it is legal
+      # to pass an array like 'connector :key1, :key2'.
+      # These keys are then applied in that order.
       attr_writer :connector
 
       # the owner form.

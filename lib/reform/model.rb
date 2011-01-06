@@ -163,7 +163,7 @@ transaction that is immediately committed (and at that point propagation starts)
         private
           def initialize model, keypath, oldval = nil
   #           super()
-            tag "New #{self} (#{model}, #{keypath.inspect}, #{oldval})"
+#             tag "New #{self} (#{model}, #{keypath.inspect}, #{oldval})"
             # note this clone may tragically fail for many Qt classes....
             raise "BOGO path, caller = #{caller.join("\n")}" if keypath == [nil]
             @model, @keypath, @oldval = model, keypath, oldval
@@ -314,7 +314,8 @@ transaction that is immediately committed (and at that point propagation starts)
         @root = @tranmodel.root
         @keypaths = {}
         @committed = @aborted = false
-        @debug_track = false
+        @debug_track = sender && sender.debug_track # assuming sender is a Control
+        tag "debug_track = #@debug_track, sender = #{sender}"
         if block_given?
           begin
             begin
@@ -660,7 +661,7 @@ The old rule that 'names' imply 'connectors' is dropped completely.
   #       send name, *args, &block
   #     end
 
-      def apply_setter name, value, sender = nil
+      def apply_setter name, value, sender = nil, more_args = nil
         case name
         when :self
 #           tag "apply_setter"
@@ -680,7 +681,8 @@ The old rule that 'names' imply 'connectors' is dropped completely.
         else
           name = name.to_s
           name = name[0...-1] if name[-1] == '?'
-          pickup_tran(sender) do        # this is only used to get the sender in
+          pickup_tran(sender) do |tran|       # this is only used to get the sender in
+            tran.debug_track! if more_args && more_args[:debug_track]
             send(name + '=', value)#  , sender)
           end
         end

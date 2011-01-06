@@ -101,6 +101,7 @@ Even more, a QDialog can be stored in the view as well!
     def initialize parent, qtc
       super
       @brushes = {} # indexed by name
+      @pens = {} # indexed by name
       @groups = {} # ""
       @pen = defaultPen
       @brush = defaultBrush
@@ -109,9 +110,10 @@ Even more, a QDialog can be stored in the view as well!
     # set the topleft and size of the scene. These can be floats and
     # can be freely chosen. Zoom, offset and aspectratio can be changed
     # for a specific view (and even rotation etc)
-    def area x, y, w, h = w
+    def area x, y = nil, w = nil, h = nil
+      x, y, w, h = x if Array === x && y.nil?
 #       tag "sceneRect := #{x}, #{y}, #{w}x#{h}"
-      @qtc.setSceneRect x, y, w, h
+      @qtc.setSceneRect x, y, w, h || w
     end
 
     # same as area 0, 0, w, h
@@ -174,14 +176,21 @@ Even more, a QDialog can be stored in the view as well!
     # Set the default fill for elements.
     def fill *args, &block
       return @brush unless !args.empty? || block
-      @brush = make_brush(*args, &block)
+#       tag "assigning brush, oldbrush = #@brush"
+      @brush = make_qtbrush_with_parent(self, *args, &block)
+#       tag "assigned effective brush #@brush"
+      children.each do |child|
+        child.qtbrush = @brush if GraphicsItem === child && !child.explicit_brush
+      end
     end
 
     # Set the default stroke for elements
     def stroke *args, &block
       return @pen unless !args.empty? || block
-      @pen = make_pen(*args, &block)
-#       tag "make_pen -> #{@pen.inspect}"}
+      @pen = make_qtpen_with_parent(self, *args, &block)
+      children.each do |child|
+        child.qtpen = @pen if GraphicsItem === child && !child.explicit_pen
+      end
     end
 
     alias :brush :fill
@@ -189,12 +198,15 @@ Even more, a QDialog can be stored in the view as well!
 
   #override
     def addGraphicsItem control, quickyhash = nil, &block
-#       tag "addControl, control #{control} is added to SCENE"
+#       tag "#{self}.addGraphicsItem, control #{control} is added to SCENE, brush=#@brush"
 #       qc = if control.respond_to?(:qtc) then control.qtc else control end             BOGO we call 'setup' two lines ahead anyway!
       @qtc.addItem control.qtc
+#       tag "#{control}.parent := #{self}"
       control.parent = self
+      control.qtpen, control.qtbrush = @pen, @brush  # initial implict tools
       control.setup quickyhash, &block
       added control
+#       tag "#{control}.parent is now #{control.parent}, ctrl.brush = #{control.brush}"
 #       when Timer, Qt::Timer #then tag "start timer"; qc.start(1000)
 #       else @qtc.addWidget(qc)
 #       end

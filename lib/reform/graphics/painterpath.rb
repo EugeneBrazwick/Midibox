@@ -31,7 +31,7 @@ module Reform
   public
 
     def self.new_qt_implementor qt_implementor_class, parent, qt_parent
-      qt_implementor_class.new
+      qt_implementor_class.new   # ignore parent again (but why???)
     end
 
     def addTo parent, hash, &block

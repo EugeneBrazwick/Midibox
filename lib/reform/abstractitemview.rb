@@ -358,7 +358,7 @@ module Reform
 
       def setLocalModel aModel
         raise 'WTF' unless aModel.model?
-        tag "#{self}::setLocalModel #{aModel}!!!!!!!!!!!!" #, caller = #{caller.join("\n")}"
+#         tag "#{self}::setLocalModel #{aModel}!!!!!!!!!!!!" #, caller = #{caller.join("\n")}"
         @localmodel = aModel
 #          note: Qt::ComboBox has no 'selectionModel'. Only ListView and TableView.
         qm = @qtc.model = @localmodel.qtc || createQModel

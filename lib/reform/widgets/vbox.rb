@@ -3,7 +3,7 @@
 
 module Reform
 
-  require_relative '../boxlayout'
+  require 'reform/boxlayout'
 
   class VBox < BoxLayout
     def self.qtimplementor

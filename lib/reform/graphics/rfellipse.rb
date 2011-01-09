@@ -5,6 +5,8 @@ module Reform
 
   require 'reform/graphicsitem'
 
+#   tag "HERE"
+
 # the default pos is 0,0 and the width 100
   class ReformEllipse < GraphicsItem
     private
@@ -72,6 +74,8 @@ module Reform
       end
 
   end # ReformEllipse
+
+#   tag "HERE"
 
   # The difference is we use center as 0,0
   class QReformEllipseItem < Qt::AbstractGraphicsShapeItem
@@ -237,6 +241,8 @@ module Reform
       end
   end # class QReformEllipseItem
 
+#   tag "calling createInstantiator"
   createInstantiator File.basename(__FILE__, '.rb'), QReformEllipseItem, ReformEllipse
+#   tag "OK"
 
 end # Reform

@@ -45,7 +45,7 @@ Even more, a QDialog can be stored in the view as well!
 
             public
               def exec receiver, quicky, &block
-                tag "FIXME, ignoring quicky + block" # should be working on the group.
+                STDERR.print "FIXME, ignoring quicky + block\n" # should be working on the group.
       #           receiver.setup ???
                 executeMacros(receiver)
               end
@@ -75,7 +75,7 @@ Even more, a QDialog can be stored in the view as well!
         public  #DefinitionsBlock methods
 
           def method_missing sym, *args, &block
-            tag "#{self}::method_missing(:#{sym})"
+#             tag "#{self}::method_missing(:#{sym})"
             if args.length == 1 && !block
     #           tag "single arg: #{self}.#{sym}(#{args[0]})"
               case what = args[0]

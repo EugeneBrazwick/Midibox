@@ -1,10 +1,24 @@
 
+# Copyright (c) 2011 Eugene Brazwick
+
+=begin
+  Empty has children but no shape of its own.
+  It is possible to set a pen and brush, and also a matrix(NIY)
+
+  Difference with itemgroup: the child takes over the transform  of the parent. So
+  reparenting an item in the scene to an empty will probably move it or rotate
+  it etc.. An Qt::GraphicsItemGroup leaves the item where it was so there
+  is no visual change.
+
+=end
 module Reform
 
 require 'reform/graphicsitem'
 
   Empty = GraphicsItem
 
+# IMPORTANT: QDuplicate inherits this but currently has a set of matrix operations
+# that actually should be here! FIXME
   class QEmpty < Qt::GraphicsItem
     include QGraphicsItemHackContext
 
@@ -15,7 +29,7 @@ require 'reform/graphicsitem'
         @brush = Qt::Brush.new
       end
 
-    public
+    public # QEmpty methods
       attr_accessor :pen, :brush
 
       def boundingRect
@@ -29,22 +43,6 @@ require 'reform/graphicsitem'
       #override
       def paint painter, option, widget
       end
-
-#       def brush= newbrush
-#         oldbrush = @brush
-#         newbrush = make_brush(newbrush) unless Qt::Brush === newbrush
-#         return if oldbrush.equal?(newbrush)
-#         @brush = newbrush
-#         children.each { |child| child.brush = newbrush if child.brush.equal?(oldbrush) }
-#       end
-#
-#       def pen= pen
-#         oldpen = @pen
-#         newpen = make_pen(newpen) unless Qt::Pen === newpen
-#         return if oldpen.equal?(newpen)
-#         @pen = newpen
-#         children.each { |child| child.pen = newpen if child.pen.equal?(oldpen) }
-#       end
 
   end
 

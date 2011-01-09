@@ -73,7 +73,7 @@ module Reform
         @qtc.instance_variable_set(:@_reform_hack, self) if @qtc
 
         # true if a connector is on this control, or on any of its children
-        @want_data = false
+#         @want_data = false                    leave it unset (effectively false)
 
         # the connected or set model. model.root.parent is the original container. This is a Model
 #         @model = nil
@@ -86,9 +86,11 @@ module Reform
       # a parameter block can be executed by omitting the block
       def parameters id, quicky = nil, &block
         if block
-          containing_form.parametermacros[id] = Macro.new(nil, id, quicky, block)
+          containing_form.parametermacros[id] = Macro.new(nil, nil, quicky, block)       # bit heavy
         else
-          containing_form.parametermacros[id].exec(self)
+#           tag "executing macroblock :#{id} on #{self}"
+          macro = containing_form.parametermacros[id] and
+            setup(macro.quicky, &macro.block)
         end
       end
 
@@ -180,11 +182,12 @@ module Reform
       #         alias :define_dynamic_setter :define_setter             CANT BE DONE EASILY WITH static methods...
 
       def executeMacros(receiver = nil)
-#         tag "#{self}#executeMacros, EXECUTE #{instance_variable_defined?(:@macros) ? @macros.length : 0} macros"
+#         tag "#{self}#executeMacros, EXECUTE #{instance_variable_defined?(:@macros) && @macros.length} macros"
         instance_variable_defined?(:@macros) and @macros.each do |macro|
 #           tag "#{self}::Executing MACRO #{macro}"
           macro.exec(receiver)
         end
+#         tag "HERE"
       end
 
       # return true if applyModel should be called.
@@ -291,7 +294,7 @@ module Reform
 
       def want_data!
 #         tag "#{self}#want_data!, propagates up (with a bit of luck)"
-        unless @want_data
+        unless want_data?
           @want_data = true
           # NOTE for dummies: 'parent' is a Qt Widget probably. So we must apply a hack here...
           # NOTE for bigger dummies: 'parent' is NOT a Qt Widget. WHY ?????
@@ -345,7 +348,7 @@ module Reform
 
     public # Control methods
 
-      def debug_track v = nil
+      def track_propagation v = nil
         return @debug_track if v.nil?
         tag "#{self}::debug_track := #{v}"
         @debug_track = v
@@ -356,7 +359,7 @@ module Reform
       # this is used when propagating modelchanges to easily skip controls
       # that have no interest in any changes.
       def want_data?
-        @want_data
+        instance_variable_defined?(:@want_data) && @want_data
       end
 
 #       def parent val = nil
@@ -687,19 +690,33 @@ module Reform
             end
             return
           end
-          data = aModel.apply_getter(cid)
+          if aModel.respond_to?(:model?) && aModel.model?
+            data = aModel.apply_getter(cid)
+          elsif Proc === cid
+            data = cid.call(aModel)
+          else
+            data = aModel
+          end
           # for simple fields the connected model is the container.
           # For example Edit.model is set to the record, same for Combo etc.
           # But if the result of cid is in fact a model, then we use that as that is the thing we gonna need.
           # This happens for frames and forms.
-#             tag "applied cid #{cid.inspect} on model #{aModel}-> #{data.inspect}"
+#           tag "applied cid #{cid.inspect} on model #{aModel}-> #{data.inspect}"
 #             tag "data.value = #{data.respond_to?(:value) && data.value.inspect}"
           @model = if (is_model = data.respond_to?(:model?) && data.model?) then data else aModel end
 #             tag "applied #{cid} on #@model -> #{data.inspect}, calling #{self}::applyModel"
           applyModel data if do_apply # , aModel the callee can use @model
-          unless is_model && (children || do_callback)
+#           tag "is_model = #{is_model}"
+#           unless is_model && (children || do_callback)  # VERY INCONVENIENT. Why can't I pass a string
+      # directly to an edit contained somewhere?
+          unless children || do_callback
             if propagation.debug_track?
-              STDERR.print "#{self}::updMod, applied model, but no propagation, since I have no children, and do_callback is not set\n"
+#               if is_model
+                STDERR.print "#{self}::updMod, applied model, but no propagation, since I have no children " +
+                             "or do_callback is not set\n"
+#               else
+#                 STDERR.print "#{self}::updMod, applied model, but no propagation, since data is not a Model\n"
+#               end
             end
             return
           end
@@ -708,8 +725,9 @@ module Reform
         end
         # if there is no cid (common case) we must propagate to all children
         propagation = propagation.apply_getter(cid) if cid
-        propagateModel aModel, propagation if children
-        rfCallBlockBack(aModel, propagation, &@whenConnected) if do_callback
+        # end it is 'data' that is now propagated, and not 'aModel'! We must use the cid.
+        propagateModel data, propagation if children
+        rfCallBlockBack(data, propagation, &@whenConnected) if do_callback
       end
 
       # return the model of the containing frame or form, traveling upwards until one is found.

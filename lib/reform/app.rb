@@ -190,6 +190,12 @@ module Reform
     baseclass for ControlContext, GraphicContext etc.
     As such it has a big impact on all Frame and Scene derivates, which are most container classes.
 
+    For example: including GraphicContext means that you get access to methods like
+    'circle', 'rect' etc.  But these are ALL plugins from the corresponding directory.
+    In this case reform/graphics. By storing the methods inside the contect we automatically
+    make them available precisely (pinpoint accuracy!) to the classes of our choice.
+    A class can easily support more than one context.
+
     First we have instantiators for each file/class in the controls or graphics directory.
     For example, since canvas.rb is in controls/ we have an instantiator 'canvas' in all
     frames (widgetcontainers) and its subclasses.
@@ -320,6 +326,8 @@ module Reform
 
     # ControlContext means we get the instantiators in the 'controls' directory.
     # So things including ControlContext can contain other widgets
+    # Remember that these context modules are extended by the registration process
+    # later on. They are not empty at all.
     module WidgetContext
       extend Instantiator
     end
@@ -391,20 +399,27 @@ module Reform
     # this class just stores a name with the arguments to a widget constructor
     class Macro
       private
+
         def initialize control, name, quicky, block
     #       tag "Macro.new(#{control}, #{name})"
           @control, @name, @quicky, @block = control, name, quicky, block
           # WTF??? macros have not a name perse, so macros[name] = self DESTROYS macros!!!!
           control.macros! << self if control
         end
-      public
+
+      public # Macro methods
+
         def exec receiver = nil
-    #       tag "executing macro #{@control.class}::#@name, args=#@quicky, block=#@block"
-          (receiver ||= @control).send(@name, @quicky, &@block) #.tap do |t|
+#           tag "executing macro #{@control.class}::#@name, args=#{@quicky.inspect}, block=#@block"
+#           tag "caller = #{caller.join("\n")}"
+          receiver ||= @control
+#           tag "calling #{receiver}#{@name.inspect}"
+          receiver.send(@name, @quicky, &@block) #.tap do |t|
     #         tag "macroresult is #{t}"
     #       end
         end
-    #         attr :quickylabel, :block
+
+        attr :quicky, :block
         attr_accessor :name
 
         def to_s
@@ -415,6 +430,7 @@ module Reform
 
     # experimental. 'Cans' graphicitem setups
     module SceneFrameMacroContext
+      public
     #     def self.createInstantiator_i name
         def self.createInstantiator_i name, qt_implementor_class, reform_class, options = nil
         end
@@ -422,8 +438,52 @@ module Reform
         def self.registerControlClassProxy_i name, thePath
           name = name.to_sym
           return if private_method_defined?(name)
+          if Symbol === thePath
+    #         tag "Create alias :#{name} :#{thePath}"
+            module_eval "alias :#{name} :#{thePath}"                # 'alias' is an UTTER HACK!
+            return
+          end
           define_method name do |quicky = nil, &block|
-            Macro.new(self, name, quicky, block)
+#             tag "arrived in method #{self}##{name.inspect}"
+            if instance_variable_defined?(:@disable_macros_in_context)
+#               tag "macros disabled"
+              # AARGH IDENTICAL CODE DETECTED. but VERY VERY hard to move.
+              # problem is the parent_qtc_to_use_for call below.
+              c = nil
+              rfRescue do
+#                 tag "check instantiator[#{name.inspect}]"
+                unless Instantiator::instantiator[name]
+#                   tag "require #{thePath.inspect}"
+                  require_relative thePath
+#                   tag "OK"
+                  raise "'#{name}' did not register an instantiator!!!" unless Instantiator::instantiator[name]
+                end
+                instantiator = Instantiator::instantiator[name]
+#                 tag "instantiator:#{instantiator}"
+                reform_class = instantiator[:reform_class]
+#                 tag "reform_class:#{reform_class}"
+                options = instantiator[:options]
+#                 tag "reform_class:#{reform_class}"
+                qt_implementor_class = instantiator[:qt_implementor_class]
+                raise ArgumentError, "Bad hash #{quicky} passed to instantiator '#{name}'" unless quicky == nil || Hash === quicky
+                qparent = quicky && quicky[:qtparent] || parent_qtc_to_use_for(reform_class)
+                ctrl = self
+                newqtc = qt_implementor_class &&
+                        ctrl.instantiate_child(reform_class, qt_implementor_class, qparent)
+#                 tag "newqtc:#{newqtc}"
+                c2 = reform_class.new ctrl, newqtc
+#                 tag "newqtc:#{newqtc}"
+                raise "MAYHEM #{reform_class}.new returned nil ????????????? " if c2.nil?
+                ctrl.add(c2, quicky, &block)
+                c = c2
+              end
+  #             tag "IMPORTANT: method '#{name}' return the control #{c} (class:#{c.class})"
+              raise "Instantiator '#{name}' failed to construct a control!" unless c
+              c
+            else
+#               tag "creating macro"
+              Macro.new(self, name, quicky, block)
+            end
           end
           private name
         end
@@ -770,7 +830,7 @@ module Reform
       raise Error, "incorrect plugin directory '#{dirprefix}'" unless located
     end
 
-    class GraphicsControl < Control; end
+    class GraphicsItem < Control; end
     class Frame < Widget; end
     class Layout < Control; end
     class Animation < Control; end
@@ -779,13 +839,23 @@ module Reform
     class Menu < Control; end
     class App < Qt::Application; end
 
-    # My idea was to keep these outside the real classes to avoid repeating myself
-    # I abuse the fact that some Models are not (and need not be by design) AbstractModels...
-    # As long as they include Model. So anything unknown becomes a Model....
+=begin
+    My idea was to keep these outside the real classes to avoid repeating myself
+    I abuse the fact that some Models are not (and need not be by design) AbstractModels...
+    As long as they include Model. So anything unknown becomes a Model....
+
+    This mapper maps baseclasses to contexts. But it is loosely coupled. Since we do not
+    instantiate anything we simply do not know the class. Below is another mapping
+    from directorynames to these baseclasses.
+    So in the end we tie directories to contexts.
+
+    IMPORTANT: the keys here are currently utterly unused. FIXME? is it even true?
+    getContext4 is used after all.
+=end
     Contexts = { Widget=>[ControlContext, AppMacroContext],
                 AbstractModel=>[ModelContext],
                 Object=>[ModelContext],
-                GraphicsControl=>[GraphicContext, SceneFrameMacroContext],
+                GraphicsItem=>[GraphicContext, SceneFrameMacroContext],
                 Animation=>[AnimationContext, SceneFrameMacroContext],
                 AbstractState=>[StateContext, SceneFrameMacroContext, AppMacroContext],
                 Menu=>[MenuContext],
@@ -814,7 +884,7 @@ module Reform
     # [abstractklass] Gives the baseclass (normally the directory would hint this). Can be one of:
     #                 - Widget
     #                 - AbstractModel
-    #                 - GraphicsControl
+    #                 - GraphicsItem
     #                 - Animation
     #                 - AbstractState
     #                 - Menu
@@ -867,7 +937,7 @@ module Reform
       dirs.each do |dir|
 #         tag "Calling internalize_dir #{dir}"
         internalize dir, 'widgets'=>Widget, 'actions'=>AbstractAction,
-                         'menus'=>Menu, 'graphics'=>GraphicsControl, 'models'=>AbstractModel,
+                         'menus'=>Menu, 'graphics'=>GraphicsItem, 'models'=>AbstractModel,
                          'animations'=>Animation, 'states'=>AbstractState
       end
     end

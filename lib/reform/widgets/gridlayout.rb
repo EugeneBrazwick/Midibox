@@ -132,6 +132,9 @@ gridlayout {
 
       alias :columncount :columnCount
       alias :colcount :columnCount
+      alias :columns :columnCount
+
+    private :columns, :colcount, :columncount
 
       # override
       def postSetup

@@ -440,9 +440,10 @@ mock:
         when :root then root
         when Proc
           #applying method on the structure (not on hash)
-          name.call(@value)
+          name.call(self) #   NOT @value, I just said it...
   #         tag "apply getter proc -> #{r.inspect}"
         when Symbol
+#           tag "check #@value respond_to :#{name}"
           if @value.respond_to?(name)
             @value.send(name)
           else

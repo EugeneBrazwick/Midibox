@@ -199,6 +199,10 @@ module Reform
       end
 
       def geometry=(*value)  # this is quick 'n dirty.  FIXME
+        STDERR.print "BAD call to GraphicsItem::geometry, causing inconsistent translation\n"
+        # ALL gi's have a 'pos' but it is basicly the translation and not the upperleft corner of a
+        # rectangle, or the center of a ellipse.
+        # Current exception is Reform::Point which abuses pos as well. Yet another FIXME.
         @qtc.pos = Qt::Point.new(value[0], value[1])
         self.size  = Qt::Size.new(value[2],  value[3])
       end

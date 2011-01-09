@@ -211,3 +211,6 @@ Current state:
     Sun Jan  9 20:25:13 CET 2011
 0037 Sun Jan  9 17:39:08 CET 2011
     The QReplicator handles pen + brush inconsistently. Should be same as 'Empty' class.
+0038 Wed Jan 12 21:00:50 CET 2011
+    Duplicator and Replicator must gain GENERIC abality to step-operate on ANY parameter.
+    This can of course be done with procs. Just define a 'step' proc that operates on the (re|du)plicate

@@ -314,8 +314,8 @@ transaction that is immediately committed (and at that point propagation starts)
         @root = @tranmodel.root
         @keypaths = {}
         @committed = @aborted = false
-        @debug_track = sender && sender.debug_track # assuming sender is a Control
-        tag "debug_track = #@debug_track, sender = #{sender}"
+        @debug_track = sender && sender.track_propagation # assuming sender is a Control
+#         tag "debug_track = #@debug_track, sender = #{sender}"
         if block_given?
           begin
             begin
@@ -324,7 +324,7 @@ transaction that is immediately committed (and at that point propagation starts)
               yield self
             rescue Exception=>e
               if @@transaction
-#                 tag "FAILED TO EXECUTE tranblock(#{e}, #{e.backtrace.join("\n")}), tran is now #{@@transaction}, abort unless nil"
+#                 tag "FAILED TO EXECUTE tranblock(#{e}, #{e.backtrace.join("\n")}), tran is now #{@@transaction}, abort"
                 abort
               end
               raise

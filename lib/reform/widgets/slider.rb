@@ -12,7 +12,11 @@ module Reform
         # Otherwise another kind of control should be used.
         connect(@qtc, SIGNAL('valueChanged(int)'), self) do |value|
           rfRescue do
-            mod = model and cid = connector and model.apply_setter(cid, value, self, debug_track: true)
+#             tag "#{self}::valueChanged, track_propagation = #{track_propagation}"
+            if (mod = model) && (cid = connector)
+#               tag "APPLY_SETTER"
+              model.apply_setter(cid, value, self)
+            end
           end
         end
       end

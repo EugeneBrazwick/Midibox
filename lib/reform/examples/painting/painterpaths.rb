@@ -12,7 +12,7 @@ require 'reform/app' # app is all you need
 # extend Reform
 
 # I lied:
-require_relative '../../graphics/painterpath'
+require 'reform/graphics/painterpath'
 
 Reform::registerControlClassProxy 'renderarea', 'examples/painting/inc/renderarea'
 

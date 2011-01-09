@@ -139,6 +139,12 @@ I believe 'brush' and 'pen' can become plugins, but they are not really widgets 
             self.color = data
           end
 
+          def color= v
+            @qtc = make_qtpen(v)
+            # we  must reassign the entire brush or a graphicitem will not be updated at all.
+            parent.qtpen = @qtc if parent
+          end
+
       end # class Pen
 
       class Gradient < Control
@@ -295,20 +301,29 @@ I believe 'brush' and 'pen' can become plugins, but they are not really widgets 
       # returns a Qt::Color. The heart of colorknowledge on earth
       # first arg can be
       #   - symbol, like :white, These values (and these only) are cached.
-      #   - Qt::Color (as is)
+      #   - Qt::Color (as is), or Qt::Color plus alpha
       #   - Qt::Brush, using its color
       #   - a String like #rgb or #rrggbb or #rrrrggggbbbb or #rgba, (and similar) or a color name
       #   - Qt::Color enum member like Qt::white
-      #   - Array [r, g, b] or [r,g,b,a]
       #   - int for red, and then arg2 = green, arg3 is blue, and arg4 is default 255 (alpha aka opaqueness)
       #         all values must be between 0 and 255
       #   - int for gray + optional alpha (aka opaqueness) value.
+      #   - Array [r, g, b] or [r,g,b,a] or [grey, a] or [Qt::Color, a]
       #   - float. similar, but all values must be between 0.0 (darkest) and 1.0(lightest)
       def make_color colorsym, g = nil, b = nil, a = nil
 #         tag "make_color(#{colorsym}, #{g}, #{b}, #{a})"
         case colorsym
     #     when Qt::Color, Qt::ConicalGradient, Qt::LinearGradient, Qt::RadialGradient then colorsym
-        when Qt::Color then colorsym
+        when Qt::Color
+          return colorsym unless
+#           tag "Color + alpha combo!, colorsym = #{colorsym.inspect}"
+          if Integer === g
+            colorsym.alpha = g
+          else
+            colorsym.alphaF = g
+          end
+#           tag "with alpha #{g} -> #{colorsym.inspect}"
+          colorsym
         when Qt::Brush then colorsym.color
         when String
           if colorsym[0] == '#'
@@ -316,22 +331,22 @@ I believe 'brush' and 'pen' can become plugins, but they are not really widgets 
             when 5
               r = Qt::Color.new(colorsym[0...-1])
               alpha = colorsym[-1, 1].hex * 17
-              r.setAlpha(alpha)
+              r.alpha = alpha
             when 9
               # #rrggbbaa
               r = Qt::Color.new(colorsym[0...-2])
               alpha = colorsym[-2, 2].hex
-              r.setAlpha(alpha)
+              r.alpha = alpha
             when 13
               # #rrrgggbbbaaa
               r = Qt::Color.new(colorsym[0...-3])
               alpha = colorsym[-3, 3].hex / 4096.0
-              r.setAlphaF(alpha)
+              r.alphaF = alpha
             when 17
               # #rrrrggggbbbbaaaa
               r = Qt::Color.new(colorsym[0...-4])
               alpha = colorsym[-4, 4].hex / 65536.0
-              r.setAlphaF(alpha)
+              r.alphaF = alpha
             else
               r = Qt::Color.new(colorsym)
             end
@@ -340,7 +355,20 @@ I believe 'brush' and 'pen' can become plugins, but they are not really widgets 
             Qt::Color.new(colorsym)
           end
         when Qt::Enum then Qt::Color.new(colorsym)
-        when Array then Qt::Color.new(*colorsym)
+        when Array
+          if Qt::Color === colorsym[0]
+#             tag "Color + alpha combo!"
+            c = colorsym[0]
+            alpha = colorsym[1]
+            if Integer === alpha
+              c.alpha = alpha
+            else
+              c.alphaF = alpha
+            end
+            c
+          else
+            Qt::Color.new(*colorsym)
+          end
         when Integer
           if b
             Qt::Color.new(colorsym, g, b, a || 255)

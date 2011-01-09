@@ -3,30 +3,27 @@
 
 module Reform
 
-  require 'reform/graphicsitem'
+  require_relative 'qtcircle'
 
-# a Point is just a line of length 0
+# a Point is just an ellipse with radius 0.5.
   class Point < GraphicsItem
     private
+      Radius = 0.5
+      Size = 2 * Radius
+
+      def at tx, ty = nil
+        tx, ty = tx if Array === tx
+        @qtc.rect = Qt::RectF.new(tx - Radius, (ty || tx) - Radius, Size, Size)
+      end
   end # Point
 
-# Not going to work...  A line with length 0 is always invisible,
-# Ellipse is also ugly as it there should be an automatic fill.
-#   class QGraphicsPointItem < Qt::GraphicsLineItem
-  class QGraphicsPointItem < Qt::GraphicsEllipseItem
-    include QGraphicsItemHackContext
+  class QPoint < QGraphicsEllipseItem
     private
       def initialize parent
-        super 0.0, 0.0, 1.0, 1.0, parent
+        super(-Point::Radius, -Point::Radius, Point::Size, Point::Size, parent)
       end
-    public
-      # override
-      def paint painter, option, widget = nil
-        painter.brush = Qt::Brush.new(Qt::Color.new(painter.pen.color))
-        painter.drawEllipse(Qt::PointF.new(0.0, 0.0), 0.5, 0.5)
-      end
-  end
+  end # QPoint
 
-  createInstantiator File.basename(__FILE__, '.rb'), QGraphicsPointItem, Point
+  createInstantiator File.basename(__FILE__, '.rb'), QPoint, Point
 
 end # Reform

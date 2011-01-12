@@ -519,7 +519,17 @@ module Reform
 #         tag "#{self}.setupQuickyhash(#{hash.inspect})"
         hash.each do |k, v|
 #           tag "#{self}.#{k}(#{v})"
-          send(k, v) unless k == :postSetup || k == :qtparent # and other hacks!!
+          unless k == :postSetup || k == :qtparent # and other hacks!!
+            # mostly if multiple args are put in a hash, they MUST become an array
+            # this is inconvenient for many funcs.
+            # so we ALWAYS unpack the array to the original args.
+            # to really pass an array as single argument use double brackets: [[ ]]
+            if Array === v
+              send(k, *v)
+            else
+              send(k, v)
+            end
+          end
         end
       end
 

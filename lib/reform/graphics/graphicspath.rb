@@ -129,7 +129,7 @@ Translation and matrix mapping can also be done.
               end
 
               def endpoint?
-                @kind == :end
+                @kind == :end || @kind == :curve_end
               end
 
               def startpoint?
@@ -175,7 +175,12 @@ Translation and matrix mapping can also be done.
                 end
               end # auto_smooth
 
-              attr :kind, :c_prev, :c_next
+              attr_accessor :c_prev, :c_next
+              attr :kind
+
+              def kind= aKind
+                @kind = aKind unless @kind == :curve_end || @kind == :curve_start
+              end
 
               def createDebugController qparent
                 Qt::GraphicsEllipseItem.new(@x - 4, @y - 4, 8, 8, qparent)
@@ -309,6 +314,7 @@ Translation and matrix mapping can also be done.
 =end
           def initialize item
             super()
+            @smooths_present = false
             @paths = []  # of subpaths
             @paths << (@currentpath = [Vertex.new])
             # lower tension (up to 0.0) cause shorter controlpoint-lines
@@ -318,20 +324,26 @@ Translation and matrix mapping can also be done.
             @tension = 1.0
           end
 
+           # at this stage there is no meaning in :smooth anymore.
           def connectToPrev qpath, vertex, prev
-            if vertex.smooth?
-              if prev.smooth?
-#                 tag "GEN: cubicTo"
+#             tag "connect #{prev} with #{vertex}"
+            # special case for invisible start and end segment
+            return if vertex.kind == :curve_end
+            if prev.kind == :curve_start
+              qpath.moveTo vertex.x, vertex.y
+              return
+            end
+            if prev.c_next
+              if vertex.c_prev
+#                 tag "GEN: cubicTo #{vertex.x}, #{vertex.y} (c1=#{prev.c_next.inspect},c2=#{vertex.c_prev.inspect},q)"
                 qpath.cubicTo(*prev.c_next, *vertex.c_prev, vertex.x, vertex.y)
               else
-#                 tag "GEN: cubicTo"
-                qpath.cubicTo(prev.x, prev.y, *vertex.c_prev, vertex.x, vertex.y)
+                qpath.cubicTo(*prev.c_next, vertex.x, vertex.y, vertex.x, vertex.y)
               end
-            elsif prev.smooth?
-#               tag "GEN: cubicTo"
-              qpath.cubicTo(*prev.c_next, vertex.x, vertex.y, vertex.x, vertex.y)
+            elsif vertex.c_prev
+              qpath.cubicTo(prev.x, prev.y, *vertex.c_prev, vertex.x, vertex.y)
             else
-#               tag "GEN: lineTo"
+#               tag "GEN: lineTo #{vertex.x}, #{vertex.y}"
               qpath.lineTo(vertex.x, vertex.y)
             end
           end
@@ -339,51 +351,48 @@ Translation and matrix mapping can also be done.
         public # PathBuilder methods
 
           def build
-#             tag "path, paths = #{@paths.inspect}"
+#             tag "building #{@paths.length} paths"
+            moveTo 0, 0 if @currentpath.length > 1              # this will set :start + :end tags
             # calculate smooths now.
-            @paths.each do |path|
-              break if (n = path.length) == 1 # which can only be the last one
-              path.each_with_index do |vertex, i|
-                case vertex.kind
-                when :end then vertex.c_prev = vertex.v if path[(i - 1) % n].smooth?
-                when :start then vertex.c_next = vertex.v if path[(i + 1) % n].smooth?
-                when :smooth
-                  vertex.auto_smooth(path[(i - 1)  % n], path[(i + 1) % n], @tension)
+            @smooths_present and
+              @paths.each do |path|
+                break if (n = path.length) == 1 # which can only be the last one
+                path.each_with_index do |vertex, i|
+                  case vertex.kind
+                  when :end, :curve_end then vertex.c_prev = vertex.v if path[(i - 1) % n].kind == :smooth
+                  when :start, :curve_start then vertex.c_next = vertex.v if path[(i + 1) % n].kind == :smooth
+                  when :smooth
+                    vertex.auto_smooth(path[(i - 1)  % n], path[(i + 1) % n], @tension)
+                  end
                 end
               end
-            end
             qpath = Qt::PainterPath.new
             @paths.each do |path|
               break if path.length == 1 # which can only be the last one
+#               tag "building path #{path.inspect}"
               prev = path.last
-#               tag "GEN: moveTo"
-              qpath.moveTo(path[0].x, path[0].y)
-              first = true
+#               tag "GEN: moveTo #{path.first.x}, #{path.first.y}"
+              qpath.moveTo((p0 = path.first).x, p0.y)
+              prev = nil
               path.each do |vertex|
-                if first
-                  first = false
-                else
-                  connectToPrev qpath, vertex, prev
-                end
+#                 tag "inspecting vertex #{vertex.x},#{vertex.y}"
+                connectToPrev qpath, vertex, prev if prev
                 prev = vertex
               end
               # at this point 'prev' has become the last vertex.
-              unless prev.endpoint?
                 # this may create a lineTo which would also be done by closeSubpath
-                connectToPrev(qpath, path[0], prev)
-                # experiment: is closeSubpath really necessary??
-#                 closeSubpath
-              end
+              connectToPrev(qpath, p0, prev) unless prev.endpoint?
             end
             qpath
           end
 
           def moveTo x, y, kind = :sharp
-            if @currentpath.length == 1
-              @currentpath[0].setPosAndKind(x, y, kind)
+            if @currentpath.length == 1 # previous move
+              @currentpath.first.setPosAndKind(x, y, kind)
             else
-              @currentpath[0].type = :start
-              @currentpath.last.type = :end
+#               tag "moveTo, set :start + :end"
+              @currentpath.first.kind = :start # the endpoints are not connected
+              @currentpath.last.kind = :end
               @paths << (@currentpath = [Vertex.new(x, y, kind)])
             end
           end
@@ -399,7 +408,14 @@ Translation and matrix mapping can also be done.
           end
 
           def smoothTo x, y
+            @smooths_present = true
             @currentpath << Vertex.new(x, y, :smooth)
+          end
+
+          def bezierTo c1x, c1y, c2x, c2y, qx, qy
+            @currentpath.last.c_next = c1x, c1y
+            @currentpath << (v = Vertex.new(qx, qy, :bezier))
+            v.c_prev = c2x, c2y
           end
 
           def each_vertex
@@ -413,9 +429,11 @@ Translation and matrix mapping can also be done.
             end
           end
 
-          def firstnode?
-            @currentpath.length == 1
-          end
+          # this means we only did the move.
+          # true initially, after a moveTo or a closeSubpath.
+#           def firstnode?
+#             @currentpath.empty?
+#           end
 
           def [](index)
             @paths.each do |path|
@@ -424,6 +442,14 @@ Translation and matrix mapping can also be done.
                 return vertex if (index -= 1) < 0
               end
             end
+          end
+
+          def last
+            @currentpath.last
+          end
+
+          def first
+            @currentpath.first
           end
 
           attr_accessor :tension
@@ -454,27 +480,71 @@ Translation and matrix mapping can also be done.
         @path.closeSubpath
       end
 
-      # if you use two lines, it's the same as one. Or you must close
-      # the first one explicitely
-      def line *args
-        first = true
+=begin
+      if you use two lines, it's the same as one. Or you must close
+      the first one explicitely
+              line x, y
+              line x2, y2
+       Same as         line x,y, x2,y2
+
+this is madness.
+
+The names are bad.
+
+moveto lineto smoothto is much better.
+
+=end
+      def lineto *args
         args.each_slice(2) do |x, y|
           return closeSubpath if x == :close
-          if @path.firstnode? && first
-            tag "firstnode, moveTo..."
-            @path.moveTo(x, y)
-            first = false
-          else
-            @path.lineTo(x, y)
-          end
+          @path.lineTo(x, y)
         end
       end
 
-      def vertex x, y
-        if @path.firstnode?
-          @path.moveTo(x, y)
-        else
-          @path.lineTo(x, y)
+      def moveto x, y, kind = :sharp
+        @path.moveTo x, y, kind
+      end
+
+      def line x, y, *args
+        moveto x, y
+        lineto *args
+      end
+
+      def triangle x1,y1, x2,y2, x3,y3
+        line x1,y1, x2,y2, x3,y3, :close
+      end
+
+      def triangle_strip x1,y1, x2,y2, *args
+        p = x1, y1
+        q = x2, y2
+        args.each_slice(2) do |x, y|
+          line *p, *q, x, y, :close
+          p = q
+          q = x, y
+        end
+      end
+
+      def triangle_fan x1, y1, x2, y2, *args
+        p0 = x1, y1
+        q = x2, y2
+        args.each_slice(2) do |x, y|
+          line *p0, *q, x, y, :close
+          q = x, y
+        end
+      end
+
+      # quad in the sense of 4 vertices, not a quadratic arc...
+      def quad x1,y1, x2,y2, x3,y3, x4,y4
+        line x1,y1, x2,y2, x3,y3, x4,y4, :close
+      end
+
+      def quad_strip xl1,yl1, xr1,yr1, *args
+        pl = xl1, yl1
+        pr = xr1, yr1
+        args.each_slice(4) do |xl, yl, xr, yr|
+          line *pl, *pr, xr, yr, xl, yl, :close
+          pl = xl, yl
+          pr = xr, yr
         end
       end
 
@@ -484,23 +554,41 @@ Translation and matrix mapping can also be done.
       # build an internal path first, then convert it to Qt::PainterPath.
       # and we have full control.
       # if the path was not closed the first node will be smooth.
-      def smooth *args
-        first = true
+      def smoothto *args
         args.each_slice(2) do |x, y|
           return closeSubpath if x == :close
-          if @path.firstnode? && first
-            @path.moveTo(x, y, :smooth)
-            first = false
-          else
-            @path.smoothTo(x, y)
-          end
+          @path.smoothTo(x, y)
         end
+      end
+
+      def smooth x, y, *args
+        moveto x, y, :smooth
+        smoothto *args
+      end
+
+      def curve *args
+#         tag "Calling smooth(#{args.inspect})"
+        smooth *args
+#         tag "set :curve_start + :curve_end"
+        @path.first.kind = :curve_start
+        @path.last.kind = :curve_end
+      end
+
+      def bezierto *args
+        args.each_slice(6) do |a| # } # c1x, c1y, c2x, c2y, qx, qy|
+          @path.bezierTo(*a)
+        end
+      end
+
+      def bezier x, y, *args
+        moveto x,y
+        bezierto *args
       end
 
       # called by postSetup, should only be called once
       def assignQPath
         @qtc.path = @path.build
-#         tag "#{@qpath.each_vertex { |v| v.createDebugController(@qtc) }}"
+#         tag "path: #{@path.each_vertex { |v| v.inspect }}"
       end
 
     public

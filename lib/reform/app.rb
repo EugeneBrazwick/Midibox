@@ -85,6 +85,25 @@ class Numeric
     def clamp lower, upper
       self < lower ? lower : self > upper ? upper : self
     end
+
+    # returns a normalized value where lower is mapped to 0.0 and upper to 1.0
+    def norm lower, upper
+      r = upper.to_f - lower.to_f
+      (self - lower) / r
+    end
+
+    # map = norm + lerp
+    def map l1, u1, l2, u2
+      norm(l1, u1).lerp(l2, u2)
+    end
+end
+
+class Float
+  public
+    # reverse of norm, linear interpolate a normalized value
+    def lerp lower, upper
+      lower + self * (upper - lower)
+    end
 end
 
 # The Reform library is a qtruby based library for building gui's in a 100%

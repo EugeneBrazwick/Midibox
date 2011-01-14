@@ -21,6 +21,7 @@ module Reform
     private
       def initialize parent
         super(-Point::Radius, -Point::Radius, Point::Size, Point::Size, parent)
+#            self.brush = Graphical::make_qtbrush(:black) ??
       end
   end # QPoint
 

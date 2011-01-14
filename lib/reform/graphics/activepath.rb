@@ -44,8 +44,8 @@ module Reform
         super
         @path = PathBuilder.new(self)
         @ctrlr_radius = 5.0
-        @ctrlr_pen = Graphical::make_pen(:red)
-        @ctrlr_brush = Graphical::make_brush(:no_brush)
+        @ctrlr_pen = Graphical::make_qtpen(:red)
+        @ctrlr_brush = Graphical::make_qtbrush(:no_brush)
         @ctrlr_cursor = Qt::PointingHandCursor
       end
 
@@ -67,11 +67,11 @@ module Reform
       end
 
       def controller_pen(*args, &block)
-        @ctrlr_pen = make_pen(*args, &block)
+        @ctrlr_pen = make_qtpen(*args, &block)
       end
 
       def controller_brush(*args, &block)
-        @ctrlr_brush = make_brush(*args, &block)
+        @ctrlr_brush = make_qtbrush(*args, &block)
       end
 
       def assignQPath

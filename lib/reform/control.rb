@@ -813,6 +813,10 @@ module Reform
         super
       end
 
+      def define quickyhash = nil, &block
+        DefinitionsBlock.new(containing_form).setup(quickyhash, &block)
+      end
+
       # Qt control that is wrapped
       attr :qtc
 

@@ -183,6 +183,7 @@ module Reform
     autoload :Control, 'reform/control'
     autoload :Prelims, 'reform/prelims'
     autoload :DynamicAttribute, 'reform/dynamicattribute'
+    autoload :DefinitionsBlock, 'reform/defblock'
 
     # A class specifically representing a duration in milliseconds
     # See Fixnum#seconds and Fixnum#milliseconds

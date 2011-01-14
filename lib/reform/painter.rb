@@ -44,7 +44,7 @@ module Reform
       when Qt::Enum then if value.type == 'Qt::GlobalColor' then value = Qt::Brush.new(value) end
       when String then value = Qt::Brush.new(Qt::Color.new(value))
       when Qt::Brush
-      else value = make_brush(value)
+      else value = make_qtbrush(value)
       end
       method_missing(:brush=, value)
     end
@@ -53,7 +53,7 @@ module Reform
       case value
       when Qt::Enum then if value.type == 'Qt::GlobalColor' then value = Qt::Color.new(value) end
       when Qt::Pen
-      else value = make_pen(value)
+      else value = make_qtpen(value)
       end
 #       tag "pen := #{value.inspect}"
       method_missing(:pen=, value)
@@ -63,10 +63,10 @@ module Reform
       case args.length
       when 2
         # always rect + brush
-        args[1] = make_brush(args[1])
+        args[1] = make_qtbrush(args[1])
       when 5
         # always x, y, w, h + brush. Hence:
-        args[4] = make_brush(args[4])
+        args[4] = make_qtbrush(args[4])
       end
       method_missing(:fillRect, *args)
     end

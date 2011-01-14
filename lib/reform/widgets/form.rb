@@ -49,6 +49,10 @@ module Reform
         @undostack = QUndoStack.new(self)
         $undo.addStack(@undostack)
         @parametermacros = {} # hash name -> macroarray
+        @brushes = {} # indexed by name
+        @pens = {} # indexed by name
+        @itemgroups = {} # ""
+        @colors = {}
       end
 
       # IMPORTANT: the name becomes a method of $qApp, if and only if it ends
@@ -68,6 +72,32 @@ module Reform
       end
 
     public
+
+      def registerBrush name, brush
+        case brush
+        when Qt::Brush then @brushes[name] = brush
+        when Graphical::Brush then @brushes[name] = brush.qtc
+        when Graphical::Gradient then @brushes[name] = Qt::Brush.new(brush.qtc)
+        else raise "Cannot register a #{brush.class}"
+        end
+      end
+
+      def registerPen name, pen
+        case pen
+        when Qt::Pen then @pens[name] = pen
+        when Graphical::Pen then @pens[name] = pen.qtc
+        else raise "Cannot register a #{brush.class}"
+        end
+      end
+
+      def registeredPen(name)
+        @pens[name]  # THIS IS EVIL || :black
+      end
+
+      def registeredBrush(name)
+        @brushes[name] # ... || :white
+      end
+
 
       # override. The containing form. We contain ourselves.
       def containing_form

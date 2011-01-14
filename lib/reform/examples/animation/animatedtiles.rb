@@ -91,15 +91,15 @@ class Button < Qt::GraphicsWidget
       grad = Qt::LinearGradient.new(r.topLeft(), r.bottomRight());
       grad.setColorAt(down ? 1 : 0, color((option.state & QStyle::State_MouseOver) != 0 ? :white : :lightGray));
       grad.setColorAt(down ? 0 : 1, color(:darkGray));
-      painter.pen = make_pen(:darkGray)
-      painter.brush = make_brush(grad);
+      painter.pen = make_qtpen(:darkGray)
+      painter.brush = make_qtbrush(grad);
       painter.drawEllipse(r);
 #       grad2 = Qt::LinearGradient.new(r.topLeft(), r.bottomRight()); ??
       grad.setColorAt(down ? 1 : 0, color(:darkGray));
       grad.setColorAt(down ? 0 : 1, color(:lightGray));
-      painter.pen = make_pen(:none)
+      painter.pen = make_qtpen(:none)
       setPen(Qt::NoPen);
-      painter.brush = make_brush(grad);
+      painter.brush = make_qtbrush(grad);
       down and painter.translate(2, 2);
       painter.drawEllipse(r.adjusted(5, 5, -5, -5));
       painter.drawPixmap(-@pix.width()/2, -@pix.height()/2, @pix);

@@ -30,11 +30,14 @@ I believe 'brush' and 'pen' can become plugins, but they are not really widgets 
 
           # makes it a solid brush.
           def color *args, &block
+#             tag "color(#{args.inspect})"
             case args[0]
             when Hash, Proc, nil
               DynamicAttribute.new(self, :color, Qt::Color, args[0], &block)
             else
-              @qtc = make_qtbrush(make_color(*args))
+#               tag "using make + make"
+              @qtc = make_qtbrush(make_color(*args) # .tap{|c| tag "col=#{c.red},#{c.green},#{c.blue}"}
+                )
             end
           end
 
@@ -106,6 +109,7 @@ I believe 'brush' and 'pen' can become plugins, but they are not really widgets 
 
           def capStyle value
             @qtc.capStyle = if Symbol === value then CapMap[value] || Qt::FlatCap else value end
+#             tag "capStyle := #{@qtc.capStyle}, value = #{value}"
           end
 
           alias :cap :capStyle
@@ -383,12 +387,36 @@ I believe 'brush' and 'pen' can become plugins, but they are not really widgets 
             Qt::Color.new((colorsym * 255.0).floor, (colorsym * 255.0).floor, (colorsym * 255.0).floor,
                           ((g || 1.0) * 255.0).floor)
           end
-        when Symbol then @@color[colorsym]
+        when Symbol
+          if col = @@color[colorsym]
+            col
+          else
+            col = containing_form.registeredBrush(colorsym) or
+              raise Error, ":#{colorsym} is not a valid colorsymbol or registered brush, use #{@@color.keys.inspect}"
+#             tag "color=#{col.color}, rgb=#{col.color.red},#{col.color.green},#{col.color.blue}"
+            col.color
+          end
         else raise Error, "invalid color #{colorsym}, #{g}, #{b}, #{a}"
         end
       end
 
       alias :color :make_color
+
+      # according to Hue, Saturation and Brightness.
+      # ranges are: 0..360, 0..255, 0..255.
+      # OR: 0.0 to 1.0 for all
+      def hsb h, s = nil, b = nil, alpha = nil
+        col = Qt::Color.new
+        case h
+        when Float then col.setHsvF(h, s || 1.0, b || 1.0, alpha || 1.0)
+        when Integer then col.setHsv(h, s || 255, b || 255, alpha || 255)
+        else raise Error, "invalid hsb #{h}, #{s}, #{b}"
+        end
+        col # errr....
+      end
+
+      # 'value' == 'brightness'
+      alias :hsv :hsb
 
       generateColorConverter :color2pen, Qt::Pen, @@pen     # DEPRECATED
       generateColorConverter :color2brush, Qt::Brush, @@solidbrush # DEPRECATED
@@ -430,9 +458,8 @@ I believe 'brush' and 'pen' can become plugins, but they are not really widgets 
       # convert anything into a Qt::Brush
       def make_qtbrush_with_parent parent, *args, &block
         args = args[0] if args.length <= 1
-    #     tag "make_qtbrush #{colorsym}, #{more.inspect}"
+#         tag "make_qtbrush_with_parent #{args.inspect}, block=#{block}"
         args = args.qtc if args.respond_to?(:qtc)
-    #     tag "colorsym = #{colorsym.inspect}"
         case args
         when Qt::Brush then args
         when false, :none, :nobrush, :no_brush then @@solidbrush[:none] ||= Qt::Brush.new(Qt::NoBrush)
@@ -443,9 +470,15 @@ I believe 'brush' and 'pen' can become plugins, but they are not really widgets 
             @@solidbrush[:none] ||= Qt::Brush.new(Qt::NoBrush)
           end
         when Symbol
-    #       tag "locating :#{colorsym}, working through @@color #{@@color.inspect}"
-          col = @@color[args] or raise Error, ":#{args} is not a valid colorsymbol, use #{@@color.keys.inspect}"
-          @@solidbrush[args] ||= Qt::Brush.new(col) #) .tap{|b| tag "returning #{b}"}
+#           tag "locating :#{args}"
+          if col = @@color[args]
+            @@solidbrush[args] ||= Qt::Brush.new(col) #) .tap{|b| tag "returning #{b}"}
+          else
+            col = containing_form.registeredBrush(args) or
+              raise Error, ":#{args} is not a valid colorsymbol or registered brush, use #{@@color.keys.inspect}"
+#             tag "color=#{col.color}, rgb=#{col.color.red},#{col.color.green},#{col.color.blue}"
+            Qt::Brush.new(col.color) #.tap{|t| c=t.color; tag "RGB:#{c.red},#{c.green},#{c.blue},#{c.alpha}"}
+          end
         when Qt::RadialGradient, Qt::LinearGradient, Qt::ConicalGradient then Qt::Brush.new(args)
         when Hash then Brush.new(parent).setup(args, &block).qtc
         when String

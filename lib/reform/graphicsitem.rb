@@ -66,6 +66,15 @@ module Reform
         end
       end
 
+      # currently 'strength' is not supported. Actually tint should become a controller, of course
+      def tint *args
+#         tag "qtc = #@qtc"
+        ef = Qt::GraphicsColorizeEffect.new(self) # @qtc)  not an object!!
+        color = ef.color = make_color(*args)
+        @qtc.setGraphicsEffect(ef)
+        @qtc.opacity = color.alphaF if color.alphaF < 1.0
+      end
+
     public # GraphicsItem methods
 
       attr :explicit_pen, :explicit_brush
@@ -95,11 +104,11 @@ module Reform
        cannot be dynamic as this causes terrible ambiguities.
 =end
       def fill *args, &block
-#         tag "#{self}::fill(#{args.inspect})"
+#         tag "#{self}::fill(#{args.inspect}), block=#{block}"
         return @qtc.brush unless args[0] || block
 #         tag "args[0].class = #{args[0].class}"
         @explicit_brush = self.qtbrush = case args[0]
-          when Symbol then frame_ex.registeredBrush(args[0]) || make_qtbrush_with_parent(self, *args)
+          when Symbol then containing_form.registeredBrush(args[0]) || make_qtbrush_with_parent(self, *args)
   #         when Hash, Proc, nil then DynamicAttribute.new(self, :brush, Qt::Brush, args[0], &block).value
           when Qt::Brush then args[0]
           when nil #DynamicAttribute.new(self, :brush, Qt::Brush, nil, &block).value
@@ -108,14 +117,14 @@ module Reform
             Brush.new(self).setup(&block).qtc # .tap{|t| tag "brush.qtc=#{t}"}
           else make_qtbrush_with_parent(self, *args)
           end
-#         tag "assign brush #{brush}"
+#         tag "assign brush #{@explicit_brush}, rgb=#{@explicit_brush.color.blue}, #{@explicit_brush.color.green}, #{@explicit_brush.color.blue}, alpha=#{@explicit_brush.color.alpha}"
       end
 
       def stroke *args, &block
 #         tag "stroke #{args.inspect}"
         return @qtc.pen unless args[0] || block
         @explicit_pen = self.qtpen = case args[0]
-          when Symbol then frame_ex.registeredPen(args[0]) || make_qtpen_with_parent(self, *args)
+          when Symbol then containing_form.registeredPen(args[0]) || make_qtpen_with_parent(self, *args)
   #         when Hash, Proc
   # #           tag "#{self}::stroke + Hash/Proc -> DynamicAttribute"
   #           DynamicAttribute.new(self, :pen, Qt::Pen, pen, &block).value
@@ -203,8 +212,10 @@ module Reform
         # ALL gi's have a 'pos' but it is basicly the translation and not the upperleft corner of a
         # rectangle, or the center of a ellipse.
         # Current exception is Reform::Point which abuses pos as well. Yet another FIXME.
+        value = value[0] if Array === value[0]
+        tag "qtc.pos := #{value[0]},#{value[1]}"
         @qtc.pos = Qt::Point.new(value[0], value[1])
-        self.size  = Qt::Size.new(value[2],  value[3])
+        self.size  = Qt::Size.new(value[2],  value[3] || value[2])
       end
 
       # catches Qt's 'itemChange' event. Value is the value of the Qt::Variant, not the variant

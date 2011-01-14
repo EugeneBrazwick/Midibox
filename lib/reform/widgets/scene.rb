@@ -30,79 +30,10 @@ Even more, a QDialog can be stored in the view as well!
     # note that ControlContext is already included in Frame.
     include Graphical, GraphicContext, AnimationContext, StateContext
 
-      # you can build a brush, pen and graphicitem pool.
-      class DefinitionsBlock < Control
-        include Graphical
-
-          class GroupMacro < Control
-            include Graphical, SceneFrameMacroContext
-            private
-              def initialize hash, &initblock
-                super(nil)
-                instance_eval(&initblock) if initblock
-                hash.each { |k, v| send(k, v) } if hash
-              end
-
-            public
-              def exec receiver, quicky, &block
-                STDERR.print "FIXME, ignoring quicky + block\n" # should be working on the group.
-      #           receiver.setup ???
-                executeMacros(receiver)
-              end
-
-          end # class GroupMacro
-
-        private # DefinitionsBlock methods
-
-          def shapegroup quickyhash = nil, &block
-            GroupMacro.new(quickyhash, &block)
-          end
-
-            # I see a pattern here (FIXME)
-          def brush *args, &block
-            make_brush(*args, &block)
-          end
-
-          alias :fill :brush
-
-          def pen *args, &block
-#             tag "Scene:: pen"
-            make_pen(*args, &block)
-          end
-
-          alias :stroke :pen
-
-        public  #DefinitionsBlock methods
-
-          def method_missing sym, *args, &block
-#             tag "#{self}::method_missing(:#{sym})"
-            if args.length == 1 && !block
-    #           tag "single arg: #{self}.#{sym}(#{args[0]})"
-              case what = args[0]
-              when Brush, Gradient then parent.registerBrush(sym, what)
-              when Pen then parent.registerPen(sym, what)
-                # parent is always the scene
-              when GroupMacro then Graphical.registerGroupMacro(parent, sym, what)
-              else super
-              end
-            else
-              super
-            end
-          end
-
-  #       def updateModel model, info
-          # IGNORE, at least currently. It may be usefull to create dynamic tools.... So never mind....
-  #       end
-      end # class DefinitionsBlock
-
-
   private # Scene Methods
 
     def initialize parent, qtc
       super
-      @brushes = {} # indexed by name
-      @pens = {} # indexed by name
-      @groups = {} # ""
       @pen = defaultPen
       @brush = defaultBrush
     end
@@ -126,7 +57,7 @@ Even more, a QDialog can be stored in the view as well!
     end
 
     def background brush
-      @qtc.backgroundBrush = make_brush(brush)
+      @qtc.backgroundBrush = make_qtbrush(brush)
     end
 
 =begin
@@ -143,31 +74,7 @@ Even more, a QDialog can be stored in the view as well!
 #     def duplicate &block
 #     end  AARGH
 
-    def define quickyhash = nil, &block
-      DefinitionsBlock.new(self).setup(quickyhash, &block)
-    end
-
   public # Scene methods
-
-    def registerBrush name, brush
-      case brush
-      when Brush then @brushes[name] = brush.qtc
-      when Gradient then @brushes[name] = Qt::Brush.new(brush.qtc)
-      else raise "Cannot register a #{brush.class}"
-      end
-    end
-
-    def registerPen name, pen
-      @pens[name] = pen.qtc
-    end
-
-    def registeredPen(name)
-      @pens[name]  # THIS IS EVIL || :black
-    end
-
-    def registeredBrush(name)
-      @brushes[name] # ... || :white
-    end
 
 #     def registerGroupMacro name, group
 #       @groups[name] = group

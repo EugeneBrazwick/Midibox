@@ -137,6 +137,17 @@ module Reform
 #         tag "qtc.pen=#{@qtc.pen.inspect}, color=#{@qtc.pen.color.inspect}"
       end
 
+      def font *args, &block
+        return @qtc.font unless args[0] || block
+        @explicit_font = self.qtfont = case args[0]
+          when Symbol then containing_form.registeredFont(args[0]) || make_qtfont_with_parent(self, *args)
+          when Qt::Font then args[0]
+          when nil then Font.new(self).setup(&block).qtc
+          else
+            make_qtfont_with_parent(self, *args)
+          end
+      end
+
       # alias :background :fill                 DEPRECATED, confused with Canvas#background. Totally different idea.
 
       alias :brush :fill
@@ -204,6 +215,15 @@ module Reform
         @qtc.pen = newpen
         children.each do |child|
           child.qtpen = newpen if GraphicsItem === child && !child.explicit_pen
+        end
+      end
+
+      def qtfont= newfont
+        newfont = make_qtfont(newfont) unless Qt::Font === newfont
+#         tag "qtfont := #{newfont}, setting #@qtc.font"
+        @qtc.font = newfont
+        children.each do |child|
+          child.qtfont = newfont if GraphicsItem === child && !child.explicit_font
         end
       end
 

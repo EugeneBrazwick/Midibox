@@ -44,6 +44,10 @@ module Reform
 
       alias :stroke :pen
 
+      def font *args, &block
+        make_qtfont(*args, &block)
+      end
+
     public  #DefinitionsBlock methods
 
       def method_missing sym, *args, &block
@@ -53,6 +57,7 @@ module Reform
           case what = args[0]
           when Qt::Brush, Brush, Gradient then parent.registerBrush(sym, what)
           when Qt::Pen, Pen then parent.registerPen(sym, what)
+          when Qt::Font, Font then parent.registerFont(sym, what)
             # parent is always the scene
           when GroupMacro then registerGroupMacro(parent, sym, what)
           else super

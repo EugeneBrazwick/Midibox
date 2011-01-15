@@ -53,6 +53,7 @@ module Reform
         @pens = {} # indexed by name
         @itemgroups = {} # ""
         @colors = {}
+        @fonts = {}
       end
 
       # IMPORTANT: the name becomes a method of $qApp, if and only if it ends
@@ -86,7 +87,15 @@ module Reform
         case pen
         when Qt::Pen then @pens[name] = pen
         when Graphical::Pen then @pens[name] = pen.qtc
-        else raise "Cannot register a #{brush.class}"
+        else raise "Cannot register a #{pen.class}"
+        end
+      end
+
+      def registerFont name, font
+        case font
+        when Qt::Font then @fonts[name] = font
+        when Graphical::Font then @fonts[name] = font.qtc
+        else raise "Cannot register a #{font.class}"
         end
       end
 
@@ -98,6 +107,9 @@ module Reform
         @brushes[name] # ... || :white
       end
 
+      def registeredFont(name)
+        @fonts[name]
+      end
 
       # override. The containing form. We contain ourselves.
       def containing_form

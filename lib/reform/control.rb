@@ -54,7 +54,7 @@ module Reform
 
       # create a new Control, using the frame as 'owner', and qtc as the wrapped Qt::Widget
       def initialize parent = nil, qtc = nil
-  #       tag "#{self}::initialize"
+#         tag "#{self}::initialize"
         if parent
 #           tag "calling Qt::Object.initialize(#{parent})"
           super(parent)
@@ -66,7 +66,7 @@ module Reform
           super()
   #         tag "HERE"
         end
-  #       tag "HERE"
+#        tag "HERE"
         # FIXME: each control has these and only qtc is of real importance
         # containing_form can be cached in the getter and has_pos needs not be set at all
         @containing_form, @qtc = parent && parent.containing_form, qtc

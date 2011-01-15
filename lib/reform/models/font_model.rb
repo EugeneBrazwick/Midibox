@@ -171,10 +171,9 @@ To fix this mess I make a new property, called stylestr. (Solution 3)
 
       # it is weird but this must be like this or it breaks (sic)
       def toString
-        super #.tap{|r|tag "toString -> #{r}"}
+        super
       end
 
-      # toString also exists.
   end # class FontModel
 
   createInstantiator File.basename(__FILE__, '.rb'), nil, FontModel

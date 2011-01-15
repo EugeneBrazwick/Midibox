@@ -424,6 +424,9 @@ module Reform
         @model_connector = value
       end
 
+      alias :modelconnector :model_connector
+      alias :keyconnector :key_connector
+
       def updateModel aModel, propagation
         if aModel == @localmodel
           setLocalModel(aModel)  # whatever changed. This may need to be more precise

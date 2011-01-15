@@ -30,14 +30,14 @@ Reform::app {
           combobox {
             name :sizeCombo
             stretch 1
-            model :sizes  # use font.sizes as model source
+            modelconnector :sizes  # use font.sizes as model source
             connector :pointSize # and set font.pointSize when changed
           }
           label text: tr('Style:') # styleLabel);
           combobox {
             name :styleCombo
             stretch 1
-            model :styles
+            modelconnector :styles
             connector :styleString # and NOT :style!!!
           }
           label text: tr('Automatic Font Merging:')

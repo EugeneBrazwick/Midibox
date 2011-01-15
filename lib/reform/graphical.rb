@@ -151,6 +151,34 @@ I believe 'brush' and 'pen' can become plugins, but they are not really widgets 
 
       end # class Pen
 
+      class Font < Control
+        private
+          def initialize parent = nil
+#             tag "loading font_model"
+#             require_relative 'models/font_model'
+#             tag "creating FontModel"
+#             fm = FontModel.new(self)
+            fm = Qt::Font.new('sans')
+#             tag "parent = #{parent.inspect}"
+#             tag "fm = #{fm}, calling super"
+            super(parent, fm)
+            @ptsize = -1 # systemdep. default
+            @name = nil
+          end
+
+          def name aName
+            @qtc.family = aName
+            parent.qtfont = @qtc if parent
+          end
+
+          alias :family  :name
+
+          def ptsize val
+            @qtc.pointSize = val
+            parent.qtfont = @qtc if parent
+          end
+      end
+
       class Gradient < Control
         include Graphical
         private
@@ -465,7 +493,7 @@ I believe 'brush' and 'pen' can become plugins, but they are not really widgets 
         when false, :none, :nobrush, :no_brush then @@solidbrush[:none] ||= Qt::Brush.new(Qt::NoBrush)
         when nil
           if block
-            Brush.new.setup(parent, &block).qtc
+            Brush.new(parent).setup(&block).qtc
           else
             @@solidbrush[:none] ||= Qt::Brush.new(Qt::NoBrush)
           end
@@ -493,8 +521,23 @@ I believe 'brush' and 'pen' can become plugins, but they are not really widgets 
         end
       end
 
+      def make_qtfont_with_parent parent, *args, &block
+        args = args[0] if args.length <= 1
+        args = args.qtc if args.respond_to?(:qtc)
+        case args
+        when Qt::Font then args
+        when String then Qt::Font.new(args)
+        when nil, Hash then Font.new(parent).setup(args, &block).qtc
+        else raise "Illegal font params #{args.inspect}"
+        end #.tap {|f| tag "created font: #{f.toString}" }
+      end
+
       def make_qtbrush *args, &block
         make_qtbrush_with_parent nil, *args, &block
+      end
+
+      def make_qtfont *args, &block
+        make_qtfont_with_parent nil, *args, &block
       end
 
       # horizontal gradient, with width 'w' logical units and

@@ -23,6 +23,6 @@ module Reform
 
   end # GraphicText
 
-  createInstantiator File.basename(__FILE__, '.rb'), Qt::GraphicsTextItem, Graphictext
+  createInstantiator File.basename(__FILE__, '.rb'), Qt::GraphicsTextItem, GraphicText
 
 end # Reform

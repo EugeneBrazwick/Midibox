@@ -15,11 +15,69 @@ module Reform
       @qtc.text = t
     end
 
+    def at x, y
+      @qtc.setOffset x, y
+    end
+
   public
 
   end # SimpleText
 
-  createInstantiator File.basename(__FILE__, '.rb'), Qt::GraphicsSimpleTextItem, SimpleText
+  class QGraphicsSimpleTextItem < Qt::GraphicsSimpleTextItem
+    private
+      def initialize qparent
+        super
+        @pen = nil # @brush = nil
+        @x = @y = 0
+      end
+
+    public
+
+      def paint painter, option, widget
+        painter.pen = @pen if @pen
+#         tag "#{self}.paint, selecting font #{font.toString} for text '#{text}'"
+        painter.font = font
+#         painter.brush = @brush if @brush              not used
+        painter.drawText(@x, @y, text)
+        # super NO
+        # painter.drawPath shape  NO
+      end
+
+      def setPen p
+        @pen = p
+        update
+      end
+
+      def pen= p
+        setPen p
+      end
+
+      def setBrush b
+#         @brush = b
+        setPen Qt::Pen.new(b.color)
+#         tag "brush:=rgb #{b.color.red},#{b.color.green},#{b.color.blue}"
+        update
+      end
+
+      def setOffset x, y
+        @x, @y = x, y
+      end
+
+      def setFont f
+        super
+#         tag "Installed font #{f.toString}, caller = #{caller.join("\n")}"
+      end
+
+      def font= f
+        setFont f
+      end
+
+      def brush= b
+        setBrush(b)
+      end
+  end
+
+  createInstantiator File.basename(__FILE__, '.rb'), QGraphicsSimpleTextItem, SimpleText
 #   tag "test for Scene#circle"
 #   raise ReformError, 'oh no' unless Scene.private_method_defined?(:circle)
 

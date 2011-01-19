@@ -177,6 +177,15 @@ I believe 'brush' and 'pen' can become plugins, but they are not really widgets 
             @qtc.pointSize = val
             parent.qtfont = @qtc if parent
           end
+
+          StyleMap = { italic: Qt::Font::StyleItalic, oblique: Qt::Font::StyleOblique, normal: Qt::Font::StyleNormal }
+
+          def style val
+            case val
+            when Symbol then @qtc.style = StyleMap[val] || Qt::StyleNormal
+            else @qtc.style = val
+            end
+          end
       end
 
       class Gradient < Control
@@ -528,6 +537,7 @@ I believe 'brush' and 'pen' can become plugins, but they are not really widgets 
         when Qt::Font then args
         when String then Qt::Font.new(args)
         when nil, Hash then Font.new(parent).setup(args, &block).qtc
+        when Symbol then containing_form.registeredFont(args) or raise Error, ":#{args} is not a registered font"
         else raise "Illegal font params #{args.inspect}"
         end #.tap {|f| tag "created font: #{f.toString}" }
       end

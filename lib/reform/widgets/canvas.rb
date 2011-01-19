@@ -133,7 +133,7 @@ module Reform
     public
 
       # override since we must set the scene here (setScene)
-      def_delegators :infused_scene!, :brush, :stroke, :fill, :pen
+      def_delegators :infused_scene!, :brush, :stroke, :fill, :pen, :font
 
       # rotate clockwise around center of the canvas.
       def rotate deg

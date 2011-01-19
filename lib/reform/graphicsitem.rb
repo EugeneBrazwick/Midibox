@@ -88,6 +88,8 @@ module Reform
         qc = if control.respond_to?(:qtc) then control.qtc else control end
         qc.parentItem = @qtc
         control.qtpen, control.qtbrush = pen, brush
+#         tag "addGraphicsItem(#{control}), taking font = #{font} from parent"
+        control.qtfont = font
         control.setup quickyhash, &block
         added control
       end
@@ -220,9 +222,10 @@ module Reform
 
       def qtfont= newfont
         newfont = make_qtfont(newfont) unless Qt::Font === newfont
-#         tag "qtfont := #{newfont}, setting #@qtc.font"
+#         tag "#{self}#qtfont := #{newfont}, setting #@qtc.font"
         @qtc.font = newfont
         children.each do |child|
+#           tag "assigning qtfont to child #{child}"
           child.qtfont = newfont if GraphicsItem === child && !child.explicit_font
         end
       end
@@ -233,7 +236,7 @@ module Reform
         # rectangle, or the center of a ellipse.
         # Current exception is Reform::Point which abuses pos as well. Yet another FIXME.
         value = value[0] if Array === value[0]
-        tag "qtc.pos := #{value[0]},#{value[1]}"
+#         tag "qtc.pos := #{value[0]},#{value[1]}"
         @qtc.pos = Qt::Point.new(value[0], value[1])
         self.size  = Qt::Size.new(value[2],  value[3] || value[2])
       end
@@ -276,6 +279,10 @@ module Reform
       end
       super
     end
+
+    def pen= pen; end
+    def brush= brush; end
+    def font= font; end
   end
 
 end # Reform

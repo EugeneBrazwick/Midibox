@@ -45,7 +45,7 @@ Why does it skip it? Is something missing?
 Actually, the only thing failing is the 'install' at the end.
 
 Workaround (experimental)
-During build remove lines with libsmokeqtmultimedia from the Makefile. 
+During build remove lines with libsmokeqtmultimedia from the Makefile.
 Multimedia stuff will obviously not work.
 
 kdebindings mailing list: https://mail.kde.org/mailman/listinfo/kde-bindings
@@ -58,14 +58,15 @@ And it does exist in qt4.6...  See github qtbindings. This is precisely it!
 require 'reform/prelims'
 
 if __FILE__ == $0
+  prelims = Prelims.new('midibox', Prelims::LinguisticsGem, Prelims::AlsaMidiDriver)
   if ARGV[0] == '--check-reqs'
     ARGV.shift
     # This takes too long for a normal jumpstart. But if you miss some optional stuff
     # it could be usefull.
-    Prelims::check_reqs
+    prelims.check_reqs
   else
 #     STDERR.puts "calling prelims_and_spectest, RUBY=#{ENV['RUBY']}, RUBYLIB=#{ENV['RUBYLIB']}"
-    Prelims::prelims_and_spectest
+    prelims.check_installation
     # It is also tempting to say `exec $RUBY $PWD/gui/mainform.rb &`
     # Otherwise we get a stuck terminal.... So:
     ENV['RUBY'] ||= 'ruby'

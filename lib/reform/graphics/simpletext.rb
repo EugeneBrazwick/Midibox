@@ -59,22 +59,23 @@ module Reform
         update
       end
 
+      def brush= b
+        setBrush(b)
+      end
+
       def setOffset x, y
         @x, @y = x, y
       end
 
       def setFont f
         super
-#         tag "Installed font #{f.toString}, caller = #{caller.join("\n")}"
+#         tag "Installed font #{f.toString}" #, caller = #{caller.join("\n")}"
       end
 
       def font= f
         setFont f
       end
 
-      def brush= b
-        setBrush(b)
-      end
   end
 
   createInstantiator File.basename(__FILE__, '.rb'), QGraphicsSimpleTextItem, SimpleText

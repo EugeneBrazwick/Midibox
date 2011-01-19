@@ -214,3 +214,6 @@ Current state:
 0038 Wed Jan 12 21:00:50 CET 2011
     Duplicator and Replicator must gain GENERIC abality to step-operate on ANY parameter.
     This can of course be done with procs. Just define a 'step' proc that operates on the (re|du)plicate
+0039 Sun Jan 16 23:12:25 CET 2011
+    prelims.rb should get the notion of a package. Since midibox = reform+alsa. Currently the 'reform.bash' starter
+    check for alsa which is stupid.

@@ -26,7 +26,7 @@ Even more, a QDialog can be stored in the view as well!
   in addition we support graphical items, shapes, and animations too.
 =end
   class Scene < Frame
-    require_relative '../graphical'
+    require 'reform/graphical'
     # note that ControlContext is already included in Frame.
     include Graphical, GraphicContext, AnimationContext, StateContext
 
@@ -103,14 +103,31 @@ Even more, a QDialog can be stored in the view as well!
     alias :brush :fill
     alias :pen :stroke
 
+    def font *args, &block
+      return @font unless !args.empty? || block
+#       tag "#{self}#font(#{args.inspect})"
+      self.qtfont = make_qtfont_with_parent(self, *args, &block)
+    end
+
+    def qtfont= f
+      @font = f
+      children.each do |child|
+        if GraphicsItem === child && !child.explicit_font
+#           tag "assigning qtfont #{@font.family} to child #{child}"
+          child.qtfont = @font
+        end
+      end
+    end
+
   #override
     def addGraphicsItem control, quickyhash = nil, &block
-#       tag "#{self}.addGraphicsItem, control #{control} is added to SCENE, brush=#@brush"
+#       tag "#{self}.addGraphicsItem, control #{control} is added to SCENE, brush=#@brush, font = #{@font.inspect}"
 #       qc = if control.respond_to?(:qtc) then control.qtc else control end             BOGO we call 'setup' two lines ahead anyway!
       @qtc.addItem control.qtc
 #       tag "#{control}.parent := #{self}"
       control.parent = self
       control.qtpen, control.qtbrush = @pen, @brush  # initial implict tools
+      control.qtfont = @font
       control.setup quickyhash, &block
       added control
 #       tag "#{control}.parent is now #{control.parent}, ctrl.brush = #{control.brush}"

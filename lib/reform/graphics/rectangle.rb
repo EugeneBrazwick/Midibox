@@ -55,6 +55,10 @@ module Reform
 
   end # Rectangle
 
-  createInstantiator File.basename(__FILE__, '.rb'), Qt::GraphicsRectItem, Rectangle
+  class QGraphicsRectItem < Qt::GraphicsRectItem
+    include QGraphicsItemHackContext
+  end;
+
+  createInstantiator File.basename(__FILE__, '.rb'), QGraphicsRectItem, Rectangle
 
 end # Reform

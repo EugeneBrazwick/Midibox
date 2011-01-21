@@ -42,7 +42,8 @@ Reform::app {
         font :ubuntu_12
         fill black # this relates to 'defaultTextColor' since 'text' accepts 'rich/html' text
           # which can be styled.
-        text at: [10, 20], width: 80, text: 'Response is the medium'
+          # IMPORTANT: Qt::GraphicsTextItem uses upperleft!!
+        text topleft: [10, 0], width: 80, text: 'Response is the medium'
       } # canvas
       canvas {
         parameters :canvas

@@ -185,6 +185,7 @@ module Reform
       def scale sx, sy = nil
         sx, sy = sx if Array === sx
         raise "scaling in two dimensions is not currently supported" if sy
+#         tag "#{@qtc}.scale := #{sx}"
         @qtc.scale = sx
       end
 
@@ -223,7 +224,7 @@ module Reform
       def qtfont= newfont
         newfont = make_qtfont(newfont) unless Qt::Font === newfont
 #         tag "#{self}#qtfont := #{newfont}, setting #@qtc.font"
-        @qtc.font = newfont
+        @qtc.font = newfont if @qtc.respond_to?(:font=)
         children.each do |child|
 #           tag "assigning qtfont to child #{child}"
           child.qtfont = newfont if GraphicsItem === child && !child.explicit_font
@@ -280,9 +281,10 @@ module Reform
       super
     end
 
-    def pen= pen; end
-    def brush= brush; end
-    def font= font; end
+# INSANE...
+#     def pen= pen; end
+#     def brush= brush; end
+#     def font= font; end
   end
 
 end # Reform

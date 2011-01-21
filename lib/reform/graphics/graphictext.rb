@@ -26,8 +26,9 @@ module Reform
 
       alias :width :textWidth
 
-      def at x, y
-        @qtc.pos = Qt::PointF.new(x, y)
+      def topleft x, y
+        pt = @qtc.pos = Qt::PointF.new(x, y)
+#         @qtc.setTransformOr   iginPoint pt
       end
 
       def geometry x = nil, y = nil, w = nil, h = nil, &block
@@ -36,8 +37,8 @@ module Reform
         when nil then DynamicAttribute.new(self, :geometryF, Qt::RectF).setup(nil, &block)
         when Hash, Proc then DynamicAttribute.new(self, :geometryF, Qt::RectF).setup(x, &block)
         else
-          @qtc.pos = Qt::PointF.new(x, y)
-          @qtc.width = w
+          topleft x, y
+          @qtc.textWidth = w
         end
       end
 
@@ -67,6 +68,15 @@ module Reform
       def brush= b
         setBrush(b)
       end
+
+#       def setFont f
+#         super
+#       end
+
+      # IMPORTANT!
+       def font= f
+         setFont f
+       end
 
   end # class QGraphicsTextItem
 

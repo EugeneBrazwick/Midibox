@@ -17,6 +17,7 @@ module Reform
 
     def at x, y
       @qtc.setOffset x, y
+      @qtc.setTransformOriginPoint x, y
     end
 
   public
@@ -67,14 +68,14 @@ module Reform
         @x, @y = x, y
       end
 
-      def setFont f
-        super
-#         tag "Installed font #{f.toString}" #, caller = #{caller.join("\n")}"
-      end
+#       def setFont f
+#         super
+# #         tag "Installed font #{f.toString}" #, caller = #{caller.join("\n")}"
+#       end
 
-      def font= f
-        setFont f
-      end
+       def font= f
+         setFont f
+       end
 
   end
 

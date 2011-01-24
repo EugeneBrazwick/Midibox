@@ -368,6 +368,7 @@ Translation and matrix mapping can also be done.
               end
             qpath = Qt::PainterPath.new
             @paths.each do |path|
+#               tag "path #{path.inspect}"
               break if path.length == 1 # which can only be the last one
 #               tag "building path #{path.inspect}"
               prev = path.last
@@ -510,17 +511,37 @@ moveto lineto smoothto is much better.
         lineto *args
       end
 
+      # adds a triangle, requiring 3 points
       def triangle x1,y1, x2,y2, x3,y3
         line x1,y1, x2,y2, x3,y3, :close
       end
 
-      def triangle_strip x1,y1, x2,y2, *args
-        p = x1, y1
-        q = x2, y2
-        args.each_slice(2) do |x, y|
-          line *p, *q, x, y, :close
-          p = q
-          q = x, y
+      # at least six points are required, point 4 is attached to 2 and 3,
+      # 5 to 3 and 4, 6 to 4 and 5, and so on.
+      # You can pass x0,y0, x1, y1, x2, y2...
+      # OR [x0,y0], [x1,y1], [x2,y2]....
+      # OR Qt::PointF's
+      # OR an enumerator that enumerates tuples x,y
+      def triangle_strip *args
+        p = q = nil
+        case args[0]
+        when Enumerator
+#           tag "Enumerator, must iterate tuples of 2 then"
+          args[0].each do |r|
+#             tag "r = #{r.inspect}, line #{p.inspect},#{q.inspect},#{r.inspect},:close" if p
+            line *p, *q, *r, :close if p
+            p, q = q, r
+          end
+        when Array, Qt::PointF
+          args.each do |r|
+            line p, q, r, :close if p
+            p, q = q, r
+          end
+        else
+          args.each_slice(2) do |x, y|
+            line *p, *q, x, y, :close if p
+            p, *q = q, x, y
+          end
         end
       end
 

@@ -352,11 +352,11 @@ I believe 'brush' and 'pen' can become plugins, but they are not really widgets 
       #   - Array [r, g, b] or [r,g,b,a] or [grey, a] or [Qt::Color, a]
       #   - float. similar, but all values must be between 0.0 (darkest) and 1.0(lightest)
       def make_color colorsym, g = nil, b = nil, a = nil
-#         tag "make_color(#{colorsym}, #{g}, #{b}, #{a})"
+#         tag "make_color(#{colorsym}, #{g}, #{b}, a:#{a})"
         case colorsym
     #     when Qt::Color, Qt::ConicalGradient, Qt::LinearGradient, Qt::RadialGradient then colorsym
         when Qt::Color
-          return colorsym unless
+          return colorsym unless g
 #           tag "Color + alpha combo!, colorsym = #{colorsym.inspect}"
           if Integer === g
             colorsym.alpha = g
@@ -412,8 +412,10 @@ I believe 'brush' and 'pen' can become plugins, but they are not really widgets 
           end
         when Integer
           if b
+#             tag "3 or 4 integers"
             Qt::Color.new(colorsym, g, b, a || 255)
           else
+#             tag "2 integers"
             Qt::Color.new(colorsym, colorsym, colorsym, g || 255)
           end
         when Float
@@ -455,7 +457,6 @@ I believe 'brush' and 'pen' can become plugins, but they are not really widgets 
       # 'value' == 'brightness'
       alias :hsv :hsb
 
-      generateColorConverter :color2pen, Qt::Pen, @@pen     # DEPRECATED
       generateColorConverter :color2brush, Qt::Brush, @@solidbrush # DEPRECATED
 
       # convert anything into a Qt::Pen
@@ -467,7 +468,7 @@ I believe 'brush' and 'pen' can become plugins, but they are not really widgets 
 #         tag "make_qtpen(args = #{args.inspect})"
         args = args[0] if args.length <= 1
         args = args.qtc if args.respond_to?(:qtc)
-#         tag "args.class = #{args.class}" # , caller=#{caller.join("\n")}"
+#         tag "make_qtpen args.class = #{args.class}, #{args.inspect}" # , caller=#{caller.join("\n")}"
         case args
         when Qt::Pen then args
         when false, :none, :nopen, :no_pen then @@pen[:none] ||= Qt::Pen.new(Qt::NoPen)
@@ -482,7 +483,9 @@ I believe 'brush' and 'pen' can become plugins, but they are not really widgets 
           @@pen[args] ||= Qt::Pen.new(col)
         when Hash then Pen.new(parent).setup(args, &block).qtc
         when Array then Qt::Pen.new(make_color(*args))
-        when Qt::Color then Qt::Pen.new(args)
+        when Qt::Color
+#           tag "Using color #{args.red}, #{args.green}, #{args.blue}, alpha=#{args.alpha}"
+          Qt::Pen.new(args)
         when Qt::Brush then Qt::Pen.new(args.color)
         else Qt::Pen.new(make_color(args))
         end

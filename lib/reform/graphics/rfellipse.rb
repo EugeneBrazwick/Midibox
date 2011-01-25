@@ -51,6 +51,7 @@ module Reform
         @qtc.radius = Qt::SizeF.new(w, h || w)
       end
 
+      # in degrees, where 0 degrees is East, 90 is North etc. So counterclockwise.
       def startAngle degrees = nil
         return @qtc.startAngle unless degrees
         @qtc.startAngle = degrees
@@ -60,6 +61,15 @@ module Reform
         return @qtc.spanAngle unless degrees
         @qtc.spanAngle = degrees
       end
+
+      def stopAngle degrees = nil
+        return @qtc.startAngle + @qtc.spanAngle unless degrees
+        @qtc.spanAngle = degrees - @qtc.startAngle
+      end
+
+      alias :from :startAngle
+      alias :to :stopAngle
+      alias :span :spanAngle
 
     public # ReformEllipse methods
 
@@ -98,6 +108,10 @@ module Reform
         return false unless a >= 0.0001
         a = a % 360.0
         a <= 0.0001 || a >= 359.9999
+      end
+
+      def drawEllipsePart painter, rect, from, to
+        painter.drawPie rect, from, to
       end
 
     public
@@ -210,12 +224,12 @@ module Reform
 
       #override
       def paint painter, option, widget
-        painter.pen = pen
+        painter.pen = pen # .tap{|t|tag "pen.color=#{pen.color.inspect}"}
         painter.brush = brush
         if full?
           painter.drawEllipse(rect)
         else
-          painter.drawPie(rect, (@startAngle * 16).round, (@spanAngle * 16).round)
+          drawEllipsePart(painter, rect, (@startAngle * 16).round, (@spanAngle * 16).round)
         end
         if selected?   # does not work -> (option.state & Qt::Style::State_Selected) != 0
           murect = painter.transform.mapRect(Qt::RectF.new(0, 0, 1, 1))
@@ -239,6 +253,15 @@ module Reform
           end
         end
       end
+
+#       def setPen p
+#         tag "pen := #{p.color.red}, #{p.color.green}, #{p.color.blue}"
+#         super
+#       end
+
+#       def pen= p
+#         setPen p
+#       end
   end # class QReformEllipseItem
 
 #   tag "calling createInstantiator"

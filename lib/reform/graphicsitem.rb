@@ -264,22 +264,42 @@ module Reform
 
   # currently only used to get the itemChange callback working
   module QGraphicsItemHackContext
-    # override
-    def itemChange change, value
-#       instance_variable_defined?(:@_reform_hack) and
-      # CALLING value on BOGO variants causes SEGV's....
-#       tag "itemChange #{change}, #{value.inspect}, null? #{value.null?}, valid? #{value.valid?}"
-      if @_reform_hack #  null if called from the constructor
-        case change
-        when Qt::GraphicsItem::ItemPositionChange, Qt::GraphicsItem::ItemPositionHasChanged,
-             Qt::GraphicsItem::ItemScenePositionHasChanged
-          @_reform_hack.itemChange(change, value.value)
-        else
-          @_reform_hack.itemChange(change, value)  # value.value crashes for some cases...
-        end
+    private
+      def drawSelectedRectArea painter, br
+        murect = painter.transform.mapRect(Qt::RectF.new(0, 0, 1, 1))
+        return unless [murect.width, murect.height].max > 0.0001
+        mbrect = painter.transform.mapRect(br)
+        return unless [mbrect.width, mbrect.height].min >= 1.0
+        itemPenWidth = pen.widthF
+        pad = itemPenWidth / 2.0
+        penWidth = 0.0
+        fgcolor = option.palette.windowText.color
+        bgcolor = Qt::Color.new(fgcolor.red > 127 ? 0 : 255, fgcolor.green > 127 ? 0 : 255,
+                                fgcolor.blue > 127 ? 0 : 255)
+        painter.pen = Qt::Pen.new(bgcolor, penWidth, Qt::SolidLine)
+        bradj = br.adjusted(pad, pad, -pad, -pad)
+        painter.drawRect(bradj)
+        painter.pen = Qt::Pen.new(option.palette.windowText, 0, Qt::DashLine)
+        painter.drawRect(bradj)
       end
-      super
-    end
+
+    public
+      # override
+      def itemChange change, value
+  #       instance_variable_defined?(:@_reform_hack) and
+        # CALLING value on BOGO variants causes SEGV's....
+  #       tag "itemChange #{change}, #{value.inspect}, null? #{value.null?}, valid? #{value.valid?}"
+        if @_reform_hack #  null if called from the constructor
+          case change
+          when Qt::GraphicsItem::ItemPositionChange, Qt::GraphicsItem::ItemPositionHasChanged,
+              Qt::GraphicsItem::ItemScenePositionHasChanged
+            @_reform_hack.itemChange(change, value.value)
+          else
+            @_reform_hack.itemChange(change, value)  # value.value crashes for some cases...
+          end
+        end
+        super
+      end
 
 # INSANE...
 #     def pen= pen; end

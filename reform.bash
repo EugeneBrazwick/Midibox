@@ -57,4 +57,5 @@ case "$RUBYLIB" in
 ('') export RUBYLIB="$rundir";;
 (*) export RUBYLIB="$rundir/lib:$RUBYLIB";;
 esac
+export RUBY
 exec "$RUBY" "$rundir/bin/reform_launcher.rb" "$@"

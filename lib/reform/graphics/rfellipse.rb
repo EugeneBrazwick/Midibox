@@ -231,27 +231,8 @@ module Reform
         else
           drawEllipsePart(painter, rect, (@startAngle * 16).round, (@spanAngle * 16).round)
         end
-        if selected?   # does not work -> (option.state & Qt::Style::State_Selected) != 0
-          murect = painter.transform.mapRect(Qt::RectF.new(0, 0, 1, 1))
-          if [murect.width, murect.height].max > 0.0001
-            br = boundingRect
-            mbrect = painter.transform.mapRect(br)
-            if [mbrect.width, mbrect.height].min >= 1.0
-              itemPenWidth = pen.widthF
-              pad = itemPenWidth / 2.0
-              penWidth = 0.0
-              fgcolor = option.palette.windowText.color
-              bgcolor = Qt::Color.new(fgcolor.red > 127 ? 0 : 255, fgcolor.green > 127 ? 0 : 255,
-                                      fgcolor.blue > 127 ? 0 : 255)
-              painter.pen = Qt::Pen.new(bgcolor, penWidth, Qt::SolidLine)
-              painter.brush = Qt::Brush.new(Qt::NoBrush)
-              bradj = br.adjusted(pad, pad, -pad, -pad)
-              painter.drawRect(bradj)
-              painter.pen = Qt::Pen.new(option.palette.windowText, 0, Qt::DashLine)
-              painter.drawRect(bradj)
-            end
-          end
-        end
+          # DUPLICATE CODE ALERT, See perlin FIXME
+        drawSelectedRectArea(painter, boundingRect) if selected?   # does not work -> (option.state & Qt::Style::State_Selected) != 0
       end
 
 #       def setPen p

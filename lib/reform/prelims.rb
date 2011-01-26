@@ -53,6 +53,18 @@ class Prelims
         end
     end # class AlsaMidiDriver
 
+    class PerlinRubySo < Package
+      public
+        def check_installation
+          return unless File.exists?(File.dirname(__FILE__) + '/../ruby-perlin/perlin.so')
+          @prelims.uihandler.busy do
+            `"#{@prelims.rakecmd}"`
+            @prelims.uihandler.die 6, "Failed to create perlin.so" unless $?.exitstatus == 0
+          end
+          @prelims.build_something!
+        end
+    end
+
     class LinguisticsGem < Package
       public
         def check_reqs
@@ -221,6 +233,7 @@ class Prelims
 
     def initialize(project, *packages)
       # the constructor should not really fail
+      ENV['RUBY'] ||= 'ruby'
       @project = project
       @packager = MyPackager.new(self)
       @packages = packages.map { |packklass| packklass.new }
@@ -422,6 +435,7 @@ then we can continue.
       check_exe_and_opt_apt_get('cmake', 'cmake', 'qtruby')
       check_exe_and_opt_apt_get('g++', 'g++', 'qtruby')
       check_exe_and_opt_apt_get('qmake', 'qt4-qmake', 'qtruby')
+      check_exe_and_opt_apt_get('make', 'make', 'reform') # 'make' is required for building perlin.so
       check_libdev_and_opt_apt_get("include/ruby-#{RUBYVERSION}/ruby.h", "ruby#{RUBYVERSION}-dev", 'qtruby')
       check_qt_devel_present
       check_gem(nil, QTRUBYGEMNAME, 'qtruby')

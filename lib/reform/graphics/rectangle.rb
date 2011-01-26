@@ -3,7 +3,7 @@
 
 module Reform
 
-  require_relative '../graphicsitem'
+  require 'reform/graphicsitem'
 
   class Rectangle < GraphicsItem
   private

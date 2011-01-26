@@ -386,21 +386,23 @@ module Reform
 
     # what to if you want both.... And what should be the order? Call qtc.method_missing(:paintEvent, painter.event)
     def paintEvent event
-#       tag "paintEvent_i(#{event})"
-      if instance_variable_defined?(:@_reform_hack) && @_reform_hack.whenPainted?
-#         tag "Creating Reform::Painter passing #{self}"
-        painter = Painter.new(paint_target)
-#         painter.event = event
-        begin
-          @_reform_hack.whenPainted(painter) != false and return true
-          # it is rather inefficient if whenPainted does return false....
-        ensure
-#           tag "Calling automatic 'end' after paintEvent"
-          painter.end
+      rfRescue do
+  #       tag "paintEvent_i(#{event})"
+        if instance_variable_defined?(:@_reform_hack) && @_reform_hack.whenPainted?
+  #         tag "Creating Reform::Painter passing #{self}"
+          painter = Painter.new(paint_target)
+  #         painter.event = event
+          begin
+            @_reform_hack.whenPainted(painter) != false and return true
+            # it is rather inefficient if whenPainted does return false....
+          ensure
+  #           tag "Calling automatic 'end' after paintEvent"
+            painter.end
+          end
+  #         tag "falling back to default paintEvent handling"
         end
-#         tag "falling back to default paintEvent handling"
+        super
       end
-      super
     end
 
   end # module QWidgetHackContext

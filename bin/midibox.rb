@@ -69,7 +69,6 @@ if __FILE__ == $0
     prelims.check_installation
     # It is also tempting to say `exec $RUBY $PWD/gui/mainform.rb &`
     # Otherwise we get a stuck terminal.... So:
-    ENV['RUBY'] ||= 'ruby'
     spawn "$RUBY '#{File.dirname(__FILE__)}/../gui/mainform.rb'"
   end
 end

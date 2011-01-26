@@ -1,4 +1,6 @@
 
+/* ENCODING: UTF-8 */
+
 #pragma implementation
 
 #include "alsa_midi_queue.h"

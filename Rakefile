@@ -22,6 +22,7 @@ else
 end
 
 ALSALIB='lib/rrts/driver/alsa_midi.so'
+PERLINLIB='lib/ruby-perlin/perlin.so'
 MIDI_IN_PORT = '20:0'
 MIDI_OUT_PORT = '20:1'
 RUBY = 'ruby -w -I lib'
@@ -54,7 +55,13 @@ end
 
 file ALSALIB => FileList['lib/rrts/driver/*.cpp'] do
   Dir.chdir 'lib/rrts/driver' do
-    sh "#{ENV['RUBY']} ./extruby.rb && make && rm -f *.o mkmf.log"
+    sh "#{ENV['RUBY']} ./extconf.rb && make && rm -f *.o mkmf.log"
+  end
+end
+
+file PERLINLIB => FileList['lib/ruby-perlin/*.cpp'] do
+  Dir.chdir 'lib/ruby-perlin' do
+    sh "#{ENV['RUBY']} ./extconf.rb && make && rm -f *.o mkmf.log"
   end
 end
 
@@ -66,8 +73,12 @@ desc 'build the alsamidi shared library'
 task :build_alsamidi => [ALSALIB] do
 end
 
+desc 'build the perlin shared library'
+task :build_perlin => [PERLINLIB] do
+end
+
 desc 'build the required library and the documentation'
-task :default => [:build_alsamidi, :rdoc] do
+task :default => [:build_alsamidi, :build_perlin, :rdoc] do
 end
 
 desc 'play a track using rplaymidi++'
@@ -110,8 +121,8 @@ task :run_codeeditor_example do
   `#{RUBY} lib/reform/examples/widgets/codeeditor.rb`
 end
 
-desc 'panic, stop all notes on midiport 20:1'
+desc "panic, stop all notes on midiport #{MIDI_OUT_PORT}"
 task :panic do
-  sh "#{RUBY} bin/panic 20:1"
+  sh "#{RUBY} bin/panic #{MIDI_OUT_PORT}"
 end
 

@@ -104,6 +104,36 @@ class Float
     def lerp lower, upper
       lower + self * (upper - lower)
     end
+
+    @@reform_perlin = nil
+
+    # can be called optionally. Note that 'octave' is an integer
+    # See http://freespace.virgin.net/hugo.elias/models/m_perlin.htm
+    # +seed+ sets the random sequence and should be changed to get
+    # a different result.
+    # +persistence+ influences how much effect higher octaves have.
+    # The default is 1.0. This means in practice that octaves above 4 have very little effect
+    # +octave+ is the complexity, or detail level of the resulting shape.
+    # The default is 1. Note that higher octaves require a higher persistence and will
+    # take more calculation time.
+    #
+    # NOTE: octave > 1 screws up result and will no longer be normalized!!!
+    def self.initPerlin(seed, persistence = 1.0, octave = 1, more = nil)
+      require_relative '../ruby-perlin/perlin'
+      smoothing = more && more[:smoothing]
+      contrast = more && more[:contrast] || 1.0
+#       tag "Calling Perlin.new(#{seed}, #{persistence}, #{octave})"
+#       raise 'what?' unless persistence
+      @@reform_perlin = Perlin.new(seed, persistence, octave, smoothing, contrast)
+    end
+
+    # returns perlin noise at 'self'. Optionally you can add a second and third dimension.
+    def noise y = nil, z = nil
+      Float::initPerlin(4439743) unless @@reform_perlin
+#       tag "noise, perlin = #{@@reform_perlin.inspect}"
+      z ? @@reform_perlin.run3d(self, y, z) : y ? @@reform_perlin.run2d(self, y)
+                                                : @@reform_perlin.run1d(self)
+    end
 end
 
 # The Reform library is a qtruby based library for building gui's in a 100%

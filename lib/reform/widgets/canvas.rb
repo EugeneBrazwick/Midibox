@@ -13,6 +13,27 @@ module Reform
    creates an implicit one internally.
 
    the Scene can contain graphic items like 'circle' etc.
+
+
+=============================================================
+TRANSFORMATIONS
+=============================================================
+
+We follow graphicsitem where you can set rotation + scale + translation.
+
+Q: is rotate + translate the same as translate + rotate?
+A: YES
+
+Q: does Qt like transforming the canvas?
+A: NO. In particular, the items may drop of the screen. Scrollbars are placed inaccurately etc.
+But maybe I do something wrong?
+For the time being, it is better to use a wrapping empty!!
+
+++++++++++++++++++++
+Canvas size
+++++++++++++++++++++
+
+If items fall from the screen the canvas does not become bigger.
 =end
   class Canvas < Widget
     include Graphical, GraphicContext, AnimationContext, StateContext
@@ -89,8 +110,10 @@ module Reform
         # avoid creating a lot of objects... Is this lame?
         @@i ||= Qt::Transform.new
         @@i.reset
+        # rotate and scale can switch
         @@i.rotate(@rotation) if @rotation
-        @@i.scale(@scale, @scale) if @scale
+        @@i.scale(*@scale) if @scale
+        # but translation must be performed last!!
         @@i.translate(*@translation) if @translation
         @@i
       end
@@ -135,8 +158,9 @@ module Reform
       # override since we must set the scene here (setScene)
       def_delegators :infused_scene!, :brush, :stroke, :fill, :pen, :font
 
-      # rotate clockwise around center of the canvas.
+      # rotate clockwise around center of the canvas. ILLEGAL....
       def rotate deg
+        fprintf(stderr, "DEPRECATED method 'Canvas#rotate' called")
         self.rotation = @rotation + deg
       end
 
@@ -146,15 +170,32 @@ module Reform
         @qtc.transform = calc_matrix
       end
 
-      def scale value = nil
-        return @scale || 1.0 unless value
-        @scale = value
+      def scale x = nil, y = nil
+        return @scale || [1.0, 1.0] unless x
+        @scale = x, y || x
         @qtc.transform = calc_matrix
       end
 
+      # IMPORTANT: scrollbars may appear and the items may fall from the view!
       def rotation deg = nil
-        return @rotation || 0 if deg.nil?
+        return @rotation || 0 unless deg
         self.rotation = deg
+      end
+
+      # IMPORTANT: Qt's view automatically uses the same area anyway
+      # This may be wrong but it implies translating the view has not much use,
+      # accept to create positions that match better with an existing system or so.
+      def translation x = nil, y = nil
+        return @translation || [0.0, 0.0] unless x
+        @translation = x, y
+        @qtc.transform = calc_matrix
+        scene = infused_scene!
+        area = scene.area
+#         tag "area is now #{area.inspect}"
+        tl = area.topLeft
+        area.moveTopLeft Qt::PointF.new(tl.x - x, tl.y - y)
+#         tag "translated area to #{area.inspect}, x=#{x}, y=#{y}"
+        scene.area = area
       end
 
       def addScene control, hash, &block
@@ -179,10 +220,14 @@ module Reform
   # It should never do this if the user has not defined a whenPainted callback!!
   # And also it shows that this method is fatally flawed
     private
+#       def initialize parent
+#         super
+#         setTransformationAnchor NoAnchor              # I  can see no difference
+#       end
 
     public
 
-    attr :autoscale
+      attr :autoscale
 
       def autoscale= value
         policy = (@autoscale = value) ? Qt::ScrollBarAlwaysOff : Qt::ScrollBarAsNeeded

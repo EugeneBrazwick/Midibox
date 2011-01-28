@@ -38,15 +38,6 @@ Even more, a QDialog can be stored in the view as well!
       @brush = defaultBrush
     end
 
-    # set the topleft and size of the scene. These can be floats and
-    # can be freely chosen. Zoom, offset and aspectratio can be changed
-    # for a specific view (and even rotation etc)
-    def area x, y = nil, w = nil, h = nil
-      x, y, w, h = x if Array === x && y.nil?
-#       tag "sceneRect := #{x}, #{y}, #{w}x#{h}"
-      @qtc.setSceneRect x, y, w, h || w
-    end
-
     # same as area 0, 0, w, h
     def size w, h = w
       @qtc.setSceneRect 0, 0, w, h
@@ -79,6 +70,20 @@ Even more, a QDialog can be stored in the view as well!
 #     def registerGroupMacro name, group
 #       @groups[name] = group
 #     end
+
+    # set the topleft and size of the scene. These can be floats and
+    # can be freely chosen. Zoom, offset and aspectratio can be changed
+    # for a specific view (and even rotation etc)
+    def area x = nil, y = nil, w = nil, h = nil
+      return @qtc.sceneRect unless x
+      x, y, w, h = x if Array === x && y.nil?
+#       tag "sceneRect := #{x}, #{y}, #{w}x#{h}"
+      @qtc.setSceneRect x, y, w, h || w
+    end
+
+    def area= rect
+      @qtc.sceneRect = rect
+    end
 
     # Set the default fill for elements.
     def fill *args, &block

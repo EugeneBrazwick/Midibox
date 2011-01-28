@@ -445,12 +445,14 @@ I believe 'brush' and 'pen' can become plugins, but they are not really widgets 
       # ranges are: 0..360, 0..255, 0..255.
       # OR: 0.0 to 1.0 for all
       def hsb h, s = nil, b = nil, alpha = nil
+#         tag "hsb(#{h}, #{s}, #{b}, #{alpha})"
         col = Qt::Color.new
         case h
         when Float then col.setHsvF(h, s || 1.0, b || 1.0, alpha || 1.0)
         when Integer then col.setHsv(h, s || 255, b || 255, alpha || 255)
         else raise Error, "invalid hsb #{h}, #{s}, #{b}"
         end
+#         tag "rgb=#{col.red}, #{col.green}, #{col.blue}, #{col.alpha}"
         col # errr....
       end
 

@@ -42,6 +42,7 @@ module Reform
       end
 
       alias :translate :position
+      alias :translation :position
       alias :pos :position
 
       def movable onoff = nil, &block
@@ -65,6 +66,8 @@ module Reform
         else self.geometry = x, y, w, h
         end
       end
+
+      alias :geo :geometry  # because I'm such a lazy bastard!
 
       # currently 'strength' is not supported. Actually tint should become a controller, of course
       def tint *args
@@ -140,7 +143,9 @@ module Reform
       end
 
       def font *args, &block
-        return @qtc.font unless args[0] || block
+        unless args[0] || block
+          return @qtc.respond_to?(:font) ? @qtc.font : nil
+        end
         @explicit_font = self.qtfont = case args[0]
           when Symbol then containing_form.registeredFont(args[0]) || make_qtfont_with_parent(self, *args)
           when Qt::Font then args[0]
@@ -158,7 +163,9 @@ module Reform
 
       # Important, angles less than 1.0 degree are taken to be a factor of the
       # circles length (1.0 == 360 degr = 2*pi rad)
-      def rotation degrees_cw, around_xy = nil
+      # This is Eugene's improved radials standard. PI does not exist!!!
+      # Hm. it looks like a very bad feature...
+      def rotate degrees_cw, around_xy = nil
         degrees_cw *= 360.0 unless Integer === degrees_cw || degrees_cw.abs > 1.00000001
         if around_xy
           @qtc.setTransformOriginPoint(*around_xy)
@@ -167,6 +174,15 @@ module Reform
         end
         @qtc.rotation = degrees_cw
       end
+
+=begin
+    'rotation' seems better than 'rotate'. Because I set a parameter, and do not perform an
+    action.  However, we also have 'translate' and 'scale' and it's not easy getting a uniform
+    name:  rotation + translation + scale?  scaled? scaling?
+
+    The preffered name is 'rotate'. As of today. Kyou kara.
+=end
+      alias :rotation :rotate
 
 =begin EVIL
       # this uses Eugene circle units where 1.0 == 360 degrees.
@@ -184,9 +200,17 @@ module Reform
 
       def scale sx, sy = nil
         sx, sy = sx if Array === sx
-        raise "scaling in two dimensions is not currently supported" if sy
 #         tag "#{@qtc}.scale := #{sx}"
-        @qtc.scale = sx
+        if sy
+          # problem: since we change 'transform' we probably lose it
+          # if rotated or translated ???
+          tag "scaling in two dimensions is currently experimental"
+          matrix = @qtc.transform
+          matrix.scale(sx, sy)
+          @qtc.transform = matrix
+        else
+          @qtc.scale = sx
+        end
       end
 
 #       def graphic?

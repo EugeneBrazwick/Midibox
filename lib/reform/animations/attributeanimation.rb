@@ -53,7 +53,7 @@ module Reform
       end
 
       def startValue *value
-#             tag "start, attrib=#@attrib"
+#         tag "start, attrib=#@attrib, value=#{value.inspect}"
         @qtc.startValue = @qtc.targetObject.value2variant(*value)
       end
 

@@ -134,6 +134,19 @@ class Float
       z ? @@reform_perlin.run3d(self, y, z) : y ? @@reform_perlin.run2d(self, y)
                                                 : @@reform_perlin.run1d(self)
     end
+
+    def seconds
+      Reform::Milliseconds.new((self * 1000).round)
+    end
+
+    alias :s :seconds
+
+    # create an instance of Reform::Milliseconds
+    def milliseconds
+      Reform::Milliseconds.new(round)
+    end
+
+    alias :ms :milliseconds
 end
 
 # The Reform library is a qtruby based library for building gui's in a 100%

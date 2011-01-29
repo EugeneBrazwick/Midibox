@@ -26,11 +26,14 @@ module Reform
         @qtc.duration = ms
       end
 
-      def postSetup
-        if @autostart
-          tag "AUTOSTARTING ANIMATION!!!!"
-          @qtc.start
-        end
+      # time to set immediately after starting (the very first loop)
+      # only works with autostart currently
+      def startTime ms
+        @startTime = Milliseconds === ms ? ms.val : ms
+      end
+
+      def currentTime ms
+        @qtc.currentTime = Milliseconds === ms ? ms.val : ms
       end
 
       define_simple_setter :loopCount
@@ -66,9 +69,11 @@ module Reform
       end
 
       def postSetup
-        @qtc.start if @autostart
+        if @autostart
+          @qtc.start
+          @qtc.currentTime = @startTime if @startTime
+        end
       end
-
 
   end #class Animation
 end # module Reform

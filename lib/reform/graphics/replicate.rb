@@ -19,16 +19,9 @@ module Reform
   #       @components = []
       end
 
-      define_simple_setter :degrees, :count, :scale, :fillhue_rotation,
-                          :rotation
-
-      def translation(x, y = nil)
-        if y
-          @qtc.translation = [x, y]
-        else
-          @qtc.translation = x
-        end
-      end
+      define_setter Integer, :count
+      define_setter Qt::PointF, :scale, :translation
+      define_setter Float, :fillhue_rotation, :rotation
 
     public # Replicate methods
 
@@ -40,30 +33,10 @@ module Reform
         parent.brush
       end
 
-      # override. it returns the added control
-      def addGraphicsItem control, quickyhash = nil, &block
-  #       tag "addControl to qtc=#@qtc, to add = #{control.qtc}"
-  #       @qtc.addToGroup(control.qtc)
-  #       control.qtc.parentItem = @qtc
-        control.qtc.parentItem = @qtc
-        control.setup quickyhash, &block
-      end
-
+      # Hack for stupid 'fillhue_rotation' hack. FIXME.
       def self.new_qt_implementor(qt_implementor_class, parent, qparent)
   #       tag "replicate: instantiate a #{qt_implementor_class}"
         QReplicate.new(qparent, parent.brush)
-      end
-
-      # override
-      def instantiate_child(reform_class, qt_implementor_class, qparent)
-        # add the child to the tree (and hence to the scene) but make it invisible
-        # otherwise we might create a dangling pointer (at least in the C++ version,
-        # may qtruby has something that protects us from memoryleaks??)
-        # All replicators elements are virtual. They do not respond to events.
-        # use 'realize' to make them real.
-        child = reform_class.new_qt_implementor(qt_implementor_class, self, qparent)
-        child.hide
-        child
       end
 
   end # class Replicate
@@ -88,7 +61,7 @@ module Reform
   #         tag "calc mat, tran=#{@translation}, rot=#@rotation, scale=#@scale, count=#@count"
           @matrix = Qt::Transform.new
           @matrix.rotate(@rotation) if @rotation
-          @matrix.scale(@scale) if @scale
+          @matrix.scale(*@scale) if @scale
           @matrix.translate(*@translation) if @translation
   #         tag "calced {#{@matrix.m11} #{@matrix.m12} #{@matrix.m13}|#{@matrix.m21} #{@matrix.m22} #{@matrix.m23}|#{@matrix.m31} #{@matrix.m32} #{@matrix.m33}}"
         end
@@ -97,6 +70,10 @@ module Reform
 
     public # QReplicate methods
 
+      def pen= p; end
+      def brush= b; end
+      def font= f; end
+
       def boundingRect
         b = Qt::RectF.new
         childItems.each { |i| b |= i.boundingRect }
@@ -104,7 +81,7 @@ module Reform
         return b unless @count && @count > 0
         m = matrix!
         @count.times { b |= m.mapRect(b) }
-  #       tag "resulting brect -> #{b.inspect}"
+#         tag "resulting brect -> #{b.inspect}"
         b
       end
 
@@ -126,8 +103,8 @@ module Reform
       def paint painter, option, widget = nil
         # widget is the actual widget, but can be nil.
         # the method should paint to painter.
-  #       painter.pen = Qt::Pen.new(Qt::black)
-  #       painter.drawRect(boundingRect)
+#          painter.pen = Qt::Pen.new(Qt::black)
+#          painter.drawRect(boundingRect)       OK
         childItems.each do |i|
           # important 'respond_to?' will NOT work!!
   #         tag "#{i}.respond_to?(:setBrush) -> #{i.respond_to?(:setBrush)}"
@@ -166,6 +143,7 @@ module Reform
               childItems.each do |i|
   #               painter.drawRect(i.boundingRect)
                 i.brush = @hue if @hue #&& i.respond_to?(:'setBrush')
+#                 tag "painting i again, transformed, painter pen = #{painter.pen.inspect}"
                 i.paint(painter, option, widget)
                 # sleep 1  HANG!!
               end
@@ -177,29 +155,44 @@ module Reform
         end
       end
 
-      # note that floats between -1.0 and 1.0 are seen as a fraction of a 360 degree rotation.
-      # So rotate 180 == rotate 180.0 == rotate 0.5
-      # The rotation is clockwise. passing 0 or 0.0 is illegal.
+      # The rotation is clockwise
       def rotation= degrees
-        degrees *= 360.0 unless Integer === degrees || degrees.abs > 1.00000001
-  #       tag "rotation := #{degrees}"
         @rotation = degrees
         unless @count
           @count = (360.000001 / @rotation.abs).floor - 1
           @count = 0 if @count < 0
         end
+        @matrix = nil
+        update
       end
 
       def fillhue_rotation= degrees
         degrees *= 360.0 unless Integer === degrees || degrees.abs > 1.00000001
         @fillhue_rotation = degrees.floor
+        @matrix = nil
+        update
       end
 
-      attr_accessor :count, :scale
+      attr :count, :scale
 
-      def translation=(x = nil, y = nil)
-  #       tag "translation"
-        @translation = if y then [x, y] else x end
+      def count= c
+        br1 = boundingRect
+        @count = c
+        br1 |= boundingRect
+        scene.update(mapRectToScene(br1)) # OK!
+#         tag "count := #{c}, update display area: #{br1.inspect}"              SEEMS OK....
+      end
+
+      def scale= x, y
+        @scale = x, y
+        @matrix = nil
+        update
+      end
+
+      def translation= x, y
+        @translation = x, y
+        @matrix = nil
+        update
       end
 
   end

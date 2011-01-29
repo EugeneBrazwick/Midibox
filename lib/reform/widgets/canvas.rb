@@ -47,7 +47,7 @@ If items fall from the screen the canvas does not become bigger.
   #       @brush = defaultBrush
       end
 
-      define_simple_setter :renderHint, :cacheMode, :dragMode, :transformationAnchor, :viewportUpdateMode
+      define_simple_setter :renderHint, :cacheMode, :dragMode, :transformationAnchor
 
       def_delegators :@qtc, :resetTransform, :render, :setViewport, :viewport=, :setRenderHint, :renderHint=
 
@@ -65,6 +65,17 @@ If items fall from the screen the canvas does not become bigger.
       BoundingRectViewportUpdate = Qt::GraphicsView::BoundingRectViewportUpdate
       NoViewportUpdate = Qt::GraphicsView::NoViewportUpdate
 
+      VUPModeMap = { full: Qt::GraphicsView::FullViewportUpdate, default: Qt::GraphicsView::MinimalViewportUpdate,
+                     minimal: Qt::GraphicsView::MinimalViewportUpdate, smart: Qt::GraphicsView::SmartViewportUpdate,
+                     boundingrect: Qt::GraphicsView::BoundingRectViewportUpdate,
+                     none: Qt::GraphicsView::NoViewportUpdate }
+
+      def viewportUpdateMode value = nil
+        return @qtc.viewportUpdateMode unless value
+        value = VUPModeMap[value] || Qt::GraphicsView::MinimalViewportUpdate if Symbol === value
+        @qtc.viewportUpdateMode = value
+      end
+
       def autoscale
         @qtc.autoscale = 1.0
       end
@@ -78,14 +89,6 @@ If items fall from the screen the canvas does not become bigger.
         return @qtc.windowTitle unless t
         @qtc.windowTitle = t
       end
-
-      # a view may override the scene background, this is however not very much advised. DEPRECATED??
-      # IMPORTANT: the background only works if there is in fact a scene present!!! So we make it
-      def background *brush, &block
-        qscene.backgroundBrush = make_qtbrush_with_parent(infused_scene!, *brush, &block)
-      end
-
-      alias :backgroundBrush :background
 
       def infused_scene!
         qscene
@@ -104,7 +107,9 @@ If items fall from the screen the canvas does not become bigger.
 
         # NOTE: this methods must be public!!
       def_delegators :infused_scene!, :addGraphicsItem, :registeredBrush,
-                    :registeredPen, :area, :addAnimation, :addState
+                    :registeredPen, :area, :addAnimation, :addState, :background
+
+      alias :backgroundBrush :background
 
       def calc_matrix
         # avoid creating a lot of objects... Is this lame?

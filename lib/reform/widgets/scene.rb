@@ -47,10 +47,6 @@ Even more, a QDialog can be stored in the view as well!
       @qtc.itemIndexMethod = m
     end
 
-    def background brush
-      @qtc.backgroundBrush = make_qtbrush(brush)
-    end
-
 =begin
     specific for scenes. This is a matrix operator. You can specify
     rotate, translate, scale, fillhue and strokehue currently.
@@ -101,12 +97,28 @@ Even more, a QDialog can be stored in the view as well!
       return @pen unless !args.empty? || block
       @pen = make_qtpen_with_parent(self, *args, &block)
       children.each do |child|
-        child.qtpen = @pen if GraphicsItem === child && !child.explicit_pen
+        if GraphicsItem === child && !child.explicit_pen
+#           tag "CALLING #{child}.qtpen := #{@pen.inspect}"
+          child.qtpen = @pen
+        end
       end
     end
 
     alias :brush :fill
     alias :pen :stroke
+
+    def background *args, &block
+#       tag "Scene#background #{args.inspect}"
+      return @qtc.backgroundBrush unless args[0] || block
+#         tag "args[0].class = #{args[0].class}"
+      @qtc.backgroundBrush = case args[0]
+        when Symbol then containing_form.registeredBrush(args[0]) || make_qtbrush_with_parent(self, *args)
+        when Qt::Brush then args[0]
+        when nil #DynamicAttribute.new(self, :brush, Qt::Brush, nil, &block).value
+           Brush.new(self, :background).setup(&block).qtc # .tap{|t| tag "brush.qtc=#{t}"}
+        else make_qtbrush_with_parent(self, *args)
+        end
+    end
 
     def font *args, &block
       return @font unless !args.empty? || block

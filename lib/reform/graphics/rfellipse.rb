@@ -11,6 +11,7 @@ module Reform
   class ReformEllipse < GraphicsItem
     private
 
+=begin OLD
       # works well with center, but NOT with topleft or bottomright!
       def size w, h = nil
         return @qtc.size unless w
@@ -66,10 +67,18 @@ module Reform
         return @qtc.startAngle + @qtc.spanAngle unless degrees
         @qtc.spanAngle = degrees - @qtc.startAngle
       end
+=end
+
+      define_setters Qt::SizeF, :size, :radius
+      define_setters Float, :startAngle, :spanAngle, :stopAngle
+      # Qt::RectF also uses topLeft and not topleft.
+      define_setters Qt::PointF, :center, :topLeft, :bottomRight
 
       alias :from :startAngle
       alias :to :stopAngle
       alias :span :spanAngle
+      alias :topleft :topLeft
+      alias :bottomright :bottomRight
 
     public # ReformEllipse methods
 
@@ -118,48 +127,55 @@ module Reform
       # startAngle and spanAngle are integers. To get degrees divide by 16.0
       attr :center, :radius, :startAngle, :spanAngle
 
-      def center= val
-        return if @center == val
+      def center= x, y = nil
+        pt = Qt::PointF === x ? x : Qt::PointF.new(x, y || x)
+        return if @center == pt
         prepareGeometryChange
-        @center = val
+        @center = pt
+        @boundingRect = Qt::RectF.new # invalidate it
+        update
+      end
+
+      def size= w, h = nil
+        sz = (Qt::SizeF === w ? w : Qt::SizeF.new(w, h || w)) / 2.0
+        self.radius = sz
+      end
+
+      def radius= w, h = nil
+        sz = Qt::SizeF === w ? w : Qt::SizeF.new(w, h || w)
+        return if @radius == sz
+        prepareGeometryChange
+        @radius = sz
         @boundingRect = Qt::RectF.new
         update
       end
 
-      def radius= val
-        return if @radius == val
-        prepareGeometryChange
-        @radius = val
-        @boundingRect = Qt::RectF.new
-        update
-      end
-
-      def topleft= val
-        self.center = Qt::PointF.new(val.x + @radius.width, val.y + @radius.height)
+      def topLeft= x, y = nil
+        pt = Qt::PointF === x ? x : Qt::PointF.new(x, y || x)
+        pt.x += @radius.width
+        pt.y += @radius.height
+        self.center = pt
 #         tag "topleft:=#{val.inspect}, center := #{center.inspect}, rad=#{@radius.inspect}"
       end
 
-      def topleft
+      def topLeft
         Qt::PointF.new(@center.x - @radius.width, @center.y - @radius.height)
       end
 
       # this is not symmetrical. It changes BOTH center and radius
       # This means topleft must be FIRST.
-      def bottomright= val
+      def bottomRight= x, y
+        pt = Qt::PointF === x ? x : Qt::PointF.new(x, y || x)
         # 1 get 'top' back
         tx, ty = @center.x - @radius.width, @center.y - @radius.height
         # center is half of this
-        @center.x, @center.y = (val.x + tx) / 2.0, (val.y + ty) / 2.0
+        @center.x, @center.y = (pt.x + tx) / 2.0, (pt.y + ty) / 2.0
         self.radius = Qt::SizeF.new(@center.x - tx, @center.y - ty)
 #         tag "br:=#{val.inspect}, t=(#{tx},#{ty}), center := #{center.inspect}, rad=#{@radius.inspect}"
       end
 
-      def bottomright
+      def bottomRight
         Qt::PointF.new(@center.left + @radius.width, @center.top + @radius.height)
-      end
-
-      def size= val
-        self.radius = Qt::SizeF.new(val.width / 2.0, val.height / 2.0)
       end
 
       def size
@@ -184,6 +200,7 @@ module Reform
       end
 
       def rect
+#         tag "center=#{@center.inspect}, radius = #{@radius.inspect}"
 #         tag "rect, center: (#{@center.x},#{@center.y}), radius: #{@radius.inspect}"
         Qt::RectF.new(@center.x - @radius.width, @center.y - @radius.height, 2 * @radius.width, 2 * @radius.height)
       end

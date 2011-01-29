@@ -3,6 +3,14 @@
 
 require 'reform/control'
 
+module Qt
+  class Pen
+    def inspect
+      "#{self}(#{color.red},#{color.green},#{color.blue}), weight=#{widthF}"
+    end
+  end
+end
+
 module Reform
 
   # this module contains generated and other 'brush' and 'pen' constructors.
@@ -24,8 +32,9 @@ I believe 'brush' and 'pen' can become plugins, but they are not really widgets 
       class Brush < Control
         include Graphical
         private
-          def initialize parent = nil
+          def initialize parent = nil, dynname = :qtbrush
             super(parent, Qt::Brush.new)
+            @dynname = dynname
           end
 
           # makes it a solid brush.
@@ -33,7 +42,9 @@ I believe 'brush' and 'pen' can become plugins, but they are not really widgets 
 #             tag "color(#{args.inspect})"
             case args[0]
             when Hash, Proc, nil
-              DynamicAttribute.new(self, :color, Qt::Color, args[0], &block)
+#               tag "a DynamicColor! on Brush#color"
+              require_relative 'dynamiccolor'
+              DynamicColor.new(self, :color, Qt::Color, args[0], &block)
             else
 #               tag "using make + make"
               @qtc = make_qtbrush(make_color(*args) # .tap{|c| tag "col=#{c.red},#{c.green},#{c.blue}"}
@@ -48,7 +59,7 @@ I believe 'brush' and 'pen' can become plugins, but they are not really widgets 
           def color= v
             @qtc = make_qtbrush(v)
             # we  must reassign the entire brush or a graphicitem will not be updated at all.
-            parent.qtbrush = @qtc if parent
+            parent.send(@dynname, @qtc) if parent
           end
 
           # override
@@ -439,7 +450,7 @@ I believe 'brush' and 'pen' can become plugins, but they are not really widgets 
         end
       end
 
-      alias :color :make_color
+#             alias :color :make_color                  CONFUSING!!
 
       # according to Hue, Saturation and Brightness.
       # ranges are: 0..360, 0..255, 0..255.

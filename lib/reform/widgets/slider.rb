@@ -12,7 +12,7 @@ module Reform
         # Otherwise another kind of control should be used.
         connect(@qtc, SIGNAL('valueChanged(int)'), self) do |value|
           rfRescue do
-#             tag "#{self}::valueChanged, track_propagation = #{track_propagation}"
+#             tag "#{self}::valueChanged in #{value}, track_propagation = #{track_propagation}"
             if (mod = model) && (cid = connector)
 #               tag "APPLY_SETTER"
               model.apply_setter(cid, value, self)
@@ -47,6 +47,7 @@ module Reform
     public # methods of Slider
 
       def updateModel model, options = nil
+#         tag "#{self}:updateModel #{model}, #{options}"
         cid = connector and
           if model && model.getter?(cid)
             @qtc.value = model.apply_getter(cid)

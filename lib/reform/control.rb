@@ -5,6 +5,11 @@
 
 module Reform
 
+  class Control < Qt::Object; end
+  class DynamicAttribute < Control; end
+  class DynamicColor < DynamicAttribute; end
+  class DynamicPoint < DynamicAttribute; end
+
 # Control instances are reform wrappers around the Qt(ruby) elements.
 # We extend QObject (Qt::Object) itself to enable slots and signals
 # Since all setup blocks are executed in the context of the item being
@@ -97,7 +102,7 @@ module Reform
       # it returns qtc.size
       # use sizeHint to set a requested size
       def size # w = nil, h = nil
-        effective_qwidget.size
+#         effective_qwidget.size
 #         return q.size unless w
 #         tag "better use
 #         if h
@@ -150,34 +155,77 @@ module Reform
         end
       end
 
-      # create a DynamicAttribute for each element in the list.
-      # the first parameter is the kind of value, and must be an animatable value
-      # defines two methods. A specific setter method is also created.
-      # since the protectionlevel is not set, they will both use the current one.
-      # So 'private ; ... define_setter '  will create two private methods.
-      # Boolean and TrueClass are the same and have defaultvalue 'true', while
-      # FalseClass has a default of 'false'. Numerics have 0 as default.
-      def self.define_setter klass, *list
+      def apply_dynamic_getter name
+        @qtc.send(name)
+      end
+
+      def apply_dynamic_setter(name, *args)
+        @qtc.send(name, *args)
+      end
+
+      DynamicAttributeKlassMap = { Qt::Color => DynamicColor ,
+                                   Qt::PointF => DynamicPoint }
+=begin
+      create a DynamicAttribute for each element in the list.
+      the first parameter is the kind of value, and must be an animatable value
+      defines two methods. A specific setter method is also created.
+      since the protectionlevel is not set, they will both use the current one.
+      So 'private ; ... define_setter '  will create two private methods.
+      Boolean and TrueClass are the same and have defaultvalue 'true', while
+      FalseClass has a default of 'false'. Numerics have 0 as default.
+
+      REQUIREMENTS:
+
+        the control must have a '@qtc' with the same method, if the method is to be called
+        without arguments.
+        the control must have a '@qtc' with the assignment version of the same method, with
+        the same arguments if the method is to be called to assign a simple value.
+
+      Example:
+
+        if you define a 'color' setter for X, then X.qtc must have a method 'color' returning
+        the color without arguments and a method 'color=' assigning it.
+
+      Note: it may be better to use 'setX' iso 'x=' ??
+
+    COSTS: dynamic setters are cheap. Two extra calls are required for simple values.
+        With define_simple_setter 'color' calling 'color yellow' will immediately call 'qtc.send(:color, yellow)'.
+        With define_setter this becomes 'apply_dynamic_setter(:color, yellow)' followed by 'qtc.send(:color, yellow)'.
+        This is only required because dynamic values have no @qtc property. It would be possible to add this
+        as a duck-typed adapter. But it is basicly not an issue.
+=end
+      def self.define_setters klass, *list
         list.each do |name|
           n = (name.to_s + '=').to_sym
           define_method name do |*args, &block|
-#             tag "DynamicAttribSetter :#{name}, args=#{args.inspect}, block = #{block}"
-            return @qtc.send(name) if args.empty? && !block
+#             tag "#{self}::#{name} DECLARATATION #{args.inspect}, block = #{block}"
+            return apply_dynamic_getter(name) if args.empty? && !block
 #             tag "args[0] is a #{args[0].class}"
             case args[0]
             when Hash, Proc, nil
-              DynamicAttribute.new(self, name, klass, args[0], &block)
+#               tag "CREATING DA!!!!!!!!!!!!!!!!!!!, #{self}::#{name}, klass=#{klass}"
+              if da_klass = DynamicAttributeKlassMap[klass]
+                require_relative 'dynamiccolor'
+              else
+                da_klass = DynamicAttribute
+              end
+              da_klass.new(self, name, klass, args[0], &block)
 #               tag "created DA, value -> #{value}"
 #               @qtc.send(n, value)             NO. data must come from outside.
-            else @qtc.send(n, *args)
+            else
+#               tag "pass on simple assignment to qtc #@qtc::#{n} := #{args.inspect}"
+              apply_dynamic_setter(n, *args)
+#               tag "qtc is now #{@qtc.inspect}"
             end
           end # method name
           define_method n do |value|
-#             tag "assigning dynamic result #{value.inspect}"
-            @qtc.send(n, value)
+#             tag "assigning dynamic result to qtc #@qtc::#{n} := #{value.inspect}"
+            apply_dynamic_setter(n, value)
           end # method name=
         end
       end # define_setter
+
+      def self.define_setter *args; self.define_setters *args; end
 
       #         alias :define_dynamic_setter :define_setter             CANT BE DONE EASILY WITH static methods...
 

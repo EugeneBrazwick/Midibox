@@ -229,7 +229,7 @@ module Reform
       def qtbrush= newbrush
 #         tag "#{self}#brush := #{newbrush}"
         newbrush = make_qtbrush(newbrush) unless Qt::Brush === newbrush
-        @qtc.brush = newbrush
+        @qtc.brush = newbrush # if @qtc.respond_to?(:brush=)            DOES NOT WORK PROPERLY!!
 #         tag "#{self}.qtc.brush := #{@qtc.brush}, while brush = #{newbrush}"
         children.each do |child|
           child.qtbrush = newbrush if GraphicsItem === child && !child.explicit_brush
@@ -238,10 +238,13 @@ module Reform
       end
 
       def qtpen= newpen
+#         tag "#{self}::qtpen := #{newpen.inspect}"
         newpen = make_qtpen(newpen) unless Qt::Pen === newpen
-        @qtc.pen = newpen
+        @qtc.pen = newpen # if @qtc.respond_to?(:pen=)          UNRELIABLE!!
         children.each do |child|
-          child.qtpen = newpen if GraphicsItem === child && !child.explicit_pen
+          next unless GraphicsItem === child && !child.explicit_pen
+#           tag "propagating pen to #{child}"
+          child.qtpen = newpen
         end
       end
 

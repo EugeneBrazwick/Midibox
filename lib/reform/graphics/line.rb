@@ -6,6 +6,9 @@ module Reform
   class Line < GraphicsItem
   private
 
+    define_setters Qt::PointF, :from, :to
+
+=begin ORG
     def from x, y = nil
 #       tag "qtc.pen.color=#{@qtc.pen.color}"
 #       tag "from, qtc.pen.color=#{@qtc.pen.color.red} #{@qtc.pen.color.green} #{@qtc.pen.color.blue}"
@@ -25,6 +28,7 @@ module Reform
       line.p2 = y ? Qt::PointF.new(x, y) : x
       @qtc.line = line
     end
+=end
 
   public
 
@@ -40,6 +44,19 @@ module Reform
     include QGraphicsItemHackContext
 
       def brush= b; end
+      def font= f; end
+
+      def from= x, y = nil
+        l = line
+        l.p1 = Qt::PointF === x ? x : Qt::PointF.new(x, y || x)
+        self.line = l
+      end
+
+      def to= x, y = nil
+        l = line
+        l.p2 = Qt::PointF === x ? x : Qt::PointF.new(x, y || x)
+        self.line = l
+      end
   end
 
   createInstantiator File.basename(__FILE__, '.rb'), QGraphicsLineItem, Line

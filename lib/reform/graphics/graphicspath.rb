@@ -460,6 +460,10 @@ Translation and matrix mapping can also be done.
     private # PathItem methods
       def initialize parent, qtc
         super
+        startPath
+      end
+
+      def startPath
         @path = PathBuilder.new(self)
       end
 
@@ -613,6 +617,8 @@ moveto lineto smoothto is much better.
         @qtc.path = @path.build
 #         tag "path: #{@path.each_vertex { |v| v.inspect }}"
       end
+
+      alias :endPath :assignQPath
 
     public
 

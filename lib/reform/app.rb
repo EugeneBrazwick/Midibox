@@ -149,6 +149,42 @@ class Float
     alias :ms :milliseconds
 end
 
+module Qt
+  class PointF
+      # Float length
+      def length
+        Math::sqrt(x * x + y * y)
+      end
+
+      # Float angle. 3 o'clock is 0, ccw is positive.
+      def angle
+        Qt::LineF.new(0.0, 0.0, x, y).angle
+      end
+
+      def inspect
+        "(%.4f,%.4f)" % [x,y]
+      end
+  end #class PointF, improved!!
+
+  class LineF
+      # QPointF normal_point. Returns the normalized normal of the line.
+      # as a point with distance 1.0 to the origin.
+      def normal_point
+        normalVector.translated(-p1).unitVector.p2
+      end
+
+  end# LineF
+
+  class Transform
+        # alias :reform_org_translate :translate THERE IS NO SUCH METHOD!!
+      # make it possible to translate using a Qt::PointF as well
+      def translate x, y = nil
+        x, y = x.x, x.y unless y
+        method_missing :translate, x, y
+      end
+  end
+end
+
 # The Reform library is a qtruby based library for building gui's in a 100%
 # declarative way (we do not compromise!!!)
 # There are NO methods involved. Ever. Anywhere.

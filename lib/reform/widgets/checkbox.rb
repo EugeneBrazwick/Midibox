@@ -13,8 +13,8 @@ module Reform
       if connectit
         connect(@qtc, SIGNAL('clicked(bool)'), self) do |checked|
           rfRescue do
-            if (cid = connector) && (model = effectiveModel)
-              model.apply_setter(cid, checked)
+            if (cid = connector) && (mod = model)
+              mod.apply_setter(cid, checked)
             end
           end
         end

@@ -31,41 +31,24 @@ require 'reform/app'
     include Graphical,  GraphicContext
     private
 
-#       def initialize parent, qparent
-#         super
-#       end
-
       # position in the Scene (not the view). The translation
-      def position tx = nil, ty = nil
-        return @qtc.pos unless tx
-        tx, ty = tx if Array === tx
-#         tag "qtc.setPos := #{tx}, #{ty}, rect = #{@qtc.rect.inspect}"
-        @qtc.setPos(tx, ty || tx)
-#         tag "qtc.setPos := #{tx}, #{ty}, rect = #{@qtc.rect.inspect}"
-      end
+      # Qt calls this pos as well.
+      define_setter Qt::PointF, :pos
 
-      alias :translate :position
-      alias :translation :position
-      alias :pos :position
-
-      def movable onoff = nil, &block
-        case onoff
-        when Hash, Proc then DynamicAttribute.new(self, :movable, TrueClass, onoff, &block)
-        else @qtc.setFlag Qt::GraphicsItem::ItemIsMovable, onoff
-        end
-      end
+      alias :translate :pos
+      alias :translation :pos
+      alias :position :pos
 
       define_simple_setter :zValue
 
-      define_setter Boolean, :visible
+      define_setter Boolean, :visible, :movable
 
       # NOTE: this is 'fat'. Not every GraphicsItem has a geometry.
       def geometry x = nil, y = nil, w = nil, h = nil, &block
         return @qtc.geometry unless x || w || block
         case x
         when Array then self.geometry = *x
-        when nil then DynamicAttribute.new(self, :geometryF, Qt::RectF).setup(nil, &block)
-        when Hash, Proc then DynamicAttribute.new(self, :geometryF, Qt::RectF).setup(x, &block)
+        when nil, Hash, proc then handle_dynamics(Qt::RectF, :geometryF, x, &block)
         else self.geometry = x, y, w, h
         end
       end
@@ -164,55 +147,41 @@ require 'reform/app'
       alias :fillcolor :fill
       alias :pen :stroke
 
-      # Important, angles less than 1.0 degree are taken to be a factor of the
-      # circles length (1.0 == 360 degr = 2*pi rad)
-      # This is Eugene's improved radials standard. PI does not exist!!!
-      # Hm. it looks like a very bad feature...
-      def rotate degrees_cw, around_xy = nil
-        degrees_cw *= 360.0 unless Integer === degrees_cw || degrees_cw.abs > 1.00000001
-        if around_xy
-          @qtc.setTransformOriginPoint(*around_xy)
+      # BROKEN compatibility: around_xy is now a hash argument and no longer argument 2.
+      def rotation degrees_cw = nil, options = {}, &block
+        case degrees_cw
+        when Proc, Hash, nil then handle_dynamics(Float, :rotation, degrees_cw, &block)
         else
-          @qtc.setTransformOriginPoint(0.0, 0.0)
+          degrees_cw *= 360.0 if options[:units]
+          degrees_cw *= 180.0 / Math::PI if options[:rads]
+          if options[:around_xy]
+            @qtc.setTransformOriginPoint(*options[:around_xy])
+          else
+            @qtc.setTransformOriginPoint(0.0, 0.0)
+          end
+          @qtc.rotation = degrees_cw
         end
-        @qtc.rotation = degrees_cw
       end
 
-=begin
-    'rotation' seems better than 'rotate'. Because I set a parameter, and do not perform an
-    action.  However, we also have 'translate' and 'scale' and it's not easy getting a uniform
-    name:  rotation + translation + scale?  scaled? scaling?
+      alias :rotate :rotation
 
-    The preffered name is 'rotate'. As of today. Kyou kara.
-=end
-      alias :rotation :rotate
-
-=begin EVIL
-      # this uses Eugene circle units where 1.0 == 360 degrees.
-      # except when degrees_ccw is an int or larger than 1
-      def rotate degrees_ccw, around_xy = nil
-        degrees *= 360.0 unless Integer === degrees || degrees.abs > 1.00000001
-        if around_xy
-          @qtc.setTransformOriginPoint(*around_xy)
+      def scale sx = nil, sy = nil, &block
+        case sx # dynamic scaling is always in both directions.
+        when Proc, Hash, nil then handle_dynamics(Float, :scale, sx, &block)
         else
-          @qtc.setTransformOriginPoint(0.0, 0.0)
-        end
-        @qtc.rotation += degrees
-      end
-=end
-
-      def scale sx, sy = nil
-        sx, sy = sx if Array === sx
-#         tag "#{@qtc}.scale := #{sx}"
-        if sy
-          # problem: since we change 'transform' we probably lose it
-          # if rotated or translated ???
-          tag "scaling in two dimensions is currently experimental"
-          matrix = @qtc.transform
-          matrix.scale(sx, sy)
-          @qtc.transform = matrix
-        else
-          @qtc.scale = sx
+          sx, sy = sx if Array === sx
+  #         tag "#{@qtc}.scale := #{sx}"
+          if sy
+            # problem: since we change 'transform' we probably lose it
+            # if rotated or translated ???
+            STDERR.print "scaling in two dimensions is currently experimental\n"
+            matrix = @qtc.transform
+            matrix.scale(sx, sy)
+            @qtc.transform = matrix
+          else
+            tag "#@qtc.scale := #{sx.inspect}"
+            @qtc.scale = sx
+          end
         end
       end
 
@@ -281,15 +250,13 @@ require 'reform/app'
 #         tag "itemChange #{change}, #{value.inspect}"
       end
 
-=begin          TOO SOON, addTo may cause reparenting...
-      def self.new_qt_implementor(qt_implementor_class, parent, qparent)
-        tag "#{self}.new_qt_implementor, parent = #{parent}, parent.brush = #{parent.brush}"
-        tmp = super
-        tmp.pen, tmp.brush = parent.pen, parent.brush
-        tmp
+      def scale= val
+        @qtc.scale = val
       end
-=end
 
+      def rotation= val
+        @qtc.rotation = val
+      end
   end # class GraphicsItem
 
   # currently only used to get the itemChange callback working

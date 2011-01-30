@@ -95,11 +95,14 @@ Even more, a QDialog can be stored in the view as well!
     # Set the default stroke for elements
     def stroke *args, &block
       return @pen unless !args.empty? || block
-      @pen = make_qtpen_with_parent(self, *args, &block)
+      self.qtpen = make_qtpen_with_parent(self, *args, &block)
+    end
+
+    def qtpen= pen
       children.each do |child|
         if GraphicsItem === child && !child.explicit_pen
 #           tag "CALLING #{child}.qtpen := #{@pen.inspect}"
-          child.qtpen = @pen
+          child.qtpen = pen
         end
       end
     end

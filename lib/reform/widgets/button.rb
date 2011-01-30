@@ -3,7 +3,7 @@
 
 module Reform
 
-  require_relative '../abstractbutton'
+  require 'reform/abstractbutton'
 
   class Button < AbstractButton
     include MenuContext # can create a menu here

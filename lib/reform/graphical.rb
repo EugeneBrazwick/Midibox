@@ -32,7 +32,7 @@ I believe 'brush' and 'pen' can become plugins, but they are not really widgets 
       class Brush < Control
         include Graphical
         private
-          def initialize parent = nil, dynname = :qtbrush
+          def initialize parent = nil, dynname = :qtbrush=
             super(parent, Qt::Brush.new)
             @dynname = dynname
           end
@@ -41,10 +41,18 @@ I believe 'brush' and 'pen' can become plugins, but they are not really widgets 
           def color *args, &block
 #             tag "color(#{args.inspect})"
             case args[0]
-            when Hash, Proc, nil
+            when Hash, nil
 #               tag "a DynamicColor! on Brush#color"
               require_relative 'dynamiccolor'
               DynamicColor.new(self, :color, Qt::Color, args[0], &block)
+            when Proc
+              require_relative 'dynamiccolor'
+              if args[0].arity == 1
+                # same as { connector: block }
+                DynamicColor.new(self, :color, Qt::Color, connector: args[0])
+              else
+                DynamicColor.new(self, :color, Qt::Color, args[0], &block)
+              end
             else
 #               tag "using make + make"
               @qtc = make_qtbrush(make_color(*args) # .tap{|c| tag "col=#{c.red},#{c.green},#{c.blue}"}
@@ -78,26 +86,37 @@ I believe 'brush' and 'pen' can become plugins, but they are not really widgets 
           end
 
           def color *args, &block
+#             tag "pen#color, args[0] = #{args[0]}"
             case args[0]
-            when Hash, Proc, nil
-              DynamicAttribute.new(self, :color, Qt::Color, args[0], &block)
+            when Hash, nil
+              require_relative 'dynamiccolor'
+              DynamicColor.new(self, :color, Qt::Color, args[0], &block)
+            when Proc
+              require_relative 'dynamiccolor'
+              if args[0].arity == 1
+                # same as { connector: block }
+                DynamicColor.new(self, :color, Qt::Color, connector: args[0])
+              else
+                DynamicColor.new(self, :color, Qt::Color, args[0], &block)
+              end
             else
               @qtc = make_qtpen(make_color(*args))
             end
           end
 
-          define_simple_setter :widthF
+          define_setter Float, :widthF
 
-  #         # width can be used with a float. If 0.0 the pen is cosmetic
-          def width value
-            case value
-            when Fixnum then @qtc.width = value
-            else @qtc.widthF = value
+          alias :width :widthF
+          alias :size :widthF
+          alias :weight :widthF
+
+          def widthF= v
+            if parent
+              @qtc = parent.pen
+              @qtc.widthF = v
+              parent.qtpen = @qtc
             end
           end
-
-          alias :size :width
-          alias :weight :width
 
           # make the size 1 pixel, independent of scale
           def cosmetic v_true = true

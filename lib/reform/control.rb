@@ -163,12 +163,12 @@ module Reform
         @qtc.send(name)
       end
 
+      # note that name ends with '='
       def apply_dynamic_setter(name, *args)
+#         tag "apply_dynamic_setter(#{name}, #{args.inspect})"
         @qtc.send(name, *args)
       end
 
-      DynamicAttributeKlassMap = { Qt::Color => DynamicColor ,
-                                   Qt::PointF => DynamicPoint }
 =begin
       create a DynamicAttribute for each element in the list.
       the first parameter is the kind of value, and must be an animatable value
@@ -192,46 +192,81 @@ module Reform
 
       Note: it may be better to use 'setX' iso 'x=' ??
 
-    COSTS: dynamic setters are cheap. Two extra calls are required for simple values.
+    COSTS: dynamic setters are cheap. Three extra calls are required for simple values.
         With define_simple_setter 'color' calling 'color yellow' will immediately call 'qtc.send(:color, yellow)'.
-        With define_setter this becomes 'apply_dynamic_setter(:color, yellow)' followed by 'qtc.send(:color, yellow)'.
+        With define_setter this becomes 'send(n, *args)' which calls 'apply_dynamic_setter(:color, yellow)'
+        which is by default 'qtc.send(:color, yellow)'.
         This is only required because dynamic values have no @qtc property. It would be possible to add this
         as a duck-typed adapter. But it is basicly not an issue.
+
+   DATATRACK:
+       the data is first assigned to the assigner in the reform class. This assigner is automatically
+       created by 'define_setters' and by default delegates to @qtc.
+
 =end
       def self.define_setters klass, *list
         list.each do |name|
-          n = (name.to_s + '=').to_sym
           define_method name do |*args, &block|
-#             tag "#{self}::#{name} DECLARATATION #{args.inspect}, block = #{block}"
-            return apply_dynamic_getter(name) if args.empty? && !block
-#             tag "args[0] is a #{args[0].class}"
-            case args[0]
-            when Hash, Proc, nil
-#               tag "CREATING DA!!!!!!!!!!!!!!!!!!!, #{self}::#{name}, klass=#{klass}"
-              if da_klass = DynamicAttributeKlassMap[klass]
-                require_relative 'dynamiccolor'
-              else
-                da_klass = DynamicAttribute
-              end
-              da_klass.new(self, name, klass, args[0], &block)
-#               tag "created DA, value -> #{value}"
-#               @qtc.send(n, value)             NO. data must come from outside.
-            else
-#               tag "pass on simple assignment to qtc #@qtc::#{n} := #{args.inspect}"
-              apply_dynamic_setter(n, *args)
-#               tag "qtc is now #{@qtc.inspect}"
-            end
+#             tag "#{self}::#{name} DECLARATATION block = #{block}, args=#{args.inspect}"
+            handle_dynamics(klass, name, *args, &block)
           end # method name
-          define_method n do |value|
+          n = (name.to_s + '=').to_sym
+          define_method n do |*value|
 #             tag "assigning dynamic result to qtc #@qtc::#{n} := #{value.inspect}"
-            apply_dynamic_setter(n, value)
+            apply_dynamic_setter(n, *value)
+            # by default this then calls @qtc.n = *value
           end # method name=
         end
       end # define_setter
 
       def self.define_setter *args; self.define_setters *args; end
 
-      #         alias :define_dynamic_setter :define_setter             CANT BE DONE EASILY WITH static methods...
+      DynamicAttributeKlassMap = { Qt::Color => DynamicColor ,
+                                   Qt::PointF => DynamicPoint }
+
+      # this method can be called for generic handling of dynamic setters
+      # It will take Proc with arity 1 special
+      # blocks or Procs with arity 0 or hashes are taken to be DynamicAttribute
+      # constructors.
+      # Otherwise it delegates to 'self.name = *args' and the block is ignored
+      #
+      # Normally your method calls this as last resort if arg0 is a Hash or a Proc or nil and a block was given.
+      # Examples:       GraphicsItem::rotation,  GraphicsItem::scale
+      def handle_dynamics(klass, name, *args, &block)
+        return apply_dynamic_getter(name) if args.empty? && !block
+#             tag "args[0] is a #{args[0].class}"
+        case args[0]
+        when Hash, nil
+#               tag "CREATING DA!!!!!!!!!!!!!!!!!!!, #{self}::#{name}, klass=#{klass}"
+          if da_klass = DynamicAttributeKlassMap[klass]
+            require_relative 'dynamiccolor'
+          else
+            da_klass = DynamicAttribute
+          end
+          da_klass.new(self, name, klass, args[0], &block)
+#               tag "created DA, value -> #{value}"
+#               @qtc.send(n, value)             NO. data must come from outside.
+        when Proc
+#               tag "proc.arity = #{args[0].arity}"
+          if da_klass = DynamicAttributeKlassMap[klass]
+            require_relative 'dynamiccolor'
+          else
+            da_klass = DynamicAttribute
+          end
+          if args[0].arity == 1
+            # same as { connector: block }
+            da_klass.new(self, name, klass, connector: args[0])
+          else
+            da_klass.new(self, name, klass, args[0], &block)
+          end
+        else
+          n = (name.to_s + '=').to_sym
+#               tag "pass on simple assignment to qtc #@qtc::#{n} := #{args.inspect}"
+#               apply_dynamic_setter(n, *args)          too direct
+          send(n, *args) # this will call the assigner defined by default below:
+#               tag "qtc is now #{@qtc.inspect}"
+        end
+      end
 
       def executeMacros(receiver = nil)
 #         tag "#{self}#executeMacros, EXECUTE #{instance_variable_defined?(:@macros) && @macros.length} macros"
@@ -356,7 +391,7 @@ module Reform
             p.want_data!
           else # this can only happen if the parent is no Control. Expected for ReForm since they have no parent.
             unless ReForm === self
-              STDERR.print "INFO: propagation of want_data! blocks at #{self}, parent #{p} lacks 'want_data!'\n"
+              STDERR.print "INFO: propagation of want_data! blocks at #{self}, parent #{p.inspect} lacks 'want_data!'\n"
             end
           end
         end
@@ -615,7 +650,8 @@ module Reform
       def name aSymbol = nil
         if aSymbol
   #       tag "#{self}::assigning objectname #{aName}"
-          self.objectName = @qtc.objectName = aSymbol.to_s
+          self.objectName = n = aSymbol.to_s
+          @qtc.objectName = n if @qtc.respond_to?(:objectName=)
         # there is a slight duplication but the qt windowtree differs.
         # for example, a layout can have named children in 'reform' but not in Qt.
   #         tag "calling #parent.registerName(#{aName})"

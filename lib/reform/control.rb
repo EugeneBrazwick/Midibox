@@ -1,7 +1,11 @@
 
-#  Copyright (c) 2010 Eugene Brazwick
+#  Copyright (c) 2010-2011 Eugene Brazwick
 
 #       equire 'reform/app'             VERY BAD IDEA
+
+verb, $VERBOSE = $VERBOSE, false
+require 'Qt'
+$VERBOSE = verb
 
 module Reform
 
@@ -88,7 +92,7 @@ module Reform
       end
 
       # a parameter block can be declared using the block. It actually is a macro.
-      # a parameter block can be executed by omitting the block
+#       # a parameter block can be executed by omitting the block
       def parameters id, quicky = nil, &block
         if block
           containing_form.parametermacros[id] = Macro.new(nil, nil, quicky, block)       # bit heavy
@@ -861,6 +865,33 @@ module Reform
         super
       end
 
+=begin
+  Within a 'define' section you can 'name' brushed, fonts, pens and shapegroups etc..(?)
+  This are then available everywhere in the form by referring to the name (a symbol).
+
+  Example:
+
+      define {
+        redbrush brush { .. }
+      }
+      canvas {
+        brush :redbrush
+      }
+
+   But 'shapegroup' behaves different. It becomes available as a 'graphical' item as a kind
+   of 'stamp'. After stamping all parameters (at the toplevel can still be changed)
+
+   Example:
+
+      define {
+        shadowcircle shapegroup {
+          circle fill: :shadowGrad, radius: 100
+        }
+      }
+      canvas {
+        shadowcircle translation: [4, 4]
+      }
+=end
       def define quickyhash = nil, &block
         DefinitionsBlock.new(containing_form).setup(quickyhash, &block)
       end

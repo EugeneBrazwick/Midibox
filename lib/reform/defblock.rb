@@ -6,29 +6,7 @@ module Reform
   class DefinitionsBlock < Control
     include Graphical
 
-      class GroupMacro < Control
-        include Graphical, SceneFrameMacroContext
-        private
-          def initialize hash, &initblock
-            super(nil)
-            instance_eval(&initblock) if initblock
-            hash.each { |k, v| send(k, v) } if hash
-          end
-
-        public
-          def exec receiver, quicky, &block
-            STDERR.print "FIXME, ignoring quicky + block\n" # should be working on the group.
-  #           receiver.setup ???
-            executeMacros(receiver)
-          end
-
-      end # class GroupMacro
-
     private # DefinitionsBlock methods
-
-      def shapegroup quickyhash = nil, &block
-        GroupMacro.new(quickyhash, &block)
-      end
 
         # I see a pattern here (FIXME)
       def brush *args, &block
@@ -48,6 +26,37 @@ module Reform
         make_qtfont(*args, &block)
       end
 
+      def parameters quicky = nil, &block
+        Macro.new nil, nil, quicky, block
+      end
+
+=begin
+    This is the same as 'parameters' except for this:
+      1) the entire set is stored inside an implicit 'empty'
+      2) when calling another hash + block can be passed
+      3) the name becomes avaible as a 'graphic'. Note that it always is an 'empty'.
+
+Example:
+
+    define {
+        myshape shapegroup {
+          circle ...
+          circle ...
+          square ...
+        }
+      }
+
+   canvas {
+      myshape pos: [10, 10]
+      myshape pos: [5, 5], rotation: 45
+    }
+
+=end
+      def shapegroup quicky = nil, &block
+        raise 'DAMN' if quicky && !(Hash === quicky)
+        GroupMacro.new nil, nil, quicky, block
+      end
+
     public  #DefinitionsBlock methods
 
       def method_missing sym, *args, &block
@@ -55,11 +64,14 @@ module Reform
         if args.length == 1 && !block
 #           tag "single arg: #{self}.#{sym}(#{args[0]})"
           case what = args[0]
-          when Qt::Brush, Brush, Gradient then parent.registerBrush(sym, what)
-          when Qt::Pen, Pen then parent.registerPen(sym, what)
-          when Qt::Font, Font then parent.registerFont(sym, what)
+          when Qt::Brush, Brush, Gradient then containing_form.registerBrush(sym, what)
+          when Qt::Pen, Pen then containing_form.registerPen(sym, what)
+          when Qt::Font, Font then containing_form.registerFont(sym, what)
             # parent is always the scene
-          when GroupMacro then registerGroupMacro(parent, sym, what)
+          when GroupMacro
+            containing_form.parametermacros[sym] = what
+            Graphical::registerGroupMacro(sym, what)
+          when Macro then containing_form.parametermacros[sym] = what
           else super
           end
         else

@@ -619,11 +619,22 @@ I believe 'brush' and 'pen' can become plugins, but they are not really widgets 
         }
         bubble
 =end
-      def self.registerGroupMacro scene, name, macro
+      def self.registerGroupMacro name, macro
+        raise 'DAMN' unless GroupMacro === macro
         name = name.to_sym
-        define_method name do |quickyhash = nil, &block|
-          # self is the object the item must be added to...
-          macro.exec(self, quickyhash, &block)
+        define_method name do |quicky = nil, &block|
+#           tag "self=#{self}, executing GroupMacro #{macro}, quicky=#{quicky.inspect}"
+          macro = containing_form.parametermacros[name] or return
+#           tag "macro.hash=#{macro.quicky.inspect}"
+#           require_relative 'graphics/empty'
+          empty do
+            rfRescue do
+              instance_eval(&macro.block) if macro.block
+              setupQuickyhash(macro.quicky) if macro.quicky
+              instance_eval(&block) if block
+              setupQuickyhash(quicky) if quicky
+            end
+          end
         end
       end
 

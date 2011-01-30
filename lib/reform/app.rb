@@ -464,8 +464,9 @@ module Reform
       private
 
         def initialize control, name, quicky, block
-    #       tag "Macro.new(#{control}, #{name})"
+#           tag "Macro.new(#{control}, #{name}, quicky=#{quicky.inspect})"
           @control, @name, @quicky, @block = control, name, quicky, block
+          raise 'DAMN' if @quicky && !(Hash === @quicky)
           # WTF??? macros have not a name perse, so macros[name] = self DESTROYS macros!!!!
           control.macros! << self if control
         end
@@ -490,6 +491,9 @@ module Reform
         end
     end # class Macro
   #
+
+    class GroupMacro < Macro
+    end
 
     # experimental. 'Cans' graphicitem setups
     module SceneFrameMacroContext

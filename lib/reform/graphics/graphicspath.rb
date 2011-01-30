@@ -595,12 +595,14 @@ moveto lineto smoothto is much better.
         @path.last.kind = :curve_end
       end
 
+      # args must have a size that is a multiple of 6
       def bezierto *args
         args.each_slice(6) do |a| # } # c1x, c1y, c2x, c2y, qx, qy|
           @path.bezierTo(*a)
         end
       end
 
+      # 8 args + extra tuples of 6
       def bezier x, y, *args
         moveto x,y
         bezierto *args

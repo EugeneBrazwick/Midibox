@@ -22,6 +22,9 @@ are now also called thus.
 
 module Reform
 
+require 'reform/control'
+require 'reform/app'
+
   class GraphicsItem < Control
     require_relative 'graphical'
     # each item can contain arbitrary children. using parentItem and childItems (Qt methods)

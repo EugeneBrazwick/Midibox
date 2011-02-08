@@ -36,6 +36,8 @@ module Reform
 #
 # But this is TOO TRICKY!!!
   class Propagation
+      Initialize = true
+      NoInit = false
     private
       # Parameters:
       # [sender] original instance that started the transaction
@@ -47,7 +49,7 @@ module Reform
       #              would add [:x] => PropertyChange(s, :x, s[:x].clone)  to the index
       #              we can only change simple indices like a fixnum or a hashsymbol.
       # [init] if true this is considered a new structure completely
-      def initialize sender, keypaths, init = false, current_path = nil
+      def initialize sender, keypaths = nil, init = false, current_path = nil
         @sender, @keypaths, @init = sender, keypaths, init
         @init = true if !@keypaths || @keypaths[[]] # the root changed.
         @current_path = current_path
@@ -156,7 +158,7 @@ transaction that is immediately committed (and at that point propagation starts)
     # After 11 clears of the Qt undostack the whole thing crashes.
       class PropertyChange #< Qt::UndoCommand #UNSTABLE
 
-        # hack, this represent a reasonanle safe 'NoValue' value
+        # hack, this represent a reasonable safe 'NoValue' value
         class NoValue
         end
 
@@ -644,11 +646,16 @@ The old rule that 'names' imply 'connectors' is dropped completely.
       # Name should be a hashindex (pref. a Symbol), or an arrayindex (Fixnum)
       # The name +:self; is special.
       def apply_getter name
+#         tag "#{self}::apply_getter(#{name.inspect})"
         case name
         when :self then self
         when :root then root
         when Proc then name.call(self)
-        when Array then name.inject(self) { |v, nm| v && v.apply_getter(nm) }
+        when Array
+          name.inject(self) do |memo, nam|
+#             tag "memo = #{memo}, component = #{nam.inspect}"
+            memo && memo.apply_getter(nam) # ).tap{ |t| tag "Result of application = #{t.inspect}"}
+          end
         else
           return nil unless (m = public_method(name)) && -1 <= m.arity && m.arity <= 0
   #       tag "apply_getter #{name} to self == 'send'"
@@ -871,7 +878,7 @@ The old rule that 'names' imply 'connectors' is dropped completely.
       def initialize parent = nil, qtc = nil
         super
         @root =
-        if parent.respond_to?(:model?) && parent.model?
+        if parent && parent.respond_to?(:model?) && parent.model?
           @root = parent.root
 #           tag "Parent (#{parent}).root = #{parent && parent.root}"
           raise 'WTF' unless @root

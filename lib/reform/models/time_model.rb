@@ -1,7 +1,7 @@
 
-# Copyright (c) 2010 Eugene Brazwick
+# Copyright (c) 2010-2011 Eugene Brazwick
 
-require_relative '../model'
+require 'reform/model'
 
 module Reform
   # model class representing the current time.

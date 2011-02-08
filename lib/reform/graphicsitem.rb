@@ -41,14 +41,15 @@ require 'reform/app'
 
       define_simple_setter :zValue
 
-      define_setter Boolean, :visible, :movable
+      define_setter TrueClass, :visible
+      define_setter FalseClass, :movable, :mouseTracking
 
       # NOTE: this is 'fat'. Not every GraphicsItem has a geometry.
       def geometry x = nil, y = nil, w = nil, h = nil, &block
         return @qtc.geometry unless x || w || block
         case x
         when Array then self.geometry = *x
-        when nil, Hash, proc then handle_dynamics(Qt::RectF, :geometryF, x, &block)
+        when nil, Hash, Proc then handle_dynamics(Qt::RectF, :geometryF, x, &block)
         else self.geometry = x, y, w, h
         end
       end
@@ -257,6 +258,34 @@ require 'reform/app'
       def rotation= val
         @qtc.rotation = val
       end
+
+      # FIXME: there is a pattern here
+      !
+      def whenMouseMoved event = nil, &block
+        if block # is a proc actually
+          @whenMouseMoved = block
+        else
+          return instance_variable_defined?(:@whenMouseMoved) unless event # so no args passed at all.
+          rfCallBlockBack(event, &@whenMouseMoved)
+        end
+      end
+
+      def whenMouseMoved?
+        instance_variable_defined?(:@whenMouseMoved)
+      end
+
+      def whenMousePressed event = nil, &block
+        if block # is a proc actually
+          @whenMousePressed = block
+        else
+          return instance_variable_defined?(:@whenMousePressed) unless event # so no args passed at all.
+          rfCallBlockBack(event, &@whenMousePressed)
+        end
+      end
+
+      def whenMousePressed?
+        instance_variable_defined?(:@whenMousePressed)
+      end
   end # class GraphicsItem
 
   # currently only used to get the itemChange callback working
@@ -280,7 +309,13 @@ require 'reform/app'
         painter.drawRect(bradj)
       end
 
+      def mouseTracking?
+        instance_variable_defined?(:mouseTracking) && @mouseTracking
+      end
+
     public
+      attr_accessor :mouseTracking
+
       # override
       def itemChange change, value
   #       instance_variable_defined?(:@_reform_hack) and
@@ -296,6 +331,29 @@ require 'reform/app'
           end
         end
         super
+      end
+
+      def mouseMoveEvent event
+        rfRescue do
+#           tag "mouseMoveEvent"
+          @_reform_hack.whenMouseMoved(event) if @_reform_hack && @_reform_hack.whenMouseMoved?
+          super
+        end
+      end
+
+      def mousePressEvent event
+        rfRescue do
+#           tag "mousePressEvent"
+          if @_reform_hack && @_reform_hack.whenMousePressed
+            @_reform_hack.whenMousePressed(event)
+#             tag "accept event"
+            event.accept
+          elsif mouseTracking
+            event.accept
+          else
+            super
+          end
+        end
       end
 
 # INSANE...

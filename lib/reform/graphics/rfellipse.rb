@@ -128,8 +128,18 @@ module Reform
       attr :center, :radius, :startAngle, :spanAngle
 
       def center= x, y = nil
-        pt = Qt::PointF === x ? x : Qt::PointF.new(x, y || x)
-        return if @center == pt
+        pt = case x
+          when Qt::PointF
+            return if @center == x
+            x
+          when Array
+            return if @center.x == x[0] && @center.y == x[1]
+            Qt::PointF.new(*x)
+          else
+            y ||= x
+            return if @center.x == x && @center.y == y
+            Qt::PointF.new(x, y)
+          end
         prepareGeometryChange
         @center = pt
         @boundingRect = Qt::RectF.new # invalidate it
@@ -241,7 +251,7 @@ module Reform
 
       #override
       def paint painter, option, widget
-        painter.pen = pen # .tap{|t|tag "pen.color=#{pen.color.inspect}"}
+        painter.pen = pen #.tap{|t|tag "pen.color=#{pen.color.inspect}"}
         painter.brush = brush
         if full?
           painter.drawEllipse(rect)

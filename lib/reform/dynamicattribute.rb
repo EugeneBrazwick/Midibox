@@ -40,6 +40,7 @@ module Reform
       end
 
       def apply_dynamic_getter name
+        tag "apply_dynamic_getter(#{name}), send to #{value}"
         value.send(name)
       end
 
@@ -120,6 +121,12 @@ module Reform
           when :default then Qt::PointF.new
           when Qt::PointF then value[0]
           else Qt::PointF.new(*value)
+          end)
+        when 'Qt::SizeF'
+          Qt::Variant::fromValue(case value[0]
+          when :default then Qt::SizeF.new
+          when Qt::SizeF then value[0]
+          else Qt::SizeF.new(*value)
           end)
         when 'Qt::Rect'
           Qt::Variant::fromValue(case value[0]

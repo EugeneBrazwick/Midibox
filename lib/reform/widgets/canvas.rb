@@ -76,6 +76,11 @@ If items fall from the screen the canvas does not become bigger.
         @qtc.viewportUpdateMode = value
       end
 
+      def mouse
+        @qtc.mouse2data = true
+        @qtc.mouseTracking = true
+      end
+
       def autoscale
         @qtc.autoscale = 1.0
       end
@@ -216,6 +221,68 @@ If items fall from the screen the canvas does not become bigger.
         child.addTo(infused_scene!, quickyhash, &block)
       end
 
+      def whenMouseMoved event = nil, &block
+        if block # is a proc actually
+          @whenMouseMoved = block
+        else
+          return instance_variable_defined?(:@whenMouseMoved) unless event # so no args passed at all.
+          rfCallBlockBack(event, &@whenMouseMoved)
+        end
+      end
+
+      def whenMouseMoved?
+        instance_variable_defined?(:@whenMouseMoved)
+      end
+
+      class MouseWrapper < AbstractModel
+        extend Forwardable
+        private
+          def initialize ev
+            super()
+            @event = ev
+          end
+        public
+          # pseudo attrib
+          def mouse
+            self
+          end
+
+          def_delegators :@event, :scenePos, :button, :globalPos, :globalX, :globalY
+
+          def pressed?
+            @event.buttons != Qt::NoButton
+          end
+
+          def sceneX
+            @event.scenePos.x
+          end
+
+          def sceneY
+            @event.scenePos.y
+          end
+
+          def model?
+            true
+          end
+
+          # returns hash, since flags type in qtruby is totally broken.
+          def buttons
+            r = {}
+            b = @event.buttons
+            r[:left] = true if (b & Qt::LeftButton.to_i) != 0
+            r[:middle] = true if (b & Qt::MiddleButton.to_i) != 0
+            r[:right] = true if (b & Qt::RightButton.to_i) != 0
+            r
+          end
+      end
+
+      def mouse2data event
+        require 'reform/model'
+#         tag "Calling updateModel with new MouseWrapper"
+        prop = Propagation.new(self)
+        prop.debug_track = true if track_propagation
+        updateModel MouseWrapper.new(event), prop
+      end
   end # class Canvas
 
   # The implementor:
@@ -225,14 +292,16 @@ If items fall from the screen the canvas does not become bigger.
   # It should never do this if the user has not defined a whenPainted callback!!
   # And also it shows that this method is fatally flawed
     private
-#       def initialize parent
-#         super
+      def initialize parent
+        super
 #         setTransformationAnchor NoAnchor              # I  can see no difference
-#       end
+        @mouse2data = false
+      end
 
     public
 
       attr :autoscale
+      attr_accessor :mouse2data
 
       def autoscale= value
         policy = (@autoscale = value) ? Qt::ScrollBarAlwaysOff : Qt::ScrollBarAsNeeded
@@ -251,6 +320,40 @@ If items fall from the screen the canvas does not become bigger.
 #          tag "winsz=#{w}x#{h}, srect=#{srect.width}x#{srect.height} -> reqsc=#{requested_scale}"
           s, @autoscale = requested_scale / @autoscale, requested_scale
           scale(s, s) if (s - 1.0).abs > 0.001
+        end
+      end
+
+      def mouseMoveEvent event
+        rfRescue do
+          if instance_variable_defined?(:@_reform_hack)
+            event.scenePos = mapToScene(event.pos)
+            @_reform_hack.whenMouseMoved(event) if @_reform_hack.whenMouseMoved?
+            if @mouse2data
+#               tag "mouse2data!!"
+              @_reform_hack.mouse2data(event)
+            end
+          end
+          super
+        end
+      end
+
+      def mousePressEvent event
+        rfRescue do
+          if instance_variable_defined?(:@_reform_hack)
+            event.scenePos = mapToScene(event.pos)
+            @_reform_hack.mouse2data(event) if @mouse2data
+          end
+          super
+        end
+      end
+
+      def mouseReleaseEvent event
+        rfRescue do
+          if instance_variable_defined?(:@_reform_hack)
+            event.scenePos = mapToScene(event.pos)
+            @_reform_hack.mouse2data(event) if @mouse2data
+          end
+          super
         end
       end
 

@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2010 Eugene Brazwick
+# Copyright (c) 2010-2011 Eugene Brazwick
 
 verb, $VERBOSE = $VERBOSE, false
 require 'Qt'
@@ -81,28 +81,55 @@ class Numeric
     # where lower < upper.  The result is always between these.
     #  7.clamp(3, 5) -> 5
     #  7.clamp(9, 14) -> 9
-    #  7.clamp(3, 14) -> 7
-    def clamp lower, upper
-      self < lower ? lower : self > upper ? upper : self
+    #  7.clamp 3..14 -> 7
+    def clamp lower, upper = nil
+      case lower
+      when Range then self < lower.min ? lower.min : self > lower.max ? lower.max : self
+      else self < lower ? lower : self > upper ? upper : self
+      end
     end
 
     # returns a normalized value where lower is mapped to 0.0 and upper to 1.0
-    def norm lower, upper
-      r = upper.to_f - lower.to_f
-      (self - lower) / r
+    # Examples:
+    #    4.0.norm(0, 10.0) = 0.4
+    #    4.0.norm(0, 1.0) = 4.0
+    #    4.0.norm -10..10 = 0.7  (namely (4--10/10--10) = 14/20)
+    def norm lower, upper = nil
+      case lower
+      when Range
+        r = lower.max.to_f - lower.min.to_f
+        (self - lower.min) / r
+      else
+        r = upper.to_f - lower.to_f
+        (self - lower) / r
+      end
     end
 
-    # map = norm + lerp
-    def map l1, u1, l2, u2
-      norm(l1, u1).lerp(l2, u2)
+    # map = norm + lerp. Note the result is a floating point. unless passing a 'range' to
+    # map into.
+    # Example:
+    # 4.0.map -10..10, 0..100     -> 70 (int)
+    def map l1, u1, l2 = nil, u2 = nil
+      case l1
+      when Range then norm(l1).lerp(u1, l2)
+      else norm(l1, u1).lerp(l2, u2)
+      end
     end
 end
 
 class Float
   public
-    # reverse of norm, linear interpolate a normalized value
-    def lerp lower, upper
-      lower + self * (upper - lower)
+    # reverse of norm, linear interpolate a normalized value.
+    # If a range is passed the result is rounded to an integer.
+    # Otherwise it will be a float.
+    # So   0.4.lerp 0..10 is 4
+    #  And 0.4.lerp 0...10 is also 4 (since 0.4*9 == 3.6)
+    # But  0.4.lerp 0, 10  is 4.0
+    def lerp lower, upper = nil
+      case lower
+      when Range then (lower.min + self * (lower.max - lower.min)).round
+      else lower + self * (upper - lower)
+      end
     end
 
     @@reform_perlin = nil
@@ -116,8 +143,9 @@ class Float
     # +octave+ is the complexity, or detail level of the resulting shape.
     # The default is 1. Note that higher octaves require a higher persistence and will
     # take more calculation time.
+    # +contrast+ is a multiplier that is applied to the result.
     #
-    # NOTE: octave > 1 screws up result and will no longer be normalized!!!
+    # The returnvalue is always between 0.0 and 1.0
     def self.initPerlin(seed, persistence = 1.0, octave = 1, more = nil)
       require_relative '../ruby-perlin/perlin'
       smoothing = more && more[:smoothing]
@@ -166,6 +194,12 @@ module Qt
       end
   end #class PointF, improved!!
 
+  class Point
+      def inspect
+        "(#{x},#{y})"
+      end
+  end
+
   class LineF
       # QPointF normal_point. Returns the normalized normal of the line.
       # as a point with distance 1.0 to the origin.
@@ -182,6 +216,10 @@ module Qt
         x, y = x.x, x.y unless y
         method_missing :translate, x, y
       end
+  end
+
+  class MouseEvent
+      attr_accessor :scenePos
   end
 end
 

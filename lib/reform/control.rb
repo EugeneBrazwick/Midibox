@@ -344,6 +344,7 @@ module Reform
       #
       # BANG! A clock.
       def connector value = nil, &block
+#         value = value[0] if value.length == 1
         if value || block
 #           tag "setting connector, want_data!"
           @connector = block ? block : value

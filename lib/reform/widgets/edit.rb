@@ -25,7 +25,9 @@ module Reform
   #       tag "initialized edit"
       end
 
-      define_simple_setter :readOnly, :text, :alignment, :maxLength
+      define_simple_setter :text, :alignment, :maxLength
+
+      define_setter FalseClass, :readOnly
 
       def rightalign
         alignment Qt::AlignRight

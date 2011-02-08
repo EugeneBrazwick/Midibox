@@ -161,14 +161,9 @@ module Reform
       ref.instance_eval(&initblock) if initblock
     end
 
-    # notice: these can no longer be queried....
-    def enabler value = nil, &block
-      DynamicAttribute.new(self, :enabled, TrueClass, value, &block)
-    end
-
-    def disabler value = nil, &block
-      DynamicAttribute.new(self, :disabled, TrueClass, value, &block)
-    end
+    # INCOMPAT change: enabler is now simply 'enabled'. disabler -> disabled
+    define_setter TrueClass, :enabled, :disabled
+    define_setter FalseClass, :mouseTracking
 
   public # Widget methods
 

@@ -217,7 +217,7 @@ module Reform
 
       # override
       def boundingRect
-        if @boundingRect.null?
+        if @boundingRect.nil?
           pw = pen.widthF
           if pw == 0.0 || full?
             @boundingRect = rect

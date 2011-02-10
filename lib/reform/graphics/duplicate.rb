@@ -9,7 +9,7 @@ Matrix is applied to each copy, otherwise they would all overlap completely.
 How to instantiate components?
 We must use a macro like system to replay construction
 
-  duplicator {
+  duplicate {
     count 2
     square geometry: [10, 10, 50]
     translation 10, 10
@@ -30,7 +30,7 @@ children.
 
 If one item changes they must ALL change. Even though they are individual copies??
 
-  duplicator {
+  duplicate {
     count 5
     square geometry: [10, 10, 50], brush: { connector: :color }
     translation 10, 10
@@ -117,8 +117,12 @@ module Reform
     private
       def initialize parent, qparent
         super
-        # ?
         @did_macros = false
+        @stepper = nil
+      end
+
+      def step(&block)
+        @stepper = block
       end
 
       # IMPORTANT fillhue_rotation DOES NOT WORK TODO
@@ -158,7 +162,8 @@ module Reform
         matrix = @qtc.matrix
 #         tag "current matrix = #{matrix.inspect}"
         @mat = Transform.new # ouch
-        @qtc.count.times do
+        (0...@qtc.count).each do |c|
+          @current_el_index = c
           @macros.each do |macro|
 #             tag "#{self}::Executing MACRO #{macro.name}#{macro.quicky.inspect}"
             macro.exec(self)
@@ -184,6 +189,7 @@ module Reform
 # #         tag "addGraphicsItem c=#{control}, qc=#{qc}, adding mat"
 #         tag "mat = #{@mat.inspect}"
         qc.setTransform @mat # if instance_variable_defined?(:@mat)
+        control.instance_exec(self, @current_el_index, &@stepper) if @stepper
         control
       end
 

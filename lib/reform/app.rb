@@ -216,6 +216,17 @@ module Qt
         x, y = x.x, x.y unless y
         method_missing :translate, x, y
       end
+
+      def inspect
+        "#{m11} #{m12} #{m13}|#{m21} #{m22} #{m23}|#{m31} #{m32} #{m33}"
+      end
+
+  end
+
+  class Color
+    def inspect
+      "rgb(#{red}, #{green}, #{blue}, #{alpha})"
+    end
   end
 
   class MouseEvent

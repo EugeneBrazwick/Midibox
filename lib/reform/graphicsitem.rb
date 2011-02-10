@@ -316,6 +316,13 @@ require 'reform/app'
     public
       attr_accessor :mouseTracking
 
+      # replacement for 'update'
+      def proper_update rect = nil
+#         tag "proper_update called"
+        rect ||= boundingRect
+        scene.update(mapRectToScene(rect)) # OK!
+      end
+
       # override
       def itemChange change, value
   #       instance_variable_defined?(:@_reform_hack) and

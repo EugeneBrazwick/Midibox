@@ -20,6 +20,7 @@ module Reform
 
         @frequency, @frameNr, @oneShot = 1.0, 0, false
         connect @qtc, SIGNAL('timeout()') do
+#           tag "TIMEOUT"
           transaction do |tran|
             self.frameNr += 1
 #             tag "self.current := .... "
@@ -75,16 +76,44 @@ module Reform
 
       # angle of the cycle. Assumes it is 0.0 at the 'start' of the timer.
       # The result is always between 0.0 and 360.0
-      def angle
+      def angle frequency = nil
         # example, if the freq = 5 hz. we make a full circle every 0.2 s.
         # so 0.2s is 360 degrees. so degrees = 0.2/360s = 1.0/hz/360
         # IN SECONDS???? BUMMER
   #       tag "elapsed=#{Qt::Time::currentTime.elapsed}"
   #       (Qt::Time::currentTime.elapsed * Factor * @frequency) % 360.0
   #       n = Time.now
-        (Time.now.to_f * 360.0 * @frequency) % 360.0
+        frequency ||= @frequency
+        (Time.now.to_f * 360.0 * frequency) % 360.0
   #       tag "n=#{n.to_f}, freq=#@frequency -> #{r}"
   #       r
+      end
+
+      def hour_f
+        n = Time.now
+        n.hour + n.min / 60.0 + n.sec / 3600.0
+      end
+
+      def hour12_f
+        n = Time.now
+        n.hour % 12 + n.min / 60.0 + n.sec / 3600.0
+      end
+
+      def min_f
+        n = Time.now
+        n.min + n.sec / 60.0
+      end
+
+      def hour
+        Time.now.hour
+      end
+
+      def min
+        Time.now.min
+      end
+
+      def sec
+        Time.now.sec
       end
 
       dynamic_accessor :frameNr, :current

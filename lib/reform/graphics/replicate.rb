@@ -23,11 +23,17 @@ module Reform
       define_setter Qt::PointF, :scale, :translation
       define_setter Float, :rotation
 
-      def fillhue_rotation val
-        raise "DEPRECATED: fillhue_rotation, use 'step'"
-      end
+=begin experimental.
+      this block is executed during the paint, where 'self' becomes each Qt::GraphicsItem in turn
+      (so all children), arg1 is the Replicate and arg2 is a counter that is in 0...count.
 
-      # experimental.
+      IMPORTANT: changing brushes on items works, but causes a new paint event to be emitted
+      causing a paint-storm.
+      Unless by using C you cannot sneak in a brush on a Qt::GraphicsShapeItem etc. without an
+      automatic call to 'update'.
+
+      See analogclock3.rb for how it does work with a Duplicator!!!
+=end
       def step(&block)
         @qtc.stepper = block
       end
@@ -57,7 +63,7 @@ module Reform
   # IMPORTANT: these are NOT Qt::Objects!! So no parenting system!
   # WRONG. But it is now setParentItem en ChildItems to do stuff...
   class QReplicate < Qt::GraphicsItem #Group
-    include
+    include QGraphicsItemHackContext
     private
       def initialize parent
         super(parent)
@@ -82,20 +88,16 @@ module Reform
           @matrix.instance_exec(@_reform_hack, &@steppermatrix)
         else
           unless @matrix
-    #         tag "calc mat, tran=#{@translation}, rot=#@rotation, scale=#@scale, count=#@count"
+#             tag "calc mat, tran=#{@translation}, rot=#@rotation, scale=#@scale, count=#@count"
             @matrix = Qt::Transform.new
             @matrix.translate(*@translation) if @translate_first
             @matrix.scale(*@scale) if @scale
             @matrix.rotate(@rotation) if @rotation
             @matrix.translate(*@translation) if @translation && !@translate_first
-    #         tag "calced {#{@matrix.m11} #{@matrix.m12} #{@matrix.m13}|#{@matrix.m21} #{@matrix.m22} #{@matrix.m23}|#{@matrix.m31} #{@matrix.m32} #{@matrix.m33}}"
+#             tag "calced {#{@matrix.m11} #{@matrix.m12} #{@matrix.m13}|#{@matrix.m21} #{@matrix.m22} #{@matrix.m23}|#{@matrix.m31} #{@matrix.m32} #{@matrix.m33}}"
           end
         end
         @matrix
-      end
-
-      def proper_update rect
-        scene.update(mapRectToScene(rect)) # OK!
       end
 
     public # QReplicate methods
@@ -131,6 +133,7 @@ module Reform
       end
 
       def paint painter, option, widget = nil
+        tag "#{self}#paint IN"
         # widget is the actual widget, but can be nil.
         # the method should paint to painter.
 #          painter.pen = Qt::Pen.new(Qt::black)
@@ -158,6 +161,7 @@ module Reform
         begin
 #           painter.worldMatrixEnabled = true # ? doesn't matter
           m = matrix!
+#           tag "m = #{m.inspect}"
           # we also have the changing hue ..... arghh
           for n in 1..@count do
             painter.setWorldTransform(m, true)# combine with current matrix
@@ -169,7 +173,7 @@ module Reform
 #             super(painter, option, widget)
             childItems.each do |i|
               i.instance_exec(@_reform_hack, n, &@stepper) if @stepper
-#                 tag "painting i again, transformed, painter pen = #{painter.pen.inspect}"
+#               tag "n = #{n}, painting i again, transformed, painter pen = #{painter.pen.inspect}"
               i.paint(painter, option, widget)
             end
           end
@@ -177,10 +181,12 @@ module Reform
           setTransform(@i) # restore to I ???????
           painter.restore
         end
+        tag "#{self}#paint OUT"
       end
 
       # The rotation is clockwise
       def rotation= degrees
+#         tag "rotation := #{degrees}, proper update!"
         prepareGeometryChange
         br1 = boundingRect
         @rotation = degrees
@@ -193,18 +199,12 @@ module Reform
         proper_update(br1)
       end
 
-      def fillhue_rotation= degrees
-        degrees *= 360.0 unless Integer === degrees || degrees.abs > 1.00000001
-        @fillhue_rotation = degrees.floor
-        @matrix = nil
-        update
-      end
-
       attr :count, :scale
 
       def count= c
         prepareGeometryChange
         br1 = boundingRect
+#         tag "count := #{c}"
         @count = c
         br1 |= boundingRect
         proper_update(br1)

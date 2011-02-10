@@ -44,6 +44,29 @@ require 'reform/graphicsitem'
       def paint painter, option, widget
       end
 
+      def proper_update bogo = nil
+#         super         boundingRect is empty anyway!
+        childItems.each do |i|
+          if i.respond_to?(:proper_update) then i.proper_update else i.update end
+        end
+      end
+
+      def rotation= r
+#         prepareGeometryChange
+        super
+#         tag "rotation := #{r}, update"
+        proper_update
+      end
+
+      def translation= f
+        super
+        proper_update
+      end
+
+      def scale= s
+        super
+        proper_update
+      end
   end
 
   # it should work as a container. It does not draw anything by itself. But you can set a transform

@@ -18,8 +18,12 @@ module Reform
       define_simple_setter :title
       alias :text :title
 
+      # 'label' is a tricky name as it is also a widget.
+      # But it seems an OK name for things that are in fact labels
+      alias :label :title
+
 # IMPORTANT $qApp.quit bypasses closing of forms.
-      def quiter
+      def fileQuit
         action {
           name :fileQuitAction
           label tr('E&xit')
@@ -29,8 +33,8 @@ module Reform
         }
       end
 
-      alias :quit :quiter
-      alias :fileQuit :quiter
+      alias :quit :fileQuit
+      alias :quiter :fileQuit
 
       def aboutQt
         action {

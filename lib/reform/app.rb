@@ -10,9 +10,11 @@ $VERBOSE = verb
 module Kernel
 
   private
-    def tag msg
-      # avoid puts for threading problems
-      STDERR.print "#{File.basename(caller[0])} #{msg}\n"
+    unless Kernel.private_method_defined?(:tag)
+      def tag msg
+        # avoid puts for threading problems
+        STDERR.print "#{File.basename(caller[0])} #{msg}\n"
+      end
     end
 
     def trace onoff = true
@@ -147,7 +149,7 @@ class Float
     #
     # The returnvalue is always between 0.0 and 1.0
     def self.initPerlin(seed, persistence = 1.0, octave = 1, more = nil)
-      require_relative '../ruby-perlin/perlin'
+      require 'ruby-perlin/perlin'
       smoothing = more && more[:smoothing]
       contrast = more && more[:contrast] || 1.0
 #       tag "Calling Perlin.new(#{seed}, #{persistence}, #{octave})"
@@ -189,16 +191,18 @@ module Qt
         Qt::LineF.new(0.0, 0.0, x, y).angle
       end
 
-      def inspect
-        "(%.4f,%.4f)" % [x,y]
-      end
+# clashes with qtruby
+#       def inspect
+#         "(%.4f,%.4f)" % [x,y]
+#       end
   end #class PointF, improved!!
 
-  class Point
-      def inspect
-        "(#{x},#{y})"
-      end
-  end
+# clashes with qtruby
+#   class Point
+#       def inspect
+#         "(#{x},#{y})"
+#       end
+#   end
 
   class LineF
       # QPointF normal_point. Returns the normalized normal of the line.
@@ -223,11 +227,12 @@ module Qt
 
   end
 
-  class Color
-    def inspect
-      "rgb(#{red}, #{green}, #{blue}, #{alpha})"
-    end
-  end
+  # clashes with qtruby
+#   class Color
+#     def inspect
+#       "rgb(#{red}, #{green}, #{blue}, #{alpha})"
+#     end
+#   end
 
   class MouseEvent
       attr_accessor :scenePos
@@ -720,6 +725,31 @@ module Reform
         end # App::createInstantiator_i
     end # module AppMacroContext
 
+    class Style < Qt::ProxyStyle
+      private
+        def initialize
+          super
+#           tag "creating proxy style"
+          @pixelMetric = {}
+        end
+
+      public # Style methods
+        # override
+        def pixelMetric metric, option = nil, widget = nil
+#           tag "pixelMetric(#{metric}, #{option}, #{widget}), pixelMetric = #{@pixelMetric.inspect}"
+          if m = @pixelMetric[metric.to_i]
+#             tag "hit on metric #{metric} !! returning #{@pixelMetric[metric]}"
+            return m
+          end
+          super
+        end
+
+        def setPM m, i
+          @pixelMetric[m] = i
+        end
+
+    end # class Style
+
   # the App is a basic Qt::Application extension. So see the qt docs as well.
   # Within an app there are 1 or more forms.
   # It is however possible to construct any Widget, AbstractState, Animation and AbstractModel.
@@ -727,23 +757,6 @@ module Reform
     class App < Qt::Application
       include AppMacroContext, ModelContext
       private
-
-        # shortcut. You can then say simple_data 'hallo', 'world'
-        def simple_data *val
-          STDERR.puts "simple_data is DEPRECATED, use 'struct'"
-          ruby_model value: if val.length == 1 then val[0] else val end
-        end
-
-        alias :simpledata :simple_data
-
-        def struct *val, &block
-#           tag "struct"
-          if block
-            addModel(Structure.new.build(&block))
-          else
-            structure value: if val.length == 1 then val[0] else val end
-          end
-        end
 
   # You would normally pass ARGV here (not *ARGV). However the way to create a reform application is:
   #
@@ -788,19 +801,129 @@ module Reform
           @lang = (ENV['LANG'] || 'en').split('_')[0]
           @lang = 'en' if lang == 'C'
           @lang = lang.to_sym
+=begin stupid requirement
           begin
             require 'linguistics'
           rescue LoadError
 #             tag "loading Linguistics failed"
-            Prelims::check_gem(nil, 'linguistics', 'midibox')
+            Prelims::check_gem(nil, 'linguistics', 'reform')
 #             tag "gem not present, retry"
             Gem::refresh
             retry
           end
           Linguistics::use(lang) # , installProxy: lang) fails in 1.9.2
+=end
           # used by filesystem to change stuff like 'open an item/create a new thing'
           require 'reform/undo'
           $undo = QUndoGroup.new(self)
+          setStyle(@style = Style.new)
+        end
+
+        PixelMetricMap = {
+          buttonMargin: Qt::Style::PM_ButtonMargin,
+          buttonShiftHorizontal: Qt::Style::PM_ButtonShiftHorizontal,
+          buttonShiftVertical: Qt::Style::PM_ButtonShiftVertical,
+          defaultFrameWidth: Qt::Style::PM_DefaultFrameWidth,
+          comboBoxFrameWidth: Qt::Style::PM_ComboBoxFrameWidth,
+          layoutLeftMargin: Qt::Style::PM_LayoutLeftMargin,
+          layoutRightMargin: Qt::Style::PM_LayoutRightMargin,
+          layoutTopMargin: Qt::Style::PM_LayoutTopMargin,
+          layoutBottomMargin: Qt::Style::PM_LayoutBottomMargin,
+          layoutHorizontalSpacing: Qt::Style::PM_LayoutHorizontalSpacing,
+          layoutVerticalSpacing: Qt::Style::PM_LayoutVerticalSpacing,
+          scrollBarExtent: Qt::Style::PM_ScrollBarExtent,
+          scrollBarSliderMin: Qt::Style::PM_ScrollBarSliderMin,
+          sliderThickness: Qt::Style::PM_SliderThickness,
+          sliderControlThickness: Qt::Style::PM_SliderControlThickness,
+          sliderLength: Qt::Style::PM_SliderLength,
+          sliderSpaceAvailable: Qt::Style::PM_SliderSpaceAvailable,
+          dockWidgetHandleExtent: Qt::Style::PM_DockWidgetHandleExtent,
+          dockWidgetFrameWidth: Qt::Style::PM_DockWidgetFrameWidth,
+          dockWidgetTitleMargin: Qt::Style::PM_DockWidgetTitleMargin,
+          menuBarPanelWidth: Qt::Style::PM_MenuBarPanelWidth,
+          menuBarItemSpacing: Qt::Style::PM_MenuBarItemSpacing,
+          menuBarHMargin: Qt::Style::PM_MenuBarHMargin,
+          menuBarVMargin: Qt::Style::PM_MenuBarVMargin,
+          toolBarFrameWidth: Qt::Style::PM_ToolBarFrameWidth,
+          toolBarHandleExtent: Qt::Style::PM_ToolBarHandleExtent,
+          toolBarItemMargin: Qt::Style::PM_ToolBarItemMargin,
+          toolBarItemSpacing: Qt::Style::PM_ToolBarItemSpacing,
+          toolBarSeparatorExtent: Qt::Style::PM_ToolBarSeparatorExtent,
+          toolBarExtensionExtent: Qt::Style::PM_ToolBarExtensionExtent,
+          tabBarTabOverlap: Qt::Style::PM_TabBarTabOverlap,
+          tabBarTabHSpace: Qt::Style::PM_TabBarTabHSpace,
+          tabBarTabVSpace: Qt::Style::PM_TabBarTabVSpace,
+          tabBarBaseHeight: Qt::Style::PM_TabBarBaseHeight,
+          tabBarBaseOverlap: Qt::Style::PM_TabBarBaseOverlap,
+          tabBarScrollButtonWidth: Qt::Style::PM_TabBarScrollButtonWidth,
+          tabBarTabShiftHorizontal: Qt::Style::PM_TabBarTabShiftHorizontal,
+          tabBarTabShiftVertical: Qt::Style::PM_TabBarTabShiftVertical,
+          tabBarIconSize: Qt::Style::PM_TabBarIconSize,
+          progressBarChunkWidth: Qt::Style::PM_ProgressBarChunkWidth,
+          splitterWidth: Qt::Style::PM_SplitterWidth,
+          titleBarHeight: Qt::Style::PM_TitleBarHeight,
+          indicatorWidth: Qt::Style::PM_IndicatorWidth,
+          indicatorHeight: Qt::Style::PM_IndicatorHeight,
+          menuPanelWidth: Qt::Style::PM_MenuPanelWidth,
+          menuHMargin: Qt::Style::PM_MenuHMargin,
+          menuVMargin: Qt::Style::PM_MenuVMargin,
+          toolBarIconSize: Qt::Style::PM_ToolBarIconSize,
+          smallIconSize: Qt::Style::PM_SmallIconSize,
+          largeIconSize: Qt::Style::PM_LargeIconSize,
+          iconViewIconSize: Qt::Style::PM_IconViewIconSize,
+          listViewIconSize: Qt::Style::PM_ListViewIconSize,
+          toolTipLabelFrameWidth: Qt::Style::PM_ToolTipLabelFrameWidth,
+          checkBoxLabelSpacing: Qt::Style::PM_CheckBoxLabelSpacing,
+          radioButtonLabelSpacing: Qt::Style::PM_RadioButtonLabelSpacing,
+          sizeGripSize: Qt::Style::PM_SizeGripSize,
+          messageBoxIconSize: Qt::Style::PM_MessageBoxIconSize,
+          buttonIconSize: Qt::Style::PM_ButtonIconSize,
+          textCursorWidth: Qt::Style::PM_TextCursorWidth
+        }
+
+        def pixelMetric metric, value
+          @style.setPM((Symbol === metric ? PixelMetricMap[metric] : metric).to_i, value)
+          setStyle(@style)
+        end
+
+        # shortcut. You can then say simple_data 'hallo', 'world'
+        def simple_data *val
+          STDERR.puts "simple_data is DEPRECATED, use 'struct'"
+          ruby_model value: if val.length == 1 then val[0] else val end
+        end
+
+        alias :simpledata :simple_data
+
+        def showIconsInMenus
+          setAttribute(Qt::AA_DontShowIconsInMenus, false) # ;  // Icons are shown in menus  ??
+        end
+
+        def smallIconSize i
+          pixelMetric :smallIconSize, i
+        end
+
+        # font can not be a link to font_model as this clashes with the following method,
+        # which is already part of Qt also.
+        def font f = nil, &block
+          return method_missing(:font) unless f
+          if Hash === f || block
+            self.font = Widget::FontRef.new(method_missing(:font), f, &block).font
+          else
+            self.font = f
+          end
+        end
+
+        def struct *val, &block
+#           tag "struct"
+          if block
+            addModel(Structure.new.build(&block))
+          else
+            structure value: if val.length == 1 then val[0] else val end
+          end
+        end
+
+        def plugin_dir dir
+          Reform::internalize_dir dir
         end
 
   # +autoform+ is normally true and indicates that the application will create
@@ -1087,7 +1210,7 @@ module Reform
 #       tag "internalize_dir #{dirs.inspect}"
       dirs = dirs[0] if dirs.length == 1 && Array === dirs[0]
       dirs.each do |dir|
-#         tag "Calling internalize_dir #{dir}"
+#         tag "Calling internalize #{dir}"
         internalize dir, 'widgets'=>Widget, 'actions'=>AbstractAction,
                          'menus'=>Menu, 'graphics'=>GraphicsItem, 'models'=>AbstractModel,
                          'animations'=>Animation, 'states'=>AbstractState

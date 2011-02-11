@@ -40,15 +40,12 @@ module Reform
         end
       end
 
-      define_simple_setter :text, :checkable
+      define_simple_setter :text
+      define_setter FalseClass, :checkable
+      define_setter String, :icon
 
       alias :label :text
       alias :title :text
-
-      def icon path
-        path = path[7..-1] if path[0, 7] == 'file://'
-        @qtc.icon = Qt::Icon.new(path)
-      end
 
       # sets 'enabled' to false
       def disabled
@@ -158,6 +155,15 @@ module Reform
       alias :statusTip :statustip
 
     public
+
+      def icon= val
+#         tag "icon := #{val}"
+        if String === val && val[0, 7] == 'file://'
+          val = Qt::Icon.new(val[7..-1])
+          raise ReformError "Icon '#{val}' does not exist" if val.null?
+        end
+        @qtc.icon = val
+      end
 
           # with a block, set checkable tag and connect the callback. Without a block call the toggled event
       # passing the current value of checked (this works even if no callback was registered).

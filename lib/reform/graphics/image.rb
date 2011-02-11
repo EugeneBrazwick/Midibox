@@ -11,6 +11,8 @@ module Reform
         @qtc.src = path
       end
 
+      alias :source :src
+
       def offset x, y
         @qtc.setOffset(x, y)
       end

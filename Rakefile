@@ -5,24 +5,13 @@ require 'rspec/core/rake_task' # as in Upgrade.markdown
 #require '/var/lib/gems/1.9.1/gems/rspec-core-2.0.1/lib/rspec/core/rake_task'
 RSPEC = true
 
-if RUBY_VERSION =~ /^1\.9\.[01]/
-  begin
-    gem 'darkfish-rdoc'
-    require 'darkfish-rdoc'
-    DARKFISH = true
-  rescue
-    require 'rake/rdoctask'
-    DARKFISH = false
-  end
-else
-  require 'rake/rdoctask'
-  DARKFISH = false
+require 'rake/rdoctask'
+DARKFISH = false
   # apart from that, it still says: 'Generating Darkfish...'
   # maybe rdoc already uses it if installed. That may explain why it does not work if 'required' by hand
-end
 
 ALSALIB='lib/rrts/driver/alsa_midi.so'
-PERLINLIB='lib/ruby-perlin/perlin.so'
+PERLINLIB='ext/ruby-perlin/perlin.so'
 MIDI_IN_PORT = '20:0'
 MIDI_OUT_PORT = '20:1'
 RUBY = 'ruby -w -I lib'
@@ -59,8 +48,8 @@ file ALSALIB => FileList['lib/rrts/driver/*.cpp'] do
   end
 end
 
-file PERLINLIB => FileList['lib/ruby-perlin/*.cpp'] do
-  Dir.chdir 'lib/ruby-perlin' do
+file PERLINLIB => FileList['ext/ruby-perlin/*.cpp'] do
+  Dir.chdir 'ext/ruby-perlin' do
     sh "#{ENV['RUBY']} ./extconf.rb && make && rm -f *.o mkmf.log"
   end
 end
@@ -126,3 +115,38 @@ task :panic do
   sh "#{RUBY} bin/panic #{MIDI_OUT_PORT}"
 end
 
+require 'rake/gempackagetask'
+reform_spec = Gem::Specification.new do |spec|
+  spec.name = 'reform'
+  spec.summary = 'RAD gui builder, state: toy'
+  spec.description = <<-EOF
+      'reform' is a declarative gui builder tool, similar to 'shoes'.
+      It can currenty only be used to toy around with, as the API
+      is still changing heavily.
+      Do not use for production stuff.
+    EOF
+  spec.requirements = ['qtbindings gem v4.6.3.1 or higher']
+  spec.version = '0.0.0.0'
+  spec.author = 'Eugene Brazwick'
+  spec.email = 'eugene.brazwick@rattink.com'
+  spec.homepage = 'https://github.com/EugeneBrazwick/Midibox'
+  spec.platform = Gem::Platform::CURRENT # ie, my current platform, ie Linux
+  spec.required_ruby_version = '>=1.9.2'
+  #
+  spec.files = Dir['bin/reform*', 'lib/reform/**', 'ext/ruby-perlin/**', 'Rakefile']
+   # it tries to run it as ruby, but it is a bash script. There is always bin/reform
+   # the handiest method is to use 'alias' like:
+   #    alias reform=/var/lib/gems/1.9.1/bin/reform-0.0.0.0-x86_64-linux/bin/reform.bash
+   # spec.executable = 'reform.bash'
+  spec.executables = []
+  spec.add_dependency 'qtbindings', '>= 4.6.3.1'
+  spec.add_development_dependency 'rspec', '>=  2.0'
+  spec.test_files = Dir['test/reform_spec.rb', 'test/structure_spec.rb']
+  # this is completely optional. Needed in some example only.
+  spec.extensions << 'ext/ruby-perlin/extconf.rb'
+  spec.require_paths = ['lib', 'ext']
+  spec.license = 'GPL-3'
+  spec.has_rdoc = true
+end
+
+Rake::GemPackageTask.new(reform_spec).define

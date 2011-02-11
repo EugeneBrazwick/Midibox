@@ -110,6 +110,13 @@ Even more, a QDialog can be stored in the view as well!
       end
     end
 
+    def qtbrush= brush
+      @brush = brush
+      children.each do |child|
+        child.qtbrush = brus if GraphicsItem === child && !child.explicit_brush
+      end
+    end
+
     alias :brush :fill
     alias :pen :stroke
 
@@ -121,8 +128,12 @@ Even more, a QDialog can be stored in the view as well!
         when Symbol then containing_form.registeredBrush(args[0]) || make_qtbrush_with_parent(self, *args)
         when Qt::Brush then args[0]
         when nil #DynamicAttribute.new(self, :brush, Qt::Brush, nil, &block).value
-           Brush.new(self, :background).setup(&block).qtc # .tap{|t| tag "brush.qtc=#{t}"}
-        else make_qtbrush_with_parent(self, *args)
+          Brush.new(self, :backgroundBrush=).setup(&block).qtc # .tap{|t| tag "brush.qtc=#{t}"}
+        when Hash
+          args[0][:dynname] = :backgroundBrush=
+          make_qtbrush_with_parent(self, *args)
+        else
+          make_qtbrush_with_parent(self, *args)
         end
     end
 
@@ -168,7 +179,7 @@ Even more, a QDialog can be stored in the view as well!
     def widget?
     end
 
-    def_delegators :@qtc, :clear
+    def_delegators :@qtc, :clear, :backgroundBrush=
 
         #override
     def addTo parent, hash, &block

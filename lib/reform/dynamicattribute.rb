@@ -1,6 +1,6 @@
 module Reform
 
-  require 'reform/control'
+#  require 'reform/control'             control is  already in autoload. Require 'reform/app' instead!
 
 =begin    # it may even be a very good idea to implement to 'enabler' and 'disabler' the very same way!
 # they are now kind of polluting the updateModel method.
@@ -152,6 +152,8 @@ module Reform
           Qt::Variant.new(value[0] == :default || value[0])
         when 'FalseClass'
           Qt::Variant.new(value[0] == :default ? false : value[0])
+        when 'String'
+          Qt::Variant.new(value[0] == :default ? '' : value[0])
         else
           raise Error, tr("Not implemented: animation for property '#@propertyname', klass=#@klass")
         end
@@ -161,7 +163,14 @@ module Reform
       def applyModel data, model = nil
 #         tag "DynamicPropertyChangeEvent -> #{self}::applyModel #{parent}.#@propertyname := #{data.inspect}"
 #         tag "??? Sending #{@propertyname.to_s + '='}(#{data.inspect}) to #{parent}"
-        parent.send(@propertyname.to_s + '=', data)
+        n = (@propertyname.to_s + '=').to_sym
+#         tag "#{parent}.respond_to?(#{n}) == #{parent.respond_to?(n)}"
+        if parent.respond_to?(n)
+#           tag "#{n} OK!"
+          parent.send(n, data)
+        else
+          parent.apply_dynamic_setter(n, data)
+        end
 #         tag "OK!"
       end
 

@@ -163,12 +163,6 @@ module Reform
         @qtc.send(name)
       end
 
-      # note that name ends with '='
-      def apply_dynamic_setter(name, *args)
-#         tag "apply_dynamic_setter(#{name}, #{args.inspect})"
-        @qtc.send(name, *args)
-      end
-
 =begin
       create a DynamicAttribute for each element in the list.
       the first parameter is the kind of value, and must be an animatable value
@@ -210,16 +204,17 @@ module Reform
 #             tag "#{self}::#{name} DECLARATATION block = #{block}, args=#{args.inspect}"
             handle_dynamics(klass, name, *args, &block)
           end # method name
-          n = (name.to_s + '=').to_sym
-          define_method n do |*value|
-#             tag "assigning dynamic result to qtc #@qtc::#{n} := #{value.inspect}"
-            apply_dynamic_setter(n, *value)
-            # by default this then calls @qtc.n = *value
-          end # method name=
+            # INCONVENIENT:
+#           n = (name.to_s + '=').to_sym
+#           define_method n do |*value|
+#             apply_dynamic_setter(n, *value)             # by default this then calls @qtc.n = *value
+#           end # method name=
         end
       end # define_setter
 
-      def self.define_setter *args; self.define_setters *args; end
+      def self.define_setter(*args)
+        self.define_setters(*args)
+      end
 
       DynamicAttributeKlassMap = { Qt::Color => DynamicColor ,
                                    Qt::PointF => DynamicPoint }
@@ -261,10 +256,13 @@ module Reform
           end
         else
           n = (name.to_s + '=').to_sym
+          if respond_to?(n)
 #               tag "pass on simple assignment to qtc #@qtc::#{n} := #{args.inspect}"
 #               apply_dynamic_setter(n, *args)          too direct
-          send(n, *args) # this will call the assigner defined by default below:
-#               tag "qtc is now #{@qtc.inspect}"
+            send(n, *args)
+          else
+            apply_dynamic_setter(n, *args)
+          end
         end
       end
 
@@ -436,9 +434,16 @@ module Reform
 
     public # Control methods
 
+      # Method called from dynamic attribute, unless 'name=' exists.
+      # note that name ends with '='
+      def apply_dynamic_setter(name, *args)
+#         tag "apply_dynamic_setter(#{name}, #{args.inspect})"
+        @qtc.send(name, *args)
+      end
+
       def track_propagation v = nil
-        return @debug_track if v.nil?
-        tag "#{self}::debug_track := #{v}"
+        return (instance_variable_defined?(:@debug_track) ? @debug_track : false) if v.nil?
+#         tag "#{self}::debug_track := #{v}"
         @debug_track = v
       end
 
@@ -702,7 +707,7 @@ module Reform
         # are doing again.
         # So this code may very well be wrong
         if instance_variable_defined?(:@model) && !instance_variable_defined?(:@localmodel)
-          STDERR.puts "warning: #{self}: start model propagation from postSetup (probably OK)" if $VERBOSE
+#           STDERR.puts "warning: #{self}: start model propagation from postSetup (probably OK)" if $VERBOSE
           updateModel(@model, Propagation.new(self, nil, true))
         end
       end

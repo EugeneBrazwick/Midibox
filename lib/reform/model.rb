@@ -35,6 +35,38 @@ module Reform
 #           dependencies_changed :to_s, :toString
 #
 # But this is TOO TRICKY!!!
+#
+# It is simple if a control can say   'connector: :f'
+# But how does a form connect to some selected row in an array?
+# This can only be done if the connector is set to '4' or whatever the selected row is by the
+# caller.
+# It depends on how complicated we design stuff. Suppose we have a form showing a table with rows.
+# We doubleclick or Enter on a row to open a form where all fields are shown in plain edits
+# (if the table does not show all fields). If the active row then changes, should our opened
+# form reflect this? I would say no.
+# Is it possible to open many instances of the same form. I would say yes.
+# So an opened form is given a specific connector and that may change later, but only for
+# StructuralChanges (internal fixup). Example: you press the 'sort' button in the table.
+# So row 4 is now suddenly row nr 1. Our opened forms should be notified and respond internally
+# but no visible change is required.
+# Then the user undoes the sort. Same story.
+#
+# Note that hashes do not have this problem at all, provided forms use the hash index.
+# But even then a form cannot set the connector in advance. We need some specific symbols
+# to deal with this?
+#
+# But even for hashes using StructuralChange is important! The reason is that Qt views must
+# be notified too.
+#
+# The following line in Control is important;
+#       propagation = propagation.apply_getter(cid) if cid
+# when propagating changes the current keypath changes too. So we know where we are in the model.
+#
+# A control no longer has a simple 'value' when receiving a propagation as complicated
+# transactions may involve several changes for their path (cid).
+# For example, a TableView can receive a change of an insert where we have
+#   - to add a row ie, to make the room for it, shifting rows down if necessary
+#   - to actually update the values in the inserted row.
   class Propagation
       Initialize = true
       NoInit = false
@@ -66,13 +98,15 @@ module Reform
         @debug_track
       end
 
-#  Suppose I listen to keypath  [:x, 4], this means my cid is 4
+# Suppose I listen to keypath  [:x, 4], this means my cid is 4 (NO!)
 # any [:x, 3] is in de keypaths hash.
-# This means that my parent must have cid :x. And this would set current_path to [:x]
+# This means that my parent must have cid :x (NO!). And this would set current_path to [:x]
 #
 # But now only :x has changed.
 # then [:x, 4] is not in the keypath.
 # This implies we must check all prefixes...
+#
+# DANGEROUS THOUGHTS:   my cid can be [:x, 4] to begin with!
 #
 # Alternative:
 #
@@ -84,18 +118,18 @@ module Reform
       def get_change connector
         return true if @init || Proc === connector
         ch = @keypaths[[]] and return ch                # shortcut same as 'init'
-        path = case connector
-        when Array
-          if connector[0] == :root
-            connector[1..-1]
-          elsif connector[-1] == :self
-            connector[0...-1]
-          else
-            connector
-          end
-        when :self then []
-        else [connector]
-        end
+        path =  case connector
+                when Array
+                  if connector[0] == :root
+                    connector[1..-1]
+                  elsif connector[-1] == :self
+                    connector[0...-1]
+                  else
+                    connector
+                  end
+                when :self then []
+                else [connector]
+                end
         path = @current_path + path if @current_path
 #           tag "get_change, @keypaths = #{@keypaths.keys.inspect}, current_path = #{@current_path.inspect}"
         subpath = []
@@ -148,82 +182,89 @@ transaction that is immediately committed (and at that point propagation starts)
   # unique global instance
       @@transaction = nil
 
-#       class PropertyIndex
-#         private
-#           def initialize *index
-#             @index = index
-#           end
-#       end
+      # this class is send as an 'event'. However propertychanges within a transaction
+      # are stored together.
+      # On commit of the transaction the whole change is pushed to all controls listening.
+      # But changes can be rather complicated if inserts and deletes are also involved
+      # If a key is involved here we would like to send an extra message, where the
+      # structural change itself is stored.
+      # Example:
+      #        array_x[3, 1] = nil
+      # This causes the property at key [:array_x, 3] to be deleted. So it sends a PropertySpliced
+      # event, with that keypath.
+      # However the array itself is also affected. So we must send a StructureSpliced event as well.
+      # StructureChanges have no 'oldvalues', but they must keep 'undo' information.
+      # In fact the PropertySpliced event no longer needs to undo anything, as the property itself
+      # never changed.  Conclusion: it can go?
+      # No. The actual data involved will be stored there. Structure changes do NOTHING with contents.
+      # Example: a form keeping track of a deleted record will show blanks. Or perhaps it will close?
+      class AbstractModelChange
+          # hack, this represent a reasonable safe 'NoValue' value
+          class NoValue
+          end
 
-    # After 11 clears of the Qt undostack the whole thing crashes.
-      class PropertyChange #< Qt::UndoCommand #UNSTABLE
+        private # AbstractModelChange methods
 
-        # hack, this represent a reasonable safe 'NoValue' value
-        class NoValue
-        end
-
-        private
-          def initialize model, keypath, oldval = nil
-  #           super()
-#             tag "New #{self} (#{model}, #{keypath.inspect}, #{oldval})"
-            # note this clone may tragically fail for many Qt classes....
+          # I believe that model is always the root-model of the system
+          # but it seems convenient to support more than one model in an application
+          def initialize model, keypath
+            @model, @keypath = model, keypath
             raise "BOGO path, caller = #{caller.join("\n")}" if keypath == [nil]
-            @model, @keypath, @oldval = model, keypath, oldval
-          end
-
-          def locate
-            @keypath && @keypath.length > 1 ?  @model.apply_getter(@keypath[0...-1]) : @model
-          end
-
-          # certain operations have no attribute
-          def locate_full
-            @keypath ? @model.apply_getter(@keypath) : @model
-          end
-
-        public
-
-          def undo
-#             tag "#{self}::UNDO, kp= #{@keypath.inspect}, @model[....][#{@keypath[-1]}] := #@oldval #######################################"
-            locate.apply_setter @keypath[-1] || :self, @oldval
-          end
-
-          attr :oldval, :keypath
-
-          def model
-#             tag "#{self}::model, model = #@model"
             @model or raise 'TOTAL CORRUPTION'
           end
 
-          def adds_or_deletes?
-            !updated?
+          # apply the keypath to the model, returning the value
+          # See Model#apply_getter
+          def locate
+            @keypath ? @model.apply_getter(@keypath) : @model
           end
 
-          alias :inserted_or_deleted? :adds_or_deletes?
-
-          # as in 'from value X to value Y'
-          def updated?
-            true
+          # locates the parent keypath in the model and returns the result of applying it.
+          # See Model#apply_getter
+          def locate_parent
+            @keypath && @keypath.length > 1 ?  @model.apply_getter(@keypath[0...-1]) : @model
           end
 
-          # the property did not exist before the operation
+        public
+          attr :model, :keypath
+
+          # returns true if change inserted something
           def inserted?
           end
 
-          # the property no longer exists
+          # returns true if change deleted something
           def deleted?
           end
-      end # class PropertyChange
+      end
 
-# IMPORTANT we use a shortcut: locate.value iso just locate
-# This is rather illegal as it assumes that the chosen operation is still valid on the wrapped element
-# Normally this would be the case. But.....
+      # class for changes of a structure. Be it a hash, array or object.
+      # Structural changes of hashes or objects are not really problematic though.
+      # We are not interested in actual data, but only how the structure is changed internally.
+      # We must be able to undo the change as well. In case of deletes, this means that new
+      # records are added using nils.
+      class StructuralChange < AbstractModelChange
+      end
 
-      # only for hashes
-      # this seems easy enough
-      class PropertyDeleted < PropertyChange
+=begin
+  this seems easy enough?
+
+  Normally you delete an entire item from an array. So the undo must
+  have the oldvalue ready!
+
+  But we violate the idea that structural changes should carry no data...
+  TODO: this is already a mess
+=end
+      class PropertyDeleted < StructuralChange
+        private
+          def initialize model, keypath, oldval
+            super model, keypath
+            @oldval = oldval
+          end
+
+        public # PropertyDeleted methods
           def undo
 #             tag "#{self}::UNDO, locate[#{@keypath[-1]}] := #{@oldval.inspect}"
-            locate.value[@keypath[-1]] = @oldval
+            locate_parent.value[@keypath[-1]] = NoValue
           end
 
           def deleted?
@@ -232,13 +273,23 @@ transaction that is immediately committed (and at that point propagation starts)
 
       end
 
+# IMPORTANT we use a shortcut: locate.value iso just locate
+# This is rather illegal as it assumes that the chosen operation is still valid on the wrapped element
+# Normally this would be the case. But.....
+
       # only for arrays.  x = [1,2,3,4]                         x = [1,2,3,4]
       #                   x.delete_at(2) -> 1,2,4               x.delete_at(-2) -> 1,2,4
       #                   x.insert(2, 3) -> 1,2,3,4             x.insert(-2, 3) -> 1,2,3,4
       class PropertySpliced < PropertyDeleted
+        private
+          def initialize model, keypath, oldvals
+            super model, keypath, oldvals
+            raise 'oldvals must be array' unless Array === oldvals
+          end
+
           def undo
 #             tag "#{self}::UNDO, locate (#{locate.value.inspect})[#{@keypath[-1]}, 1] := #{@oldval.inspect}"
-            locate.value.insert(@keypath[-1], @oldval)
+            locate_parent.value.insert(@keypath[-1], *@oldval)
           end
       end
 
@@ -247,15 +298,16 @@ transaction that is immediately committed (and at that point propagation starts)
       # Also if we have x == [1, nil] and x == [1] then in both cases x[1] == nil.
       # the correct query would be idx < length, for arrays
       # for hashes it is has_key?(idx)
-      class PropertyAdded < PropertyChange
+      class PropertyAdded < StructuralChange
         private
           def initialize model, keypath, count = 1
-            super(model, keypath, NoValue)
+            super model, keypath
             @count = count
           end
-        public
+
+        public # PropertyAdded methods
           def undo
-            locate.value.slice!(@keypath[-1], @count)
+            locate_parent.value.slice!(@keypath[-1], @count)
           end
 
           def inserted?
@@ -271,43 +323,61 @@ transaction that is immediately committed (and at that point propagation starts)
           end
         public
           def undo
-            locate_full.pop(@count)
+            locate.pop(@count)
           end
       end
 
-      class PropertyShifted < PropertyDeleted
-#         private
-#           def initialize model, keypath, oldvalues
-#             super(model, keypath)
-#             @count = count
-#           end
-#         public
+      class PropertyShifted < PropertySpliced
           def undo # similar to Pop
-            locate_full.value.unshift(*@oldval)
+            locate.value.unshift(*@oldval)
           end
       end
 
       class PropertyUnshifted < PropertyPushed
-
           def undo
-            locate_full.shift(@count)
+            locate.shift(@count)
           end
       end
 
-      class PropertyPopped < PropertyDeleted
-#         private
-#           def initialize model, keypath, prevvals
-#           end
+      class PropertyPopped < PropertySpliced
         public
           def undo
-            locate_full.value.push(*@oldval)
+            locate.value.push(*@oldval)
           end
       end
+
+      # class for changes that actually involve data.
+      # This can still be an insert (new data) or delete (possible to undo, so olddata is required)
+      # But we are not really interested WHERE something is deleted or inserted.
+      class PropertyChange < AbstractModelChange
+
+        private
+          def initialize model, keypath, oldval = nil
+            super model, keypath
+#             tag "New #{self} (#{model}, #{keypath.inspect}, #{oldval})"
+            @oldval = oldval
+          end
+
+        public
+
+          def undo
+#             tag "#{self}::UNDO, kp= #{@keypath.inspect}, @model[....][#{@keypath[-1]}] := #@oldval #######################################"
+            locate_parent.apply_setter @keypath[-1] || :self, @oldval
+          end
+
+          attr :oldval
+
+          # as in 'from value X to value Y'
+          def updated?
+            true
+          end
+
+      end # class PropertyChange
 
     private # Transaction methods
 
       def initialize model, sender = nil
-        @stack = [] # UNSTABLE Qt::UndoStack.new ## cannot pass self (self) # super()
+        @stack = []
 #         tag "tran test"
         raise ProtocolError, 'Protocol error, transaction already started' if @@transaction
         raise "total chaos, caller=#{caller.join("\n")}" unless model
@@ -361,8 +431,11 @@ transaction that is immediately committed (and at that point propagation starts)
         raise ProtocolError, 'Protocol error, no transaction' unless @@transaction
         kp = propch.keypath
         kp = @tranmodel.keypath + kp unless @tranmodel.keypath.empty?
-        @keypaths[kp] = propch
-        @keypaths[kp[0...-1]] = propch if kp && propch.adds_or_deletes?
+        if kp && StructuralChange === propch
+          @keypaths[kp[0...-1]] = propch
+        else
+          @keypaths[kp] = propch
+        end
         @stack.push propch
         # set last_property so addDependencyChange can work with that.
         @last_property = propch
@@ -426,12 +499,11 @@ transaction that is immediately committed (and at that point propagation starts)
       def addPropertyChange *keypath, oldval
 #         tag "self = #{self}, @@transaction = #{@@transaction}, oldval=#{oldval}"
         keypath = keypath[0] if Array === keypath[0]
-        push(oldval == PropertyChange::NoValue ? PropertyAdded.new(@tranmodel, keypath)
-                                               : PropertyChange.new(@tranmodel, keypath, oldval))
+        push(PropertyChange.new(@tranmodel, keypath, oldval))
       end
 
       # call this method to add pseudo changes. See TimeModel source for an example.
-      # Adds the @last_property changed
+      # Adds the @last_property changed (as set by +push+)
       def addDependencyChange *keypath
         keypath = keypath[0] if Array === keypath[0]
         @keypaths[@tranmodel.keypath + keypath] = @last_property
@@ -486,7 +558,17 @@ The old rule that 'names' imply 'connectors' is dropped completely.
       newval.mutilate
       myprop = newval
 
-  will work as expected
+  will work as expected.
+
+  This is the same within Qt.
+  If you say
+    color = pen.color
+    color.mutilate
+  the pens color will not be changed. You must set it again
+  using
+    pen.color = color
+  even more, the pen must also be set in the item again!
+    item.pen = pen
 =end
           def dynamic_writer attrsym
 #             tag "WHAT??"
@@ -575,12 +657,6 @@ The old rule that 'names' imply 'connectors' is dropped completely.
 # #         @@root
 #       end
 
-      def setupQuickyhash hash
-        hash.each do |k, v|
-          send(k, v) unless k == :postSetup || k == :qtparent # and other hacks!!
-        end
-      end
-
     public # Model methods
 
       def root
@@ -627,13 +703,12 @@ The old rule that 'names' imply 'connectors' is dropped completely.
 #         @observers.delete observer
 #       end
 
-=begin rdoc
-      returns whether name may function as 'getter' on the model
-      names like 'getX' are currently not supported.
-      However, a proc can very well be a setter, where the object is
-      passed as an argument.  This makes it possible to code the
-      text or value to use in the gui, and not in the model.
-=end
+#       returns whether +name+ may function as 'getter' on the model
+#       names like 'getX' are currently not supported.
+#       However, a proc can very well be a getter, where the object is
+#       passed as an argument.  This makes it possible to code the
+#       text or value to use in the gui, and not in the model.
+#       Because of this any Proc passed will return true.
       def getter? name
         return true if name == :self || Proc === name
   #       tag "Does #{self.class}##{name} is a public method?"
@@ -643,8 +718,9 @@ The old rule that 'names' imply 'connectors' is dropped completely.
       end
 
       # To apply the getter, this method must be used.
-      # Name should be a hashindex (pref. a Symbol), or an arrayindex (Fixnum)
-      # The name +:self; is special.
+      # +name+ should be a hashindex (pref. a Symbol), or an arrayindex (Fixnum)
+      # The name +:self+ is special (more or less). 'self' is not a method in a ruby but you
+      # could consider it to be one.
       def apply_getter name
 #         tag "#{self}::apply_getter(#{name.inspect})"
         case name
@@ -725,7 +801,7 @@ The old rule that 'names' imply 'connectors' is dropped completely.
         raise "ARGHHH, caller = #{caller.join("\n")}" unless Hash === hash
         hash.each do |k, v|
   #         tag "send(#{k.inspect}, #{v.class} #{v})"
-          send(k, v)
+          send(k, v) unless k == :postSetup || k == :qtparent
         end
       end
 
@@ -739,7 +815,7 @@ The old rule that 'names' imply 'connectors' is dropped completely.
       end
 
       def keypath
-        @keypath || []
+        instance_variable_defined?(:@keypath) ? (@keypath || []) : []
       end
 
       # the transaction is passed to this block
@@ -848,6 +924,15 @@ The old rule that 'names' imply 'connectors' is dropped completely.
       end
 
       def draggable?
+      end
+
+      # sends a propertyChanged event for each field mentioned
+      def touch sender, *fields
+        transaction(sender) do |tran|
+          fields.each do |field|
+            tran.addPropertyChange field, apply_getter(field)
+          end
+        end
       end
 
       # the model should override this to something more distinguishable

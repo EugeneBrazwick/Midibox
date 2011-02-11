@@ -164,6 +164,8 @@ module Reform
     # INCOMPAT change: enabler is now simply 'enabled'. disabler -> disabled
     define_setter TrueClass, :enabled, :disabled
     define_setter FalseClass, :mouseTracking
+#     define_setter String, :styleSheet
+    define_simple_setter :styleSheet
 
   public # Widget methods
 
@@ -172,9 +174,9 @@ module Reform
       true
     end
 
-    def disabled= val
-      @qtc.enabled = !val
-    end
+#     def disabled= val
+#       @qtc.enabled = !val
+#     end
 
     def disabled?
       !@qtc.enabled?
@@ -281,7 +283,7 @@ module Reform
     alias :minSize :minimumSizeHint
     alias :minimumSizehint :minimumSizeHint
 
-    def_delegators :@qtc, :adjustSize, :enabled=, :enabled?, :style=, :style, :setAttribute
+    def_delegators :@qtc, :adjustSize, :enabled?, :style=, :style, :setAttribute
 
     def resize x, y = nil
       if y.nil?
@@ -327,18 +329,6 @@ module Reform
 #       tag "#{self}: calling #{parent}.addWidget + SETUP"
       parent.addWidget self, hash, &block
     end
-
-=begin
-    def updateModel model, options = nil
-      tag "#{self}.updateModel (name='#{name}'), model=#{model.inspect}"
-      if e = enabler
-        @qtc.enabled = model.apply_getter(e) if model.getter?(e)
-      elsif d = disabler
-        @qtc.enabled = !model.apply_getter(d) if model.getter?(d)
-      end
-      super
-    end
-=end
 
     def addWidget control, hash, &block
 #       tag "#{self}.addWidget(#{control.qtc}), qtc = #@qtc"
@@ -406,30 +396,6 @@ module Reform
 #     alias :org_paintEvent :paintEvent         #can't do this in a module...
     include QWidgetHackContext
     public
-
-    # this stupid method MUST Be here and cannot be in QWidgetHackContext !!!!
-#     def paintEvent event
-#       paintEvent_i(event) or super
-=begin
-      tag "paintEvent(#{event})"
-      if instance_variable_defined?(:@_reform_hack) && @_reform_hack.whenPainted
-        require 'reform/painter'
-        tag "Creating Reform::Painter passing #{self}"
-        painter = Painter.new(self)
-#         painter.event = event
-        painter.renderHint = Qt::Painter::Antialiasing
-        begin
-          @_reform_hack.whenPainted(painter) != false and return
-          # it is rather inefficient if whenPainted does return false....
-        ensure
-          tag "Calling automatic 'end' after paintEvent"
-          painter.end
-        end
-        tag "falling back to default paintEvent handling"
-      end
-      super
-=end
-#     end
 
   end # class QWidget
 

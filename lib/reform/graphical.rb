@@ -32,9 +32,15 @@ I believe 'brush' and 'pen' can become plugins, but they are not really widgets 
       class Brush < Control
         include Graphical
         private
+          # dynname is the assignment to be made on the parent!
           def initialize parent = nil, dynname = :qtbrush=
+#             tag "new Brush(#{parent}, dynname = '#{dynname}'"
             super(parent, Qt::Brush.new)
             @dynname = dynname
+          end
+
+          def dynname arg
+            @dynname = arg
           end
 
           # makes it a solid brush.
@@ -65,9 +71,13 @@ I believe 'brush' and 'pen' can become plugins, but they are not really widgets 
           end
 
           def color= v
+#             tag "color := #{v}"
             @qtc = make_qtbrush(v)
             # we  must reassign the entire brush or a graphicitem will not be updated at all.
-            parent.send(@dynname, @qtc) if parent
+            if parent
+#               tag "#{parent}.#@dynname #@qtc"
+              parent.send(@dynname, @qtc)
+            end
           end
 
           # override
@@ -110,6 +120,7 @@ I believe 'brush' and 'pen' can become plugins, but they are not really widgets 
           alias :size :widthF
           alias :weight :widthF
 
+#           remove_method(:widthF=)
           def widthF= v
             if parent
               @qtc = parent.pen
@@ -555,7 +566,10 @@ I believe 'brush' and 'pen' can become plugins, but they are not really widgets 
         when Hash then Brush.new(parent).setup(args, &block).qtc
         when String
           if args[0, 7] == 'file://'
-            Qt::Brush.new(Qt::Pixmap.new(args[7..-1]))
+            pixmap = Qt::Pixmap.new(args[7..-1])
+            raise ReformError, "Could not load pixmap '#{args[7..-1]}'" if pixmap.null?
+#             tag "Creating brush from pixmap"
+            Qt::Brush.new(pixmap)
           else
             Qt::Brush.new(make_color(args))
           end

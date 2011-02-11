@@ -52,7 +52,7 @@ mock:
   Basicly we should follow the Qt method and use Index instances.  But now they can also
   be hash keys (so anything).
 
-  A change=index can be an array of fields, like [:y, 0, :y]
+  A change-index can be an array of fields, like [:y, 0, :y]
 
   So an undo operation contains the changed index, the operation-kind (like insert/delete/replace) and the old value.
 
@@ -113,10 +113,16 @@ mock:
     s[3] = x is the same as s[3,1] = x or s[3,1] = [x]
     s[3]=x,y is the same as s[3,0] =x,y or s[3,0] = [x,y]
     It differs whether the righthand side is an array or not. And s[0] = [3,2] is different from s[0,0] = [3,2] !
+
+
+=====================================================
+INTEGRITY KILLER NR 1: array.sort! and array.sort_by!
+=====================================================
+We need a map then from old sit. to new sit. Can be done using objectids.
+
 =end
   class Structure #< AbstractModel       #          yaml does not really work nice with Qt objects....
      include Model, ModelContext
-#      include ModelContext
 
     private # methods of Structure
 
@@ -383,7 +389,7 @@ mock:
               when :unshift # comparable with push, but then in front
                 raise 'oops' if block
                 return self if args.empty?
-                STDERR.puts "array integrity goes down the drain. BUG 0027 strikes!"
+                STDERR.print "array integrity goes down the drain. BUG 0027 strikes!\n"
                 @value.unshift(*args)
                 tran.push(Transaction::PropertyUnshifted.new(@root, @keypath, args.length)) unless tran.aborted?
                 return self
@@ -717,8 +723,8 @@ At this point I got the notion of 'keypaths' that denote a path within the model
 
 If we then use the concept of a root model and we have a way of delivering modelchanges
 recursively to those nodes that are interested in changes we don't need observers
-anymore.  We just propagate the modelchange to application and it will send
-it to all concerned forms.
+anymore.  We just propagate the modelchange to the application and it will send
+it to all concerned forms and beyond.
 
 This means that wrapping a ruby object that is not simple, and also not a Hash or
 an Array or another Enumerable, should basicly work similar.
@@ -766,10 +772,13 @@ Next we apply the connector to the rootmodel.
 
 A connector is simply a part of the keypath.
 
-Two complications:
+Four complications:
   - changes that cause other attributes to change instead of a single one.
   - the ability to use blocks as getters and setters
   - expensive parts in the keypath
+  - changes that insert or delete array entries and so totally mess up and controls
+    whose keypath has an array index in them. Like [:styles, 123].
+    So we need specific messages for those events so they can cope.
 
 class Root
   attr :x
@@ -808,6 +817,11 @@ A connector that is a proc will always reconnect if the propertychange propagate
 If it also has a keypath we will check up to the proc.
 So if [:a, ->a{a.to_s}] then we will reconnect if :a has changed in the passed model.
 
+Arrays as [GS]etters
+====================
+Work as if each element is applied on the result of applying the previous one.
+So [:f, :g]  applied on x would be x.f.g.
+
 Expensive Parts
 ================
 
@@ -815,9 +829,8 @@ Persistance
 ============
 Assuming that the application is stable enough, a timed save of the rootdata will work
 as a persistance trick (or when exiting). We can save 'backups' every 10 minutes or so.
-The computer can save let's say 10MB per second so for simplistic apps this should
-in fact be more than sufficient.
-
+The computer can save let's say > 100MB per second (on SSD's for example) so for simplistic
+apps this should in fact be more than sufficient.
 
 External components
 ===================
@@ -835,6 +848,12 @@ Complicated alterations
 We will simply take these as 'replacing' the array as a whole. These kind of operations are rare.
 Could be when we drag a selection over into a list or so. Just updating the entire contents would be
 OK.
+
+NOT OK at all. Especially when array operations are involved, we can assume these arrays can be
+quite big.  The change must be done as efficient as possible.  This is even more true if controls
+are watching 'm' or any subpart of it.  Replacing the array will not work correctly. The control
+that has m[4] open for example, must change to m[5] if we do m[0,2] = a,b,c!! And it does not need
+to reload or update the screen, since we know the change is purely internal.
 
 Identity
 =============

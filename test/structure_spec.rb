@@ -276,7 +276,7 @@ describe Structure do
     end
   end
 
-  it "shifting should work" do
+  it "should shift properly" do
     s = Structure.new 1, 2, 3, 4, 5
     s.shift
     s.value.should == [ 2, 3, 4, 5]

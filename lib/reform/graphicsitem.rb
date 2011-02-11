@@ -57,13 +57,14 @@ require 'reform/app'
       alias :geo :geometry  # because I'm such a lazy bastard!
 
       # currently 'strength' is not supported. Actually tint should become a controller, of course
-      def tint *args
-#         tag "qtc = #@qtc"
-        ef = Qt::GraphicsColorizeEffect.new(self) # @qtc)  not an object!!
-        color = ef.color = make_color(*args)
-        @qtc.setGraphicsEffect(ef)
-        @qtc.opacity = color.alphaF if color.alphaF < 1.0
-      end
+#       def tint *args
+#         STDERR.print "DEPRECATED, use the tint plugin\n"
+# #         tag "qtc = #@qtc"
+#         ef = Qt::GraphicsColorizeEffect.new(self) # @qtc)  not an object!!
+#         color = ef.color = make_color(*args)
+#         @qtc.graphicsEffect = ef
+#         @qtc.opacity = color.alphaF if color.alphaF < 1.0
+#       end
 
     public # GraphicsItem methods
 
@@ -367,6 +368,6 @@ require 'reform/app'
 #     def pen= pen; end
 #     def brush= brush; end
 #     def font= font; end
-  end
+  end # class QGraphicsItemHackContext
 
 end # Reform

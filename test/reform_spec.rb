@@ -56,9 +56,10 @@ describe Frame do
   end
 
   it 'should have created a formlayout and reparented edit' do
-#     tag "children = #{$qApp.firstform.children.map {|c| c.class }.inspect}"
-    $qApp.firstform.children.length.should == 1
-    layout = $qApp.firstform.children[0]
+#     tag "children = #{$qApp.firstform.children.map{|c| c.class }.inspect}"
+    # it has always an UndoStack ready...
+    $qApp.firstform.children.length.should == 2
+    layout = $qApp.firstform.find(FormLayout).to_a[0]
     layout.class.should == FormLayout
     layout.children.length.should == 1
     layout.children[0].class.should == Edit

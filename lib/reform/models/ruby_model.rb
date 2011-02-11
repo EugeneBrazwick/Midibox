@@ -3,13 +3,7 @@ module Reform
 
 require_relative '../model'
 
-# Assuming we have a simple mapped array, how do we apply changes to the model using
-# insert delete and update of a single row?
-#
-# Support for simple arrays that consist of other Model entries.
-# For a pure array + hash structure use Structure
-# These two classes probably should merge as their intention is the same:
-# 'wrap' around ordinary ruby data.
+  #  DEPRECATED. Use 'structure' and 'struct' instead. Or 'rstore'.
   class SimpleModel < AbstractModel
     include Enumerable
 

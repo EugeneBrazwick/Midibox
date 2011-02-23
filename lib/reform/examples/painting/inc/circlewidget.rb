@@ -116,8 +116,8 @@ module Reform
     def updateModel model, opts = nil
 #       tag "#{self}.updateModel(#{model}, qtc.frameNr = #{@qtc.frameNr})"
 #       tag "connector=#{connector}"
-      if (cid = connector) && model && model.getter?(cid)
-        @qtc.frameNr = model.apply_getter(cid)
+      if (cid = connector) && model && model.model_getter?(cid)
+        @qtc.frameNr = model.model_apply_getter(cid)
       end
       super
       @qtc.update

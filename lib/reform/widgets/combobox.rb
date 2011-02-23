@@ -1,5 +1,5 @@
 
-#  Copyright (c) 2010 Eugene Brazwick
+#  Copyright (c) 2010-2011 Eugene Brazwick
 
 module Reform
 
@@ -43,7 +43,7 @@ See examples/models/demo03.rb
         connect(@qtc, SIGNAL('activated(int)'), self) do |idx|
           rfRescue do
 #             tag "Activated(#{idx})"
-            if model && (cid = connector) && model.setter?(cid)
+            if model && (cid = connector) && model.model_setter?(cid)
               activated(model, cid, idx)
             end
           end

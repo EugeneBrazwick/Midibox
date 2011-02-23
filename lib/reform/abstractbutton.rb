@@ -1,5 +1,5 @@
 
-# Copyright (c) 2010 Eugene Brazwick
+# Copyright (c) 2010-2011 Eugene Brazwick
 
 module Reform
 
@@ -55,10 +55,10 @@ module Reform
       def updateModel model, options = nil
   #       tag "@{self} connectModel #{aModel}, cid=#{connector}"
         cid = connector and
-          if model && model.getter?(cid)
-            @qtc.text = model.apply_getter(cid)
+          if model && model.model_getter?(cid)
+            @qtc.text = model.model_apply_getter(cid)
           end
-        # ????? if (model = effective_model) && (tcid = text_connector) && model.getter?(tcid)
+        # ????? if (model = effective_model) && (tcid = text_connector) && model.model_getter?(tcid)
         super
       end
 

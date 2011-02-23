@@ -66,7 +66,7 @@ module Reform
       def sequence quickyhash = nil, &block
         require_relative 'animations/sequentialanimation'
         setProperty('value', value2variant(:default))
-        SequentialAnimation.new(self, Qt::SequentialAnimationGroup.new(self)).setup(quickyhash, &block)
+        SequentialAnimation.new(self, QSequentialAnimationGroup.new(self)).setup(quickyhash, &block)
       end
 
       def animation quickyhash = nil, &block
@@ -75,7 +75,7 @@ module Reform
 #             tag "Creating Qt::Variant of value"
         setProperty('value', value2variant(:default))
 #         tag ("calling Animation.new")
-        AttributeAnimation.new(self, Qt::PropertyAnimation.new(self)).setup(quickyhash, &block)
+        AttributeAnimation.new(self, QPropertyAnimation.new(self)).setup(quickyhash, &block)
       end
 
       # macro to define single arg 'component'. For example Color may have 'red', and Point has 'x' and 'y'.

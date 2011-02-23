@@ -1,5 +1,5 @@
 
-# Copyright (c) 2010 Eugene Brazwick
+# Copyright (c) 2010-2011 Eugene Brazwick
 
 class Array
   def has_key? i
@@ -126,132 +126,95 @@ We need a map then from old sit. to new sit. Can be done using objectids.
 
     private # methods of Structure
 
-      # Named parameters, in case arg1 is a hash
       # [parent] owner control, or a wrapped value.
-      # [root] the root
       # [value] the value
       # [qtc] Qt implementor (if parent is a control) or the root-structure otherwise
-      # [keypath] array of indices that lead to this value within the root-structure.
-      #           nil (default) is equivalent with [].
-      #           Only applies when a root is given
-      def initialize *args
-        super() ##!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-#         tag "new #{self}, args = #{args.inspect}"
-        if args.length == 1 && Control === args[0]
-          @parent = @args[0]
-          raise "TOTAL CORRUPTION" unless !args[0].model? || args[0].root
-          @root = if args[0].model? then args[0].root else self end
-        else
-          @root = self
-        end
-#         tag "INITIALIZE ,args = #{args.inspect}"
-        if args.length == 1
-          args = args[0]
-          if Hash === args && args.has_key?(:keypath)
-  #         tag "#{self}.new(#{parent.inspect}, gp=#{qtc}"
-            @root = args[:root] || self
-            @keypath = args[:keypath] || []
-            assign :self, args[:value]
-            raise "BOGO keypath, caller = #{caller.join("\n")}" if @keypath == [nil] || !(Array === @keypath)
-            raise 'TRYING TO MAKE A MESS????, keypath given but not value' if @value.nil?
-          else
-            @keypath = []
-            assign :self, args
-          end
-        else
-#         @root = self
-# #         tag "setup @value := #{args}"
-          @keypath = []
-          assign :self, args
-        end
-        raise 'TRYING TO MAKE A MESS????' if @value.nil?
-        raise 'TRYING TO MAKE A MESS????' if @value.respond_to?(:model?) && @value.model?
-        raise 'TRYING TO MAKE A MESS????' if @root.nil? || @root != root
-#         tag "INIT #{self} OK, @root = #@root, root = #{self.root}"
+      # [key]
+      def initialize parent, key, value
+        @model_parent, @model_key, @model_value = parent, key, value
       end
 
       # It is very dangerous storing keypaths within an array, as the indices may shift!!
-      def inter value, key
+      def inter key, value
 #         tag "inter value #{value.inspect}, klass:#{value.class} for key :#{key}"
         case value
-        when Hash, Array then Structure.new(value: value, keypath: @keypath + [key], root: @root)
+        when Hash, Array then Structure.new(self, key, value)
         when Numeric, FalseClass, TrueClass, NilClass, String, Symbol then value
         else
           if value.respond_to?(:model?) && value.model?
 #             raise 'blerk' if value.disposed?
             # incorporate the model by setting parent + root + keypath
-            value.root = @root
-            value.keypath = @keypath + [key]
+            value.model_parent = self
+            value.model_key = key
 #             tag "#{value}.parent := #{self}"
 #             tag "oldparent was #{value.parent}"
-            value.parent = self
             value
           else
-            Structure.new(value: value, keypath: @keypath + [key], root: @root)
+            Structure.new(self, key, value)
           end
         end
       end
 
-      def assign key, value, org_symbol = nil
-#         tag "Assign #{key.inspect}, #{value}, currentvalue=#{@value.inspect}, keypath=#{@keypath.inspect}, value:=#{value.inspect}"
+      def model_assign key, value, org_symbol = nil
+#         tag "Assign #{key.inspect}, #{value}, currentvalue=#{@model_value.inspect}, keypath=#{@model_keypath.inspect}, value:=#{value.inspect}"
         case key
         when :self
-#           tag "#{self} ASSIGN self @value := #{value}"
-          @value = value
-          case @value
+#           tag "#{self} ASSIGN self @model_value := #{value}"
+          @model_value = value
+          case @model_value
           when Hash
-            @value.each do |k, v|
+            @model_value.each do |k, v|
 #               tag "Checking hash key #{k.inspect}, value = #{v.inspect}"
-              @value[k] = inter(v, k)
+              @model_value[k] = inter(k, v)
             end
           when Array
-            @value.each_with_index do |v, k|
-              @value[k] = inter(v, k)
+            @model_value.each_with_index do |v, k|
+              @model_value[k] = inter(k, v)
             end
           end
-          raise 'TRYING TO MAKE A MESS????' if @value.nil?
+          raise 'TRYING TO MAKE A MESS????' if @model_value.nil?
         when Array
-          @value[*key] = inter(value, key)
+          @model_value[*key] = inter(key, value)
         else
           org_symbol ||= (key.to_s + '=').to_sym      # the caller sometimes knows this, so we could pass it as option
-#           tag "does #@value (class #{@value.class}) respond_to #{org_symbol.inspect}"
-          if org_symbol != :[]= && @value.respond_to?(org_symbol)
+#           tag "does #@model_value (class #{@model_value.class}) respond_to #{org_symbol.inspect}"
+          if org_symbol != :[]= && @model_value.respond_to?(org_symbol)
 #             tag "YES, send it"
-            @value.send(org_symbol, inter(value, org_symbol))
+            @model_value.send(org_symbol, inter(org_symbol, value))
           else
-#             tag "NO, apply index @value[#{key}] := #{value}"
-            @value[key] = inter(value, key)
+#             tag "NO, apply index @model_value[#{key}] := #{value}"
+            @model_value[key] = inter(key, value)
           end
         end
       rescue TypeError => err
         raise err.class, tr("when assigning '#{key}': #{err}"), err.backtrace + caller
-#         tag "Assigned #{value}, value is now #{@value.inspect}"
+#         tag "Assigned #{value}, value is now #{@model_value.inspect}"
       end
 
       def calc_prev name
 #         tag "calc_prev(#{name.inspect})"
         case name
         when :self
-          @value
+          @model_value
         when Symbol
-          if @value.respond_to?(name)
+          if @model_value.respond_to?(name)
 #             tag "true getter"
-            @value.send(name)
+            @model_value.send(name)
           else
             name2 = (name.to_s + '?').to_sym
-            if @value.respond_to?(name2)
+            if @model_value.respond_to?(name2)
 #               tag "boolean getter"
-              @value.send(name2)
-            elsif @value.has_key?(name)
-              @value[name]
+              @model_value.send(name2)
+            elsif @model_value.has_key?(name)
+              @model_value[name]
             else
-#               tag "value #{@value.inspect} does not have key #{name.inspect}"
+#               tag "value #{@model_value.inspect} does not have key #{name.inspect}"
               Transaction::PropertyChange::NoValue # we got nothing better
             end
           end
         else
-          if @value.has_key?(name)
-            @value[name]
+          if @model_value.has_key?(name)
+            @model_value[name]
           else
             Transaction::PropertyChange::NoValue # we got nothing better
           end
@@ -260,11 +223,9 @@ We need a map then from old sit. to new sit. Can be done using objectids.
 
     public  # methods of Structure
 
-      attr_accessor :parent
-
-      def value v = nil
-        return @value if v.nil?
-        @value = v
+      def model_value v = nil
+        return @model_value if v.nil?
+        @model_value = v
         # We support Hash, or Array or anything simple
       end
 
@@ -276,122 +237,180 @@ We need a map then from old sit. to new sit. Can be done using objectids.
 
       # MAKES A MESS!! Reason: Qtruby abuses it too. So we must be careful to pass these on to super!!!
       def method_missing symbol, *args, &block
-#         tag "METHOD_MISSING #{symbol.inspect}, current value = #{@value.inspect}"
+#         tag "METHOD_MISSING #{symbol.inspect}, current value = #{@model_value.inspect}"
 #         raise 'WTF' if symbol == :tran
-        return super unless @value
+        return super unless @model_value
         case symbol
-        when :parent=, :parent then return super
+        when :model_parent=, :model_parent then return super
         end
-        if symbol.to_s[-1] == '='
+        if symbol[-1] == '='
           return super if args.length > 3
-#           is_setter = @value.respond_to?(symbol)
+#           is_setter = @model_value.respond_to?(symbol)
           key = symbol[0...-1].to_sym
           # Now the value assigned is the very last arg.
           # Example   x[3,4,5] = 34
           # then we have args = [3,4,5,34]
-#           tag "applying #{symbol.inspect} to hash #{@value}, n='#{nam[0..-2]}', args=#{args.inspect}"
+#           tag "applying #{symbol.inspect} to hash #{@model_value}, n='#{nam[0..-2]}', args=#{args.inspect}"
           # what's to assign:
           if key == :[] #  So s.x[4] = ... something or s[4][:x] = ... or even s.y[2,4] = ....
-            if args.length == 3
+            if args.length == 3  # x[3, 4] = ....
+              # In cases of 'splice', if the second arg is an array, it is unpacked.
+              # In cases of 'splice' arg2 is the nr of items deleted.
 #               tag "splice operation"
-              value = args[2]
+              idx0, del_count, value = args
+              if value.respond_to?(:length)
+                ins_count = value.length
+              else
+                ins_count = 1
+                value = [value]
+              end
               key = args[0, 2]
-              prev = @value.clone
-              undo_path = @keypath
-            else # single key replacement
+#               oldvals = @model_value[*key]
+            else # single key replacement, truly a PropertyChange
+              # NO: key can be a range!!
               raise 'oops' unless args.length == 2
               key, value = args
-              prev = calc_prev key
-              undo_path = @keypath + [key]
+              if Range === key
+                idx0 = key.min
+                del_count = key.max - idx0 + 1
+                if value.respond_to?(:length)
+                  ins_count = value.length
+                else
+                  ins_count = 1
+                  value = [value]
+                end
+              else
+                idx0 = key
+                del_count = 0
+                ins_count = 1
+                value = [value]
+              end
+#               oldvals = @model_value[key]
+            end
+            # Examples:  x[3,0] = a,b,c    del_count = 0, ins_count = 3, all insert
+            #            x3[3,1] = a,b     del_count=1, ins_count=2, 1 update, 1 ins
+            #            x3[3,2] = a,b     del_count=2, ins_count=2, pure update
+            #            x3[3,2] = a (a not an array!)  del_count=2, ins_count=1, 1 update, 1 delete
+            #            x3[3,2] = []      del_count=2, ins_count=0, pure delete
+            # we have a propertychange for a whole range of items, if del_count < ins_count
+            raise 'oops' unless Array === value
+            model_pickup_tran do |tran|
+              upd_count = [del_count, ins_count].min
+              del_count -= upd_count
+              ins_count -= upd_count
+              for j in 0...upd_count
+                oldval = model_apply_getter(idx0)
+                tran.addPropertyChange(self, idx0, oldval) unless tran.aborted?
+                model_assign(idx0, value[j])
+                idx0 += 1
+              end
+              if del_count > 0
+#                 if del_count == 1    # the caller did x[] == .. so let's pass that on the wrapped value
+#                   tran.push(PropertyDeleted.new(self, idx0, @model_value[idx0])) unless tran.aborted?
+#                   @model_value.delete_at(idx0)
+#                 else
+                  unless tran.aborted?
+                    oldvals = @model_value[idx, del_count]
+                    tran.push(PropertySpliced.new(self, idx0, oldvals))
+                  end
+                  @model_value[idx0, del_count] = []
+#                 end
+              end
+              if ins_count > 0
+                tran.push(PropertyAdded.new(self, idx0, ins_count)) unless tran.aborted?
+                @model_value[idx0, 0] = value[upd_count, ins_count]
+              end
             end
           else  # other setter like             x.field = value
-            if args.length > 1 || !@value.respond_to?(:[]=) && !@value.respond_to?(symbol)
+            if args.length > 1 || !@model_value.respond_to?(:[]=) && !@model_value.respond_to?(symbol)
               tag "I CAN'T USE THIS, argcount=#{args.length}, value does not have []= and also not #{symbol}"
               # this will fail, but the errormessage makes more sense:
-#               return @value.method_missing(symbol, *args, &block)             requires hack since mm is private!
+#               return @model_value.method_missing(symbol, *args, &block)             requires hack since mm is private!
               return super
             end
             value = args[0]
-            prev = calc_prev key
-#             tag "other setter (#{key.inspect}), newval = #{value}, prev = #{prev}, @value= #{@value.inspect}"
-            undo_path = @keypath + [key]
-          end
-          pickup_tran do |tran|
-# tran.debug_track!
-#             tag "recording transaction log"
-# IMPORTANT: it is possible that we get here from an undo-operation. So 'assign' must be called, even if the
-# transaction is already aborted
-            assign(key, value, symbol)
-            tran.addPropertyChange(undo_path, prev) unless tran.aborted?
+            oldvals = model_apply_getter(key)
+#             tag "other setter (#{key.inspect}), newval = #{value}, prev = #{prev}, @model_value= #{@model_value.inspect}"
+            model_pickup_tran do |tran|
+  # tran.debug_track!
+  #             tag "recording transaction log"
+  # IMPORTANT: it is possible that we get here from an undo-operation. So 'assign' must be called, even if the
+  # transaction is already aborted
+              model_assign(key, value, symbol)
+              tran.addPropertyChange(self, key, oldvals) unless tran.aborted?
+            end
           end
         else
-          # another fine mess. Some methods will change @value nevertheless.
+          # another fine mess. Some methods will change @model_value nevertheless.
           # We must catch ALL of them!!
-          last_char = symbol.to_s[-1]
-          if (last_char == '!' || Corrupteron[symbol]) && @value.respond_to?(symbol)
+          last_char = symbol[-1]
+          if (last_char == '!' || Corrupteron[symbol]) && @model_value.respond_to?(symbol)
 #             tag "MODIFIER DETECTED!!!!!!!!!!!!!!!!!!!!!!!!!!!! -> #{symbol}"
-            pickup_tran do |tran|
+            model_pickup_tran do |tran|
               case symbol # special cases
               when :<<
                 raise 'oops' unless args.length == 1 || block
-                @value << inter(args[0], @value.length)
-                tran.push(Transaction::PropertyPushed.new(@root, @keypath)) unless tran.aborted?
+                @model_value << inter(@model_value.length, args[0])
+                tran.push(Transaction::PropertyPushed.new(self)) unless tran.aborted?
                 return self
               when :push # not the same as <<, you cannot << 1,2 but you can push(1,2)
                 raise 'oops' if block
                 return self if args.empty?
                 args.each do |el|
-                  @value.push(inter(el, @value.length))
+                  @model_value.push(inter(@model_value.length, el))
                 end
-                tran.push(Transaction::PropertyPushed.new(@root, @keypath, args.length)) unless tran.aborted?
+                tran.push(Transaction::PropertyPushed.new(self, args.length)) unless tran.aborted?
                 return self
               when :delete_at
                 raise 'oops' unless args.length == 1 || block
                 idx = args[0]
-                return self unless @value.has_key?(idx)
-                return @value.delete_at(idx) if tran.aborted?
+                return self unless @model_value.has_key?(idx)
+                return @model_value.delete_at(idx) if tran.aborted?
                 # BUG 0027 applies here. May destroy integrity
-                prev = @value[idx]
-                result = @value.delete_at idx
-                tran.push(Transaction::PropertySpliced.new(@root, @keypath + [idx], prev))
+                oldvals = [@model_value[idx]]
+                result = @model_value.delete_at idx
+                tran.push(Transaction::PropertySpliced.new(self, idx, oldvals))
                 return result # , :_root)               if you want to use as struct use your own constructor
               when :delete
                 # BUG 0027 applies here. May destroy integrity
                 raise 'oops' unless args.length == 1
                 # 'delete' works differently for arrays and hashes!
-                if Hash === @value
+                if Hash === @model_value
                   # However, the 'abort' will ruin the order this way...   Currently a 'feature'
                   idx = args[0]
-                  return self unless @value.has_key?(idx)
-                  return @value.delete(idx, &block) if tran.aborted?
-                  prev = @value[idx]
-                  result = @value.delete(idx, &block)
-                  tran.push(Transaction::PropertyDeleted.new(@root, @keypath + [idx], prev))
+                  return self unless @model_value.has_key?(idx)
+                  return @model_value.delete(idx, &block) if tran.aborted?
+                  prev = @model_value[idx]
+#                   tag "Calling #{@model_value}.delete(#{idx.inspect})"
+                  result = @model_value.delete(idx, &block)
+#                   tag "value is now #{@model_value.inspect}"
+                  tran.push(Transaction::PropertyDeleted.new(self, idx, prev))
                   return result # , :_root)               if you want to use as struct use your own constructor
                 end
               when :pop
                 raise 'oops' unless args.length <= 1 || block
                 count = args[0] || 1
-                return @value.pop(count) if tran.aborted?               # CANTHAPPEN DUE TO SHORTCUT IN model.rb (fixme??)
-                prev = @value.last(count)
-                result = @value.pop(count)
-                tran.push(Transaction::PropertyPopped.new(@root, @keypath, prev))
+                return @model_value.pop(count) if tran.aborted?               # CANTHAPPEN DUE TO SHORTCUT IN model.rb (fixme??)
+                prev = @model_value.last(count)
+                result = @model_value.pop(count)
+                tran.push(Transaction::PropertyPopped.new(self, prev))
                 return result # see delete_at
               when :shift # comparable with pop, but then in front
                 # BUG 0027 applies here. May destroy integrity
                 raise 'oops' unless args.length <= 1 || block
                 count = args[0] || 1
-                return @value.shift(count) if tran.aborted?
-                prev = @value.first(count) # always an array
-                result = @value.shift(count)
-                tran.push(Transaction::PropertyShifted.new(@root, @keypath, prev))
+                return @model_value.shift(count) if tran.aborted?
+                prev = @model_value.first(count) # always an array
+                result = @model_value.shift(count)
+                tran.push(Transaction::PropertyShifted.new(self, prev))
                 return result # see delete_at
               when :unshift # comparable with push, but then in front
                 raise 'oops' if block
                 return self if args.empty?
-                STDERR.print "array integrity goes down the drain. BUG 0027 strikes!\n"
-                @value.unshift(*args)
-                tran.push(Transaction::PropertyUnshifted.new(@root, @keypath, args.length)) unless tran.aborted?
+                @model_value.unshift(*args)
+                unless tran.aborted?
+                  tran.push(Transaction::PropertyUnshifted.new(self, args.length))
+                end
                 return self
               when :insert
                 raise 'oops' if block || args.empty?
@@ -402,26 +421,26 @@ We need a map then from old sit. to new sit. Can be done using objectids.
                 #  x = [1, 2, 3, 4]
                 #  x.insert(-2, 5, 6) -> [1, 2, 3, 5, 6, 4]
                 # the slice is then  x.slice!(at - elcount + 1, elcount)
-                return @value.insert(*args) if tran.aborted?
-                STDERR.puts "array integrity goes down the drain. BUG 0027 strikes!"
+                return @model_value.insert(*args) if tran.aborted?
                 idx, elcount = args[0], args.length - 1
-                @value.insert(*args)
-                tran.push(Transaction::PropertyAdded.new(@root, @keypath + [idx], elcount))
+                @model_value.insert(*args)
+                tran.push(Transaction::PropertyAdded.new(self, idx, elcount))
                 return self
               end
-              return @value.send(symbol, *args, &block) if tran.aborted?
-              prev = @value.clone
-              result = @value.send(symbol, *args, &block)
-              tran.addPropertyChange(@keypath, prev)
+              return @model_value.send(symbol, *args, &block) if tran.aborted?
+              raise "not implemented yet: total destructors like '#{symbol}'"
+              prev = @model_value.clone # BAD IDEA !!
+              result = @model_value.send(symbol, *args, &block)
+              tran.addPropertyChange(self, :self, prev)
               result
             end
           else
             return super unless args.empty?
-            return apply_getter(:self) if symbol == :self
+            return model_apply_getter(:self) if symbol == :self
             key = last_char == '?' ? symbol[0...-1].to_sym : symbol
-#             tag "Apply GETTER #{symbol.inspect}, value=#@value"
-            if @value.respond_to?(:has_key?) && @value.has_key?(symbol) then @value[key]
-            elsif @value.respond_to?(symbol) then @value.send(symbol, *args, &block)
+#             tag "Apply GETTER #{symbol.inspect}, value=#@model_value"
+            if @model_value.respond_to?(:has_key?) && @model_value.has_key?(symbol) then @model_value[key]
+            elsif @model_value.respond_to?(symbol) then @model_value.send(symbol, *args, &block)
             else nil
             end
           end
@@ -429,34 +448,34 @@ We need a map then from old sit. to new sit. Can be done using objectids.
 #         tag "OK"              AAAAAAAAAAAARGFHHHHH
       end
 
-      def getter? name
+      def model_getter? name
         case name
         when :self, Proc then true
-        when Symbol, String then (!@value.respond_to?(:has_key?) || @value.has_key?(name))
+        when Symbol, String then (!@model_value.respond_to?(:has_key?) || @model_value.has_key?(name))
         else true
         end
       end
 
       # To apply the getter, this method must be used.
-      def apply_getter name
-#         tag "apply_getter(#{name.inspect}), value=#@value"
+      def model_apply_getter name
+#         tag "model_apply_getter(#{name.inspect}), value=#@model_value"
         case name
         when :self
-          Array === @value || Hash === @value ? self : @value
-        when :root then root
+          Array === @model_value || Hash === @model_value ? self : @model_value
+        when :root then model_root
         when Proc
           #applying method on the structure (not on hash)
-          name.call(self) #   NOT @value, I just said it...
+          name.call(self) #   NOT @model_value, I just said it...
   #         tag "apply getter proc -> #{r.inspect}"
         when Symbol
-#           tag "check #@value respond_to :#{name}"
-          if @value.respond_to?(name)
-            @value.send(name)
+#           tag "check #@model_value respond_to :#{name}"
+          if @model_value.respond_to?(name)
+            @model_value.send(name)
           else
             begin
-              @value[name]
+              @model_value[name]
             rescue TypeError
-              raise Error, tr("Bad getter '#{name.inspect}' on #{@value.class} value, caller = #{caller.join("\n")}")
+              raise Error, tr("Bad getter '#{name.inspect}' on #{@model_value.class} value, caller = #{caller.join("\n")}")
             end
 #             nil
           end
@@ -464,66 +483,66 @@ We need a map then from old sit. to new sit. Can be done using objectids.
           # using recursion
           name.inject(self) do |v, nm|
 #             tag "Apply #{nm} on #{(v.respond_to?(:value) ? v.value : v).inspect}, v.root= #{v && v.root}"
-            (v && v.apply_getter(nm))#.tap{|r| tag " :#{nm} ---> #{(r.respond_to?(:value) ? r.value : r).inspect}"}
+            (v && v.model_apply_getter(nm))#.tap{|r| tag " :#{nm} ---> #{(r.respond_to?(:value) ? r.value : r).inspect}"}
           end
         else
-          @value[name]
+          @model_value[name]
         end
       end
 
-      def setter? name
+      def model_setter? name
         case name
         when Proc then false
-        when Symbol, String then (!@value.respond_to?(:has_key?) || @value.has_key?(name)) && !@value.frozen?
+        when Symbol, String then (!@model_value.respond_to?(:has_key?) || @model_value.has_key?(name)) && !@model_value.frozen?
         else
-          !@value.frozen?
+          !@model_value.frozen?
         end
       end
 
-      def apply_setter name, value, sender = nil, more_args = nil
-#         tag "apply_setter(#{name.inspect}, #{value}, sender = #{sender})"
+      def model_apply_setter name, value, sender = nil, more_args = nil
+#         tag "model_apply_setter(#{name.inspect}, #{value}, sender = #{sender})"
   #         name = name.to_s
   #         name = name[0...-1] if name[-1] == '?'
         if Array === name
-          sub = name[0...-1].inject(self) { |v, nm| v && v.apply_getter(nm) } and
-            sub.apply_setter(name[-1], value, sender)
+          sub = name[0...-1].inject(self) { |v, nm| v && v.model_apply_getter(nm) } and
+            sub.model_apply_setter(name[-1], value, sender)
           return
         end
-        pickup_tran(sender) do |tran|
+        model_pickup_tran(sender) do |tran|
           if tran.aborted?
-            assign(name, value)
+            model_assign(name, value)
           else
             tran.debug_track! if more_args && more_args[:debug_track]
             prev = calc_prev(name)
-            assign(name, value)
+            model_assign(name, value)
 #             tag "ADDING PROPCHANGE"
-            tran.addPropertyChange(name == :self ? @keypath : @keypath + [name], prev)
+            tran.addPropertyChange(name == :self ? @model_keypath : @model_keypath + [name], prev)
           end
         end
       end
 
       # override
       def length
-#         tag "#{self}::length, @value=#{@value.inspect}"
-        @value.respond_to?(:length) ? @value.length : 1
+#         tag "#{self}::length, @model_value=#{@model_value.inspect}"
+        @model_value.respond_to?(:length) ? @model_value.length : 1
       end
 
       #Note that Hashes will iterate their key as the index. While Array uses the real index.
       # If you use each_with_index on a hash we get el = [key0,value0] and index 0  etc.
       def each_with_index &block
         return to_enum(:each_with_index) unless block
-        path = @keypath
-        if @value.respond_to?(:each_pair)
-#           tag "#{@value.inspect} behaves Hash-like, using each_pair"
+        path = @model_keypath
+        if @model_value.respond_to?(:each_pair)
+#           tag "#{@model_value.inspect} behaves Hash-like, using each_pair"
           index = 0
-          @value.each_pair do |key, el|
+          @model_value.each_pair do |key, el|
 #             tag "each_pair iteration -> #{index.inspect}, #{el}"
             yield el, index
             index += 1
           end
-        elsif @value.respond_to?(:each_with_index)
-#           tag "#@value behaves Array-like"
-          @value.each_with_index do |el2, index2|
+        elsif @model_value.respond_to?(:each_with_index)
+#           tag "#@model_value behaves Array-like"
+          @model_value.each_with_index do |el2, index2|
 #             tag "YIELD a new Structure on #{el.inspect}, index = #{index}"
             yield el2, index2
           end
@@ -533,16 +552,16 @@ We need a map then from old sit. to new sit. Can be done using objectids.
       end
 
       # Note that for { 3=>35, 23=>2} as s.row(0) will 35 and s.row(1) will be 2.
-      def row numeric_key
-        if @value.respond_to?(:each_pair)
+      def model_row numeric_key
+        if @model_value.respond_to?(:each_pair)
           i = 0
-          @value.each_pair do |k, v|
+          @model_value.each_pair do |k, v|
             return v if i == numeric_key
             i += 1
           end
         end
-        if @value.respond_to?(:[])
-          @value[numeric_key]
+        if @model_value.respond_to?(:[])
+          @model_value[numeric_key]
         else
           numeric_key == 0 ? self : nil
         end
@@ -552,18 +571,14 @@ We need a map then from old sit. to new sit. Can be done using objectids.
         if args.length == 1
           key = args[0]
 #           if key == :self
-#             Hash === @value ? self : wrap(@value, :self)
+#             Hash === @model_value ? self : wrap(@model_value, :self)
 #           else
-          @value[key]
+          @model_value[key]
 #           end
         else
-          @value[*args]
+          @model_value[*args]
         end
       end
-
-#       def value2index value
-#         if @key2index then @key2index[SimpleModel::value2key(value)] else 0 end
-#       end
 
       # this method is used to set the proper row, if 'value' is connected to it.
       # Now the problem is that Hashes and Arrays can connect to their index or their value.
@@ -571,34 +586,34 @@ We need a map then from old sit. to new sit. Can be done using objectids.
       # IMPORTANT saying 'key_connector:id' is not the same as leaving it the default (also :id)
       # Because this switches on locating the value by key
       #
-      def value2index value, view
+      def model_value2index value, view
         return 0 if value.nil?
         key_connector = view.key_connector
-        key = value2key(value, view) or
+        key = model_value2key(value, view) or
           key ||= value if key_connector # if key-lookup is enforced,
 #         tag "value2index, key_connector=#{key_connector}, key = #{key.inspect}, value was #{(value.respond_to?(:value) ? value.value : value).inspect}"
-        if @value.respond_to?(:each_key)
+        if @model_value.respond_to?(:each_key)
 #           tag "HASH case"
           if key
-            @value.each_key.find_index(key)
-          elsif @value.respond_to?(:each_pair)
+            @model_value.each_key.find_index(key)
+          elsif @model_value.respond_to?(:each_pair)
 #             tag "Using each_pair"
-            @value.each_pair.find_index { |k, v| v == value }
+            @model_value.each_pair.find_index { |k, v| v == value }
           end
-          @value.each_key.find_index(value)
-        elsif @value.respond_to?(:find_index)
+          @model_value.each_key.find_index(value)
+        elsif @model_value.respond_to?(:find_index)
 #           tag "ARRAY case"
-          return nil if @value.empty?
-          key = value if !key && value2key(@value[0], view) # force the use of a key if this seems to be how it should be done.
+          return nil if @model_4value.empty?
+          key = value if !key && model_value2key(@model_value[0], view) # force the use of a key if this seems to be how it should be done.
               # but it is higher heuristics
           if key
             return key if key_connector == :numeric_index
-            @value.find_index do |value|
+            @model_value.find_index do |value|
 #               tag "Comparing value2key #{value2key(value, view).inspect}, with key #{key.inspect}"
-              value2key(value, view) == key
+              model_value2key(value, view) == key
             end #.tap{|r|tag "find_index -> #{r.inspect}"}
           else
-            @value.find_index(value)
+            @model_value.find_index(value)
           end
         else
           0
@@ -614,7 +629,7 @@ We need a map then from old sit. to new sit. Can be done using objectids.
       # In case of arrays this is the value, UNLESS the record has a method id.
       # In case of a hash this is the value, only if the values have a method 'id'
       #
-      # This is the reverse of value2index
+      # This is the reverse of model_value2index
       #
       # REASONING: if a hash than probably a hash mapping this key to its instance. But if the instance
       # supports 'id' than passing that instance back and forth seems reasonable.
@@ -625,47 +640,47 @@ We need a map then from old sit. to new sit. Can be done using objectids.
       # In that case use setting key_connector will force passing the key, if it does not exist then the numeric_idx is used as
       # a final solution
       # For hashes, 'key_connector :someid' will tweak the keymethod to use
-      def index2value numeric_idx, view
-        if @value.respond_to?(:keys)
-          key = @value.keys[numeric_idx]
-          r = @value[key]
-#           tag "keys detected, r = #{r}, value2key(#{r}) == #{value2key(r,view)} index2value[#{numeric_idx}] -> #{value2key(r,view) ? r : key}"
-          value2key(r, view) ? r : key
-        elsif @value.respond_to?(:[])
+      def model_index2value numeric_idx, view
+        if @model_value.respond_to?(:keys)
+          key = @model_value.keys[numeric_idx]
+          r = @model_value[key]
+#           tag "keys detected, r = #{r}, value2key(#{r}) == #{value2key(r,view)} model_index2value[#{numeric_idx}] -> #{value2key(r,view) ? r : key}"
+          model_value2key(r, view) ? r : key
+        elsif @model_value.respond_to?(:[])
           return numeric_idx if view.key_connector == :numeric_index
-#           tag "arraylike, index2value[#{numeric_idx}] -> #{@value[numeric_idx]}"
-          r = @value[numeric_idx]
-          view.key_connector ? value2key(r, view) || numeric_idx : r
+#           tag "arraylike, index2value[#{numeric_idx}] -> #{@model_value[numeric_idx]}"
+          r = @model_value[numeric_idx]
+          view.key_connector ? model_value2key(r, view) || numeric_idx : r
 #           value2key(r, view) ? numeric_idx : r
         else
-#           tag "non enumerable value, return #@value as is"
-          @value
+#           tag "non enumerable value, return #@model_value as is"
+          @model_value
         end
       end
 
       # important override
       def respond_to? symbol
         # only the getters are really covered here.
-        @value.respond_to?(symbol) || Hash === @value && @value[symbol] || super
+        @model_value.respond_to?(symbol) || Hash === @model_value && @model_value[symbol] || super
       end
 
       def build &block
-        @value = {}
+        @model_value = {}
 #         tag "build, value := {}, + instance eval"
         instance_eval(&block)
         self
       end
 
       #override
-      def mimeType
-        tag "#{self}::mimeType, getter? #{getter?(:mimeType)}, value=#{@value.inspect}"
-        getter?(:mimeType) ? apply_getter(:mimeType) : super
+      def model_mimeType
+        tag "#{self}::model_mimeType, getter? #{model_getter?(:model_mimeType)}, value=#{@model_value.inspect}"
+        model_getter?(:model_mimeType) ? model_apply_getter(:model_mimeType) : super
       end
 
       def to_yaml(*args)
         # sooo sneaky...
-#         tag "#{@value.inspect}::to_yaml"
-        @value.to_yaml(*args)
+#         tag "#{@model_value.inspect}::to_yaml"
+        @model_value.to_yaml(*args)
       end
 
       def addModel control, hash, &block

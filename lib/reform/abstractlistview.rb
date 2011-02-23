@@ -1,5 +1,5 @@
 
-# Copyright (c) 2010 Eugene Brazwick
+# Copyright (c) 2010-2011 Eugene Brazwick
 
 require 'reform/abstractitemview'
 
@@ -153,19 +153,11 @@ Not supported yet
   In that case it is pretty useless. Maybe handy for debugging
 =end
       def activated model, cid, idx, data_idx = nil
-        tag "YES, 'activated'!!!, idx = #{idx}, cid=#{cid}, model=#{model}, data_to_transmit=#{@localmodel.index2value(idx, self).inspect}, debug_track = #@debug_track"
-        model.apply_setter cid, @localmodel.index2value(idx, col0), self #, debug_track: true
+        tag "YES, 'activated'!!!, idx = #{idx}, cid=#{cid}, model=#{model},
+        data_to_transmit=#{@localmodel.index2value(idx, self).inspect}, debug_track = #@debug_track"
+        # BROKEN CODE ALERT: index2value is not in Model
+        model.model_apply_setter cid, @localmodel.index2value(idx, col0), self #, debug_track: true
       end
-
-      # where idx is numeric
-#       def data_at idx
-#         @localmodel.row(idx).apply_getter(@connectors[:display] || :to_s)
-#       end
-
-      # def override the class. I need not even be a QModel...
-#       def qModel klass
-#         @qmodel = QModel
-#       end
 
       #override. Select the correct index in the view based on the single value
       # that we connect to.
@@ -174,7 +166,7 @@ Not supported yet
         if modcon = col0.connectors[:model]
           # change the contents first
 #           tag "applying model_connector #@model_connector"
-          setLocalModel @model.apply_getter(modcon)#.tap{|r| tag "setLocalModel(#{r.value.inspect})!!!!!!!!!!!!!!!!!!!!!!!!!!!!!" }
+          setLocalModel @model.model_apply_getter(modcon)#.tap{|r| tag "setLocalModel(#{r.value.inspect})!!!!!!!!!!!!!!!!!!!!!!!!!!!!!" }
         end
         # it's not entirely clear when the events are triggered
         # - currentIndexChanged(int)

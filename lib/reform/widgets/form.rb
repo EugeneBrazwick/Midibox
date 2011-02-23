@@ -10,6 +10,25 @@ module Reform
  a ReForm is a basic form. It inherits Frame
  but is meant as a complete window.
 
+ The form setupcode is only executed when 'run' is called on the form!!!
+ But we don't want problems when instantiating 3 X-forms recursively.
+ This indicates that 'form' should not create a 'QForm' at all!
+
+ As long as a form has no name we can't do much with it anyway.
+
+ Let's say that 'app' has a 'reform' macroarray
+
+    define {
+        name form { ..
+        }
+    }
+
+  After that you can do
+
+    $qApp.name.run
+
+  And that will create the ReForm, the QForm, run it and dispose of it again.
+
 =end
   class ReForm < Frame
     include ModelContext, StateContext
@@ -19,13 +38,12 @@ module Reform
       # NOTE: due to a qtruby hack this is called twice per 'new'!!!
       # But the first time it never goes beyond 'super'!
       def initialize qtc
-  #       tag "#{self}.initialize(#{qtc}), stacktrace=#{caller.join("\n")}"
+#         tag "#{self}.initialize(#{qtc})" # , stacktrace=#{caller.join("\n")}"
         super nil, qtc
         # store a ref to ourselves in the Qt::Widget
         # block to call for lazy initialization. After done so it becomes nil, can also be a 'quicky' hash
+        # assigned by 'app'.
         @setup = nil #setupblock
-        # the menubar implementor:
-  #       @qmenuBar = nil
         # Proc to execute to setup the menu dynamically
         @contextMenuProc = nil
         # unpositioned forms should be centered (but only if size is set)
@@ -64,12 +82,20 @@ module Reform
       # recursive structures. Only one of them can be registered within the application.
       def name aName = nil
         return super unless aName
-        @qtc.name = aName
+        @qtc.objectName = aName.to_s
         $qApp.registerForm self, aName
       end
 
       def central
         raise "'central' is meaningless for forms"
+      end
+
+      def alwaysOnTop!
+        setWindowFlags alwaysOnTop: true
+      end
+
+      def splash!
+        setWindowFlags alwaysOnTop: true, splashscreen: true
       end
 
     public
@@ -133,6 +159,10 @@ module Reform
 
       # setup is the proc passed to the RForm#run method
       attr_writer :setup
+
+      def deleteOnClose!
+        @qtc.setAttribute(Qt::WA_DeleteOnClose)
+      end
 
       # called when the form is closed. NOT! Not implemented yet.
       def whenClosed &block
@@ -206,19 +236,6 @@ module Reform
         whenShown
       end # ReForm#run
 
-      # override
-#       def updateModel aModel, options = nil
-#         if aModel && (name = aModel.name)
-#           registerName name, aModel
-#         end
-#         super
-#       end
-
-      # override
-#       def effectiveModel
-#         @model
-#       end
-
       #override, can be used to reregister a name with a different control
       def registerName aName, aControl
         aName = aName.to_sym
@@ -255,6 +272,9 @@ module Reform
           event.accept
           @_reform_hack.whenClosed
           $undo.removeStack(@_reform_hack.undostack)
+          if testAttribute(Qt::WA_DeleteOnClose)
+            $qApp.unregisterForm(@_reform_hack)
+          end
         else
           event.ignore
         end

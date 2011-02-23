@@ -1,5 +1,5 @@
 
-#  Copyright (c) 2010 Eugene Brazwick
+#  Copyright (c) 2010-2011 Eugene Brazwick
 
 module Reform
 
@@ -30,9 +30,9 @@ module Reform
     def updateModel model, options = nil
 #       tag "updateModel #{model.inspect}, cid=#{connector}"
       cid = connector or return
-      if model && model.getter?(cid)
+      if model && model.model_getter?(cid)
 #         tag "getter located"
-        case data = model.apply_getter(cid)
+        case data = model.model_apply_getter(cid)
         when Qt::Time
           @qtc.display data.toString(if data.second % 2 == 0 then 'hh mm' else 'hh:mm' end)
         else

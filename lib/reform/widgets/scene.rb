@@ -162,7 +162,7 @@ Even more, a QDialog can be stored in the view as well!
       control.parent = self
       control.qtpen, control.qtbrush = @pen, @brush  # initial implict tools
 #       tag "setting pen #{@pen} color: #{@pen.color.inspect} in control #{control}"
-      control.qtfont = @font
+      control.qtfont = @font if instance_variable_defined?(:@font)
       control.setup quickyhash, &block
       added control
 #       tag "#{control}.parent is now #{control.parent}, ctrl.brush = #{control.brush}"

@@ -1,5 +1,5 @@
 
-#  Copyright (c) 2010 Eugene Brazwick
+#  Copyright (c) 2010-2011 Eugene Brazwick
 
 module Reform
 
@@ -24,7 +24,7 @@ module Reform
     # override. Use current since @data is bogus here
     def activated model, cid, idx
 #       tag "YES, 'activated'!!!, idx = #{idx}, cid=#{cid}, model=#{model}, SELF:=#{current}"
-      model.apply_setter(cid, current)
+      model.model_apply_setter(cid, current)
     end
 
     public

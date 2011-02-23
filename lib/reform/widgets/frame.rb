@@ -1,4 +1,6 @@
 
+# Copyright (c) 2010-2011 Eugene Brazwick
+
 module Reform
 
   require 'reform/widget'
@@ -79,13 +81,13 @@ module Reform
 =begin
     def updateModel aModel, propagation
 #       tag "#{self}::updateModel"
-#       tag "connector=#{connector}(getter?:#{aModel.getter?(connector)}), aModel = #{aModel}"
+#       tag "connector=#{connector}(getter?:#{aModel.model_getter?(connector)}), aModel = #{aModel}"
       if (cid = connector) && aModel
 #         tag "Applying getter #{cid} on model"
-        mod = aModel.apply_getter(cid)
+        mod = aModel.model_apply_getter(cid)
         applyModel mod, aModel
         aModel = mod
-        propagateModel aModel, propagation.apply_getter(cid)
+        propagateModel aModel, propagation.model_apply_getter(cid)
       else
         propagateModel aModel, propagation
       end
@@ -102,7 +104,7 @@ module Reform
     def effectiveModel
       return @model if instance_variable_defined?(:@model)
       aModel = parent.effectiveModel
-      if (cid = connector) && aModel then aModel.apply_getter(cid) else aModel end
+      if (cid = connector) && aModel then aModel.model_apply_getter(cid) else aModel end
     end
 
     # override

@@ -1,5 +1,5 @@
 
-#  Copyright (c) 2010 Eugene Brazwick
+#  Copyright (c) 2010-2011 Eugene Brazwick
 
 module Reform
 
@@ -14,7 +14,7 @@ module Reform
         connect(@qtc, SIGNAL('clicked(bool)'), self) do |checked|
           rfRescue do
             if (cid = connector) && (mod = model)
-              mod.apply_setter(cid, checked)
+              mod.model_apply_setter(cid, checked)
             end
           end
         end
@@ -73,11 +73,11 @@ module Reform
     def updateModel model, options = nil
 #       tag "@{self} updateModel #{aModel}, cid=#{connector}"
       if model
-        if (cid = connector) && model.getter?(cid)
-          @qtc.checked = model.apply_getter(cid) == value
+        if (cid = connector) && model.model_getter?(cid)
+          @qtc.checked = model.model_apply_getter(cid) == value
         end
-        if (tcid = text_connector) && model.getter?(tcid)
-          @qtc.text = model.apply_getter(tcid)
+        if (tcid = text_connector) && model.model_getter?(tcid)
+          @qtc.text = model.model_apply_getter(tcid)
         end
 #         tag "qtc.checked := model.#{cid}[?] == #{@qtc.checked}, model=#{@model}"
 #         if options && options[:initialize]

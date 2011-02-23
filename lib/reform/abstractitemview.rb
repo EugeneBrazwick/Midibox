@@ -13,7 +13,7 @@ module Reform
   It should be possible to say:
 
     pieview {
-      decorator :color
+      decorator :color   # blob. You can also pass an image as icon
       key_connector :section
       label_connector :section
       value_connector :count
@@ -49,7 +49,7 @@ module Reform
           # it seems, yes, you can
           ##            Bogo = Qt::Variant.new   CAUSES MAYHEM (sometimes??)
 
-          # this is rather trigger. The enums cannot be used as a hashkey.  But I noticed that already
+          # this is rather tricky. The enums cannot be used as a hashkey.  But I noticed that already
           # when attempting to use them as key in combobox setups...
           Role2ConnMap = { Qt::DisplayRole.to_i=>:display,
                            Qt::EditRole.to_i=>:editor,
@@ -87,8 +87,13 @@ module Reform
             when :display then connector ||= :to_s
             end
             value = case connector
-            when Symbol then is_model ? record.apply_getter(connector) : connector == :self ? record : record.send(connector)
-            when Proc then is_model ? record.apply_getter(connector) : connector[record]
+            when Symbol
+              if is_model
+                record.model_apply_getter(connector)
+              else
+                connector == :self ? record : record.send(connector)
+              end
+            when Proc then is_model ? record.model_apply_getter(connector) : connector[record]
             else connector
             end
 #             tag "raw valued returned for role :#{connectorname} for row #{index.row} is #{value.inspect}"
@@ -401,7 +406,7 @@ module Reform
       end
 
       def postSetup
-        setLocalModel(@localmodel) if @localmodel
+        setLocalModel(@localmodel) if instance_variable_defined?(:@localmodel) && @localmodel
         super
       end
 
@@ -413,7 +418,7 @@ module Reform
         added control
       end
 
-      # implicit default is :id.
+      # the default is :id.
       def key_connector value = nil
         return @key_connector unless value
         @key_connector = value
@@ -428,7 +433,7 @@ module Reform
       alias :keyconnector :key_connector
 
       def updateModel aModel, propagation
-        if aModel == @localmodel
+        if instance_variable_defined?(:@localmodel) && aModel == @localmodel
           setLocalModel(aModel)  # whatever changed. This may need to be more precise
         else
           super

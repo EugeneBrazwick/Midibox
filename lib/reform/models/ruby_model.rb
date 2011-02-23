@@ -65,7 +65,7 @@ require_relative '../model'
       end
 
         # returns the models value at given numeric index
-      def index2value numeric_idx
+      def model_index2value numeric_idx, view = nil
         if Hash === @value then @index2key[idx] else @value[idx] end
       end
 
@@ -93,7 +93,7 @@ require_relative '../model'
         end
       end
 
-      def getter? name
+      def model_getter? name
         return true if name == :self || Proc === name
         m = (@value.public_method(name) rescue nil) or return
   #       tag "m.arity = #{m.arity}"
@@ -101,13 +101,13 @@ require_relative '../model'
       end
 
       # To apply the getter, this method must be used.
-      def apply_getter name
+      def model_apply_getter name
         return @value if name == :self
         name.call(@value) if Proc === name
         @value.send name
       end
 
-      def setter?(name)
+      def model_setter?(name)
         return true if name == :self
         n = name.to_s
         n = n[0...-1] if n[-1] == '?'
@@ -115,7 +115,7 @@ require_relative '../model'
         -2 <= m.arity && m.arity <= 1
       end
 
-      def apply_setter name, value, sender
+      def model_apply_setter name, value, sender
         if name == :self
           @value = value
           super name, self, sender
@@ -130,7 +130,7 @@ require_relative '../model'
 
       attr_writer :value
 
-      def self.value2key value, view
+      def self.model_value2key value, view
         if Model::enum2i(value.respond_to?(idid = view.key_connector)
           value.send(idid)
         else
@@ -138,7 +138,7 @@ require_relative '../model'
         end
       end
 
-      def value2index value, view
+      def model_value2index value, view
 #         tag "value2index(#{value}) -> key #{SimpleModel::value2key(value).inspect}"
 #         tag "@key2index=#{@key2index.inspect}. Since @value = #@value"
         if @key2index then @key2index[SimpleModel::value2key(value, view)] else 0 end

@@ -10,9 +10,9 @@ describe Structure do
     s = Structure.new 5
     # the only possible attribute is self
 #     tag "s = #{s.inspect}"
-    s.apply_getter(:self).should == 5
-    s.apply_setter(:self, 4)
-    s.apply_getter(:self).should == 4
+    s.model_apply_getter(:self).should == 5
+    s.model_apply_setter(:self, 4)
+    s.model_apply_getter(:self).should == 4
   end
 
   it "self should work as method to access the value" do
@@ -69,8 +69,8 @@ describe Structure do
   it "should collect changes and report these when the tran is committed" do
     s = Structure.new a: 24, b: 345, c: 'hallo', d: 'world'
     o = MyObserver.new
-    s.parent = o
-    s.parent.should == o
+    s.model_parent = o
+    s.model_parent.should == o
     s.transaction do
       s.a = 184
       s.c = 'ohayou'
@@ -82,7 +82,7 @@ describe Structure do
     # So  [:a, 323, :b] as key indicates that s.a[323].b  has been altered
     (keys = o.propa.keypaths.keys).should == [[:a], [:c], [:d]]
     (pc = o.propa.keypaths[keys[0]]).should be_a Transaction::PropertyChange
-    pc.keypath.should == [:a]
+    pc.key.should == [:a]
     pc.oldval.should == 24
     o.propa.keypaths[keys[1]].oldval == 'hallo'
     o.propa.keypaths[keys[2]].oldval == 'world'
@@ -94,9 +94,9 @@ describe Structure do
       s.a = 184
       s.c = 'ohayou'
       s.d = 'kono sekai'
-      s.value.should == { a: 184, b: 345, c: 'ohayou', d: 'kono sekai' }
+      s.model_value.should == { a: 184, b: 345, c: 'ohayou', d: 'kono sekai' }
       tran.abort
-      s.value.should == { a: 24, b: 345, c: 'hallo', d: 'world' }
+      s.model_value.should == { a: 24, b: 345, c: 'hallo', d: 'world' }
     end
   end
 
@@ -126,10 +126,21 @@ describe Structure do
     end
   end
 
+  it "structures should be contagious" do
+    t = Structure.new x: 24, y: 'hallo', z: { a: 23, b: 'world', c: { d: 'even deeper' } }
+    t.z.class.should == Structure
+    t.z.c.class.should == Structure
+    t = Structure.new 23, 'hallo', { a: 23, b: 'world', c: { d: 'even deeper' } }
+    t[2].class.should == Structure
+    t[2].c.class.should == Structure
+    t = Structure.new x: 23, y: 'hallo', c: [23, 'world', 'even deeper' ]
+    t.c.class.should == Structure
+  end
+
   it "should collect more complicated changes" do
     s = Structure.new x: 24, y: [23, 'hallo', {i: :interesting}]
     o = MyObserver.new
-    s.parent = o
+    s.model_parent = o
     s.transaction do
       s.x *= 2
       s.y[2] = {i: :strange, j: 'one more key'}

@@ -8,6 +8,10 @@ module Reform
 
   end
 
-  createInstantiator File.basename(__FILE__, '.rb'), Qt::ParallelAnimationGroup, ParallelAnimation
+  class QParallelAnimationGroup < Qt::ParallelAnimationGroup
+    include QAnimationHackContext
+  end
+
+  createInstantiator File.basename(__FILE__, '.rb'), QParallelAnimationGroup, ParallelAnimation
 
 end

@@ -217,3 +217,7 @@ Current state:
 0039 Sun Jan 16 23:12:25 CET 2011
     prelims.rb should get the notion of a package. Since midibox = reform+alsa. Currently the 'reform.bash' starter
     check for alsa which is stupid.
+0040 Sun Sep 11 13:49:21 CEST 2011
+    Need a 'observe' clause for all gui elements. Reason: shared datasource elements can't otherwise be
+    observed correctly. It should add a toplevel observer, and not work really different than how the 
+    application handles changes right now. 

@@ -1,6 +1,18 @@
 
 module Reform
 
+  class FormExec < Macro
+    private
+      def initialize q, b
+        super nil, nil, q, b
+      end
+
+    public
+      def run
+        $qApp.instantiateTemporaryForm(self)
+      end
+  end # class FormExec
+
 # you can build a brush, pen and graphicitem pool.
 # For colors use brushes as well.
   class DefinitionsBlock < Control
@@ -28,6 +40,11 @@ module Reform
 
       def parameters quicky = nil, &block
         Macro.new nil, nil, quicky, block
+      end
+
+      def form quicky = nil, &block
+#         tag "create FormExec"
+        FormExec.new quicky, block
       end
 
 =begin
@@ -71,6 +88,10 @@ Example:
           when GroupMacro
             containing_form.parametermacros[sym] = what
             Graphical::registerGroupMacro(sym, what)
+          when FormExec
+#             tag "registerFormExec(#{sym}, FormExec: #{what})"
+            what.name = sym # to keep track of this chaos
+            $qApp.registerFormExec(sym, what)
           when Macro then containing_form.parametermacros[sym] = what
           else super
           end

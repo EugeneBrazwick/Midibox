@@ -1,4 +1,6 @@
 
+# Copyright (c) 2011 Eugene Brazwick
+
 module Reform
 
   require_relative '../labeledwidget'
@@ -12,7 +14,7 @@ module Reform
       # Otherwise another kind of control would be used.
       connect(@qtc, SIGNAL('valueChanged(int)'), self) do |value|
         rfRescue do
-          model = effectiveModel and cid = connector and model.apply_setter(cid, value)
+          model = effectiveModel and cid = connector and model.model_apply_setter(cid, value)
         end
       end
     end
@@ -37,9 +39,9 @@ module Reform
 
     def updateModel model, options = nil
       cid = connector and
-        if model && model.getter?(cid)
-          @qtc.value = model.apply_getter(cid)
-          @qtc.readOnly = !model.setter?(cid)
+        if model && model.model_getter?(cid)
+          @qtc.value = model.model_apply_getter(cid)
+          @qtc.readOnly = !model.model_setter?(cid)
         else
           @qtc.value = @qtc.minimum
         end

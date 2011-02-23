@@ -1,5 +1,5 @@
 
-#  Copyright (c) 2010 Eugene Brazwick
+#  Copyright (c) 2010-2011 Eugene Brazwick
 
 module Reform
 
@@ -15,9 +15,9 @@ module Reform
         connect(@qtc, SIGNAL('editingFinished()'), self) do
           unless @qtc.readOnly?  # Qt manages to send editingFinished even if the control is readonly...
            rfRescue do
-              if @mem_text != @qtc.text && (mod = model) && (cid = connector) #&& model.setter?(cid)
+              if @mem_text != @qtc.text && (mod = model) && (cid = connector) #&& model.model_setter?(cid)
 #                 tag "EditingFinished, assign '#{@qtc.text}' to models property cid=#{connector}, @model=#{@model}"
-                mod.apply_setter(cid, @mem_text = @qtc.text, self)
+                mod.model_apply_setter(cid, @mem_text = @qtc.text, self)
               end
             end
           end
@@ -40,7 +40,7 @@ module Reform
       def applyModel data
 #         tag "applyModel, data = #{data}"
         @mem_text = @qtc.text = data.respond_to?(:to_str) ? data.to_str : data.to_s
-        @qtc.readOnly = !@model.setter?(connector)
+        @qtc.readOnly = !@model.model_setter?(connector)
       end
 
     public

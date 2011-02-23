@@ -105,7 +105,7 @@ Data was always retrieved using the display_connector, and the roles
 used different connectors. And these were applied on 'The Record'.
 So the core of QModel::data was:
 
-    record.apply_getter(connector)
+    record.model_apply_getter(connector)
 
 Not a column in site.
 

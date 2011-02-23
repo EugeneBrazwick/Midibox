@@ -1,4 +1,6 @@
 
+# Copyright (c) 2011 Eugene Brazwick
+
 module Reform
 
   require_relative 'widget'
@@ -18,7 +20,7 @@ module Reform
 #             tag "#{self}::valueChanged in #{value}, track_propagation = #{track_propagation}"
             if (mod = model) && (cid = connector)
 #               tag "APPLY_SETTER, value = #{value}"
-              model.apply_setter(cid, @floatmode ? value / FloatModeFactor : value, self)
+              model.model_apply_setter(cid, @floatmode ? value / FloatModeFactor : value, self)
             end
           end
         end
@@ -64,12 +66,12 @@ module Reform
       def updateModel model, options = nil
 #         tag "#{self}:updateModel #{model}, #{options}"
         cid = connector and
-          if model && model.getter?(cid)
+          if model && model.model_getter?(cid)
             if @floatmode
-              @qtc.value = FloatModeFactor * model.apply_getter(cid)
+              @qtc.value = FloatModeFactor * model.model_apply_getter(cid)
 #               tag "value := #{@qtc.value}"
             else
-              @qtc.value = model.apply_getter(cid)
+              @qtc.value = model.model_apply_getter(cid)
             end
           else
             @qtc.value = @qtc.minimum

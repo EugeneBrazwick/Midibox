@@ -236,7 +236,7 @@ module Reform
         # shows FileDialog to open a file and assign the contents to _file_
       def open parent = nil
 #         tag "open dirname=#@dirname, filename=#@filename"
-        apply_setter(:path, Qt::FileDialog.getOpenFileName(parent && parent.qtc, open_caption,
+        model_apply_setter(:path, Qt::FileDialog.getOpenFileName(parent && parent.qtc, open_caption,
                                                            @dirname, @pattern),
                      parent)
       end

@@ -41,9 +41,24 @@ module Reform
                     sine: Qt::EasingCurve::InOutSine,
                     elastic: Qt::EasingCurve::OutElastic,
                     back: Qt::EasingCurve::OutBack,
-                    bounce: Qt::EasingCurve::OutBounce
+                    overshoot: Qt::EasingCurve::OutBack,
+                    bounce: Qt::EasingCurve::OutBounce,
+                    accelerate: Qt::EasingCurve::InCubic,
+                    accelerate2: Qt::EasingCurve::InQuad,
+                    accelerate3: Qt::EasingCurve::InCubic,
+                    accelerate4: Qt::EasingCurve::InQuart,
+                    accelerate5: Qt::EasingCurve::InQuint,
+                    accelerateEx: Qt::EasingCurve::InExpo,
+                    slowdown: Qt::EasingCurve::OutCubic,
+                    slowdown2: Qt::EasingCurve::OutQuad,
+                    slowdown3: Qt::EasingCurve::OutCubic,
+                    slowdown4: Qt::EasingCurve::OutQuart,
+                    slowdown5: Qt::EasingCurve::OutQuint,
+                    slowdownEx: Qt::EasingCurve::OutExpo,
                     }
 
+      # this could be expanded using class EasingCurve < Control
+      # if v is a Hash or Proc or a block is passed
       def easing v
         @qtc.easingCurve = case v
         when Qt::EasingCurve then v
@@ -61,6 +76,32 @@ module Reform
         @qtc.endValue = @qtc.targetObject.value2variant(*value)
       end
 
+      # pass an array or hash.
+      # if an array the values are set on equadistant points.
+      # The  array should be at least 2 long (being start and stop)
+      # If a hash is passed the keys must be floats in range 0.0 to 1.0
+      #
+      # due to limitations in qtruby stops do not replace. They always add, so to alter the values
+      # you must create a new animation instead...
+      def values *value
+        hash = nil
+        dparent = @qtc.targetObject # same as 'dynamicParent'
+        if value.length == 1
+          case v = value[0]
+          when Hash
+            v.each { |key, val| @qtc.setKeyValueAt(key, dparent.value2variant(val)) }
+            return
+          when Array then value = v
+          end
+        end
+        d = 1.0 / (value.length - 1)
+        t = 0.0
+        value.each do |val|
+          @qtc.setKeyValueAt(t, dparent.value2variant(val))
+          t += d
+        end
+      end
+
 #       alias :startValue :start
 #       alias :endValue :stop
 
@@ -69,6 +110,15 @@ module Reform
 
   end
 
-  createInstantiator File.basename(__FILE__, '.rb'), Qt::PropertyAnimation, AttributeAnimation
+  class QPropertyAnimation < Qt::PropertyAnimation
+    include QAnimationHackContext
+#     def initialize parent
+#       super
+#       tag "QPropertyAnimation is created, has method 'finished'"
+#     end
+#     signals 'finished()', 'stateChanged(QAnimation::State newState, QAnimation::State oldState)'
+  end
+
+  createInstantiator File.basename(__FILE__, '.rb'), QPropertyAnimation, AttributeAnimation
 end
 

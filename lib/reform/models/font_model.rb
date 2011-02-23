@@ -1,5 +1,5 @@
 
-# Copyright (c) 2010 Eugene Brazwick
+# Copyright (c) 2010-2011 Eugene Brazwick
 
 module Reform
 
@@ -82,7 +82,7 @@ To fix this mess I make a new property, called stylestr. (Solution 3)
 
       # IMPORTANT: Qt::Font does not 'behave' properly. It DOES document a 'style' method
       # but it does not exist!
-      def getter?(name)
+      def model_getter?(name)
         case name
         when :style, :pointSize then true
         else super

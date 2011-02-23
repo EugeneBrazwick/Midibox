@@ -33,8 +33,15 @@ Reform::app {
     list {
       # the first list has its own data:
       struct MyData
+      # the local connector, what's displayed
       local_connector :section #{ |rec| rec.section }
+      # connect to the global modal using the next entry.
+      # So initially this will locate 'Medical & Bioinformatics' in the local struct
+      # using the key 'section'
       connector :current
+      # connector to tell the key on a connected record
+      # We need it as our hash has no proper default key (ie a field called 'id')
+      # So we use localmodel.section == globalmodel.current
       key_connector :section # this is important
       decorator :color
       sizeHint 340, 460
@@ -42,10 +49,11 @@ Reform::app {
 # =end
 # =begin
     vbox {
-      # This list should take the model using the model connector.
+      # This list should take the model using the model_connector.
       # Therefore the result should be the same.
       # The only problem is that the current row should also be retrieved like this.
       list {
+        # :root makes this an absolute path.
         model_connector [:root, :data]
         local_connector :section #{ |rec| rec.section }
         connector :current
@@ -58,14 +66,19 @@ Reform::app {
 # =end
 # =begin
     vbox {
-      # This list should take the model using the model connector.
+      # This list should take the model using the model_connector.
       # Therefore the result should be the same.
       # The only problem is that the current row should also be retrieved like this.
       list {
         model_connector [:root, :data]
-        local_connector :section #{ |rec| rec.section }
-        key_connector :numeric_index # special value
+        # display_connector is a better name for local_connector, maybe:
+        display_connector :section
+        # also allowed:  'display :section'
+        # we now use 'current2' to indicate the current row
         connector :current2
+        # the key is the pseudo field :numeric_index,
+        # it indicates we must apply 'model[connector-value]'
+        key_connector :numeric_index
         decorator :color
         sizeHint 340, 460
       }

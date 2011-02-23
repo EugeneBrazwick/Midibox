@@ -11,7 +11,7 @@ module Reform
         connect(@qtc, SIGNAL('gradientStopsChanged()'), self) do
           rfRescue do
             tag "changed, assign '#{@qtc.stops}' to models property cid=#{connector}, effectiveModel=#{effectiveModel}"
-            model = effectiveModel and cid = connector and model.apply_setter(cid, @qtc.stops)
+            model = effectiveModel and cid = connector and model.model_apply_setter(cid, @qtc.stops)
           end
         end
       end
@@ -26,8 +26,8 @@ module Reform
       def updateModel model, options = nil
 #       tag "connectModel #{model.inspect}, cid=#{connector}"
         cid = connector and
-          if model && model.getter?(cid)
-            @qtc.stops = model.apply_getter(cid)
+          if model && model.model_getter?(cid)
+            @qtc.stops = model.model_apply_getter(cid)
 #             @qtc.readOnly = !model.setter?(cid)
           else
             @qtc.stops = nil # aka 'apply default'

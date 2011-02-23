@@ -1,5 +1,5 @@
 
-# copyright (c) 2010 Eugene Brazwick
+# copyright (c) 2010-2011 Eugene Brazwick
 
 module Reform
 
@@ -181,9 +181,9 @@ It should work similar to ComboBox using AbstractTableView iso AbstractListView.
 #           column = @columns[col]
 #           model = effectiveModel or next
 #           cid = column.connector or next
-#           next unless model.setter?(cid)
-# #           model.row(row).apply_setter(cid, column.var2data(item.data(Qt::UserRole)))
-#           model[row].apply_setter(cid, column.var2data(item.data(Qt::UserRole)))
+#           next unless model.model_setter?(cid)
+# #           model.model_row(row).model_apply_setter(cid, column.var2data(item.data(Qt::UserRole)))
+#           model[row].model_apply_setter(cid, column.var2data(item.data(Qt::UserRole)))
 #         end
 #         tag "Calling RubyDelegate.new RubyDelegate=#{RubyDelegate}"
 #         d = RubyDelegate.new(self, @qtc)

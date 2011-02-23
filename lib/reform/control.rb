@@ -47,16 +47,16 @@ module Reform
 #
   class Control < Qt::Object
 
-      class Animation < Control
-
-        private # Animation methods
-          # our parent is the parent of the DynamicAttribute so it could be a GraphicsItem.
-          # Which is a Qt::Object, even if Qt::GraphicsItem is not
-          def initialize attrib
-#             tag "Assigned attrib and propertyname '#{@qtc.propertyName}'"
-          end
-
-      end
+#       class Animation < Control
+#
+#         private # Animation methods
+#           # our parent is the parent of the DynamicAttribute so it could be a GraphicsItem.
+#           # Which is a Qt::Object, even if Qt::GraphicsItem is not
+#           def initialize attrib
+# #             tag "Assigned attrib and propertyname '#{@qtc.propertyName}'"
+#           end
+#
+#       end
 
 
     private # Control methods
@@ -795,7 +795,7 @@ module Reform
             return
           end
           if aModel.respond_to?(:model?) && aModel.model?
-            data = aModel.apply_getter(cid)
+            data = aModel.model_apply_getter(cid)
           elsif Proc === cid
             data = cid.call(aModel)
           else

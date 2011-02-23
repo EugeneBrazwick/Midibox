@@ -1,5 +1,5 @@
 
-#  Copyright (c) 2010 Eugene Brazwick
+#  Copyright (c) 2010-2011 Eugene Brazwick
 
 module Reform
 
@@ -26,12 +26,12 @@ module Reform
     def updateModel model, options = nil
 #       tag "#{self}::updateModel, cid=#{connector}"
       cid = connector and
-        if model && model.getter?(cid)
-  #         tag "apply getter -> #{model.apply_getter(cid)}"
-          @qtc.date = model.apply_getter(cid) || Qt::Date.currentDate
+        if model && model.model_getter?(cid)
+  #         tag "model_apply getter -> #{model.model_apply_getter(cid)}"
+          @qtc.date = model.model_apply_getter(cid) || Qt::Date.currentDate
   #         tag "Qt::Date.new == #{Qt::Date.new} == today?? NO"
   #         tag "Date #{name}, date := #{@qtc.date.inspect}"
-          @qtc.readOnly = !model.setter?(cid)
+          @qtc.readOnly = !model.model_setter?(cid)
         else
   #         tag "clear #{name}"
   #         @qtc.date = nil  SEGV

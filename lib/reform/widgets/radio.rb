@@ -1,5 +1,5 @@
 
-# Copyright (c) 2010 Eugene Brazwick
+# Copyright (c) 2010-2011 Eugene Brazwick
 
 module Reform
 
@@ -14,7 +14,7 @@ module Reform
       connect(@qtc, SIGNAL('clicked(bool)'), self) do |checked|
         rfRescue do
           if (cid = connector) && (model = effectiveModel)
-            model.apply_setter(cid, @value)
+            model.model_apply_setter(cid, @value)
           end
         end
       end

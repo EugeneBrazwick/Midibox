@@ -20,7 +20,7 @@ module Reform
             rfRescue do
               if instance_variable_defined?(:@value) && (cid = connector) && (model = effectiveModel)
     #             tag "triggerered. apply_setter #{cid} on model #{model}, connector=#{connector} -> value = #@value"
-                model.apply_setter cid, @value
+                model.model_apply_setter cid, @value
               end
             end
           end
@@ -31,7 +31,7 @@ module Reform
               value = checked && instance_variable_defined?(:@value) ? @value : checked
   #             tag "toggled. apply_setter #{cid} on model #{model}, connector=#{connector} -> value = #{value}"
   #             tag "stack=#{caller.join("\n")}"
-              model.apply_setter(cid, value)
+              model.model_apply_setter(cid, value)
             end
           end
         end

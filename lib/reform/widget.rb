@@ -167,6 +167,47 @@ module Reform
 #     define_setter String, :styleSheet
     define_simple_setter :styleSheet
 
+    WindowFlagMap = { widget: Qt::WidgetType, window: Qt::Window, dialog: Qt::DialogType,
+                      popup: Qt::Popup, tool: Qt::Tool, splashscreen: Qt::SplashScreenType,
+                      desktop: Qt::Desktop,
+                      #, subwindow: Qt::SubwindowType,
+                      bypassWM: Qt::X11BypassWindowManagerHint,
+                      frameless: Qt::FramelessWindowHint,
+                      customize: Qt::CustomizeWindowHint,
+                      title: Qt::WindowTitleHint,
+                      systemmenu: Qt::WindowSystemMenuHint,
+                      minimize: Qt::WindowMinimizeButtonHint,
+                      maximize: Qt::WindowMaximizeButtonHint,
+                      #minmax: Qt::WindowMinMaxButtonHint,
+                      close: Qt::WindowCloseButtonHint,
+                      contexthelp: Qt::WindowContextHelpButtonHint,
+                      staysOnTop: Qt::WindowStaysOnTopHint,
+                      alwaysOnTop: Qt::WindowStaysOnTopHint
+    }
+
+    def self.hash2windowFlags f
+      pos = neg = 0x0
+      for k, v in f
+#         tag "k=#{k}"
+        if v
+          pos |= WindowFlagMap[k].to_i
+        else
+          neg |= WindowFlagMap[k].to_i
+        end
+      end
+#       tag "pos = #{pos}, neg=#{neg}"
+      return pos, neg
+    end
+
+    def setWindowFlags flags
+      if Hash === flags
+        pos, neg = Widget::hash2windowFlags(flags)
+        @qtc.windowFlags = (@qtc.windowFlags & ~neg) | pos
+      else
+        @qtc.windowFlags |= flags
+      end
+    end
+
   public # Widget methods
 
     # override

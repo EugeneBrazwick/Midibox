@@ -886,6 +886,10 @@ module Reform
           setStyle(@style)
         end
 
+        def define quickyhash = nil, &block
+          DefinitionsBlock.new(self).setup(quickyhash, &block)
+        end
+
         # shortcut. You can then say simple_data 'hallo', 'world'
         def simple_data *val
           STDERR.puts "simple_data is DEPRECATED, use 'struct'"
@@ -984,6 +988,7 @@ module Reform
         # Do not use
         attr :firstform
 
+        # the 'root' model of the system
         attr :model
 
         def parent_qtc_to_use_for reform_class
@@ -1025,6 +1030,7 @@ module Reform
             hello.show
           end
           if @model
+# #             @model.initRoot
             updateModel(@model, Propagation.new(self, nil, true))
           end
         end
@@ -1063,6 +1069,21 @@ module Reform
           @all_forms << aForm
         end
 
+        def registerFormExec name, macro
+#           tag "registerFormExec(#{name}, #{macro.class}: #{macro})"
+          raise 'Bad name for a form, the name must end with "Form"' unless name.to_s[-4, 4] == 'Form'
+          raise 'bad args' unless FormExec === macro
+          $qApp.singleton_class.send(:define_method, name) { macro }
+        end
+
+        def unregisterForm reform
+#           tag "unregisterForm"
+          name = reform.objectName
+          @forms.delete(name) if name && !name.empty?
+          @all_forms.delete(reform)
+#           tag "forms.keys is now: #{@forms.keys.inspect}, |all_forms| = #{@all_forms.length}"
+        end
+
         # Return a form by name
         def [](formname)
           @forms[formname]
@@ -1070,6 +1091,13 @@ module Reform
 
         def instantiate_child(reform_class, qt_implementor_class, qparent)
           reform_class.new_qt_implementor(qt_implementor_class, self, qparent)
+        end
+
+        def instantiateTemporaryForm macro
+#           tag "instantiateTemporaryForm macro = #{macro}"
+          f = form(macro.quicky, &macro.block)
+          f.deleteOnClose!
+          f.run
         end
 
         # qtruby or Qt destroys the encoding.

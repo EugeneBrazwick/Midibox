@@ -261,8 +261,7 @@ require 'reform/app'
       end
 
       # FIXME: there is a pattern here
-      !
-      def whenMouseMoved event = nil, &block
+      def whenMouseMoved(event = nil, &block)
         if block # is a proc actually
           @whenMouseMoved = block
         else
@@ -275,7 +274,7 @@ require 'reform/app'
         instance_variable_defined?(:@whenMouseMoved)
       end
 
-      def whenMousePressed event = nil, &block
+      def whenMousePressed(event = nil, &block)
         if block # is a proc actually
           @whenMousePressed = block
         else

@@ -15,14 +15,18 @@ include Reform
 
 describe RStore do
 
+  before :all do
+    @dbname = 'test.dbm'
+  end
+  
   it 'should store data between ruby invocations' do
     t = TestMe.new
-    RStore.new('test') do |rstore|
+    RStore.new(@dbname) do |rstore|
       rstore.t = t
     end
     # fork do   rspec doesn't like fork
 #     tag "Reopen test"
-    RStore.new('test') do |rstore|
+    RStore.new(@dbname) do |rstore|
 #       tag "read key 't'"
       t = rstore.t
 #       tag "t = #{t.inspect}"
@@ -37,10 +41,10 @@ describe RStore do
   end # it
 
   it 'should be contagious' do
-    RStore.new('test') do |rstore|
+    RStore.new(@dbname) do |rstore|
       rstore.t = TestMe.new
     end
-    RStore.new('test') do |rstore|
+    RStore.new(@dbname) do |rstore|
       t = rstore.t
       t.model_root.should == rstore
       # t is 'contaminated'. Changes to it are also saved to disk!
@@ -48,30 +52,30 @@ describe RStore do
       t.text = 'Not at all weird'
 #       tag "OK maybe"
     end
-    RStore.new('test') do |rstore|
+    RStore.new(@dbname) do |rstore|
       t = rstore.t
       t.text.should == 'Not at all weird'
     end
   end
 
   it "should accept hashes" do
-    RStore.new('test') do |rstore|
+    RStore.new(@dbname) do |rstore|
       rstore.t = { a: 24, b: 345, c: 'hallo', d: 'world' }
     end
-    RStore.new('test') do |rstore|
+    RStore.new(@dbname) do |rstore|
       s = rstore.t
       (RStoreNode === s).should == true
       s.b.should == 345
       s.b = 'something completely different'
       s.b.should == 'something completely different'
     end
-    RStore.new('test') do |rstore|
+    RStore.new(@dbname) do |rstore|
       rstore.t.b.should == 'something completely different'
     end
   end
 
   it "should rollback simple transactions" do
-    RStore.new('test') do |rstore|
+    RStore.new(@dbname) do |rstore|
       rstore.t = 'Hallo world'
       rstore.transaction do |tran|
         rstore.t = 'oops'
@@ -95,7 +99,7 @@ describe RStore do
   end
 
   it "should collect changes and report these when the tran is committed" do
-    RStore.new('test') do |rstore|
+    RStore.new(@dbname) do |rstore|
       # FEATURE: what gets out, is not what is put in!!
 #       s = rstore.s = { a: 24, b: 345, c: 'hallo', d: 'world' }
       rstore.s = { a: 24, b: 345, c: 'hallo', d: 'world' }
@@ -122,7 +126,7 @@ describe RStore do
   end
 
   it "should be possible to abort hash changes" do
-    RStore.new('test') do |rstore|
+    RStore.new(@dbname) do |rstore|
       rstore.s = { a: 24, b: 345, c: 'hallo', d: 'world' }
       s = rstore.s
       s.transaction do |tran|
@@ -143,7 +147,7 @@ describe RStore do
   end
 
   it "should wrap around arrays" do
-    RStore.new('test') do |rstore|
+    RStore.new(@dbname) do |rstore|
       rstore.s = [24, 80, 'hallo', :world, true]
       s = rstore.s
       s[2].should == 'hallo'

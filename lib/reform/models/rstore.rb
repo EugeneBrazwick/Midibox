@@ -48,8 +48,12 @@ end
 
 module Reform
 
-require 'kyotocabinet'
-
+# rstorenode is the basic wrapper around all complex objects.
+# it used objectids to store itself on disk if used as a component
+# of another rstore objects. Exceptions are simple objects as 
+# numbers and strings.
+# Complex objects are stored where the oid is the key and the
+# Marshal-ed value.
   class RStoreNode
     include Model
 
@@ -505,7 +509,7 @@ require 'kyotocabinet'
   end # class RStoreNode
 
   class RStore < RStoreNode
-    include KyotoCabinet
+#    include KyotoCabinet
       ROOT_OID = 0
     private # RStore methods
       def initialize dbname
@@ -513,8 +517,21 @@ require 'kyotocabinet'
         # hash from object_id to oid
         @objectspace = {}
         @in_tran = nil
-        @rstore_db = DB::new(DB::GEXCEPTIONAL)
-        @rstore_db.open(dbname + '.kch', DB::OWRITER | DB::OCREATE)
+        @rstore_db = case dbname
+        when nil 
+          require_relative '../rstores/nil'
+          RStoreBackend::Nil.new
+        when /\.kch$/ 
+          require 'kyotocabinet'
+          t = DB::new(DB::GEXCEPTIONAL)
+          t.open(dbname, DB::OWRITER | DB::OCREATE)
+          t
+        when /\.g?dbm$/
+          require_relative '../rstores/gdbm'
+          RStoreBackend::GDBM.new(dbname)
+        else  
+          raise "Don't know how to handle '#{dbname}'"
+        end
         if rstore_root = @rstore_db[ROOT_OID]
 #           tag "rstore_db[ROOT_OID] = #{rstore_root.inspect}"
           t = Marshal::load(rstore_root)

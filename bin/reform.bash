@@ -54,8 +54,8 @@ while [ -z "$RUBY" ]; do
 done
 case "$RUBYLIB" in
 ($rundir) ;;
-('') export RUBYLIB="$rundir";;
-(*) export RUBYLIB="$rundir/lib:$RUBYLIB";;
+('') export RUBYLIB="$rundir/../lib";;
+(*) export RUBYLIB="$rundir/../lib:$RUBYLIB";;
 esac
 export RUBY
 exec "$RUBY" "$rundir/reform_launcher.rb" "$@"

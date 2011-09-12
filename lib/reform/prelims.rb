@@ -78,12 +78,13 @@ class Prelims
           @prelims = prelims
         end
 
-	def missing_package_critical_question package
+      	def missing_package_critical_question package
 	  @prelims.uihandler.critical_question "Package missing",
                                                 "Package '#{package}' is missing but it can be " +
 			   		        "installed now. Do this now?"
 	end
 
+      public
 	def geminstall package
 	  @prelims.uihandler.sudo "'#{@prelims.gemcmd}' install '#{package}'" or
 	    @prelims.uihandler.die(3, "Failed to install package '#{package}'")
@@ -278,7 +279,7 @@ class Prelims
 #       STDERR.puts "BUSY?"
       @uihandler.busy do
 #          STDERR.puts "gksu '#{@gemcmd}' install '#{package}'"
-	@packager.geminstall @gemcmd, package
+	@packager.geminstall package
       end
       true
     end

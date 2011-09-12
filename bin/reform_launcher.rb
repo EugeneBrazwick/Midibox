@@ -4,6 +4,7 @@
 # Verified with clean Maverick: NOT
 # Verified with clean Fedora: NOT
 
+STDERR.puts "$RUBYLIB=#{ENV['RUBYLIB']}"
 require 'reform/prelims'
 
 if __FILE__ == $0

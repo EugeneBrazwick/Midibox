@@ -509,29 +509,29 @@ module Reform
   end # class RStoreNode
 
   class RStore < RStoreNode
-#    include KyotoCabinet
-      ROOT_OID = 0
+      ROOT_OID = '0'
     private # RStore methods
       def initialize dbname
         super(nil, nil, nil, ROOT_OID)
         # hash from object_id to oid
         @objectspace = {}
         @in_tran = nil
-        @rstore_db = case dbname
-        when nil 
-          require_relative '../rstores/nil'
-          RStoreBackend::Nil.new
-        when /\.kch$/ 
-          require 'kyotocabinet'
-          t = DB::new(DB::GEXCEPTIONAL)
-          t.open(dbname, DB::OWRITER | DB::OCREATE)
-          t
-        when /\.g?dbm$/
-          require_relative '../rstores/gdbm'
-          RStoreBackend::GDBM.new(dbname)
-        else  
-          raise "Don't know how to handle '#{dbname}'"
-        end
+        @rstore_db = 
+          case dbname
+          when nil 
+            require_relative '../rstores/nil'
+            RStoreBackend::Nil.new
+          when /\.kch$/ 
+            require_relative '../rstores/kyoto'
+            RStoreBackend::KyotoCabinet.new(dbname)
+          when /\.g?dbm?$/
+            require_relative '../rstores/gdbm'
+#             tag "open GDBM #{dbname}"
+            RStoreBackend::GDBM.new(dbname)
+          else  
+            raise "Don't know how to handle database '#{dbname}'"
+          end
+        raise 'blech' if @rstore_db.closed?
         if rstore_root = @rstore_db[ROOT_OID]
 #           tag "rstore_db[ROOT_OID] = #{rstore_root.inspect}"
           t = Marshal::load(rstore_root)
@@ -570,9 +570,10 @@ module Reform
       end
 
       def rstore_gen_oid
-        oid = @rstore_db[:rstore_oid] || 0
+        oid = @rstore_db['rstore_oid'] || 'A'
 #         tag "rstore_gen_oid, oid = #{oid.inspect}"
-        @rstore_db[:rstore_oid] = Integer(oid) + 1
+        # to the uniformed: next-> A...Z.AA...AZ.BA...BZ etc etc 
+        @rstore_db['rstore_oid'] = oid.next
       end
 
       def close

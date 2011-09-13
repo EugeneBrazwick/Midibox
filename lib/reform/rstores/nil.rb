@@ -16,6 +16,17 @@ module Reform
 #         def []= key, value
 #           @storage[key] = value
 #         end
+      public
+        def closed?
+          false
+        end
+           
+        def begin_transaction sync = false
+        end
+        
+        def end_transaction commit = true
+        end
+
     end
   end
 end

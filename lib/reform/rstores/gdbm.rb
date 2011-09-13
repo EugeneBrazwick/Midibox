@@ -8,9 +8,14 @@ module Reform
     class GDBM < ::GDBM
       private
         def initialize path, opts = nil
-          super 
+          super(path, 0666, nil)
         end
       public
+        def begin_transaction sync = false
+        end
+        
+        def end_transaction commit = true
+        end
     end
   end
 end

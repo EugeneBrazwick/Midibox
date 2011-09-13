@@ -16,7 +16,7 @@ include Reform
 describe RStore do
 
   before :all do
-    @dbname = 'test.dbm'
+    @dbname = '/tmp/rstore_test.dbm'
   end
   
   it 'should store data between ruby invocations' do
@@ -84,7 +84,7 @@ describe RStore do
       end
     end
     # even more, the change should not be saved
-    RStore.new('test') do |rstore|
+    RStore.new(@dbname ) do |rstore|
       rstore.t.should == 'Hallo world'
     end
   end
@@ -141,7 +141,7 @@ describe RStore do
       end
       s.should == { a: 24, b: 345, c: 'hallo', d: 'world' }
     end
-    RStore.new('test') do |rstore|
+    RStore.new(@dbname) do |rstore|
       rstore.s.should == { a: 24, b: 345, c: 'hallo', d: 'world' }
     end
   end
@@ -155,7 +155,7 @@ describe RStore do
       s[2].should == 81
       s.should == [24, 80, 81, :world, true]
     end
-    RStore.new('test') do |rstore|
+    RStore.new(@dbname) do |rstore|
       s = rstore.s
       s[2].should == 81
       s.should == [24, 80, 81, :world, true]

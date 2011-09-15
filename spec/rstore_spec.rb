@@ -162,7 +162,31 @@ describe RStore do
     end
   end
 
-
+  it 'should follow Array splicing and slicing habits' do
+     # we can replace elements that do not exist
+    RStore.new(@dbname) do |rstore|
+      rstore.s = [24, 80, 'hallo', :world, true]
+      s = rstore.s
+      s.transaction do |tran|
+        s[2..99] = [33, 'mi mi mi do']
+        s.should == [24, 80, 33, 'mi mi mi do']
+        tran.abort
+      end
+      s.should == [24, 80, 'hallo', :world, true]
+    end
+    RStore.new(@dbname) do |rstore|
+      rstore.s = [24, 80, 'hallo', :world, true]
+      s = rstore.s
+      # we can replace elements that do not exist
+      s[2..99] = [33, 'mi mi mi do']
+      s.should == [24, 80, 33, 'mi mi mi do']
+      # we can insert non existing bits
+    end
+    RStore.new(@dbname) do |rstore|
+      s = rstore.s
+      s.should == [24, 80, 33, 'mi mi mi do']
+    end
+  end
 end # describe RStore
 
 __END__

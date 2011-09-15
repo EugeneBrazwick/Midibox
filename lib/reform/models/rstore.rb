@@ -164,7 +164,7 @@ module Reform
       def handle_splices *args
 #         tag "handle_splices #{self}::[]=#{args.inspect}"
         if args.length == 3  # x[3, 4] = ....
-          # In cases of 'splice', if the second arg is an array, it is unpacked.
+          # In cases of 'splice', if the last arg is an array, it is unpacked.
           # In cases of 'splice' arg2 is the nr of items deleted.
 #               tag "splice operation"
           idx0, del_count, value = args
@@ -196,15 +196,21 @@ module Reform
           end
 #               oldvals = @model_value[key]
         end
+        # Examples: x=[0,1,2,3]  x[2..99] = 'oops' -> x := [0,1, 'oops']
+        length = @model_value.length
+        del_count = length - idx0 if idx0 + del_count > length 
+        # x3 is here for example [0,1,2,3,4,5,6,7,8,9]
         # Examples:  x[3,0] = a,b,c    del_count = 0, ins_count = 3, all insert
         #            x3[3,1] = a,b     del_count=1, ins_count=2, 1 update, 1 ins
         #            x3[3,2] = a,b     del_count=2, ins_count=2, pure update
         #            x3[3,2] = a (a not an array!)  del_count=2, ins_count=1, 1 update, 1 delete
         #            x3[3,2] = []      del_count=2, ins_count=0, pure delete
+        #            x3[3,99] = a.     del_count=7, ins_count=1
+        # effectively equal to x3[3,7] = a
         # we have a propertychange for a whole range of items, if del_count < ins_count
         raise 'oops' unless Array === value
         model_pickup_tran do |tran|
-          upd_count = [del_count, ins_count].min
+          upd_count = del_count < ins_count ? del_count : ins_count
           del_count -= upd_count
           ins_count -= upd_count
 #           tag "upd_count=#{upd_count},del_count=#{del_count},ins_count=#{ins_count}"
@@ -221,7 +227,8 @@ module Reform
 #                   @model_value.delete_at(idx0)
 #                 else
               unless tran.aborted?
-                oldvals = @model_value[idx, del_count]
+#                 tag "idx=#{idx0},del_count=#{del_count}"
+                oldvals = @model_value[idx0, del_count]
                 tran.push(Transaction::PropertySpliced.new(self, idx0, oldvals))
               end
               @model_value[idx0, del_count] = []

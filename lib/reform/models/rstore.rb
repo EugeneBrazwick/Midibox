@@ -161,6 +161,7 @@ module Reform
 
       # IMPORTANT: copie from structure.rb
       # We could reimplement structure as an rstore with a particular backend.
+      # This includes handling of self[i] = val
       def handle_splices *args
 #         tag "handle_splices #{self}::[]=#{args.inspect}"
         if args.length == 3  # x[3, 4] = ....
@@ -168,37 +169,33 @@ module Reform
           # In cases of 'splice' arg2 is the nr of items deleted.
 #               tag "splice operation"
           idx0, del_count, value = args
-          if value.respond_to?(:length)
-            ins_count = value.length
-          else
-            ins_count = 1
-            value = [value]
-          end
+          value = [value] unless value.respond_to?(:length)
           key = args[0, 2]
 #               oldvals = @model_value[*key]
-        else # single key replacement, truly a PropertyChange
-          # NO: key can be a range!!
+        else 
+#           tag "single key replacement,can be range"
           raise 'oops' unless args.length == 2
           key, value = args
           if Range === key
             idx0 = key.min
             del_count = key.max - idx0 + 1
-            if value.respond_to?(:length)
-              ins_count = value.length
-            else
-              ins_count = 1
-              value = [value]
-            end
+            value = [value] unless value.respond_to?(:length)
           else
             idx0 = key
-            del_count = ins_count = 1 # ?!
+            del_count = 1
             value = [value]
+#             tag "arrayfying value"
           end
 #               oldvals = @model_value[key]
         end
+        ins_count = value.length
         # Examples: x=[0,1,2,3]  x[2..99] = 'oops' -> x := [0,1, 'oops']
         length = @model_value.length
-        del_count = length - idx0 if idx0 + del_count > length 
+#         tag "ins_count=#{ins_count}, del_count=#{del_count}, l=#{length}, idx=#{idx0}"
+        del_count = [0, length - idx0].max if idx0 + del_count > length
+        # nr of implicit nils added:
+        nil_count = idx0 > length ? idx0 - length : 0
+        raise 'argg' if nil_count > 0 && del_count > 0
         # x3 is here for example [0,1,2,3,4,5,6,7,8,9]
         # Examples:  x[3,0] = a,b,c    del_count = 0, ins_count = 3, all insert
         #            x3[3,1] = a,b     del_count=1, ins_count=2, 1 update, 1 ins
@@ -218,6 +215,7 @@ module Reform
           for j in 0...upd_count
             oldval = @model_value[idx0]
             tran.addPropertyChange(self, idx0, oldval) unless tran.aborted?
+#             tag "calling model_assign(#{idx}, #{value[j].inspect}"
             model_assign(idx0, value[j])
             idx0 += 1
           end
@@ -226,17 +224,19 @@ module Reform
 #                   tran.push(PropertyDeleted.new(self, idx0, @model_value[idx0])) unless tran.aborted?
 #                   @model_value.delete_at(idx0)
 #                 else
-              unless tran.aborted?
+            unless tran.aborted?
 #                 tag "idx=#{idx0},del_count=#{del_count}"
-                oldvals = @model_value[idx0, del_count]
-                tran.push(Transaction::PropertySpliced.new(self, idx0, oldvals))
-              end
-              @model_value[idx0, del_count] = []
+              oldvals = @model_value[idx0, del_count]
+              tran.push(Transaction::PropertySpliced.new(self, idx0, oldvals))
+            end
+            @model_value[idx0, del_count] = []
 #                 end
           end
           if ins_count > 0
-            tran.push(Transaction::PropertyAdded.new(self, idx0, ins_count)) unless tran.aborted?
+            tran.push(Transaction::PropertyAdded.new(self, idx0 - nil_count, ins_count + nil_count)) unless tran.aborted?
+#             tag "inserting at #{idx0}, value[#{upd_count}, #{ins_count}], = #{value[upd_count, ins_count].inspect}"
             @model_value[idx0, 0] = value[upd_count, ins_count]
+#             tag "modval is now #{@model_value.inspect}"
           end
         end # tran
       end # handle_splices
@@ -307,6 +307,8 @@ module Reform
 
       attr_accessor :rstore_oid
 
+      # called internally before marshalling-out the result.
+      # the reverse of rstore_hash2value
       def self.rstore_value2hash value, rstore
 #         tag "rstore_value2hash(#{value.inspect})"
         if rstore_atom?(value)
@@ -314,8 +316,35 @@ module Reform
         else
           case value
           when Array
-            return value if value.all? { |v| rstore_atom?(v) }
-            raise 'niy: storing arrays'
+            no_atoms, all_atoms = true, true
+            value.each do |el|
+              if rstore_atom?(el) then no_atoms = false else all_atoms = false end 
+            end
+            return value if all_atoms  # this includes []
+            return OidRefs.new(value) if no_atoms
+            # when replacing values with oids, how to differentiate
+            # with a plain value equal to some oid?
+            # for hashes we mark the key
+            a = []
+            value.each do |v|
+              if rstore_atom?(v) || OidRef === v
+                a << v
+              else 
+                case v
+                when RStoreNode
+                  a << OidRef.new(v.rstore_oid)
+                else
+                  ospace = rstore.objectspace
+                  unless oid = ospace[id = v.object_id]
+                    ospace[id] = oid = rstore.rstore_gen_oid
+                    rstore[oid] = v
+                  end
+                  a << OidRef.new(oid)
+                end
+              end
+            end # each
+#             tag "ready to marshal mixed node array: #{a.inspect}"
+            a
           when Hash
             return value if value.all? { |k, v| rstore_atom?(v) }
             h = {}
@@ -323,18 +352,20 @@ module Reform
               if rstore_atom?(v)
                 h[k] = v
               else
+                # mark key so loader knows this is an oid:
+                key = (k.to_s + RSTORE_ATTR_SUFFIX).to_sym
                 case v
                 when OidRef
-                  h[(k.to_s + RSTORE_ATTR_SUFFIX).to_sym] = v.oid
+                  h[key] = v.oid
                 when RStoreNode
-                  h[(k.to_s + RSTORE_ATTR_SUFFIX).to_sym] = v.rstore_oid
+                  h[key] = v.rstore_oid
                 else
                   ospace = rstore.objectspace
                   unless oid = ospace[id = v.object_id]
                     ospace[id] = oid = rstore.rstore_gen_oid
                     rstore[oid] = v
                   end
-                  h[(k.to_s + RSTORE_ATTR_SUFFIX).to_sym] = oid
+                  h[key] = oid
                 end
               end
             end

@@ -162,7 +162,7 @@ describe RStore do
     end
   end
 
-  it 'should follow Array splicing and slicing habits' do
+  it 'should follow Array splicing habits' do
      # we can replace elements that do not exist
     RStore.new(@dbname) do |rstore|
       rstore.s = [24, 80, 'hallo', :world, true]
@@ -180,11 +180,46 @@ describe RStore do
       # we can replace elements that do not exist
       s[2..99] = [33, 'mi mi mi do']
       s.should == [24, 80, 33, 'mi mi mi do']
-      # we can insert non existing bits
-    end
+     end
     RStore.new(@dbname) do |rstore|
       s = rstore.s
       s.should == [24, 80, 33, 'mi mi mi do']
+    end
+  end
+
+  it 'should insert implicit nils' do
+    RStore.new(@dbname) do |rstore|
+      rstore.s = [24, 80]
+      s = rstore.s
+      s.transaction do |tran|
+        s[5, 0] = ['hallo', nil, 'mi mi mi do']
+        s.should == [24, 80, nil, nil, nil, 'hallo', nil, 'mi mi mi do']
+        tran.abort
+      end
+      s.should == [24, 80]
+    end
+    RStore.new(@dbname) do |rstore|
+      rstore.s = [24, 80]
+      s = rstore.s
+      s.transaction do |tran|
+        s[5, 99] = ['hallo', nil, 'mi mi mi do']
+      end
+      s.should == [24, 80, nil, nil, nil, 'hallo', nil, 'mi mi mi do']
+    end
+    RStore.new(@dbname) do |rstore|
+      s = rstore.s
+      s.should == [24, 80, nil, nil, nil, 'hallo', nil, 'mi mi mi do']
+    end
+  end
+  
+  it 'should be able to handle nested arrays' do
+    RStore.new(@dbname) do |rstore|
+      rstore.s = [24, 80]
+      s = rstore.s
+      s.transaction do |tran|
+        s[5] = ['hallo', nil, 'mi mi mi do']
+      end
+      s.should == [24, 80, nil, nil, nil, ['hallo', nil, 'mi mi mi do']]
     end
   end
 end # describe RStore
@@ -197,7 +232,7 @@ DESIGN
 ----------------------------
 
 Same as structure.rb
-But everything is stored in kyoto tycoon database.
+But everything is stored in a keyvalue (pe kyoto tycoon) database.
 
 We need
   - oids. Next oid to use is stored in 'oid' key.

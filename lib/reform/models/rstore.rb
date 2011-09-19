@@ -93,7 +93,7 @@ module Reform
 
       def model_assign key, value, method_symbol = nil
 #         tag "model_assign[#{key}] := #{value.inspect}"
-        raise 'WTF' if value.nil?
+#         raise 'WTF' if value.nil?         nothing wrong with a[2] = nil etc.
         raise '?' if RStoreNode::rstore_atom?(@model_value)
         val = RStoreNode::rstore_inter(key, value, self, rstore_rstore)
         case @model_value
@@ -241,6 +241,27 @@ module Reform
         end # tran
       end # handle_splices
 
+      def handle_hash_key_op(*args)
+        # it is not possible to delete keys here!
+#         tag "handle_hash_key_op #{self}::[]=#{args.inspect}"
+#           tag "single key replacement,can be range"
+        raise 'oops' unless args.length == 2
+        key, value = args
+        is_insert = @model_value.value?(key)
+        model_pickup_tran do |tran|
+          unless tran.aborted?
+            if is_insert
+              tran.push(PropertyAdded.new(self, key))
+            else
+              oldval = @model_value[key]
+              tran.addPropertyChange(self, key, oldval)
+  #             tag "calling model_assign(#{idx}, #{value[j].inspect}"
+            end
+          end
+          model_assign(key, value)
+        end # tran
+      end # handle_hash_key_op
+      
     public # methods of RStoreNode
 
       attr :model_value
@@ -264,7 +285,11 @@ module Reform
           # assignments including splices  (ignored for now)
 #           tag "args.length = #{args.length}"
           if symbol == :[]= #  So s.x[4] = ... something or s[4][:x] = ... or even s.y[2,4] = ....
-            handle_splices *args
+            if Hash === @model_value
+              handle_hash_key_op(*args)
+            else
+              handle_splices(*args)
+            end
           else # key <> []
             return super if args.length > 1
             value = args[0]

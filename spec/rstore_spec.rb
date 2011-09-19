@@ -222,6 +222,70 @@ describe RStore do
       s.should == [24, 80, nil, nil, nil, ['hallo', nil, 'mi mi mi do']]
     end
   end
+  
+  it "should wrap around hashes" do
+    RStore.new(@dbname) do |rstore|
+      rstore.s = {id1: 28, month: 12, say: 'hallo', world: true }
+      s = rstore.s
+      rstore.transaction do |tran|
+        s[:id1].should == 28
+        s[:id1] = 'world'
+        s.id1.should == 'world'
+        s.month = 6
+        s[:month].should == 6
+        tran.abort
+      end
+      s.should == { id1: 28, month: 12, say: 'hallo', world: true }
+    end
+    RStore.new(@dbname) do |rstore|
+      rstore.s = {id1: 28, month: 12, say: 'hallo', world: true }
+      s = rstore.s
+      s[:id1].should == 28
+      s[:id1] = 'world'
+      s.id1.should == 'world'
+      s.should == { id1: 'world', month: 12, say: 'hallo', world: true }
+    end
+    RStore.new(@dbname) do |rstore|
+      s = rstore.s
+      s[:say].should == 'hallo'
+      s.should == {id1: 'world', month: 12, say: 'hallo', world: true }
+    end
+  end
+
+  it "should not fuzz about nil values" do
+    RStore.new(@dbname) do |rstore|
+      rstore.s = {id1: 28, month: nil, say: 'hallo', world: true }
+      rstore.a = [2, nil, 4]
+      s = rstore.s
+      a = rstore.a
+      rstore.transaction do |tran|
+        s[:month].should == nil
+        s[:id1] = nil
+        s.id1.should == nil
+        a[1] = 7
+        a[2] = nil
+        a.should == [2, 7, nil]
+        tran.abort
+      end
+      s.should == { id1: 28, month: nil, say: 'hallo', world: true }
+      a.should == [2, nil, 4]
+    end
+    RStore.new(@dbname) do |rstore|
+      rstore.s = {id1: 28, month: nil, say: 'hallo', world: true }
+      rstore.a = [2, nil, 4]
+      s = rstore.s
+      a = rstore.a
+      s[:id1] = nil
+      a[2] = nil 
+      a[1] = 'hallo'
+    end
+    RStore.new(@dbname) do |rstore|
+      s = rstore.s
+      a = rstore.a
+      s.should == {id1: nil, month: nil, say: 'hallo', world: true }
+      a.should == [2, 'hallo', nil]
+    end
+  end
 end # describe RStore
 
 __END__

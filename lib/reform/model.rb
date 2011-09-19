@@ -290,6 +290,7 @@ transaction that is immediately committed (and at that point propagation starts)
       # for hashes it is has_key?(idx)
       class PropertyAdded < StructuralChange
         private
+          # use count == nil for hash adds.
           def initialize model, key, count = 1
             super model, key
             @count = count
@@ -297,7 +298,11 @@ transaction that is immediately committed (and at that point propagation starts)
 
         public # PropertyAdded methods
           def undo
-            @model.model_value.slice!(@key, @count)
+            if @count
+              @model.model_value.slice!(@key, @count)
+            else
+              @model.model_value.delete(@key)
+            end
           end
 
           def inserted?
@@ -355,8 +360,9 @@ transaction that is immediately committed (and at that point propagation starts)
       class PropertyChange < AbstractModelChange
 
         private
-          def initialize model, key, oldval = nil
+          def initialize model, key, oldval #= nil
             super model, key
+#             raise 'wtf' if oldval.nil?
 #             tag "New #{self} (#{model}, #{keypath.inspect}, #{oldval})"
             @oldval = oldval
           end
@@ -364,7 +370,7 @@ transaction that is immediately committed (and at that point propagation starts)
         public
 
           def undo
-#             tag "#{self}::UNDO, kp= #{@keypath.inspect}, @model[....][#{@keypath[-1]}] := #@oldval #######################################"
+            #tag "#{self}::UNDO"
             @model.model_apply_setter(@key, @oldval)
           end
 

@@ -1020,6 +1020,9 @@ it, the chance of names clashes must be minimized.
       def model_abort_work
       end
 
+      # if true, do not store this model inside others
+      def model_has_own_storage?
+      end
   end # module Model
 
   # This class implements Model but is also a Control.
@@ -1059,7 +1062,7 @@ if __FILE__ == $0
       tag "propagate: field: #@field, #{prop.inspect}"
     end
 
-    dynamic_accessor :field
+    model_dynamic_accessor :field
 
   end
 

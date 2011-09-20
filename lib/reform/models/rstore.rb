@@ -147,7 +147,7 @@ module Reform
             end
             RStoreNode.new(parent, key, value, oid)
           else
-            if value.respond_to?(:model?) && value.model?
+            if value.respond_to?(:model_has_own_storage?) && value.model_has_own_storage?
               STDERR.print "kind of mounted model '#{value}' detected, not stored!!!"
               value.model_parent = parent
               value.model_key = key
@@ -684,6 +684,12 @@ module Reform
         t = Marshal::restore(@rstore_db[oid])
         RStoreNode::rstore_hash2value(t, self)
       end
+      
+      #override
+      def model_has_own_storage?
+        true
+      end
+
   end # class RStore
 
 end # module Reform

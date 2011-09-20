@@ -286,6 +286,66 @@ describe RStore do
       a.should == [2, 'hallo', nil]
     end
   end
+
+  class Bear
+    private
+      def initialize name, age, profession
+        @name, @age, @profession = name, age, profession
+      end
+    public
+      attr_accessor :name, :age, :profession
+      
+      def confused!
+        self.age, @name = @name, @age
+      end
+  end
+  
+  it "should wrap around any object" do
+    RStore.new(@dbname) do |rstore|
+      bear = Bear.new 'Mr Bear', 12, 'bear'
+      rstore.bear = bear
+      bear = rstore.bear
+      rstore.transaction do |tran|
+        bear.age.should == 12
+        bear.age = 11
+        bear.age.should == 11
+        bear.class.should == Bear
+        tran.abort
+      end
+      bear.age.should == 12
+    end
+    RStore.new(@dbname) do |rstore|
+      rstore.bear = Bear.new 'Mr Bear', 12, 'bear'
+      bear = rstore.bear
+      bear.age.should == 12
+      bear.profession = 'unemployed'
+      bear.profession.should == 'unemployed'
+    end
+    RStore.new(@dbname) do |rstore|
+      bear = rstore.bear
+      bear.age.should == 12
+      bear.profession.should == 'unemployed'
+    end
+  end
+
+  it "should not handle confused bears" do
+    # what he wanted to say: self.x = val should be persistent
+    # but @x = val will not (which is obvious)
+    # but neither is.
+    # 'confuse!' operates on Bear and not on RStoreNode
+    RStore.new(@dbname) do |rstore|
+      rstore.bear = Bear.new 'Mr Bear', 12, 'bear'
+      bear = rstore.bear
+      bear.confused!
+      bear.age.should == 'Mr Bear'
+      bear.name.should == 12
+    end
+    RStore.new(@dbname) do |rstore|
+      bear = rstore.bear 
+      bear.age.should == 12
+      bear.name.should == 'Mr Bear'
+    end
+  end
 end # describe RStore
 
 __END__
@@ -315,3 +375,39 @@ When structures are read the oid must be stored in them.
 RStoreNode must forward to wrapped classes.  Unlike structure we must catch all updates.
 So the oids can be stored in the RStoreNodes.
 It may also be that we must inherit from RStoreNode. That is much less tricky.
+
+===================================
+    Confused!
+===================================
+In case we have confused bears, I mean instances with methods that
+change attributes of the instance like:
+
+    def x= val
+      @x = val
+      @y = 2 * x
+    end
+    
+RStoreNode can catch 'x=' messages. So we can track the change to x.
+But RStoreNode knows nothing about y, so it is not made persistent.
+This was solved in Model by using 'model_dynamic_accessor' iso 'attr_accessor':
+    model_dynamic_accessor :y
+    def x= val
+      @x = val
+      self.y = 2 * x
+    end
+
+But the point was that Bear is not a Model. Just a plain class. Even so,
+the model will propagate changes, but NOT make them persistent. 
+
+Solutions?
+  1) ignore this problem.AARGGHH
+  2) automatically include Model to the class of any stored instance, unless
+     already done so. Then replace the instance setters one by one.
+     This is an AARGGHH solution
+    It seems to duplicate the whole wrapper stuff inside.
+  3) assume Bear is evil, and all methods (or all assigners and ! methods)
+     may change any attribute. So after each method check for changes.
+     But this requires to store a copy before any method call.
+     AARGGHH
+     
+     

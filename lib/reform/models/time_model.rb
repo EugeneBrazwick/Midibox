@@ -116,7 +116,7 @@ module Reform
         Time.now.sec
       end
 
-      dynamic_accessor :frameNr, :current
+      model_dynamic_accessor :frameNr, :current
 
       def start
         @qtc.start

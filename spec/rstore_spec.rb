@@ -291,11 +291,27 @@ describe RStore do
     private
       def initialize name, age, profession
         @name, @age, @profession = name, age, profession
+        @favorite_food = 'honey'
+        @org_food = nil
       end
-    public
-      attr_accessor :name, :age, :profession
       
-      def confused!
+    public
+      attr_accessor :age, :profession
+      attr :name, :favorite_food
+      
+      def name= value
+        @name = value
+        case @name 
+        when 'Edgar Allen' then @favorite_food = 'books' 
+        when 'Pooh' 
+          @org_food = @favorite_food
+          @favorite_food = 'umbrellas'
+        else
+          @org_food and @favorite_food = @org_food
+        end
+      end
+      
+      def confused
         self.age, @name = @name, @age
       end
   end
@@ -328,7 +344,7 @@ describe RStore do
     end
   end
 
-  it "should not handle confused bears" do
+  it "should not handle confused bears (anti-spec)" do
     # what he wanted to say: self.x = val should be persistent
     # but @x = val will not (which is obvious)
     # but neither is.
@@ -336,7 +352,7 @@ describe RStore do
     RStore.new(@dbname) do |rstore|
       rstore.bear = Bear.new 'Mr Bear', 12, 'bear'
       bear = rstore.bear
-      bear.confused!
+      bear.confused
       bear.age.should == 'Mr Bear'
       bear.name.should == 12
     end
@@ -344,6 +360,57 @@ describe RStore do
       bear = rstore.bear 
       bear.age.should == 12
       bear.name.should == 'Mr Bear'
+    end
+  end
+  
+  it "should not be able to rollback sideeffects (anti-spec)" do
+    RStore.new(@dbname) do |rstore|
+      rstore.bear = Bear.new 'Mr Bear', 12, 'bear'
+      # favorite_food does not change consistently with the 
+      # name. Since rstore knows nothing about it, it is NOT undone
+      # when a transaction is aborted.
+      rstore.transaction do |tran|
+        bear = rstore.bear
+        bear.favorite_food.should == 'honey'
+        bear.name = 'Edgar Allen'
+        bear.favorite_food.should == 'books'
+        tran.abort
+        # this does NOT undo the favorite food as well!
+        bear.name.should == 'Mr Bear'
+        bear.favorite_food.should == 'books'
+      end
+    end
+  end
+  
+  it "should rollback a consistent sideeffect" do
+    RStore.new(@dbname) do |rstore|
+      rstore.bear = Bear.new 'Mr Bear', 12, 'bear'
+      # favorite_food does change consistently with the 
+      # name, if the name is 'Pooh'. 
+      # because the rollback is executed through a call to 'name='
+      rstore.transaction do |tran|
+        bear = rstore.bear
+        bear.favorite_food.should == 'honey'
+        bear.name = 'Pooh'
+        bear.favorite_food.should == 'umbrellas'
+        tran.abort
+        # this does NOT undo the favorite food as well!
+        bear.name.should == 'Mr Bear'
+        bear.favorite_food.should == 'honey'
+      end
+    end
+  end
+  
+  it "should make assignment sideeffects persistent" do
+    RStore.new(@dbname) do |rstore|
+      rstore.bear = Bear.new 'Mr Bear', 12, 'bear'
+      bear = rstore.bear
+      bear.favorite_food.should == 'honey'
+      bear.name = 'Edgar Allen'
+    end
+    RStore.new @dbname do |rstore|
+      bear = rstore.bear
+      bear.favorite_food.should == 'books'      
     end
   end
 end # describe RStore

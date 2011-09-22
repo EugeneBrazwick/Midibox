@@ -1,6 +1,7 @@
 
 require 'reform/app'
 require 'reform/models/rstore'
+require 'pp'
 
 class TestMe
   private
@@ -70,7 +71,15 @@ describe RStore do
       s.b.should == 'something completely different'
     end
     RStore.new(@dbname) do |rstore|
-      rstore.t.b.should == 'something completely different'
+      t = rstore.t
+      t.b.should == 'something completely different'
+#       tag "assign 'bye' to 'c'"
+      t.c = 'bye'
+    end
+    RStore.new(@dbname) do |rstore|
+      t = rstore.t
+#       tag "reloaded rstore + t"
+      t.c.should == 'bye'
     end
   end
 
@@ -289,15 +298,16 @@ describe RStore do
 
   class Bear
     private
-      def initialize name, age, profession
+      def initialize name = 'Mr Bear', age = 12, profession = 'bear'
         @name, @age, @profession = name, age, profession
         @favorite_food = 'honey'
         @org_food = nil
+        @umbrellas = []
       end
       
     public
       attr_accessor :age, :profession
-      attr :name, :favorite_food
+      attr :name, :favorite_food, :umbrellas
       
       def name= value
         @name = value
@@ -413,6 +423,117 @@ describe RStore do
       bear.favorite_food.should == 'books'      
     end
   end
+  
+  it "should be possible to remove the rstore contents" do
+    RStore.new(@dbname) do |rstore|
+      rstore.clear
+      rstore.length.should == 0
+#       tag "rstore = #{rstore.inspect}"
+      rstore.s = 24
+      rstore.t = [2, 3, 4]
+      rstore.b = Bear.new
+      # length and delete are delegated and say nothing about the actual
+      # oid-value tuples stored. Hopefully....
+      rstore.length.should == 3
+      rstore.delete :t
+      rstore.delete :s 
+      rstore.length.should == 1
+    end
+    RStore.new(@dbname) do |rstore|
+      rstore.length.should == 1
+    end
+  end
+  
+  it "should handle recursive arrays correctly" do
+    RStore.new(@dbname) do |rstore|
+      rstore.clear
+#       tag "creating bear + assign to key 'bear'"
+      rstore.bear = Bear.new
+      bear = rstore.bear
+#       tag "bear = #{bear.pretty_inspect}"
+#       tag "bear.umbrellas: #{bear.instance_variable_get(:@umbrellas).inspect}"
+      bear.umbrellas.should == []
+#       tag "adding nifty + hp umbrellas to the deal"
+      bear.umbrellas << 'nifty' << 'hurricane proof'
+#       tag "backend dumped: #{rstore.rstore_db_inspect}"
+    end
+=begin
+  the idea is as follows. Bear.new creates an umbrella array with value []
+  this is accepted, and becomes some 'oid'.
+  When we add 'nifty' it changes umbrellas on disk by resaving the array
+  under its oid.
+  At that point bear.umbrellas = OidRef('D')
+  while backend[D] contains marshal(['nifty'])
+=end
+    RStore.new(@dbname) do |rstore|
+      bear = rstore.bear
+      bear.umbrellas.should == ["nifty", "hurricane proof"]
+    end
+  end
+  
+  it "should be possible to compact the rstore contents" do
+    RStore.new(@dbname) do |rstore|
+      rstore.clear
+      rstore.length.should == 0
+#       tag "rstore = #{rstore.inspect}"
+      rstore.s = 24
+      rstore.t = [2, 3, 4]
+      rstore.bear = Bear.new
+      bear = rstore.bear
+      bear.umbrellas << 'nifty' << 'hurricane proof'
+      # length and delete are delegated and say nothing about the actual
+      # oid-value tuples stored. Hopefully....
+      rstore.rstore_db_length.should == 5
+      rstore.delete :t
+      rstore.length.should == 2
+    end
+    RStore.new(@dbname) do |rstore|
+#       tag "loaded rstore: #{rstore.inspect}"
+      rstore.rstore_db_length.should == 5
+      rstore.length.should == 2
+      rstore.delete :s 
+      rstore.delete :bear
+      rstore.rstore_db_length.should == 5
+      rstore.length.should == 0
+    end
+    RStore.new(@dbname) do |rstore|
+#       tag "loaded rstore: #{rstore.inspect}"
+      rstore.s = 24
+      rstore.t = [2, 3, 4]
+      rstore.bear = Bear.new
+      bear = rstore.bear
+      bear.umbrellas << 'nifty' << 'hurricane proof'
+      rstore.rstore_db_length.should == 8
+      rstore.length.should == 3
+      rstore.delete :t
+      bear.umbrellas.should == ['nifty', 'hurricane proof']
+    end
+    RStore.new(@dbname) do |rstore|
+      bear = rstore.bear
+      bear.umbrellas.should == ['nifty', 'hurricane proof']
+      rstore.compact
+      bear.umbrellas.should == ['nifty', 'hurricane proof']
+      rstore.length.should == 2
+      # we should have root + bear + umbrellas makes 3
+      rstore.rstore_db_length.should == 3
+      rstore.delete :s 
+      rstore.compact 
+      rstore.rstore_db_length.should == 3
+      rstore.delete :bear
+      rstore.rstore_db_length.should == 3
+      rstore.length.should == 0
+      rstore.compact
+      rstore.length.should == 0
+      # the root node ('0') is ALWAYS present.
+      rstore.rstore_db_length.should == 1
+    end
+  end
+  
+  it "should handle delete on Hash"
+  it "should handle delete on Array"
+  it "should handle pop and push"
+  it "should handle shift and unshift"
+  
 end # describe RStore
 
 __END__

@@ -389,7 +389,7 @@ transaction that is immediately committed (and at that point propagation starts)
         @stack = []
 #         tag "tran test"
         raise ProtocolError, 'Protocol error, transaction already started' if @@transaction
-#         tag "BEGIN WORK, SENDER IS NOW #{sender}, caller=#{caller.join("\n")}"
+#         tag "BEGIN WORK, SENDER IS NOW #{sender}" #, caller=#{caller.join("\n")}"
         @sender, @@transaction = sender, self
         @root = root
         @keypaths = {} # must be full paths!
@@ -412,6 +412,7 @@ transaction that is immediately committed (and at that point propagation starts)
               raise
             end
           ensure
+#             tag "call commit if #{@@transaction}"
             @@transaction and commit
           end
         end
@@ -430,7 +431,8 @@ transaction that is immediately committed (and at that point propagation starts)
         @keypaths.keys
       end
 
-      # call this to add more complex changes to the changed-stack
+      # call this to add more complex changes to the changed-stack.
+      # important task: add the propch.model to @altered_owners
       def push propch
 #         tag "Transaction#push(#{propch.inspect})"
         raise ProtocolError, 'Protocol error, no transaction' unless @@transaction
@@ -1013,7 +1015,7 @@ it, the chance of names clashes must be minimized.
       # use this to store changes to disk or so.
       # raising an exception will abort the transaction
       # +altered_nodes is an array of updated owners of attributes
-      def model_commit_work altered_nodes
+      def model_commit_work altered_owners
       end
 
       # called just after all work has been rolled back

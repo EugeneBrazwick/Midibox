@@ -9,6 +9,12 @@ $VERBOSE = verb
 
 module Reform
 
+    # Use this class for GUI errors, including misconfigurations.
+  class Error < StandardError
+  end
+  
+  ReformError = Error
+
   class Control < Qt::Object; end
   class DynamicAttribute < Control; end
   class DynamicColor < DynamicAttribute; end

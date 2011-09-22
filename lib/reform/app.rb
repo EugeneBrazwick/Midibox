@@ -332,13 +332,6 @@ module Reform
 
     MilliSeconds = Milliseconds
 
-
-    # Use this class for GUI errors, including misconfigurations.
-    class Error < StandardError
-    end
-
-    ReformError = Error
-
 =begin
     baseclass for ControlContext, GraphicContext etc.
     As such it has a big impact on all Frame and Scene derivates, which are most container classes.

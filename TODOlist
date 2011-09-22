@@ -224,3 +224,6 @@ Current state:
 0041 Mon Sep 12 22:22:37 CEST 2011
     after building the qtbindings gem, it cannot be loaded! Some caching issue, because it
     works after that.
+0042 Thu Sep 22 21:07:50 CEST 2011
+    Need RStore::Item class to create auto-persistent subclasses, that allow more complicated
+    changes.

@@ -106,7 +106,7 @@ module Reform
       end
 
       def model_assign key, value, method_symbol = nil
-#         tag "model_assign[#{key}] := #{value.inspect}"
+#        tag "model_assign[#{key}] := #{value.inspect}"
 #         raise 'WTF' if value.nil?         nothing wrong with a[2] = nil etc.
         raise '?' if RStoreNode::rstore_atom?(@model_value)
         if RStoreNode.rstore_atom?(value)
@@ -145,13 +145,13 @@ module Reform
 =end
       # this is the place where rstore contents is gathered and stored
       def self.rstore_inter key, value, parent, rstore
-#         tag "rstore_inter(#{key}, #{value})"
-        return value if rstore_atom?(value)
-        raise 'what?' if RStoreNode === value
-        ospace = rstore.objectspace
+#        tag "rstore_inter(#{key}, #{value}), id = #{value.object_id}"
+        return value if rstore_atom?(value) || RStoreNode === value
         need_ospace_storing = false
-        unless oid = ospace[id = value.object_id]
-          ospace[id] = oid = rstore.rstore_gen_oid
+        if oid = rstore.objectspace[id = value.object_id]
+	  rv = rstore.revspace[oid] and return rv
+	else
+          oid = rstore.rstore_gen_oid(value)
           need_ospace_storing = true
         end
         case value
@@ -184,18 +184,20 @@ module Reform
           end
         end
 #         tag "returning from rstore_inter, got oid #{oid}"
+        rv = RStoreNode.new(parent, key, value, oid)
         if need_ospace_storing
 #           tag "inter stores new oid #{oid}"
           rstore[oid] = value
+	  rstore.revspace[oid] = rv
         end
-        RStoreNode.new(parent, key, value, oid)
+	rv
       end # def rstore_inter
 
       # IMPORTANT: copie from structure.rb
       # We could reimplement structure as an rstore with a particular backend.
       # This includes handling of self[i] = val
       def handle_splices *args
-#         tag "handle_splices #{self}::[]=#{args.inspect}"
+#        tag "handle_splices #{self}::[]=#{args.inspect}"
         if args.length == 3  # x[3, 4] = ....
           # In cases of 'splice', if the last arg is an array, it is unpacked.
           # In cases of 'splice' arg2 is the nr of items deleted.
@@ -205,7 +207,7 @@ module Reform
           key = args[0, 2]
 #               oldvals = @model_value[*key]
         else 
-#           tag "single key replacement,can be range"
+#          tag "single key replacement,can be range"
           raise 'oops' unless args.length == 2
           key, value = args
           if Range === key
@@ -242,12 +244,12 @@ module Reform
           upd_count = del_count < ins_count ? del_count : ins_count
           del_count -= upd_count
           ins_count -= upd_count
-#           tag "upd_count=#{upd_count},del_count=#{del_count},ins_count=#{ins_count}"
+#          tag "upd_count=#{upd_count},del_count=#{del_count},ins_count=#{ins_count}"
           # one by one
           for j in 0...upd_count
             oldval = @model_value[idx0]
             tran.addPropertyChange(self, idx0, oldval) unless tran.aborted?
-#             tag "calling model_assign(#{idx}, #{value[j].inspect}"
+#            tag "calling model_assign(#{idx}, #{value[j].inspect}"
             model_assign(idx0, value[j])
             idx0 += 1
           end
@@ -313,9 +315,10 @@ module Reform
             # BUG 0027 applies here. May destroy integrity
             raise 'oops' unless args.length == 1
             # 'delete' works differently for arrays and hashes!
-            if Hash === @model_value
+            case @model_value
+	    when Hash
               idx = args[0]
-              return self unless @model_value.has_key?(idx)
+              return @model_value.default(idx) unless @model_value.has_key?(idx)
               return @model_value.delete(idx, &block) if tran.aborted?
               prev = @model_value[idx]
 #                   tag "Calling #{@model_value}.delete(#{idx.inspect})"
@@ -323,7 +326,51 @@ module Reform
 #                   tag "value is now #{@model_value.inspect}"
               tran.push(Transaction::PropertyDeleted.new(self, idx, prev))
               return result # , :_root)               if you want to use as struct use your own constructor
+	    when Array
+              return @model_value.delete(idx, &block) if tran.aborted?
+	      idx = @model_value.find_index(args[0])
+#	      tag "located idx #{idx} in array for 'delete'"
+	      return block ? block.call : nil unless idx
+#	      tag "idx exists, execute delete and push tranpropchange"
+              prev = @model_value[idx]
+              result = @model_value.delete(args[0], &block)
+#	      tag "mv is now #@model_value"
+              tran.push(Transaction::PropertyDeleted.new(self, idx, prev))
+              return result
             end
+	  when :pop
+	    raise 'oops' unless args.length <= 1 || block
+	    count = args[0] || 1
+	    return @model_value.pop(count) if tran.aborted?
+	    prev = @model_value.last(count)
+	    result = @model_value.pop(count)
+	    tran.push(Transaction::PropertyPopped.new(self, prev))
+	    return result
+	  when :push # not the same as <<, you cannot << 1,2 but you can push(1,2)
+	    raise 'oops' if block
+	    return self if args.empty?
+	    args.each do |el|
+	      @model_value.push(RStoreNode::rstore_inter(@model_value.length, el, self, rstore_rstore))
+	    end
+	    tran.push(Transaction::PropertyPushed.new(self, args.length)) unless tran.aborted?
+	    return self
+	  when :shift # comparable with pop, but then in front
+	    # BUG 0027 applies here. May destroy integrity
+	    raise 'oops' unless args.length <= 1 || block
+	    count = args[0] || 1
+	    return @model_value.shift(count) if tran.aborted?
+	    prev = @model_value.first(count) # always an array
+	    result = @model_value.shift(count)
+	    tran.push(Transaction::PropertyShifted.new(self, prev))
+	    return result # see delete_at
+	  when :unshift # comparable with push, but then in front
+	    raise 'oops' if block
+	    return self if args.empty?
+	    @model_value.unshift(*args)
+	    unless tran.aborted?
+	      tran.push(Transaction::PropertyUnshifted.new(self, args.length))
+	    end
+	    return self
           end
           return @model_value.send(symbol, *args, &block) if tran.aborted?
           raise "not implemented yet: total destructors like '#{symbol}'"
@@ -358,9 +405,9 @@ module Reform
             when RStoreNode
               a << OidRef.new(v.rstore_oid)
             else
-              ospace = rstore.objectspace
-              unless oid = ospace[id = v.object_id]
-                ospace[id] = oid = rstore.rstore_gen_oid
+              objectspace = rstore.objectspace
+              unless oid = objectspace[id = v.object_id]
+                oid = rstore.rstore_gen_oid(v)
                 rstore.rstore_assign_i oid, v
               end
               a << OidRef.new(oid)
@@ -387,9 +434,8 @@ module Reform
             when RStoreNode
               h[key] = v.rstore_oid
             else
-              ospace = rstore.objectspace
-              unless oid = ospace[id = v.object_id]
-                ospace[id] = oid = rstore.rstore_gen_oid
+              unless oid = rstore.objectspace[id = v.object_id]
+                oid = rstore.rstore_gen_oid(v)
 #                 tag "rstore_value2hash creates new oid #{oid}"
                 rstore.rstore_assign_i oid, v
               end
@@ -400,13 +446,90 @@ module Reform
         h
       end
       
+      def method_missing(symbol, *args, &block)
+#        tag "#{self}::METHOD_MISSING #{symbol.inspect}, current value = #{@model_value.inspect}"
+        raise 'WTF' if @model_value.nil?
+        case last_char = symbol.to_s[-1]
+        when '='
+#          tag "test for splicing, args.length = #{args.length}"
+          if symbol == :[]= #  So s.x[4] = ... something or s[4][:x] = ... or even s.y[2,4] = ....
+            return handle_hash_key_op(*args) if Hash === @model_value
+            return handle_splices(*args)
+          end # key <> []
+          return super if args.length > 1
+          value = args[0]
+#          tag "value to assign = #{value.inspect}"
+          key = symbol[0...-1].to_sym # !
+          oldval = model_apply_getter(key)
+          model_pickup_tran do |tran|
+            model_assign(key, value, symbol)
+#            tag "addPropertyChange(#{self}, #{key.inspect}, oldval= #{oldval.inspect})"
+            tran.addPropertyChange(self, key, oldval) unless tran.aborted?
+#            tag "COMMITTING!!!!!!!!!!!!!!!!!!"
+          end
+          return nil
+        when '!' # always treat as changer 
+          return handle_corrupteron(symbol, *args, &block) if @model_value.respond_to?(symbol)
+        end
+        if Corrupteron[symbol] && @model_value.respond_to?(symbol)
+          return handle_corrupteron(symbol, *args, &block) 
+        end
+        # PARANOIA check for things that should definetely be methods
+        if symbol[0, 7] == 'rstore_' || symbol[0, 6] == 'model_'  || symbol.to_s.to_i != 0 # how weird can it get?? #|| symbol == :key
+          raise "oh no! method #{symbol} should really exist!" 
+        end
+        return self if symbol == :self && args.empty?
+#        tag "Now use #@model_value to apply #{symbol} on"
+        key = last_char == '?' ? symbol[0...-1].to_sym : symbol
+        has_key = @model_value.respond_to?(:has_key?) && args.empty? && @model_value.has_key?(symbol)
+        rv = if has_key then @model_value[key]
+        elsif @model_value.respond_to?(symbol) then @model_value.send(symbol, *args, &block)
+        else nil
+        end
+#	tag "rv=#{rv}"
+        if OidRef === rv
+	  if v = rstore_rstore.revspace[oid = rv.oid] 
+	    rv = v
+	  else
+	    rv = rstore_rstore[oid]
+#	    tag "and return a new wrapper!"
+	    rv = RStoreNode.new(self, symbol, rv, oid)
+	    rstore_rstore.revspace[oid] = rv
+	  end
+          # Now remove the OidRef
+          if has_key
+            @model_value[key] = rv
+          else
+            assigner = (symbol.to_s + '=').to_sym
+            @model_value.send(assigner, rv) if @model_value.respond_to?(assigner)
+          end
+        end
+#	tag "method_missing #{symbol} -> rv #{rv}"
+        rv
+      end # def method_missing
+
+      def model_row_i numeric_key
+        if @model_value.respond_to?(:each_pair)
+          i = 0
+          @model_value.each_pair do |k, v|
+            return v if i == numeric_key
+            i += 1
+          end
+        end
+        if @model_value.respond_to?(:[])
+          @model_value[numeric_key]
+        else
+          numeric_key == 0 ? self : nil
+        end
+      end
+
     public # methods of RStoreNode
 
       attr :model_value
       attr :model_key # #!!!
 
       def inspect
-        "#{self.class}[#@rstore_oid]" # STACKOVERFLOW: {RStoreNode::rstore_value2hash(self, @rstore_rstore).inspect}"
+        "#{self.class}[OID:#@rstore_oid]" # STACKOVERFLOW: {RStoreNode::rstore_value2hash(self, @rstore_rstore).inspect}"
       end
       
       def rstore_rstore
@@ -423,62 +546,6 @@ module Reform
 #         tag "#{self} == #{other}, #@model_value == other -> #{@model_value == other}"
         super || @model_value == other
       end
-
-      def method_missing(symbol, *args, &block)
-#         tag "#{self}::METHOD_MISSING #{symbol.inspect}, current value = #{@model_value.inspect}"
-        raise 'WTF' if @model_value.nil?
-        case last_char = symbol.to_s[-1]
-        when '='
-          # assignments including splices  (ignored for now)
-#           tag "args.length = #{args.length}"
-          if symbol == :[]= #  So s.x[4] = ... something or s[4][:x] = ... or even s.y[2,4] = ....
-            return handle_hash_key_op(*args) if Hash === @model_value
-            return handle_splices(*args)
-          end # key <> []
-          return super if args.length > 1
-          value = args[0]
-#           tag "value to assign = #{value.inspect}"
-          key = symbol[0...-1].to_sym # !
-          oldval = model_apply_getter(key)
-          model_pickup_tran do |tran|
-            model_assign(key, value, symbol)
-#             tag "addPropertyChange(#{self}, #{key.inspect}, oldval= #{oldval.inspect})"
-            tran.addPropertyChange(self, key, oldval) unless tran.aborted?
-#             tag "COMMITTING!!!!!!!!!!!!!!!!!!"
-          end
-          return nil
-        when '!' # always treat as changer 
-          return handle_corrupteron(symbol, *args, &block) if @model_value.respond_to?(symbol)
-        end
-        if Corrupteron[symbol] && @model_value.respond_to?(symbol)
-          return handle_corrupteron(symbol, *args, &block) 
-        end
-        # PARANOIA check for things that should definetely be methods
-        if symbol[0, 7] == 'rstore_' || symbol[0, 6] == 'model_'  || symbol.to_s.to_i != 0 # how weird can it get?? #|| symbol == :key
-          raise "oh no! method #{symbol} should really exist!" 
-        end
-        return self if symbol == :self && args.empty?
-#           tag "Now use #@model_value to apply #{symbol} on"
-        key = last_char == '?' ? symbol[0...-1].to_sym : symbol
-        has_key = @model_value.respond_to?(:has_key?) && args.empty? && @model_value.has_key?(symbol)
-        rv = if has_key then @model_value[key]
-        elsif @model_value.respond_to?(symbol) then @model_value.send(symbol, *args, &block)
-        else nil
-        end
-        if OidRef === rv
-          rv = rstore_rstore[oid = rv.oid]
-          # and return a new wrapper!
-          rv = RStoreNode.new(self, symbol, rv, oid)
-          # Now remove the OidRef
-          if has_key
-            @model_value[key] = rv
-          else
-            assigner = (symbol.to_s + '=').to_sym
-            @model_value.send(assigner, rv) if @model_value.respond_to?(assigner)
-          end
-        end
-        rv
-      end # def method_missing
 
       attr_accessor :rstore_oid
 
@@ -513,11 +580,10 @@ module Reform
                 v.send(:remove_instance_variable, iv)
                 v.instance_variable_set((iv.to_s + RSTORE_ATTR_SUFFIX), val.rstore_oid)
               else
-                tag "rstore_value2hash, complex value #{val}"
-                ospace = rstore.objectspace
-                unless oid = ospace[id = val.object_id]
-                  ospace[id] = oid = rstore.rstore_gen_oid
-                  tag "rstore_value2hash generated oid '#{oid}' for ivar #{iv}"
+#                tag "rstore_value2hash, complex value #{val}"
+                unless oid = rstore.objectspace[id = val.object_id]
+                  oid = rstore.rstore_gen_oid(val)
+#                  tag "rstore_value2hash generated oid '#{oid}' for ivar #{iv}"
                   rstore.rstore_assign_i oid, val
                 end
                 v.send(:remove_instance_variable, iv)
@@ -534,13 +600,13 @@ module Reform
       # where 'hash' is actually what was unmarshalled. We need a little fixup to
       # do.
       def self.rstore_hash2value hash, rstore = nil
-#         tag "unmarshalled hash of class #{hash.class} -> RStoreNode"
+#        tag "unmarshalled hash of class #{hash.class} -> RStoreNode"
         case hash
         when OidRefs
-          tag "OidRefs"
+#          tag "OidRefs"
           hash.map { |oid| OidRef.new(oid) }
         when Hash
-#           tag "real Hash 2 value"
+#          tag "real Hash 2 value, keys=#{hash.keys}"
           return hash if hash.keys.none? { |key| key[-RSTORE_ATTR_SUFFIX_LEN..-1] == RSTORE_ATTR_SUFFIX }
           h = {}
           hash.each do |k, v2|
@@ -550,9 +616,10 @@ module Reform
               h[k] = v2
             end
           end
+#	  tag "hash2value->#{h.pretty_inspect}"
           h
         when Array
-#           tag "Array: nothing to improve"
+#          tag "Array: nothing to improve -> #{hash.pretty_inspect}"
           hash
         else
 #           tag "restoring instance of class #{hash.class}"
@@ -597,18 +664,20 @@ module Reform
 
       # override
       def model_row numeric_key
-        if @model_value.respond_to?(:each_pair)
-          i = 0
-          @model_value.each_pair do |k, v|
-            return v if i == numeric_key
-            i += 1
-          end
+        case rv = model_row_i(numeric_key)
+        when OidRef
+	  if v = rstore_rstore.revspace[oid = rv.oid]
+	    rv = v
+	  else
+	    rv = rstore_rstore[oid]
+#	    tag "and return a new wrapper!"
+	    rv = RStoreNode.new(self, numeric_key, rv, oid)
+	    rstore_rstore.revspace[oid] = rv
+	  end
+          # Now remove the OidRef
+	  @model_value[numeric_key] = rv
         end
-        if @model_value.respond_to?(:[])
-          @model_value[numeric_key]
-        else
-          numeric_key == 0 ? self : nil
-        end
+	rv
       end
 
       #override
@@ -696,6 +765,8 @@ module Reform
         super(nil, nil, nil, ROOT_OID)
         # hash from object_id to oid
         @objectspace = {}
+	# hash from oid to instance (should be an RStoreNode)
+	@revspace = {}
         # transaction in progress:
         @in_tran = nil
         # backend:
@@ -740,31 +811,31 @@ module Reform
       end
 
       # traverse val adding all oids to the '@marked' hash
-      def rstore_mark val      
-        tag "Marking reached node #{val.inspect}"
+      def rstore_mark val
+#        tag "Marking reached node #{val.inspect}"
         case val
         when OidRef 
-          tag "OidRef, marked = #{@marked[val.oid]}"
+#          tag "OidRef, marked = #{@marked[val.oid]}"
           return if @marked[val.oid]
-          tag "MARKED: #{val.oid}!"
+#          tag "MARKED: #{val.oid}!"
           @marked[val.oid] = true
           rstore_mark(self[val.oid])
         when Array
-          tag "Array with #{val.length} values"
+#          tag "Array with #{val.length} values"
           val.each { |v| rstore_mark(v) unless Node::rstore_atom?(v) }
         when Hash
-          tag "Hash with #{val.length} values"
+#          tag "Hash with #{val.length} values"
           val.each_value { |v| rstore_mark(v) unless Node::rstore_atom?(v) }
         else
           ivs = val.instance_variables
-          tag "Instance with #{ivs.length} attributes"
+#          tag "Instance with #{ivs.length} attributes"
           ivs.each do |iv|
             v = val.instance_variable_get(iv)
-            tag "ivar: #{v.inspect}"
+#            tag "ivar: #{v.inspect}"
             rstore_mark(v) unless Node::rstore_atom?(v)
           end
         end
-        tag "return from mark"
+#        tag "return from mark"
       end
       
     public # RStore methods
@@ -772,6 +843,9 @@ module Reform
       def clear 
         @model_value = {}
         @rstore_db.clear
+	@in_tran = false
+	@objectspace = {}
+	@revspace = {}
         # it is rather obvious that rstore_value2hash({}) == {} itself. 
         @rstore_db[ROOT_OID] = Marshal::dump(RStoreNode::rstore_value2hash(@model_value, self))
       end
@@ -788,23 +862,27 @@ module Reform
         self
       end
 
-      attr :objectspace
+      attr :objectspace, :revspace
 
       def tran?
         @in_tran
       end
 
-      def rstore_gen_oid
+      def rstore_gen_oid val 
         oid = @rstore_db['next_rstore_oid'] || 'A'
 #         tag "rstore_gen_oid, oid = #{oid.inspect}"
         # to the uniformed: next-> A...Z.AA...AZ.BA...BZ etc etc 
         @rstore_db['next_rstore_oid'] = oid.next
+	@objectspace[val.object_id] = oid
+	@revspace[oid] = val 
         oid
       end
 
       def close
 #         tag "closing the rstore"
         @rstore_db.close
+	@objectspace = @revspace = nil
+	@in_tran = false
       end
 
       # override. It is important to realize that assignments causing 'inter'
@@ -871,14 +949,14 @@ module Reform
       end
       
       def garbage_collect
-        tag "garbage_collect"
+#        tag "garbage_collect"
         @marked = { ROOT_OID=>true }
-        tag "marking"
+#        tag "marking"
         rstore_mark(self[ROOT_OID])
-        tag "sweep, marked nodes= #{@marked.keys.inspect}"
+#        tag "sweep, marked nodes= #{@marked.keys.inspect}"
         sweep = []
         @rstore_db.each_key { |key| sweep << key unless @marked[key] }
-        tag "actually delete them, sweep=#{sweep.inspect}"
+#        tag "actually delete them, sweep=#{sweep.inspect}"
         sweep.each { |key| @rstore_db.delete(key) }
         @marked = nil
       end

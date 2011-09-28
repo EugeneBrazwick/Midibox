@@ -37,7 +37,7 @@ module RRTS
 #           [ name ]  Name of the client, default is 'rplayer'
 #           [ clientname ] Alias for _name_.
 #           [ client_name ] Alias for _name_.
-#           [ end_delay ] Sleeptime when quiting, default +nil+ (== not). Do not pass 0.
+#           [ end_delay ] Sleeptime when quiting, default +nil+ (== 'do not sleep'). Do not pass 0.
 #           [ blockingmode ] can be +:blocking+ or +:nonblocking+ (or the constants Blocking/NonBlocking)
 #                            +:blocking+ is the default
 #           [ full_throttle ] Spam the output queue if +true=. This disables the +write_ahead+ and is default false

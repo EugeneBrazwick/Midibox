@@ -2,6 +2,7 @@
 require 'reform/app'
 require 'reform/models/rstore'
 require 'pp'
+require 'rspec'
 
 class TestMe
   private
@@ -529,11 +530,183 @@ describe RStore do
     end
   end
   
-  it "should handle delete on Hash"
-  it "should handle delete on Array"
-  it "should handle pop and push"
-  it "should handle shift and unshift"
-  
+  it "should handle delete on Hash" do 
+    RStore.new(@dbname) do |rstore|
+      rstore.clear
+      rstore.h = { bear: 'Pooh', lion: 'Roar', ant: 'Heavy' }
+      rstore.transaction do |tran|
+	rstore.h.delete(:bear)
+	tran.abort
+      end
+    end
+    RStore.new(@dbname) do |rstore|
+      rstore.h.should == { bear: 'Pooh', lion: 'Roar', ant: 'Heavy' }
+      rstore.h.delete(:bear)
+    end
+    RStore.new(@dbname) do |rstore|
+      rstore.h.should == { lion: 'Roar', ant: 'Heavy' }
+    end
+  end
+
+  it "should handle delete on Array" do
+    RStore.new(@dbname) do |rstore|
+      rstore.clear
+      rstore.h = [ 'Pooh', :lion, 42 ]
+      rstore.transaction do |tran|
+	rstore.h.delete('Pooh')
+	rstore.h.delete('not there')
+	tran.abort
+      end
+    end
+    RStore.new(@dbname) do |rstore|
+      rstore.h.should == [ 'Pooh', :lion, 42 ]
+      rstore.h.delete(42)
+      rstore.h.should == [ 'Pooh', :lion ]
+#      tag "rstore contents: #{rstore.rstore_db_inspect}"
+    end
+    RStore.new(@dbname) do |rstore|
+      rstore.h.should == [ 'Pooh', :lion ]
+    end
+  end
+
+  it "should handle pop on Array" do
+    RStore.new(@dbname) do |rstore|
+      rstore.clear
+      rstore.h = [ 'Pooh', :lion, 42 ]
+      rstore.transaction do |tran|
+	rstore.h.pop
+	tran.abort
+      end
+    end
+    RStore.new(@dbname) do |rstore|
+      rstore.h.should == [ 'Pooh', :lion, 42 ]
+      rstore.h.pop
+      rstore.h.should == [ 'Pooh', :lion ]
+#      tag "rstore contents: #{rstore.rstore_db_inspect}"
+    end
+    RStore.new(@dbname) do |rstore|
+      rstore.h.should == [ 'Pooh', :lion ]
+    end
+  end
+
+  it "should handle push on Array" do
+    RStore.new(@dbname) do |rstore|
+      rstore.clear
+      rstore.h = [ 'Pooh', :lion, 42 ]
+      rstore.transaction do |tran|
+	rstore.h.push(:ant_eater, :royal_bastard)
+	tran.abort
+      end
+    end
+    RStore.new(@dbname) do |rstore|
+      rstore.h.should == [ 'Pooh', :lion, 42 ]
+      rstore.h.push(:ant_eater, :royal_bastard)
+      rstore.h.should == [ 'Pooh', :lion, 42, :ant_eater, :royal_bastard ]
+    end
+    RStore.new(@dbname) do |rstore|
+      rstore.h.should == [ 'Pooh', :lion, 42, :ant_eater, :royal_bastard ]
+    end
+  end
+
+  it "should handle shift on Array" do
+    RStore.new(@dbname) do |rstore|
+      rstore.clear
+      rstore.h = [ 'Pooh', :lion, 42 ]
+      rstore.transaction do |tran|
+	rstore.h.shift
+	tran.abort
+      end
+    end
+    RStore.new(@dbname) do |rstore|
+      rstore.h.should == [ 'Pooh', :lion, 42 ]
+      rstore.h.shift
+      rstore.h.should == [ :lion, 42 ]
+    end
+    RStore.new(@dbname) do |rstore|
+      rstore.h.should == [ :lion, 42 ]
+    end
+  end
+
+  it "should handle unshift" do
+    RStore.new(@dbname) do |rstore|
+      rstore.clear
+      rstore.h = [ 'Pooh', :lion, 42 ]
+      rstore.transaction do |tran|
+	rstore.h.unshift(:ant_eater, :royal_bastard)
+	tran.abort
+      end
+    end
+    RStore.new(@dbname) do |rstore|
+      rstore.h.should == [ 'Pooh', :lion, 42 ]
+      rstore.h.unshift(:ant_eater, :royal_bastard)
+      rstore.h.should == [ :ant_eater, :royal_bastard, 'Pooh', :lion, 42]
+    end
+    RStore.new(@dbname) do |rstore|
+      rstore.h.should == [ :ant_eater, :royal_bastard, 'Pooh', :lion, 42]
+    end
+  end
+
+  it "should handle circular references" do
+    RStore.new(@dbname) do |rstore|
+      rstore.bear1 = { name: 'little bear', occupation: 'being little' }
+      rstore.bear2 = { name: 'big bear', occupation: 'being big' }
+      little_bear, big_bear = rstore.bear1, rstore.bear2
+      little_bear[:dad] = big_bear
+      big_bear[:son] = little_bear
+    end
+    RStore.new(@dbname) do |rstore|
+      little_bear, big_bear = rstore.bear1, rstore.bear2
+#      tag "lb=#{little_bear.inspect}, bb=#{big_bear.inspect}"
+      dad, son = little_bear[:dad], big_bear[:son]
+#      tag "son=#{son.inspect}, dad=#{dad.inspect}"
+      dad.model_value.should be(big_bear.model_value)
+      dad.should be(big_bear)
+      son.should be(little_bear)
+    end
+  end
+
+  it "should handle self referencing" do
+    selfref = [1, 2, 3, 4]
+    selfref << selfref
+    RStore.new(@dbname) do |rstore|
+      rstore.clear
+#      tag "assigning selfref"
+      rstore.selfref = selfref
+#      tag "closing rstore"
+    end
+#    tag "reopen rstore"
+    RStore.new(@dbname) do |rstore|
+#      tag "loading selfref"
+      selfref = rstore.selfref
+      selfref[4].should be(selfref)
+      selfref[4].model_value.should be(selfref.model_value)
+    end
+  end
+
+  it "should maintain the 'shared' state of objects" do
+    item1 = [1, 2, 3, 4]
+    item2 = :system
+    item3 = { k: item1, l: item1, m: item2 }
+    item4 = [item1, item1, item2, item2, item3, item3]
+    RStore.new(@dbname) do |rstore|
+      rstore.item1 = item1
+      rstore.item2 = item2
+      rstore.item4 = item4
+    end
+    RStore.new(@dbname) do |rstore|
+      item1 = rstore.item1
+      item2 = rstore.item2
+      item4 = rstore.item4
+      item3 = item4[5]
+      item3[:k].should be(item1)
+      item3[:l].should be(item1)
+      item3[:m].should be(item2)
+      item4[0].should be(item1)
+      item4[2].should be(item2)
+      item4[4].should be(item3)
+    end
+  end
+
 end # describe RStore
 
 __END__

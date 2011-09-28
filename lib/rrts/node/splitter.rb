@@ -22,8 +22,10 @@ module RRTS
 
     end # again, this was almost too easy....
 
-# Splitter make it possible of associating several consumer with a single filter.
+# Splitter make it possible of associating several consumers with a single filter.
 # As such it resembles a 'MultiFilter'.
+# There is no notion of default or 'else' channel. Each channel stuck in requires
+# a condition, even if that is { |x| true }. It can also not be nil (currently at least)
 # Splitter can also be created by stacking up Filters on top of one another
 # but this would be rather complicated.
 # For example a channelsplitter cannot just be a ch==1 + ch==2 condition in
@@ -32,7 +34,7 @@ module RRTS
 # Internally it uses a different structure than Base.
 # We use a hash with key: the condition, and value: the ConsumerBlade stuck to it.
 #
-# IMPORTANT: conditions do not work as hashkeys. So I decided that name is required.
+# IMPORTANT: conditions do not work as hashkeys. So I decided that a name is required.
     class Splitter < Consumer
 
         class Split < Identity
@@ -58,12 +60,17 @@ module RRTS
 
       public
 
+	# assign the +block+ condition to given splitter, creating it if needed
+	# if no +block+ is given returns the condition named +name+
         def condition(name, &block)
 #           tag "splitters = #@splitters"
-          s = @splitters[name] and return s
+	  unless block
+            s = @splitters[name] and return s
+	  end
           @splitters[name] = Split.new(name, &block)
         end
 
+	# override
         def consume producer, &when_done
           cons = {}
           @splitters.each do |k, split|
@@ -73,7 +80,7 @@ module RRTS
           each_fiber(when_done) do |ev|
             if ev.nil?
               # this is an obligation and inconvenient for handle_event overrides
-              cons.each_value { |out| out.resume nil }
+              send_nils_to cons
             else
               cons.each do |name, fib|
 #                 tag "calling handle_event #{ev}, based on #{@splitters.inspect}"

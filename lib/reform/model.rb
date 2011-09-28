@@ -389,7 +389,7 @@ transaction that is immediately committed (and at that point propagation starts)
         @stack = []
 #         tag "tran test"
         raise ProtocolError, 'Protocol error, transaction already started' if @@transaction
-#         tag "BEGIN WORK, SENDER IS NOW #{sender}" #, caller=#{caller.join("\n")}"
+#        tag "BEGIN WORK, SENDER IS NOW #{sender}" #, caller=#{caller.join("\n")}"
         @sender, @@transaction = sender, self
         @root = root
         @keypaths = {} # must be full paths!
@@ -1061,7 +1061,7 @@ if __FILE__ == $0
     end
 
     def propagateChange prop
-      tag "propagate: field: #@field, #{prop.inspect}"
+#      tag "propagate: field: #@field, #{prop.inspect}"
     end
 
     model_dynamic_accessor :field
@@ -1074,7 +1074,7 @@ if __FILE__ == $0
     s.field = 45
     s.transaction(self) do
       s.field = 24
-      tag "AND now expect prop:"
+#      tag "AND now expect prop:"
     end
 =end
  #=begin
@@ -1083,10 +1083,10 @@ if __FILE__ == $0
       raise 'WTF' unless tran == Transaction::transaction
       s.field = 82324
       raise 'WTF' unless tran == Transaction::transaction && tran.active?
-      tag "AND now expect no prop, calling ABORT!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+#      tag "AND now expect no prop, calling ABORT!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
       tran.abort
       raise "WTF, tran=#{tran.inspect}" unless Transaction::transaction == nil && tran.aborted?
-      tag "s.field #{s.field} should be restored to 24"
+#      tag "s.field #{s.field} should be restored to 24"
       raise 'WTF' unless s.field == 24
     end
  #=end

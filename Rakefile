@@ -3,7 +3,8 @@ require 'rake'
 require 'rake/clean'
 require 'rspec/core/rake_task' # as in Upgrade.markdown
 #require '/var/lib/gems/1.9.1/gems/rspec-core-2.0.1/lib/rspec/core/rake_task'
-RSPEC = true
+RSPEC = `gem list | grep rspec`.strip != ''
+RCOV = `gem list | grep rcov`.strip != ''
 
 require 'rake/rdoctask'
 DARKFISH = false
@@ -33,7 +34,16 @@ if RSPEC
   RSpec::Core::RakeTask.new(:rspec_tests) do |t|
     t.rspec_opts = ['--color']
     t.ruby_opts = ['-W0']
-    t.pattern = FileList['test/**/*_spec.rb']
+    t.pattern = FileList['test/**/*_spec.rb', 'spec/**/*_spec.rb']
+  end
+
+  desc "Run all specs with RCov"
+  RSpec::Core::RakeTask.new(:coverage) do |t|
+    t.rspec_opts = ['--color']
+    t.ruby_opts = ['-W0']
+    t.pattern = FileList['spec/**/*_spec.rb']
+    t.rcov = true
+    t.rcov_opts = ['--exclude', 'spec', '--exclude', 'test']
   end
 
   task :test=>:rspec_tests do

@@ -28,8 +28,8 @@ module RRTS # namespace
         # Create a new node. Possible options depend on the subclass, see
         # Producer::new
         def initialize options = nil
-         # IT REPEAT IT AGAIN!!! ALL DEFAULTS FOR OPTIONS MUST BE *before* THE super call!!!!
-          @spam = false
+         # ALL DEFAULTS FOR OPTIONS MUST BE *before* THE super call!!!!
+          @spam = false # ignore timings, just give all you got
 #           tag "new #{self}"
           super()
 #           tag "consumers := []"
@@ -52,8 +52,8 @@ module RRTS # namespace
           end
         end
 
-        # Basic consuming fiber structure. The event handling is all within an
-        # exclusive block.  To stop, the producer must send a nil message
+        # Basic 'consuming' fiber structure. The event handling is all within an
+        # 'exclusive' block.  To stop, the producer must send a nil message
         # (this is handled automatically by the Producer class).
         # See Fiber::new and Monitor#synchronize in the pickaxe/ri/rdoc.
         #
@@ -62,11 +62,13 @@ module RRTS # namespace
         # Parameters:
         # [when_done] if a proc is passed here it will always be executed when
         #             the fiber is done.
+	# [&block] your event handler
+	#
         # Example:
         #
-        #    fiber = each_fiber { |event| puts event.to_s }
+        #    consumer = each_fiber { |event| puts event.to_s }
         #    event_source.each do |event|
-        #      fiber.resume event
+        #      consumer.resume event
         #    end
         #
         def each_fiber when_done = nil
@@ -75,13 +77,27 @@ module RRTS # namespace
             begin # ensure
               loop do
                 synchronize do
-                  yield(ev)
+                  yield ev
                   raise StopIteration if ev.nil? && (@producercount -= 1) == 0
                 end # synchronize
                 ev = Fiber.yield
               end # loop
             ensure
               when_done.call if when_done
+            end
+          end
+        end
+
+        # send nil events to each element in given consumerarray
+        # consumers take this as a hint to stop erm... consuming
+        def send_nils_to cons
+          protect_from_interrupt do
+            cons.each do |out|
+              begin
+                out.resume nil
+              rescue FiberError
+                # ignore, normal if Fiber already exited (p.e. on an Interrupt)
+              end
             end
           end
         end
@@ -114,6 +130,9 @@ module RRTS # namespace
       public
 
         # Add one or an array of consumers. Note that this code is *not* used by Consumer
+	# Returns self
+	# If this producer is a spammer, all consumer will become infected with it as well
+	# This method can be called more than once
         def >> consumer
           if consumer.respond_to?(:to_ary)
             @consumers += consumer.to_ary
@@ -162,7 +181,6 @@ module RRTS # namespace
 
         # passing complete chunks is a very quick way of passing messages.
         def to_chunk
-          nil
         end
 
         attr :consumers # for debugging purposes currently BAD EFFECTS!!! AAARGHH
@@ -181,7 +199,10 @@ module RRTS # namespace
         attr_writer :spam
     end
 
-# A Producer is a producer of events.
+# A Producer is a producer of events. And an event should suppot a 'tick'
+# method which contains the timestamp when it should be fired.
+# Timing can be disabled using the 'spam' option, so in that case I guess
+# any ruby instance can serve as event
     class Producer < Base
       include Enumerable # since we use 'each' already
 
@@ -189,10 +210,10 @@ module RRTS # namespace
 #       Create a new producer.
 #       Valid options are:
 #       [:spam]] use spamming mode. If so the producer returns events as fast as possible.
-#                Setting this will ignore +write_ahead+. The default value is +false+.
+#                Setting this to true will ignore +write_ahead+. The default value is +false+.
 #       [:full_throttle] same as spam
 #       [:write_ahead] number of seconds to be ahead with producing events. If the next event
-#                      is scheduled more than this away, we sleep for +sleeptime+ seconds.
+#                      is scheduled more than this amount in the future, we sleep for +sleeptime+ seconds.
 #                      Default is 3. This option conflicts with +spam+.
 #       [:sleeptime] number of seconds to sleep if too far ahead. Default is 2. It is clear
 #                    that it should be less than +write_ahead+.
@@ -202,7 +223,7 @@ module RRTS # namespace
 #       not for Producer#each in
 #       general (as I am lazy and otherwise all implementors must add the same timing sequence
 #       over and over (3 times for now)).
-#       Also it is convenient having each always use 'spam' mode.
+#       Also it is convenient having 'each' always use 'spam' mode.
         def initialize options = nil
           @write_ahead = 3
           @sleeptime = 2
@@ -210,6 +231,7 @@ module RRTS # namespace
           super
         end
 
+	# override
         def parse_option k, v
           case k
           when :spam, :full_throttle then @spam = v
@@ -217,20 +239,6 @@ module RRTS # namespace
           when :sleeptime then @sleeptime = v
           when :threads then @threads = v
           else super
-          end
-        end
-
-        # send nil events to given consumers.
-        # consumers take this as a hint to stop erm... consuming
-        def send_nils_to(cons)
-          protect_from_interrupt do
-            cons.each do |out|
-              begin
-                out.resume nil
-              rescue FiberError
-                # ignore, normal if Fiber already exited (p.e. on an Interrupt)
-              end
-            end
           end
         end
 
@@ -329,10 +337,11 @@ module RRTS # namespace
         # [producer] a Producer instance or an array of them. If supplied we connect to it/them using
         #            Base#connect_from. This will add these producers as our eventsources.
         # [options]. See Base::new. We also support +:condition: here. Same as passing it as third argument.
-        # [condition] This is the actual filter proc. If not given (or +nil+) it is effectively
+        # [condition] This is the actual filter block. If not given (or +nil+) it is effectively
         #             equal to { |ev| true }. It should accept a single argument and return a boolean.
-        #             The returnvalue +true+ indicates the event will pass, otherwise it will vanish
-        #             from the premises.
+        #             A returnvalue equivalent to +true+ (not nil/false) indicates the event will pass, 
+	#	      otherwise it will vanish
+        #             from the premises. The condition is never applied to nil events.
         def initialize producer = nil, options = nil, &condition
           @condition = condition
   #         tag "Filter.new, condition=#{@condition.inspect}"

@@ -252,8 +252,14 @@ transaction that is immediately committed (and at that point propagation starts)
 
         public # PropertyDeleted methods
           def undo
-#             tag "#{self}::UNDO, locate[#{@keypath[-1]}] := #{@oldval.inspect}"
-            @model.model_apply_setter(key, @oldval)
+#            tag "#{self}::UNDO, model[#@key] := #{@oldval.inspect}"
+	    mv = @model.model_value
+	    if mv.respond_to?(:insert)
+	      mv.insert(key, @oldval)
+	    else
+	      @model.model_apply_setter(key, @oldval)
+	    end
+#	    tag "undid delete : #{@model.inspect}"
           end
 
           def deleted?
@@ -363,7 +369,7 @@ transaction that is immediately committed (and at that point propagation starts)
           def initialize model, key, oldval #= nil
             super model, key
 #             raise 'wtf' if oldval.nil?
-#             tag "New #{self} (#{model}, #{keypath.inspect}, #{oldval})"
+            #tag "New #{self} (#{model}, #{key.inspect}, #{oldval})"
             @oldval = oldval
           end
 
@@ -382,6 +388,39 @@ transaction that is immediately committed (and at that point propagation starts)
           end
 
       end # class PropertyChange
+
+      class TotalReplacement < AbstractModelChange 
+	private
+	  def initialize owner, prev
+	    super owner, :self
+            @oldval = prev
+	  end
+
+	public
+          # as in 'from value X to value Y'
+          def updated?
+            true
+          end
+
+          def undo
+	    if @model.respond_to?(:each_pair)
+	      @oldval.each_pair do |k, v|
+		@model.model_apply_setter(k, v)
+	      end
+	    elsif @model.respond_to?(:each_with_index)
+	      @oldval.each_with_index do |v, i|
+		@model.model_apply_setter(i, v)
+	      end
+	    else
+	      @oldval.instance_variables.each do |k|
+		@model.model_apply_setter(k, @oldval.instance_variable_get(k))
+	      end
+	    end
+          end
+
+	  attr :oldval
+
+      end # class TotalReplacement
 
     private # Transaction methods
 

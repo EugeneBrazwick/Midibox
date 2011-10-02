@@ -381,11 +381,11 @@ module Reform
         # For internal use only (hence _i suffix)
         def registerControlClassProxy_i name, thePath
           name = name.to_sym
-#           tag "#{self}::registerControlClassProxy_i(#{name}, #{thePath})"
+#          tag "#{self}::registerControlClassProxy_i(#{name}, #{thePath})"
           # to avoid endless loops we must consider that by loading some classes it is possible
           # that we already loaded the file.
           if Symbol === thePath
-    #         tag "Create alias :#{name} :#{thePath}"
+#            tag "Create alias :#{name} :#{thePath}"
             module_eval("alias :#{name} :#{thePath}")
             return
           end
@@ -1112,7 +1112,7 @@ module Reform
 #         tag "GLOBBING #{dirprefix}/#{dir}/*.rb"
         for file in Dir["#{dirprefix}/#{dir}/*.rb"]
           basename = File.basename(file, '.rb')
-#           tag "INTERNALIZE #{basename} from #{file}"
+#          tag "INTERNALIZE #{basename} from #{file}"
           if File.symlink?(file)
             symlinks[basename.to_sym] = File.basename(File.readlink(file), '.rb').to_sym
           else

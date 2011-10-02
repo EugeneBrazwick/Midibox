@@ -54,13 +54,13 @@ end
 
 file ALSALIB => FileList['lib/rrts/driver/*.cpp'] do
   Dir.chdir 'lib/rrts/driver' do
-    sh "#{ENV['RUBY']} ./extconf.rb && make && rm -f *.o mkmf.log"
+    sh "#{ENV['RUBY'] || 'ruby'} ./extconf.rb && make && rm -f *.o mkmf.log"
   end
 end
 
 file PERLINLIB => FileList['ext/ruby-perlin/*.cpp'] do
   Dir.chdir 'ext/ruby-perlin' do
-    sh "#{ENV['RUBY']} ./extconf.rb && make && rm -f *.o mkmf.log"
+    sh "#{ENV['RUBY'] || 'ruby'} ./extconf.rb && make && rm -f *.o mkmf.log"
   end
 end
 

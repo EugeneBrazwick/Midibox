@@ -133,7 +133,7 @@ module Reform
       end
 
       def paint painter, option, widget = nil
-        tag "#{self}#paint IN"
+#        tag "#{self}#paint IN"
         # widget is the actual widget, but can be nil.
         # the method should paint to painter.
 #          painter.pen = Qt::Pen.new(Qt::black)
@@ -181,7 +181,7 @@ module Reform
           setTransform(@i) # restore to I ???????
           painter.restore
         end
-        tag "#{self}#paint OUT"
+#        tag "#{self}#paint OUT"
       end
 
       # The rotation is clockwise

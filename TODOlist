@@ -109,18 +109,18 @@ dedicated git-branch, with remark starting with 'fix0001:' etc.
 -0019 Wed Sep 29 19:59:26 CEST 2010 BUG: rrecordmidi++ does not understand '-?' for --help
     Wed Oct  6 15:49:47 CEST 2010
 -0020 Wed Sep 29 20:13:13 CEST 2010 bin/node_identity.rb --output='UM-2 MIDI 2' --input=/tmp/t.yaml GIVES:
-    /home/ara/Midibox/lib/rrts/midiqueue.rb:88:in `set_queue_tempo':
+    ~/Midibox/lib/rrts/midiqueue.rb:88:in `set_queue_tempo':
     wrong argument type RRTS::Driver::AlsaQueueTempo_i (expected Data) (TypeError)
-        from /home/ara/Midibox/lib/rrts/midiqueue.rb:94:in `tempo='
-        from /home/ara/Midibox/lib/rrts/midiqueue.rb:53:in `initialize'
-        from /home/ara/Midibox/lib/rrts/sequencer.rb:494:in `new'
-        from /home/ara/Midibox/lib/rrts/sequencer.rb:494:in `create_queue'
-        from /home/ara/Midibox/lib/rrts/node/player.rb:145:in `block in consume'
-        from /home/ara/Midibox/lib/rrts/node/node.rb:64:in `block (3 levels) in each_fiber'
+        from ~/Midibox/lib/rrts/midiqueue.rb:94:in `tempo='
+        from ~/Midibox/lib/rrts/midiqueue.rb:53:in `initialize'
+        from ~/Midibox/lib/rrts/sequencer.rb:494:in `new'
+        from ~/Midibox/lib/rrts/sequencer.rb:494:in `create_queue'
+        from ~/Midibox/lib/rrts/node/player.rb:145:in `block in consume'
+        from ~/Midibox/lib/rrts/node/node.rb:64:in `block (3 levels) in each_fiber'
         from /usr/lib/ruby/1.9.1/monitor.rb:201:in `mon_synchronize'
-        from /home/ara/Midibox/lib/rrts/node/node.rb:62:in `block (2 levels) in each_fiber'
-        from /home/ara/Midibox/lib/rrts/node/node.rb:61:in `loop'
-        from /home/ara/Midibox/lib/rrts/node/node.rb:61:in `block in each_fiber'
+        from ~/Midibox/lib/rrts/node/node.rb:62:in `block (2 levels) in each_fiber'
+        from ~/Midibox/lib/rrts/node/node.rb:61:in `loop'
+        from ~/Midibox/lib/rrts/node/node.rb:61:in `block in each_fiber'
     It seems that AlsaQueueTempo_i is never seen as originating from snd_seq_queue_tempo_malloc??
     Fri Oct  8 21:26:52 CEST 2010 FIXED
 0021 Fri Oct  8 21:26:01 CEST 2010.  Change 'skew' consistently into a float.
@@ -136,20 +136,20 @@ I can see something is being done but a user will be confused if a gem install t
 0025 Thu Oct 21 22:45:36 CEST 2010. If it asks to save the data, when closing down, it must be
      with a 'save|do not save|cancel' dialog. And if I cancel the form must not be closed.
 -0026 Wed Oct 27 23:02:59 CEST 2010. midibox crashes (upgraded to maverick. Qt4.7)
-    /home/ara/Midibox/lib/reform/models/structure.rb:175: [BUG] Segmentation fault
+    ~/Midibox/lib/reform/models/structure.rb:175: [BUG] Segmentation fault
 	ruby 1.9.2p0 (2010-08-18 revision 29036) [x86_64-linux]
 	-- control frame ----------
 	c:0045 p:---- s:0167 b:0167 l:000166 d:000166 CFUNC  :method_missing
-	c:0044 p:0212 s:0165 b:0165 l:000164 d:000164 METHOD /home/ara/Midibox/lib/reform/models/structure.rb:175
-	c:0043 p:0022 s:0160 b:0157 l:000147 d:000156 BLOCK  /home/ara/Midibox/lib/reform/models/structure.rb:192
+	c:0044 p:0212 s:0165 b:0165 l:000164 d:000164 METHOD ~/Midibox/lib/reform/models/structure.rb:175
+	c:0043 p:0022 s:0160 b:0157 l:000147 d:000156 BLOCK  ~/Midibox/lib/reform/models/structure.rb:192
 	c:0042 p:---- s:0153 b:0153 l:000152 d:000152 FINISH
 	c:0041 p:---- s:0151 b:0151 l:000150 d:000150 CFUNC  :each
-	c:0040 p:0219 s:0148 b:0148 l:000147 d:000147 METHOD /home/ara/Midibox/lib/reform/models/structure.rb:191
-	c:0039 p:0251 s:0141 b:0141 l:000140 d:000140 METHOD /home/ara/Midibox/lib/reform/models/structure.rb:147
+	c:0040 p:0219 s:0148 b:0148 l:000147 d:000147 METHOD ~/Midibox/lib/reform/models/structure.rb:191
+	c:0039 p:0251 s:0141 b:0141 l:000140 d:000140 METHOD ~/Midibox/lib/reform/models/structure.rb:147
 	c:0038 p:---- s:0137 b:0137 l:000136 d:000136 FINISH
 	c:0037 p:---- s:0135 b:0135 l:000134 d:000134 CFUNC  :new
-	c:0036 p:0296 s:0131 b:0131 l:000130 d:000130 METHOD /home/ara/Midibox/lib/reform/models/structure.rb:168
-	c:0035 p:0022 s:0126 b:0123 l:000113 d:000122 BLOCK  /home/ara/Midibox/lib/reform/models/structure.rb:192
+	c:0036 p:0296 s:0131 b:0131 l:000130 d:000130 METHOD ~/Midibox/lib/reform/models/structure.rb:168
+	c:0035 p:0022 s:0126 b:0123 l:000113 d:000122 BLOCK  ~/Midibox/lib/reform/models/structure.rb:192
     Strange.
      Fri Oct 29 22:43:52 CEST 2010
 0027 Sat Oct 30 15:33:21 CEST 2010. Design error. Specific for Structure::unshift, and changing array order.
@@ -171,20 +171,20 @@ I can see something is being done but a user will be confused if a gem install t
 0030 Tue Dec 21 21:47:48 CET 2010. Fedora14 support. Running virtual now.
 Current state:
     Failed to load Qt4, attempt to build it right here and now
-    CHECKING '/home/ara/.rvm/src/ruby-1.9.2-p0/include/ruby.h'
+    CHECKING '~/.rvm/src/ruby-1.9.2-p0/include/ruby.h'
     Retry!
     Failed to load Qt4, attempt to build it right here and now
-    CHECKING '/home/ara/.rvm/src/ruby-1.9.2-p0/include/ruby.h'
+    CHECKING '~/.rvm/src/ruby-1.9.2-p0/include/ruby.h'
     Retry!
     Failed to load Qt4, attempt to build it right here and now
-    CHECKING '/home/ara/.rvm/src/ruby-1.9.2-p0/include/ruby.h'
+    CHECKING '~/.rvm/src/ruby-1.9.2-p0/include/ruby.h'
     etc..... load == 100%
     However a restart of the midibox script fixes it.
 0031 Sat Nov 20 23:09:47 CET 2010 BUG:
-    /home/ara/Midibox/lib/rrts/midievent.rb:149:in `populate': undefined method `id_clients' for #<RRTS::Sequencer:0x00000002855690> (NoMethodError)
-        from /home/ara/Midibox/lib/rrts/midievent.rb:149:in `initialize'
-        from /home/ara/Midibox/lib/rrts/sequencer.rb:322:in `new'
-        from /home/ara/Midibox/lib/rrts/sequencer.rb:322:in `event_input'
+    ~/Midibox/lib/rrts/midievent.rb:149:in `populate': undefined method `id_clients' for #<RRTS::Sequencer:0x00000002855690> (NoMethodError)
+        from ~/Midibox/lib/rrts/midievent.rb:149:in `initialize'
+        from ~/Midibox/lib/rrts/sequencer.rb:322:in `new'
+        from ~/Midibox/lib/rrts/sequencer.rb:322:in `event_input'
     Happens on qtrconnect after unplugging + replugging usb-midiconnector.
     Must be a PortStartEvent then ?
 0032 Sat Nov 20 23:09:47 CET 2010
@@ -195,8 +195,8 @@ Current state:
 0034 Fri Jan  7 23:21:10 CET 2011
     :: ruby1.9.1 examples/painting/cubics_demo04.rb
     when clicking in an active vertex:
-    /home/ara/Midibox/lib/reform/graphics/activepath.rb:93:in `setVertexPos': undefined method `path' for #<Reform::PathItem::PathBuilder:0x00000001684380> (NoMethodError)
-    from /home/ara/Midibox/lib/reform/graphics/activepath.rb:34:in `itemChange'
+    ~/Midibox/lib/reform/graphics/activepath.rb:93:in `setVertexPos': undefined method `path' for #<Reform::PathItem::PathBuilder:0x00000001684380> (NoMethodError)
+    from ~/Midibox/lib/reform/graphics/activepath.rb:34:in `itemChange'
 -0035 Sun Jan  9 14:10:28 CET 2011
     struct does not propagate at all it seems, see lib/reform/examples/processing/data1_2b.rb
     data1_2.rb shows a circle that is immediately 'red', however it does that because the dynamic color
@@ -212,7 +212,7 @@ Current state:
 0037 Sun Jan  9 17:39:08 CET 2011
     The QReplicator handles pen + brush inconsistently. Should be same as 'Empty' class.
 0038 Wed Jan 12 21:00:50 CET 2011
-    Duplicator and Replicator must gain GENERIC abality to step-operate on ANY parameter.
+    Duplicator and Replicator must gain GENERIC ability to step-operate on ANY parameter.
     This can of course be done with procs. Just define a 'step' proc that operates on the (re|du)plicate
 0039 Sun Jan 16 23:12:25 CET 2011
     prelims.rb should get the notion of a package. Since midibox = reform+alsa. Currently the 'reform.bash' starter
@@ -227,3 +227,26 @@ Current state:
 0042 Thu Sep 22 21:07:50 CEST 2011
     Need RStore::Item class to create auto-persistent subclasses, that allow more complicated
     changes.
+-0043 Sun Oct  2 17:30:45 CEST 2011
+    Regression: reform spectest App: ICE default IO error handler doing exit(), errno = 4
+    Mon Oct  3 21:05:38 CEST 2011
+    Did not occur one day later. Must be some weird X state???
+-0044 Mon Oct  3 20:51:32 CEST 2011
+    ~/Midibox/lib/reform/app.rb:389:in `module_eval': undefined method `rfcircle' for module `Reform::GraphicContext' (NameError)
+	from ~/Midibox/lib/reform/app.rb:389:in `module_eval'
+	from ~/Midibox/lib/reform/app.rb:389:in `registerControlClassProxy_i'
+	from ~/Midibox/lib/reform/app.rb:1170:in `block in registerKlassProxy'
+	from ~/Midibox/lib/reform/app.rb:1170:in `each'
+	from ~/Midibox/lib/reform/app.rb:1170:in `registerKlassProxy'
+	from ~/Midibox/lib/reform/app.rb:1123:in `block (2 levels) in internalize'
+	from ~/Midibox/lib/reform/app.rb:1123:in `each'
+	from ~/Midibox/lib/reform/app.rb:1123:in `block in internalize'
+	from ~/Midibox/lib/reform/app.rb:1110:in `each'
+	from ~/Midibox/lib/reform/app.rb:1110:in `internalize'
+	from ~/Midibox/lib/reform/app.rb:1235:in `block in internalize_dir'
+	from ~/Midibox/lib/reform/app.rb:1233:in `each'
+	from ~/Midibox/lib/reform/app.rb:1233:in `internalize_dir'
+	from ~/Midibox/lib/reform/app.rb:1253:in `app'
+  Mon Oct  3 21:02:00 CEST 2011
+  reason circle -> rfcircle -> rfellipse. Feature: this is not handled at all.
+  So relinked circle -> rfellipse directly.

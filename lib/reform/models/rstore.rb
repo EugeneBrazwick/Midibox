@@ -97,7 +97,7 @@ module Reform
     private # RStoreNode methods
 
       def initialize parent, key, value, oid
-        raise 'BOGO' if !(nil == key || Symbol === key || Integer === key && key < 10_000_000)
+        raise "BOGO key #{key.inspect}" if !(nil == key || Symbol === key || Integer === key && key < 10_000_000)
         raise 'arg' if Class === parent
         @model_parent, @model_key, @model_value = parent, key, value
 #         tag "#{self}.new, parent=#{@model_parent}, key=#{key.inspect}, value=#{value}, oid=#{oid}"
@@ -169,7 +169,7 @@ module Reform
             STDERR.print "kind of mounted model '#{value}' detected, not stored!!!"
             value.model_parent = parent
             value.model_key = key
-            rstore[oid] = value if need_ospace_storing
+            rstore.rstore_assign_oid(oid, value) if need_ospace_storing
             return value
           end
 #           tag "interring other kind of instance #{value}"
@@ -187,7 +187,7 @@ module Reform
         rv = RStoreNode.new(parent, key, value, oid)
         if need_ospace_storing
 #           tag "inter stores new oid #{oid}"
-          rstore[oid] = value
+          rstore.rstore_assign_oid oid, value
 	  rstore.revspace[oid] = rv
         end
 	rv
@@ -338,6 +338,24 @@ module Reform
               tran.push(Transaction::PropertyDeleted.new(self, idx, prev))
               return result
             end
+          when :delete_at
+            raise 'oops' unless args.length == 1 && !block
+            # 'delete' works differently for arrays and hashes!
+	    idx = args[0]
+	    if @model_value.respond_to?(:has_key?)
+	      return nil unless @model_value.has_key?(idx)
+	    else # array
+	      l = @model_value.length
+	      idx = l + idx if idx < 0
+	      return nil if idx >= l
+	    end
+	    return @model_value.delete_at(idx) if tran.aborted?
+            prev = @model_value[idx]
+            #tag "Calling #{@model_value}.delete_at(#{idx.inspect})"
+            result = @model_value.delete_at(idx)
+            #tag "value is now #{@model_value.inspect}"
+	    tran.push(Transaction::PropertyDeleted.new(self, idx, prev))
+	    return result
 	  when :pop
 	    raise 'oops' unless args.length <= 1 || block
 	    count = args[0] || 1
@@ -353,6 +371,14 @@ module Reform
 	      @model_value.push(RStoreNode::rstore_inter(@model_value.length, el, self, rstore_rstore))
 	    end
 	    tran.push(Transaction::PropertyPushed.new(self, args.length)) unless tran.aborted?
+	    return self
+	  when :insert
+	    raise 'oops' if block || args.empty?
+	    return self if args.length == 1
+	    return @model_value.insert(*args) if tran.aborted?
+	    idx, elcount = args[0], args.length - 1
+	    @model_value.insert(*args)
+	    tran.push(Transaction::PropertyAdded.new(self, idx, elcount))
 	    return self
 	  when :shift # comparable with pop, but then in front
 	    # BUG 0027 applies here. May destroy integrity
@@ -373,14 +399,13 @@ module Reform
 	    return self
           end
           return @model_value.send(symbol, *args, &block) if tran.aborted?
-          raise "not implemented yet: total destructors like '#{symbol}'"
           # We must make sure the abort restores the situation
           # it should NOT replace 'self' with the clone.
           # Maybe a special propch can work here 'TotalReplaceOfContents'
-          # to restore by doing a 'foreach proprty' kind of operation
+          # to restore by doing a 'foreach property' kind of operation
           prev = @model_value.clone
           result = @model_value.send(symbol, *args, &block)
-          tran.push(Transaction::TotalReplacement.new(self, :self, prev))
+          tran.push(Transaction::TotalReplacement.new(self, prev))
           result
         end
       end
@@ -491,7 +516,7 @@ module Reform
 	  if v = rstore_rstore.revspace[oid = rv.oid] 
 	    rv = v
 	  else
-	    rv = rstore_rstore[oid]
+	    rv = rstore_rstore.rstore_oid2value(oid)
 #	    tag "and return a new wrapper!"
 	    rv = RStoreNode.new(self, symbol, rv, oid)
 	    rstore_rstore.revspace[oid] = rv
@@ -527,6 +552,13 @@ module Reform
 
       attr :model_value
       attr :model_key # #!!!
+
+      # same as 'symbol = nil; remove_instance_variable(symbol)
+      # untested...
+      def rstore_remove_instance_variable symbol
+	send(symbol.to_s + '=', nil)
+	@model_value.send(:remove_instance_variable, symbol)
+      end
 
       def inspect
         "#{self.class}[OID:#@rstore_oid]" # STACKOVERFLOW: {RStoreNode::rstore_value2hash(self, @rstore_rstore).inspect}"
@@ -669,7 +701,7 @@ module Reform
 	  if v = rstore_rstore.revspace[oid = rv.oid]
 	    rv = v
 	  else
-	    rv = rstore_rstore[oid]
+	    rv = rstore_rstore.rstore_oid2value(oid)
 #	    tag "and return a new wrapper!"
 	    rv = RStoreNode.new(self, numeric_key, rv, oid)
 	    rstore_rstore.revspace[oid] = rv
@@ -708,6 +740,7 @@ module Reform
             begin
               @model_value[name]
             rescue TypeError
+	      tag "TypeError, model_value is #@model_value"
               raise Error, tr("Bad getter '#{name.inspect}' on #{@model_value.class} value, caller = #{caller.join("\n")}")
             end
 #             nil
@@ -733,7 +766,7 @@ module Reform
       end
 
       def model_apply_setter name, value, sender = nil, more_args = nil
-#         tag "model_apply_setter(#{name.inspect}, #{value}, sender = #{sender})"
+        #tag "model_apply_setter(#{name.inspect}, #{value}, sender = #{sender})"
   #         name = name.to_s
   #         name = name[0...-1] if name[-1] == '?'
         if Array === name
@@ -748,10 +781,17 @@ module Reform
               prev = calc_prev(name)
               model_assign(name, value)
   #             tag "ADDING PROPCHANGE"
-              tran.addPropertyChange(name == :self ? @model_keypath : @model_keypath + [name], prev)
+              tran.addPropertyChange(self, name, prev)
             end
           end
         end
+      end
+
+      # important override
+      def respond_to? symbol
+        # only the getters are really covered here.
+        @model_value.respond_to?(symbol) || 
+	  Hash === @model_value && @model_value[symbol] || super
       end
 
   end # class RStoreNode
@@ -819,7 +859,7 @@ module Reform
           return if @marked[val.oid]
 #          tag "MARKED: #{val.oid}!"
           @marked[val.oid] = true
-          rstore_mark(self[val.oid])
+          rstore_mark(rstore_oid2value(val.oid))
         when Array
 #          tag "Array with #{val.length} values"
           val.each { |v| rstore_mark(v) unless Node::rstore_atom?(v) }
@@ -900,7 +940,7 @@ module Reform
         altered_owners.each do |object_id, node|
           raise 'aaargh' unless RStoreNode === node
           raise 'aargh' unless oid = node.rstore_oid
-          self[oid] = node.model_value
+          rstore_assign_oid oid, node.model_value
         end
         @rstore_db.end_transaction(true)
         @in_tran = false
@@ -920,7 +960,7 @@ module Reform
         @rstore_db[oid] = Marshal::dump(value)
       end
         
-      def []=(oid, value)
+      def rstore_assign_oid oid, value
         raise 'BOGO call' if RStoreNode === value
         raise 'Attempt to update outside transaction' unless @in_tran
         raise 'wtf' if oid =~ /^rstore/
@@ -928,7 +968,7 @@ module Reform
         rstore_assign_i oid, RStoreNode::rstore_value2hash(value, self)
       end
 
-      def [](oid)
+      def rstore_oid2value oid
         t = Marshal::restore(@rstore_db[oid])
 #         tag "raw rstore node unmarshalled[#{oid}]->#{t.pretty_inspect}"
         RStoreNode::rstore_hash2value(t, self)
@@ -952,7 +992,7 @@ module Reform
 #        tag "garbage_collect"
         @marked = { ROOT_OID=>true }
 #        tag "marking"
-        rstore_mark(self[ROOT_OID])
+        rstore_mark(rstore_oid2value(ROOT_OID))
 #        tag "sweep, marked nodes= #{@marked.keys.inspect}"
         sweep = []
         @rstore_db.each_key { |key| sweep << key unless @marked[key] }

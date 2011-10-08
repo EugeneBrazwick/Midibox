@@ -1,7 +1,6 @@
 
-# Copyright (c) 2010 Eugene Brazwick
+# Copyright (c) 2010-2011 Eugene Brazwick
 
-# require 'continuation'
 require 'Qt'
 require 'reform/control'
 
@@ -360,6 +359,13 @@ transaction that is immediately committed (and at that point propagation starts)
           end
       end
 
+      class VirtualPropertyChange < AbstractModelChange
+        public
+          def updated?
+            true
+          end
+      end # class VirtualPropertyChange
+
       # class for changes that actually involve data.
       # This can still be an insert (new data) or delete (possible to undo, so olddata is required)
       # But we are not really interested WHERE something is deleted or inserted.
@@ -562,17 +568,11 @@ transaction that is immediately committed (and at that point propagation starts)
       end
 
       # call this method to add pseudo changes. See TimeModel source for an example.
-      # Adds the @last_property changed (as set by +push+)
-      def addDependencyChange *key
-        model = @last_property.model
-        fullpath, root = model.model_keypath_and_root
-        if Array === key
-          fullpath += key
-        else
-          fullpath << key
-        end
-        keypath = keypath[0] if Array === keypath[0]
-        @keypaths[fullpath] = @last_property
+      # Adds to the @last_property changed (as set by +push+)
+      def addDependencyChange altered_owner, *keys
+	keys.each do |key|
+	  push(VirtualPropertyChange.new(altered_owner, key))
+	end
       end
   end # class Transaction
 

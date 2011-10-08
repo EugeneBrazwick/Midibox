@@ -58,7 +58,7 @@ module Reform
         @reg[pattern] = klass
       end
 
-      def postSetup
+      def model_postSetup
         @filename and load
       end
 

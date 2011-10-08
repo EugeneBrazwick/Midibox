@@ -520,6 +520,7 @@ module Reform
       # here we 'execute' the block or the hash, whichever was given
       # and then we call postSetup
       def setup hash = nil, &initblock
+	#tag "#{self}::setup"
         rfRescue do
           instance_eval(&initblock) if initblock
           setupQuickyhash(hash) if hash
@@ -703,8 +704,9 @@ module Reform
       # the default executes any gathered macro's. Then, if a model was set it calls
       # updateModel to initialize all connecting controls.
       # So you should call this first if you override this method
+      # Called from Control#setup
       def postSetup
-#         tag "#{self}#postSetup, model=#@model"
+        #tag "#{self}#postSetup, model=#@model"
         executeMacros
         # this is a dirty trick, but if a @localmodel is set (combo/list/table/ etc)
         # then these have @model == @localmodel (initially at least)

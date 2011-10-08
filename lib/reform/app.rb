@@ -910,12 +910,13 @@ module Reform
           end
         end
 
-        def struct *val, &block
+        def struct hash, &block
 #           tag "struct"
+	  raise 'struct now requires a hash in all cases' unless Hash === hash
           if block
             addModel(Structure.new.build(&block))
           else
-            structure value: if val.length == 1 then val[0] else val end
+            structure val
           end
         end
 
@@ -965,8 +966,10 @@ module Reform
         end
 
         def addModel control, hash = nil, &block
+	  #tag "addModel(#{control}), calling setup"
           raise Error, tr('A model was already set on the application') if @model
           control.parent = self
+	  #tag "calling #{control.class}#setup"
           control.setup hash, &block
           @model = control
         end

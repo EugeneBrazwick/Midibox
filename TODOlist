@@ -250,3 +250,6 @@ Current state:
   Mon Oct  3 21:02:00 CEST 2011
   reason circle -> rfcircle -> rfellipse. Feature: this is not handled at all.
   So relinked circle -> rfellipse directly.
+-0045 Sat Oct  8 12:23:12 CEST 2011. Regression. analogclock2/3 don't rotate properly.
+The arms OK, but the empty does nothing...
+Sat Oct  8 19:41:00 CEST 2011 Fixed. postSetup -> model_postSetup

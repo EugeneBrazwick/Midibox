@@ -11,7 +11,7 @@ module Reform
 
       def initialize parent, qtc = nil
         super
-#         tag "TimeModel.new(#{parent}, #{qtc})"
+  #      tag "TimeModel.new(#{parent}, #{qtc}), autostart := true"
 #         @timerid = nil
         @autostart = true
 
@@ -19,17 +19,18 @@ module Reform
 # BAD IDEA:  @current != current
 
         @frequency, @frameNr, @oneShot = 1.0, 0, false
+#	tag "setting up timer callback"
         connect @qtc, SIGNAL('timeout()') do
-#           tag "TIMEOUT"
+#          tag "TIMEOUT"
           transaction do |tran|
             self.frameNr += 1
-#             tag "self.current := .... "
+#            tag "self.current := .... "
             self.current = Qt::Time::currentTime
-            tran.addDependencyChange :to_s
-            tran.addDependencyChange :toString
+            tran.addDependencyChange self, :sec, :to_s, :toString, :hour12_f, :hour_f,
+				     :min_f
           end
         end
-  #       tag "creating timer"
+#        tag "creating timer, with default interval 1000"
         # OK
         @qtc.interval = 1000
       end
@@ -63,8 +64,8 @@ module Reform
 
     public
 
-      def postSetup
-#         tag "postSetup, autostart = #@autostart"
+      def model_postSetup
+#        tag "postSetup, autostart = #@autostart"
         @qtc.start if @autostart
       end
 

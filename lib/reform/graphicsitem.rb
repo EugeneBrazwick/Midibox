@@ -1,5 +1,5 @@
 
-# Copyright (c) 2010 Eugene Brazwick
+# Copyright (c) 2010-2011 Eugene Brazwick
 
 =begin
 
@@ -49,7 +49,7 @@ require 'reform/app'
         return @qtc.geometry unless x || w || block
         case x
         when Array then self.geometry = *x
-        when nil, Hash, Proc then handle_dynamics(Qt::RectF, :geometryF, x, &block)
+        when nil, Hash, Proc then handle_dynamics(Qt::RectF, :geometryF, nil, x, &block)
         else self.geometry = x, y, w, h
         end
       end
@@ -152,7 +152,7 @@ require 'reform/app'
       # BROKEN compatibility: around_xy is now a hash argument and no longer argument 2.
       def rotation degrees_cw = nil, options = {}, &block
         case degrees_cw
-        when Proc, Hash, nil then handle_dynamics(Float, :rotation, degrees_cw, &block)
+        when Proc, Hash, nil then handle_dynamics(Float, :rotation, nil, degrees_cw, &block)
         else
           degrees_cw *= 360.0 if options[:units]
           degrees_cw *= 180.0 / Math::PI if options[:rads]
@@ -169,7 +169,7 @@ require 'reform/app'
 
       def scale sx = nil, sy = nil, &block
         case sx # dynamic scaling is always in both directions.
-        when Proc, Hash, nil then handle_dynamics(Float, :scale, sx, &block)
+        when Proc, Hash, nil then handle_dynamics(Float, :scale, nil, sx, &block)
         else
           sx, sy = sx if Array === sx
   #         tag "#{@qtc}.scale := #{sx}"
@@ -181,7 +181,7 @@ require 'reform/app'
             matrix.scale(sx, sy)
             @qtc.transform = matrix
           else
-            tag "#@qtc.scale := #{sx.inspect}"
+#            tag "#@qtc.scale := #{sx.inspect}"
             @qtc.scale = sx
           end
         end

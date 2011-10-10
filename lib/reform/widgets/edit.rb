@@ -11,6 +11,7 @@ module Reform
       def initialize parent, qtc
         super
         @mem_text = nil
+	@readOnly = false
 #         tag "new Edit(parent=#{parent}, qtc=#{qtc})"
         connect(@qtc, SIGNAL('editingFinished()'), self) do
           unless @qtc.readOnly?  # Qt manages to send editingFinished even if the control is readonly...
@@ -27,7 +28,7 @@ module Reform
 
       define_simple_setter :text, :alignment, :maxLength
 
-      define_setter FalseClass, :readOnly
+      define_setter FalseClass, :readOnly, shadowed: true
 
       def rightalign
         alignment Qt::AlignRight
@@ -38,17 +39,18 @@ module Reform
       end
 
       def applyModel data
-#         tag "applyModel, data = #{data}"
+#        tag "applyModel, data = #{data.inspect}"
         @mem_text = @qtc.text = data.respond_to?(:to_str) ? data.to_str : data.to_s
-        @qtc.readOnly = !@model.model_setter?(connector)
+        @qtc.readOnly = @readOnly || !@model.model_setter?(connector)
       end
 
     public
 
-    def insert(*args)
-      @qtc.insert(*args)
-    end
+      def insert(*args)
+	@qtc.insert(*args)
+      end
 
+      attr_writer :readOnly # as shadow of qtc.readOnly
   end
 
   createInstantiator File.basename(__FILE__, '.rb'), Qt::LineEdit, Edit

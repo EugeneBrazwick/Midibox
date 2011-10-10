@@ -208,7 +208,7 @@ module Reform
         list.each do |name|
           define_method name do |*args, &block|
 #             tag "#{self}::#{name} DECLARATATION block = #{block}, args=#{args.inspect}"
-            handle_dynamics(klass, name, *args, &block)
+            handle_dynamics(klass, name, nil, *args, &block)
           end # method name
             # INCONVENIENT:
 #           n = (name.to_s + '=').to_sym
@@ -218,8 +218,10 @@ module Reform
         end
       end # define_setter
 
-      def self.define_setter(*args)
-        self.define_setters(*args)
+      def self.define_setter klass, name, options = nil
+	define_method name do |*args, &block|
+	  handle_dynamics(klass, name, options, *args, &block)
+	end
       end
 
       DynamicAttributeKlassMap = { Qt::Color => DynamicColor ,
@@ -233,9 +235,10 @@ module Reform
       #
       # Normally your method calls this as last resort if arg0 is a Hash or a Proc or nil and a block was given.
       # Examples:       GraphicsItem::rotation,  GraphicsItem::scale
-      def handle_dynamics(klass, name, *args, &block)
+      def handle_dynamics(klass, name, options, *args, &block)
+#	tag "handle_dynamics #{klass} #{name}"
         return apply_dynamic_getter(name) if args.empty? && !block
-#             tag "args[0] is a #{args[0].class}"
+#        tag "args[0] is a #{args[0].class}"
         case args[0]
         when Hash, nil
 #               tag "CREATING DA!!!!!!!!!!!!!!!!!!!, #{self}::#{name}, klass=#{klass}"
@@ -244,7 +247,8 @@ module Reform
           else
             da_klass = DynamicAttribute
           end
-          da_klass.new(self, name, klass, args[0], &block)
+          da_i = da_klass.new(self, name, klass, args[0], &block)
+	  da_i.options = options 
 #               tag "created DA, value -> #{value}"
 #               @qtc.send(n, value)             NO. data must come from outside.
         when Proc
@@ -256,18 +260,21 @@ module Reform
           end
           if args[0].arity == 1
             # same as { connector: block }
-            da_klass.new(self, name, klass, connector: args[0])
+            da_i = da_klass.new(self, name, klass, connector: args[0])
           else
-            da_klass.new(self, name, klass, args[0], &block)
+            da_i = da_klass.new(self, name, klass, args[0], &block)
           end
+	  da_i.options = options 
         else
           n = (name.to_s + '=').to_sym
           if respond_to?(n)
-#               tag "pass on simple assignment to qtc #@qtc::#{n} := #{args.inspect}"
+#            tag "pass on simple assignment to qtc #@qtc::#{n} := #{args.inspect}"
 #               apply_dynamic_setter(n, *args)          too direct
             send(n, *args)
           else
+#            tag "pass on dynamic assignment to qtc #@qtc::#{n} := #{args.inspect}, shadowed=#{options && options[:shadowed]}"
             apply_dynamic_setter(n, *args)
+	    send(n, *args) if options && options[:shadowed]
           end
         end
       end
@@ -443,7 +450,7 @@ module Reform
       # Method called from dynamic attribute, unless 'name=' exists.
       # note that name ends with '='
       def apply_dynamic_setter(name, *args)
-#         tag "apply_dynamic_setter(#{name}, #{args.inspect})"
+#        tag "#{self}#apply_dynamic_setter(#{name}, #{args.inspect})"
         @qtc.send(name, *args)
       end
 
@@ -803,10 +810,13 @@ module Reform
             return
           end
           if aModel.respond_to?(:model?) && aModel.model?
+#	    tag "apply getter '#{cid}' to aModel"
             data = aModel.model_apply_getter(cid)
           elsif Proc === cid
+#	    tag "apply getter '#{cid}' to aModel"
             data = cid.call(aModel)
           else
+#	    tag "take aModel as is"
             data = aModel
           end
           # for simple fields the connected model is the container.
@@ -816,7 +826,7 @@ module Reform
 #           tag "applied cid #{cid.inspect} on model #{aModel}-> #{data.inspect}"
 #             tag "data.value = #{data.respond_to?(:value) && data.value.inspect}"
           @model = if (is_model = data.respond_to?(:model?) && data.model?) then data else aModel end
-#             tag "applied #{cid} on #@model -> #{data.inspect}, calling #{self}::applyModel"
+#          tag "applied #{cid} on #@model -> #{data.inspect}, calling #{self}::applyModel"
           applyModel data if do_apply # , aModel the callee can use @model
 #           tag "is_model = #{is_model}"
 #           unless is_model && (children || do_callback)  # VERY INCONVENIENT. Why can't I pass a string

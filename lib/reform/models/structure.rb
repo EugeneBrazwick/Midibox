@@ -155,7 +155,7 @@ mock:
 
       #override
       def model_mimeType
-        tag "#{self}::model_mimeType, getter? #{model_getter?(:model_mimeType)}, value=#{@model_value.inspect}"
+#        tag "#{self}::model_mimeType, getter? #{model_getter?(:model_mimeType)}, value=#{@model_value.inspect}"
         model_getter?(:model_mimeType) ? model_apply_getter(:model_mimeType) : super
       end
 

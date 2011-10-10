@@ -14,14 +14,13 @@ module Reform
   #      tag "TimeModel.new(#{parent}, #{qtc}), autostart := true"
 #         @timerid = nil
         @autostart = true
-
-#         @current = Qt::Time::currentTime # this may lag!! FIXME? can we not always return the currentTime??
-# BAD IDEA:  @current != current
-
+	# the next assignment is important to give @current at least
+	# some initial value. See 004_digiclock.rb
+	@current = Qt::Time::currentTime 
         @frequency, @frameNr, @oneShot = 1.0, 0, false
 #	tag "setting up timer callback"
         connect @qtc, SIGNAL('timeout()') do
-#          tag "TIMEOUT"
+          #tag "TIMEOUT"
           transaction do |tran|
             self.frameNr += 1
 #            tag "self.current := .... "

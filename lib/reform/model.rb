@@ -82,7 +82,7 @@ module Reform
       # [init] if true this is considered a new structure completely
       # [current_path] current place in the model (while propagating).  Initially nil
       def initialize sender, keypaths = nil, init = false, current_path = nil
-#         tag "#{self}.new, keypaths = #{keypaths.inspect}"
+#        tag "#{self}.new, keypaths = #{keypaths.inspect}"
         @sender, @keypaths, @init = sender, keypaths, init
         @init = true if !@keypaths || @keypaths[[]] # the root changed.
         @current_path = current_path
@@ -441,8 +441,8 @@ transaction that is immediately committed (and at that point propagation starts)
         @altered_owners = {} # indexed by object_id
         @committed = @aborted = false
         @debug_track = sender && sender.track_propagation # assuming sender is a Control
+#	tag "debug_track=#@debug_track"
         @root.model_begin_work
-#         tag "debug_track = #@debug_track, sender = #{sender}"
         if block_given?
           begin
             begin
@@ -523,7 +523,7 @@ transaction that is immediately committed (and at that point propagation starts)
       end
 
       def propagate_changes
-#         tag "#{self}.COMMIT WORK, @@tran= #{@@transaction}, aborted=#@aborted, sender = #@sender"
+#        tag "#{self}.COMMIT WORK, @@tran= #{@@transaction}, aborted=#@aborted, sender = #@sender"
         # NOTE: tr() only works on Qt::Object...
         if @debug_track
           STDERR.print "create Propagation, sender = #@sender, model=#{@root}\n"
@@ -644,22 +644,24 @@ it, the chance of names clashes must be minimized.
     item.pen = pen
 =end
           def model_dynamic_writer attrsym
-#             tag "WHAT??"
             methname = (attrsym.to_s + '=').to_sym
-            define_method methname do |value, sender = nil|
-#               tag " I AM HERE"
+	    # a x= method can only take 1 argument.
+            define_method methname do |value|
+              #tag " I AM HERE"
               # the question is: who called this method??
 #               Binding.of_caller do |binding|          WORKS ONES ONLY .....
 #                 sender = eval 'self', binding
                 #               tag "HERE Sender = #{sender}"
               attr = ('@' + attrsym.to_s).to_sym
               prev = instance_variable_defined?(attr) ? instance_variable_get(attr) : nil
-#               tag "#{attr} := #{value}, prev = #{prev}"
+#              tag "#{attr} := #{value}, prev = #{prev}"
               return if prev == value
+	      sender = self # better than nothing ???
               model_pickup_tran(sender) do |tran|
                 # Existing tran. Note it may be a tran aborting, and resetting our data
                 # in that case, do not change anything.
                 tran.addPropertyChange(self, attrsym, prev) unless tran.aborted?
+#		tag "calling instance_variable_set(#{attr}, #{value})"
                 instance_variable_set(attr, value)
               end
             end # dynamic methname

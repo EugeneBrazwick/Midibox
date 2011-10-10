@@ -20,6 +20,7 @@ module Reform
 #         @qtc = klass.new STUPID IDEA klass can be Float or Integer.
 #         tag "DA.new: par:#{parent}, name: :#{propertyname}, quickyhash=#{quickyhash.inspect}, block=#{block}, klass=#{klass}, qtc=#@qtc"
         raise 'wtf' unless propertyname && klass
+	@options = nil
         #setupQtc               INSANE. there is NO qtc anywhere!!!
         @propertyname, @klass = propertyname, klass
         setProperty('value', value2variant(:default))  # DynamicAttribute is a Qt::Object after all
@@ -40,7 +41,7 @@ module Reform
       end
 
       def apply_dynamic_getter name
-        tag "apply_dynamic_getter(#{name}), send to #{value}"
+#        tag "apply_dynamic_getter(#{name}), send to #{value}"
         value.send(name)
       end
 
@@ -51,7 +52,7 @@ module Reform
 #         tag "SEND #{propval}::#{assigner} #{args.inspect}"
         propval.send(assigner, *args)
         setProperty('value', value2variant(propval))
-#         tag "SEND #{parent}::#@propertyname := #@qtc"
+#        tag "SEND #{parent}::#@propertyname := #{propval}"
         parent.send(@propertyname.to_s + '=', propval)
       end
 
@@ -176,6 +177,7 @@ module Reform
 
       # the result is a symbol
       attr :propertyname, :animprop
+      attr_writer :options
 
       alias :propertyName :propertyname
 

@@ -41,11 +41,11 @@
  ****************************************************************************/
 =end
 
-# Copyright (c) 2010 Eugene Brazwick
+# Copyright (c) 2010-2011 Eugene Brazwick
 
 module Reform
 
-  require_relative '../model'
+  require 'reform/model'
 
 =begin rdoc
 
@@ -58,219 +58,220 @@ This demonstrates that ANY ruby class can easily be a model in the 'reform' syst
 =end
   class CalculatorModel < AbstractModel
     private
-    def initialize parent, q = nil
-      super
-      clearAll
-    end
-
-    def f2s arg
-      arg.to_s.sub(/\.0*$|(\.[0-9]*[1-9]+)0+$/, '\1')
-    end
-
-    def abortOperation
-      clearAll
-      self.display = '####'
-    end
-
-    def calculate rightOperand, pendingOperator
-      case pendingOperator
-      when :add
-        @sumSoFar += rightOperand
-      when :sub
-        @sumSoFar -= rightOperand
-      when :mult
-        @factorSoFar *= rightOperand
-      when :div
-        return abortOperation if rightOperand == 0.0
-        @factorSoFar /= rightOperand
+      def initialize parent, q = nil
+	super
+	clearAll
       end
-      true
-    end
 
-    # make a float out of @display
-    def display_to_f
-      case @display
-      when 'Infinity' then 1.0 / 0.0
-      when '-Infinity' then -1.0 / 0.0
-      else Float(@display[-1] == '.' ? @display + '0' : @display)
+      def f2s arg
+	arg.to_s.sub(/\.0*$|(\.[0-9]*[1-9]+)0+$/, '\1')
       end
-    end
+
+      def abortOperation
+	clearAll
+	self.display = '####'
+      end
+
+      def calculate rightOperand, pendingOperator
+	case pendingOperator
+	when :add
+	  @sumSoFar += rightOperand
+	when :sub
+	  @sumSoFar -= rightOperand
+	when :mult
+	  @factorSoFar *= rightOperand
+	when :div
+	  return abortOperation if rightOperand == 0.0
+	  @factorSoFar /= rightOperand
+	end
+	true
+      end
+
+      # make a float out of @display
+      def display_to_f
+	case @display
+	when 'Infinity' then 1.0 / 0.0
+	when '-Infinity' then -1.0 / 0.0
+	else Float(@display[-1] == '.' ? @display + '0' : @display)
+	end
+      end
 
     public
 
-    # this is a string and can be incomplete, like '3.'
-    # It is not localized. dynamic_accessor causes dynamicPropertyChanged to be called
-    # and with that connectModel
-    dynamic_accessor :display
+      # this is a string and can be incomplete, like '3.'
+      # It is not localized. dynamic_accessor causes dynamicPropertyChanged to be called
+      # and with that connectModel.
+      model_dynamic_accessor :display
 
-    # digit is a single char string from '0' to '9'.
-    def enterDigit val
-      return if @display == '0' && val == '0'
-      if @waitingForOperand
-        @display = '0'
-        @waitingForOperand = false
+      # digit is a single char string from '0' to '9'.
+      def enterDigit val, sender = nil
+	#tag "enterDigit(#{val}), display='#@display'"
+	return if @display == '0' && val == '0'
+	if @waitingForOperand
+	  @display = '0'
+	  @waitingForOperand = false
+	end
+	# changed from example: how can Nokia example even work?
+	#tag "calling self.display=()"
+	self.display = f2s(@display == '0' ? val : @display + val)
       end
-      # changed from example: how can Nokia example even work?
-      tag "calling display=()"
-      self.display = f2s(@display == '0' ? val : @display + val)
-    end
 
-    # clear current number input (and only that).
-    def clear
-      return if @waitingForOperand
-      self.display = '0'
-      @waitingForOperand = true
-    end
-
-    # reinitialize the model
-    def clearAll
-      # value in M,  accumulated sum,  temporary for multiplications and divisions
-      @sumInMemory = @sumSoFar = @factorSoFar = 0
-      # expecting numeric input
-      @waitingForOperand = true
-      # last multiplicative operator entered by user
-      @pendingMultiplicativeOperator = nil
-      # last additive operator entered by user
-      @pendingAdditiveOperator = nil
-      self.display = '0'
-    end
-
-    # opsym can be :sqrt, :sqr, :reciprocal
-    # execute operator on current operand
-    def enterUnaryOperator opsym
-      operand = display_to_f
-      result = 0.0
-      case opsym
-      when :sqrt
-        abortOperation if operand < 0.0
-        begin
-          result = Math.sqrt(operand)
-        rescue Errno::EDOM
-          self.display = '####'
-          @waitingForOperand = true
-          return
-        end
-      when :sqr
-        result = operand * operand
-      when :reciprocal
-        abortOperation if operand == 0.0
-        result = 1.0 / operand
+      # clear current number input (and only that).
+      def clear
+	return if @waitingForOperand
+	self.display = '0'
+	@waitingForOperand = true
       end
-      self.display = f2s(result)
-      @waitingForOperand = true
-    end
 
-    # opsym can be :add or :sub
-    # if multiplication is queued, execute it first
-    # if addition was queued, execute it
-    # queue the current addition
-    def enterAdditiveOperator opsym
-      operand = display_to_f
-      if @pendingMultiplicativeOperator
-        return unless calculate(operand, @pendingMultiplicativeOperator)
-        self.display, @factorSoFar = f2s(operand = @factorSoFar), 0.0
-        @pendingMultiplicativeOperator = nil
+      # reinitialize the model
+      def clearAll
+	# value in M,  accumulated sum,  temporary for multiplications and divisions
+	@sumInMemory = @sumSoFar = @factorSoFar = 0
+	# expecting numeric input
+	@waitingForOperand = true
+	# last multiplicative operator entered by user
+	@pendingMultiplicativeOperator = nil
+	# last additive operator entered by user
+	@pendingAdditiveOperator = nil
+	self.display = '0'
       end
-      if @pendingAdditiveOperator
-        return unless calculate(operand, @pendingAdditiveOperator)
-        self.display = f2s(@sumSoFar)
-      else
-        @sumSoFar = operand
+
+      # opsym can be :sqrt, :sqr, :reciprocal
+      # execute operator on current operand
+      def enterUnaryOperator opsym
+	operand = display_to_f
+	result = 0.0
+	case opsym
+	when :sqrt
+	  abortOperation if operand < 0.0
+	  begin
+	    result = Math.sqrt(operand)
+	  rescue Errno::EDOM
+	    self.display = '####'
+	    @waitingForOperand = true
+	    return
+	  end
+	when :sqr
+	  result = operand * operand
+	when :reciprocal
+	  abortOperation if operand == 0.0
+	  result = 1.0 / operand
+	end
+	self.display = f2s(result)
+	@waitingForOperand = true
       end
-      @pendingAdditiveOperator = opsym
-      @waitingForOperand = true
-    end
 
-    # we support :mult and :div
-    # if a multiplication was queued, execute it
-    # then queue this multiplication
-    def enterMultiplicativeOperator opsym
-      operand = display_to_f
-      if @pendingMultiplicativeOperator
-        return unless calculate(operand, @pendingMultiplicativeOperator)
-        self.display = f2s(@factorSoFar)
-      else
-        @factorSoFar = operand
+      # opsym can be :add or :sub
+      # if multiplication is queued, execute it first
+      # if addition was queued, execute it
+      # queue the current addition
+      def enterAdditiveOperator opsym
+	operand = display_to_f
+	if @pendingMultiplicativeOperator
+	  return unless calculate(operand, @pendingMultiplicativeOperator)
+	  self.display, @factorSoFar = f2s(operand = @factorSoFar), 0.0
+	  @pendingMultiplicativeOperator = nil
+	end
+	if @pendingAdditiveOperator
+	  return unless calculate(operand, @pendingAdditiveOperator)
+	  self.display = f2s(@sumSoFar)
+	else
+	  @sumSoFar = operand
+	end
+	@pendingAdditiveOperator = opsym
+	@waitingForOperand = true
       end
-      @pendingMultiplicativeOperator = opsym
-      @waitingForOperand = true
-    end
 
-    # execute pending calculations in the queue, and display the result
-    def enterEquals
-      operand = display_to_f
-      if @pendingMultiplicativeOperator
-        return unless calculate(operand, @pendingMultiplicativeOperator)
-        operand, @factorSoFar = @factorSoFar, 0.0
-        @pendingMultiplicativeOperator = nil
+      # we support :mult and :div
+      # if a multiplication was queued, execute it
+      # then queue this multiplication
+      def enterMultiplicativeOperator opsym
+	operand = display_to_f
+	if @pendingMultiplicativeOperator
+	  return unless calculate(operand, @pendingMultiplicativeOperator)
+	  self.display = f2s(@factorSoFar)
+	else
+	  @factorSoFar = operand
+	end
+	@pendingMultiplicativeOperator = opsym
+	@waitingForOperand = true
       end
-      if @pendingAdditiveOperator
-        return unless calculate(operand, @pendingAdditiveOperator)
-        @pendingAdditiveOperator = nil
-      else
-        @sumSoFar = operand
+
+      # execute pending calculations in the queue, and display the result
+      def enterEquals
+	operand = display_to_f
+	if @pendingMultiplicativeOperator
+	  return unless calculate(operand, @pendingMultiplicativeOperator)
+	  operand, @factorSoFar = @factorSoFar, 0.0
+	  @pendingMultiplicativeOperator = nil
+	end
+	if @pendingAdditiveOperator
+	  return unless calculate(operand, @pendingAdditiveOperator)
+	  @pendingAdditiveOperator = nil
+	else
+	  @sumSoFar = operand
+	end
+	self.display = f2s(@sumSoFar)
+	@sumSoFar = 0.0
+	@waitingForOperand = true
       end
-      self.display = f2s(@sumSoFar)
-      @sumSoFar = 0.0
-      @waitingForOperand = true
-    end
 
-    # erases previous result, then adds '.' at end
-    def enterPoint
-      @display = '0' if @waitingForOperand
-      self.display = @display + '.'
-      @waitingForOperand = false
-    end
-
-    # if negative number make it positive and vice versa
-    def enterChangeSign
-      text = @display.dup # !!
-#       tag "text='#{text}', op=#{display_to_f}"
-      if (operand = display_to_f) > 0.0
-        text = '-' + text
-      elsif operand < 0.0
-        text[0, 1] = ''  # this mutates text, so beware it is not @display
+      # erases previous result, then adds '.' at end
+      def enterPoint
+	@display = '0' if @waitingForOperand
+	self.display = @display + '.'
+	@waitingForOperand = false
       end
-#       tag "assign '#{text}'"
-      self.display = text
-    end
 
-    # erase last char. If empty string would be returned, use '0' instead
-    def enterBackspace
-      return if @waitingForOperand
-      text = @display.chop
-#       tag "text='#{text}'"
-#       text.chop!  AARGHHHH
-      if text.empty?
-        text = '0'
-        @waitingForOperand = true
+      # if negative number make it positive and vice versa
+      def enterChangeSign
+	text = @display.dup # !!
+  #       tag "text='#{text}', op=#{display_to_f}"
+	if (operand = display_to_f) > 0.0
+	  text = '-' + text
+	elsif operand < 0.0
+	  text[0, 1] = ''  # this mutates text, so beware it is not @display
+	end
+  #       tag "assign '#{text}'"
+	self.display = text
       end
-#       tag "Assigning new text '#{text}' to DYNAMIC property"
-      self.display = text
-    end
 
-    # clear internal sum
-    def clearMemory
-      @sumInMemory = 0.0
-    end
+      # erase last char. If empty string would be returned, use '0' instead
+      def enterBackspace
+	return if @waitingForOperand
+	text = @display.chop
+  #       tag "text='#{text}'"
+  #       text.chop!  AARGHHHH
+	if text.empty?
+	  text = '0'
+	  @waitingForOperand = true
+	end
+  #       tag "Assigning new text '#{text}' to DYNAMIC property"
+	self.display = text
+      end
 
-    # display internal sum, erasing the current number
-    def readMemory
-      self.display = f2s(@sumInMemory)
-      @waitingForOperand = true
-    end
+      # clear internal sum
+      def clearMemory
+	@sumInMemory = 0.0
+      end
 
-    # execute pending calculations and store the result in the memory slot
-    def setMemory
-      enterEquals
-      @sumInMemory = display_to_f
-    end
+      # display internal sum, erasing the current number
+      def readMemory
+	self.display = f2s(@sumInMemory)
+	@waitingForOperand = true
+      end
 
-    # execute pending calculations, then add the result to the value in memory
-    def addToMemory
-      enterEquals
-      @sumInMemory += display_to_f
-    end
+      # execute pending calculations and store the result in the memory slot
+      def setMemory
+	enterEquals
+	@sumInMemory = display_to_f
+      end
+
+      # execute pending calculations, then add the result to the value in memory
+      def addToMemory
+	enterEquals
+	@sumInMemory += display_to_f
+      end
 
   end # class CalculatorModel
 

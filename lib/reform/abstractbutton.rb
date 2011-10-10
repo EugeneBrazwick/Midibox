@@ -29,7 +29,7 @@ module Reform
       # Without a block we emit 'clicked'
       def whenClicked paramhash = nil, &block
         if block
-          connect(@qtc, SIGNAL('clicked()'), self) { rfCallBlockBack(&block) }
+          connect(@qtc, SIGNAL('clicked()'), self) { rfCallBlockBack(self, &block) }
         elsif paramhash
           form = containing_form
           paramhash.each do |param, value|

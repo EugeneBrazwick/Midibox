@@ -299,6 +299,7 @@ module Reform
 
     # should NOT call qtc.sizeHint, since that's our caller!!!!
     def sizeHint_i
+#      tag "#{self}.sizeHint = #@sizeHint"
       instance_variable_defined?(:@sizeHint) ? @sizeHint : nil
     end
 
@@ -307,8 +308,10 @@ module Reform
     end
 
     def sizeHint x = nil, y = nil
+      #tag "#{self}#sizeHint(#{x}, #{y})"
       return sizeHint_i || @qtc.sizeHint if x.nil?
       x, y = x if Array === x
+      #tag "assigning @sizeHint!"
       @sizeHint = if Qt::Size === x then x else Qt::Size.new(x, y || x) end
     end
 
@@ -395,7 +398,8 @@ module Reform
   module QWidgetHackContext
     # override
     def sizeHint
-      (instance_variable_defined?(:@_reform_hack) ? (@_reform_hack.sizeHint_i || super) : super) #.tap{|t|tag("#{self}.sz:#{t.inspect}")}
+      #tag "sizeHint, reformhack=#@_reform_hack"
+      (instance_variable_defined?(:@_reform_hack) ? (@_reform_hack.sizeHint_i || super) : super)# .tap{|t|tag("#{self}.sz:#{t.inspect}")}
     end
 
     # override
@@ -448,7 +452,7 @@ module Reform
 =begin
     def resizeEvent event
 #       old_resizeEvent event
-      tag "emit Qt::Widget::resized"
+#      tag "emit Qt::Widget::resized"
       resized event.size.width, event.size.height
     end
 =en d

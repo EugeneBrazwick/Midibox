@@ -27,15 +27,15 @@ mock:
 
     private # methods of Structure
 
-      # [value] the hash 
+      # [value] the hash, or array, or any object actually
       def initialize value = nil
-	super(nil)
-	if value
-	  model_pickup_tran(sender) do 
-	    # I think this is the most honoust way of setting up @model_value
-	    value.each { |k, v| self[k] = v } 
-	  end
-	end
+	super(nil, value)
+#	if value
+#	  model_pickup_tran(sender) do 
+#	    # I think this is the most honoust way of setting up @model_value
+#	    value.each { |k, v| self[k] = v } 
+#	  end
+#	end
       end
 
     public  # methods of Structure
@@ -65,48 +65,6 @@ mock:
         end
       end
 =end
-
-      # this method is used to set the proper row, if 'value' is connected to it.
-      # Now the problem is that Hashes and Arrays can connect to their index or 
-      # their value.
-      #
-      # IMPORTANT saying 'key_connector:id' is not the same as leaving it 
-      # the default (also :id)
-      # Because this switches on locating the value by key
-      #
-      def model_value2index value, view
-        return 0 if value.nil?
-        key_connector = view.key_connector
-        key = model_value2key(value, view) or
-          key ||= value if key_connector # if key-lookup is enforced,
-#         tag "value2index, key_connector=#{key_connector}, key = #{key.inspect}, value was #{(value.respond_to?(:value) ? value.value : value).inspect}"
-        if @model_value.respond_to?(:each_key)
-#           tag "HASH case"
-          if key
-            @model_value.each_key.find_index(key)
-          elsif @model_value.respond_to?(:each_pair)
-#             tag "Using each_pair"
-            @model_value.each_pair.find_index { |k, v| v == value }
-          end
-          @model_value.each_key.find_index(value)
-        elsif @model_value.respond_to?(:find_index)
-#           tag "ARRAY case"
-          return nil if @model_4value.empty?
-          key = value if !key && model_value2key(@model_value[0], view) # force the use of a key if this seems to be how it should be done.
-              # but it is higher heuristics
-          if key
-            return key if key_connector == :numeric_index
-            @model_value.find_index do |value|
-#               tag "Comparing value2key #{value2key(value, view).inspect}, with key #{key.inspect}"
-              model_value2key(value, view) == key
-            end #.tap{|r|tag "find_index -> #{r.inspect}"}
-          else
-            @model_value.find_index(value)
-          end
-        else
-          0
-        end
-      end
 
       # Qt::Base overrides this, so we must overoverride it
       def << value

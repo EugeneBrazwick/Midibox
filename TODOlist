@@ -222,7 +222,8 @@ Current state:
     observed correctly. It should add a toplevel observer, and not work really different than how the 
     application handles changes right now. 
 0041 Mon Sep 12 22:22:37 CEST 2011
-    after building the qtbindings gem, it cannot be loaded! Some caching issue, because it
+    after building the qtbindings gem, it cannot be loaded! Some caching issue, because it. qtbindings is inconvenient. Constructors are
+    hacked and slow. 
     works after that.
 0042 Thu Sep 22 21:07:50 CEST 2011
     Need RStore::Item class to create auto-persistent subclasses, that allow more complicated
@@ -253,3 +254,7 @@ Current state:
 -0045 Sat Oct  8 12:23:12 CEST 2011. Regression. analogclock2/3 don't rotate properly.
 The arms OK, but the empty does nothing...
 Sat Oct  8 19:41:00 CEST 2011 Fixed. postSetup -> model_postSetup
+0046 Sat Oct 15 21:14:45 CEST 2011. Using 'x' to set a bool prop is deprecated.
+Either say 'x true' or 'x!'. 
+0047 Sat Oct 15 21:15:23 CEST 2011. qtbindings is inconvenient. Constructors are
+hacked and slow. bugs are hard to trace due to 'method_missing' crap.

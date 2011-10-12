@@ -10,10 +10,8 @@ class Const < Qt::Object
 end
 
 Reform::app {
-#   groupbox {
     # this setup is a failure for some reason. At this point calendar.rb got into the groove
     # however. What's the use of groupbox???
-    # leaving it out shows that makecenter works even on its own....
     calendarwidget {
       name :calendarWidget
       # this silently ignores illegal inputs:
@@ -24,7 +22,5 @@ Reform::app {
                                 # or int/string triples dMy yMd Mdy as long y > 31
       gridVisible true
       whenMonthChanged { }
-      makecenter # this induces a gridlayout!
     }
-#   }
 }

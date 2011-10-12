@@ -47,6 +47,10 @@ module Reform
     def self.qtimplementor
       Qt::FormLayout
     end
+
+    def addLayout control, hash, &block
+      raise 'You cannot add layouts in a formlayout, please use grid, vbox or hbox'
+    end
   end # class FormLayout
 
   createInstantiator File.basename(__FILE__, '.rb'), FormLayout.qtimplementor, FormLayout

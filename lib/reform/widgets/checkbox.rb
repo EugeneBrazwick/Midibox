@@ -18,6 +18,13 @@ module Reform
             end
           end
         end
+        connect(@qtc, SIGNAL('toggled(bool)'), self) do |checked|
+          rfRescue do
+            if (cid = connector) && (mod = model)
+              mod.model_apply_setter(cid, checked)
+            end
+          end
+	end
       end
     end # initialize
 

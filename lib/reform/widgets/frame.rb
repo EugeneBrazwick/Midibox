@@ -33,6 +33,7 @@ module Reform
 
     # note hash and block are setups for 'control'
     def check_layout control, creator = :formlayout, hash = nil, &block
+      #tag "check_layout"
       unless layout = infused_layout
         # problematic: the creator tends to call postSetup, but it must be delayed
 #         tag "missing layout, create a '#{creator}'"
@@ -131,10 +132,11 @@ module Reform
 
     def addLayout control, hash, &block
       if layout = infused_layout
+        #tag "infused layout present"
         control.parent = layout
         layout.addLayout(control, hash, &block)
       else
-#           tag "#{self.class}::addControl. SETTING layout of #@qtc to #{control.qtc}"
+        #tag "#{self.class}::addControl. SETTING layout of #@qtc to #{control.qtc}"
         # Qt says the same but it's only a warning
         super # @qtc.layout = control.qtc
       end

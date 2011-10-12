@@ -1,6 +1,6 @@
 #!/usr/bin/ruby
 
-# Copyright (c) 2010 Eugene Brazwick
+# Copyright (c) 2010-2011 Eugene Brazwick
 
 require 'reform/app'
 
@@ -35,65 +35,66 @@ Reform::app {
         title tr('Preview')
         calendarwidget {
           name :calendarWidget
-#           minimumDate Const::MinimumDate   # dd-mm-yy(yy)? or yyyy.mm.dd or mm[^-]dd[^-]yy(yy)?
-#           maximumDate Const::MaximumDate   # or dd.MMM.yy(yy)? or MMM.dd.yy(yy)?
-#                                     # or yy(yy)?.MMM.dd
-                                    # or split in three triple integers y m d
-                                    # or int/string triples dMy yMd Mdy as long y > 31
-#           gridVisible true
-#           whenMonthChanged { } # reformatCalendarPage } # FIXME ??? cannot exist
-          makecenter # center it in containerwidget, with a stretchy space around it.
+	  # we connect to the calendar model, 'as is'
+	  connector :self
         }
       } # groupbox
       # general options group box  UR
       groupbox { # generalOptionsGroupBox
         layoutpos 1 # by default it goes down, we want to add a column here
         title tr('General Options')
-        combobox { # localeCombo
-          # use Qt locale languagelist, and for each locale add the
-          # countriesForLanguage(lang).
-          # the currentlocale must be made the default value and thus function
-          # as the 'connecting' modelpart, we should simply set calendar.language_and_country
-          name :locale
-          locale_model
-          labeltext tr('&Locale')  # quicky label association, becomes a 'buddy'
-        }
-        combobox { # firstDayCombo
-          # or datasource({k=>v,...}) or datasource Hash[k=>v,...]
-          model CalendarModel::WeekDaysFromSun2Sat
-          name :firstDayOfWeek # should return a Qt::XXXday
-        }
-        # as demo, I write it in full, but could place 'label' in combobox here as well
-        label { # firstDayLabel
-          text tr('Wee&k starts on:')
-          buddy :firstDayOfWeek
-        }
-        combobox { # selectionModeCombo
-          model CalendarWidget::PossibleSelections
-          labeltext tr('&Selection mode:')
-        }
-         hbox { # checkBoxLayout
-          checkbox { # gridCheckBox
-            text tr('&Grid')
-            name :gridVisible?
-          }
-          spacer stretch: 1 # stretchable open space in between
-          checkbox { # navigationCheckBox
-            text tr('&Navigation Bar')
-            name :navigationBarVisible?
-          }
-        } # hbox
-        combobox {# horizontalHeaderCombo
-          name :horizontalHeaderFormat
-          model CalendarWidget::PossibleHorizontalHeaderOptions
-#           currentIndex 1  # this alters the model on initialization, even!!
-          labeltext tr('&Horizontal header:')
-        }
-        combobox { # verticalHeaderCombo
-          name :verticalHeaderFormat
-          model CalendarWidget::PossibleVerticalHeaderOptions
-          labeltext tr('&Vertical header:')
-        }
+	vbox {
+	  formlayout {
+	    combobox { # localeCombo
+	      # use Qt locale languagelist, and for each locale add the
+	      # countriesForLanguage(lang).
+	      # the currentlocale must be made the default value and thus function
+	      locale_model
+	      connector :locale
+	      labeltext tr('&Locale')  # quicky label association, becomes a 'buddy'
+	    }
+	    combobox { # firstDayCombo
+	      model_connector [:model_root, :weekdays]
+	      name :firstDayOfWeek  # 'needed' for buddy
+	      connector :firstDayOfWeek 
+	    }
+	    # as demo, I write it in full, but could place 'label' in combobox here as well
+	    label { # firstDayLabel
+	      text tr('Wee&k starts on:')
+	      buddy :firstDayOfWeek
+	    }
+	    combobox { # selectionModeCombo
+	      # I could have said: model_connector [:model_root, :possibleSelections]
+	      struct Reform::CalendarModel::PossibleSelections
+	      labeltext tr('&Selection mode:')
+	      connector :selectionMode
+	    }
+	  }
+	  hbox { # checkBoxLayout
+	    checkbox { # gridCheckBox
+	      text tr('&Grid')
+	      connector :gridVisible?
+	    }
+	    spacer stretch: 1 # stretchable open space in between
+	    checkbox { # navigationCheckBox
+	      text tr('&Navigation Bar')
+	      connector :navigationBarVisible?
+	    }
+	  } # hbox
+	  formlayout {
+	    combobox {# horizontalHeaderCombo
+	      struct Reform::CalendarModel::PossibleHorizontalHeaderOptions
+	      connector :horizontalHeaderFormat
+    #           currentIndex 1  # this alters the model on initialization, even!!
+	      labeltext tr('&Horizontal header:')
+	    }
+	    combobox { # verticalHeaderCombo
+	      struct Reform::CalendarModel::PossibleVerticalHeaderOptions
+	      connector :verticalHeaderFormat
+	      labeltext tr('&Vertical header:')
+	    }
+	  } # formlayout
+	} # vbox
       } # generalOptionsGroupBox
 
       # dates group box  BL
@@ -102,26 +103,28 @@ Reform::app {
         date { # minimumDateEdit
           displayFormat 'MMM d yyyy'
           dateRange Const::MinimumDate, Const::MaximumDate
-          name :minimumDate
+          connector :minimumDate
           labeltext tr('&Minimum Date:')
         }
         date { # currentDateEdit
           displayFormat 'MMM d yyyy'
           dateRange Const::MinimumDate, Const::MaximumDate
-          name :selectedDate
+          connector :selectedDate
           labeltext tr('&Current Date:')
         }
         date { # maximumDateEdit
           displayFormat 'MMM d yyyy'
           dateRange Const::MinimumDate, Const::MaximumDate
-          name :maximumDate
+          connector :maximumDate
           labeltext tr('Ma&ximum Date:')
         }
       } # dateGroupBox
       # textformats group box  BR
       groupbox { # TextFormatsGroupBox
         title tr('Text Formats')
-        calendarcolorcombo { # contrib widget
+	vbox {
+	  formlayout {
+	    calendarcolorcombo { # contrib widget
                              # it should be possible to make such a thing
                              # within the application here.
 =begin
@@ -138,41 +141,41 @@ However they play dirty since it is really a canned command being executed in th
 proper context. Maybe we should call it a 'macro'.
 We 'can' a 'control' so 'can_control'.  But it looks like a question...
 =end
-          currentKey Qt::black
-          labeltext tr('&Weekday color:')
-          whenActivated do |data, idx|
-            format = Qt::TextCharFormat.new
-            format.foreground = Qt::Brush.new(data) # .to_color
-            calendarWidget.setWeekdayTextFormat(Qt::Monday, format);
-            calendarWidget.setWeekdayTextFormat(Qt::Tuesday, format);
-            calendarWidget.setWeekdayTextFormat(Qt::Wednesday, format);
-            calendarWidget.setWeekdayTextFormat(Qt::Thursday, format);
-            calendarWidget.setWeekdayTextFormat(Qt::Friday, format);
-          end
-        }
-        combobox { # weekendColorCombo
-          model Const::PossibleColors
-          currentKey Qt::red
-          labeltext tr('Week&end color:')
-          whenActivated do |data, idx|
-            (format = Qt::TextCharFormat.new).foreground = Qt::Brush.new(data)
-            calendarWidget.setWeekdayTextFormat Qt::Saturday, format
-            calendarWidget.setWeekdayTextFormat Qt::Sunday, format
-          end
-        }
-        combobox {
-          model tr('Bold'), tr('Italic'), tr('Green'), tr('Plain')
-          labeltext tr('&Header text:')
-          whenActivated do |data, idx|
-            format = Qt::TextCharFormat.new
-            case idx
-            when 0 then format.fontWeight = Qt::Font::Bold
-            when 1 then format.fontItalic = true
-            when 2 then format.foreground = Qt::Brush.new(Qt::green)
-            end
-            calendarWidget.headerTextFormat format
-          end
-        }
+	      currentIndex 2
+	      labeltext tr('&Weekday color:')
+	      whenActivated do |data, key|
+		format = Qt::TextCharFormat.new
+		format.foreground = Qt::Brush.new(data) # .to_color
+		calendarWidget.setWeekdayTextFormat(Qt::Monday, format);
+		calendarWidget.setWeekdayTextFormat(Qt::Tuesday, format);
+		calendarWidget.setWeekdayTextFormat(Qt::Wednesday, format);
+		calendarWidget.setWeekdayTextFormat(Qt::Thursday, format);
+		calendarWidget.setWeekdayTextFormat(Qt::Friday, format);
+	      end
+	    }
+	    combobox { # weekendColorCombo
+	      struct Const::PossibleColors
+	      currentIndex 0
+	      labeltext tr('Week&end color:')
+	      whenActivated do |data, key|
+		(format = Qt::TextCharFormat.new).foreground = Qt::Brush.new(key)
+		calendarWidget.setWeekdayTextFormat Qt::Saturday, format
+		calendarWidget.setWeekdayTextFormat Qt::Sunday, format
+	      end
+	    }
+	    combobox {
+	      struct tr('Bold'), tr('Italic'), tr('Green'), tr('Plain')
+	      labeltext tr('&Header text:')
+	      whenActivated do |data, key|
+		format = Qt::TextCharFormat.new
+		case idx
+		when 0 then format.fontWeight = Qt::Font::Bold
+		when 1 then format.fontItalic = true
+		when 2 then format.foreground = Qt::Brush.new(Qt::green)
+		end
+		calendarWidget.headerTextFormat format
+	      end
+	    }
 =begin
 these two are problematic.
 Since they are NOT part of Qt::CalendarWidget it seems ugly to still
@@ -180,24 +183,21 @@ add an implementation.
 solution 1) extend both model + widget with subclasses, maybe even in this form.
 solution 2) just ad hoc code it, similar to the example
 =end
-        hbox { # checkBoxLayout
-          checkbox {
-            name :firstFridayCheckbox
-            connector false
-            text tr('&First Friday in blue')
-            whenClicked { |checked| updateModel(@model) }
-          }
-          spacer stretch: 1
-          checkbox {
-            name :mayFirstCheckbox
-            connector false
-            text tr('May &1 in red')
-            whenClicked do |checked|
-#               tag "whenClicked, self=#{self}, calling whenCon"
-              updateModel(@model)
-            end
-          }
-        } # hbox
+	  } # formlayout
+	  hbox { # checkBoxLayout
+	    checkbox {
+	      name :firstFridayCheckbox
+	      connector false
+	      text tr('&First Friday in blue')
+	    }
+	    spacer stretch: 1
+	    checkbox {
+	      name :mayFirstCheckbox
+	      connector false
+	      text tr('May &1 in red')
+	    }
+	  } # hbox
+	} # vbox
       } # textFormatsGroupBox
     }  # layout
 #     tag "setting whenConnected form callback"

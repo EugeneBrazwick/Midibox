@@ -522,6 +522,7 @@ transaction that is immediately committed (and at that point propagation starts)
         @root.model_commit_work @altered_owners
       end
 
+      # called from commit
       def propagate_changes
 #        tag "#{self}.COMMIT WORK, @@tran= #{@@transaction}, aborted=#@aborted, sender = #@sender"
         # NOTE: tr() only works on Qt::Object...
@@ -715,7 +716,9 @@ it, the chance of names clashes must be minimized.
 
       # this saves a lot of duplication. The block is passed the transaction.
       def model_pickup_tran sender = nil
+#	tag "model_pickup_tran(#{sender})"
         if tran = Transaction.transaction
+#	  tag "already exists, ignoring sender"
           yield(tran)
         else
           Transaction.new(model_root, sender) do |tr|
@@ -740,11 +743,12 @@ it, the chance of names clashes must be minimized.
 #         (@observers ||= nil) and @observers.each do |o|
         raise 'ouch' unless model_root == self
 #         root = self # model_root
-#         tag "model_propagateChange, self=#{self}, parent = #{@model_parent}, root = #{model_root}"
-        if p = model_parent
+#        tag "model_propagateChange, self=#{self}, parent = #{@parent}, root = #{model_root}"
+        if p = parent
           p.updateModel self, propagation
         else
-          STDERR.puts "Warning: propagateChange is ignored if your model (#{self}) has no rootparent!!" if $VERBOSE
+#	  tag "ALERT, no parent..."
+          STDERR.print "Warning: propagateChange is ignored if your model (#{self}) has no parent!!\n" if $VERBOSE
         end
 #         end
       end
@@ -869,7 +873,7 @@ it, the chance of names clashes must be minimized.
       # Control compat
       def addTo parent, hash, &block
 #         tag "#{self}::addTo"
-        model_parent.addModel self, hash, &block
+        parent.addModel self, hash, &block
       end
 
        # Control compat
@@ -924,7 +928,7 @@ it, the chance of names clashes must be minimized.
       # grab a row, can return a Model or simple data like Numeric, String etc.
       # It should never return an Array or Hash or a complex instance that is not Model.
       def model_row(numeric_idx)
-        raise "#{self.class}#row is not implemented"
+        raise "#{self.class}#model_row is not implemented"
       end
 
       # iterate the rows
@@ -952,6 +956,7 @@ it, the chance of names clashes must be minimized.
 
       # try to retrieve key from value by looking to a field called 'id'
       # Unfortunately sometimes the value is not a model but a raw hash.
+      # The proces can be tweaked by setting up a key_connector.
       def model_value2key value, view # or widget
         # note that Strings have to_i as well.
         case value
@@ -1040,11 +1045,11 @@ it, the chance of names clashes must be minimized.
       end
 
       def model_value2index value, view
-        raise 'NIY: model_value2index'
+        raise "NIY: #{self.class}#model_value2index"
       end
 
       def model_index2value numeric_idx, view
-        raise 'NIY: model_index2value'
+        raise "NIY: #{self.class}#model_index2value"
       end
 
       # callback, called when the transaction is just started and no work has been done yet
@@ -1079,14 +1084,6 @@ it, the chance of names clashes must be minimized.
         @model_parent = parent
       end
 
-#     def length  # not likely
-#       @qtc.rowCount           # and rowCount requires an index too...
-#     end
-
-      # Model already has this but something strange is going on!!
-#       def addTo parent, hash, &block
-#         parent.addModel self, hash, &block
-#       end
   end
 
 end # module Reform

@@ -9,36 +9,25 @@ module Reform
   class Date < Edit
     private
 
-    define_simple_setter :displayFormat, :minimumDate, :maximumDate
+      # these delegate to Qt::DateEdit
+      define_simple_setter :displayFormat, :minimumDate, :maximumDate
 
-    def dateRange from, to
-      @qtc.minimumDate = from
-      @qtc.maximumDate = to
-    end
+      def dateRange from, to
+	@qtc.minimumDate, @qtc.maximumDate = from, to
+      end
 
-    # override
-    def changed_signal_signature
-      'dateChanged(const QDate &)'
-    end
+      # override
+      def changed_signal_signature
+	'dateChanged(const QDate &)'
+      end
 
     public
-    #override. Same as Edit except for a single 'text'->'date' conversion.
-    def updateModel model, options = nil
-#       tag "#{self}::updateModel, cid=#{connector}"
-      cid = connector and
-        if model && model.model_getter?(cid)
-  #         tag "model_apply getter -> #{model.model_apply_getter(cid)}"
-          @qtc.date = model.model_apply_getter(cid) || Qt::Date.currentDate
-  #         tag "Qt::Date.new == #{Qt::Date.new} == today?? NO"
-  #         tag "Date #{name}, date := #{@qtc.date.inspect}"
-          @qtc.readOnly = !model.model_setter?(cid)
-        else
-  #         tag "clear #{name}"
-  #         @qtc.date = nil  SEGV
-          @qtc.date = Qt::Date.currentDate
-        end
-      super
-    end
+      #override. Same as Edit except for a single 'text'->'date' conversion.
+      def applyModel data
+  #       tag "#{self}::updateModel, cid=#{connector}"
+	@qtc.date = data || Qt::Date.currentDate
+        @qtc.readOnly = @readOnly || !@model.model_setter?(connector)
+      end
 
   end
 

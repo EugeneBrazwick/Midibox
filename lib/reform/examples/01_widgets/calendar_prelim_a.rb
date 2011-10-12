@@ -1,6 +1,6 @@
 #!/usr/bin/ruby -w
 
-# Copyright (c) 2010 Eugene Brazwick
+# Copyright (c) 2010-2011 Eugene Brazwick
 
 require 'reform/app'
 
@@ -10,6 +10,7 @@ class Const < Qt::Object
 end
 
 Reform::app {
+# using calendarwidget which is in lib/reform/widgets
   calendarwidget {
     name :calendarWidget
     # this silently ignores illegal inputs:
@@ -19,8 +20,6 @@ Reform::app {
                               # or split in three triple integers y m d
                               # or int/string triples dMy yMd Mdy as long y > 31
     gridVisible true
-    #  would it be better if it were named 'whenMonthChanged'
-    #  since that's what a page is, basically.
     whenMonthChanged { }
   }
 }

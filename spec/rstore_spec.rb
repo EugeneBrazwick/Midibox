@@ -115,8 +115,8 @@ describe RStore do
       rstore.s = { a: 24, b: 345, c: 'hallo', d: 'world' }
       s = rstore.s
       o = MyObserver.new
-      rstore.model_parent = o
-      rstore.model_parent.should == o
+      rstore.parent = o
+      rstore.parent.should == o
       s.transaction do
         s.a = 184
         s.c = 'ohayou'

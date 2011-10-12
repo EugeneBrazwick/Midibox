@@ -42,20 +42,13 @@ See examples/models/demo03.rb
   #       @model_connector = nil
         connect(@qtc, SIGNAL('activated(int)'), self) do |idx|
           rfRescue do
-#             tag "Activated(#{idx})"
+#            tag "Activated(#{idx})"
             if model && (cid = connector) && model.model_setter?(cid)
               activated(model, cid, idx)
             end
           end
         end
       end # initialize
-
-#       def currentKey k
-  #       tag "currentKey := #{k.class}#{k}, index=#{@index.inspect}, index[k]=#{@index[k]}"
-  #       k = k.to_i if k.respond_to?(:to_i)  # this fixes Qt::Enum identity crises (I hope) AARGH
-#         @qtc.currentIndex = @index[enum2i(k)] || -1
-  #       tag "currentIndex is now #{@qtc.currentIndex}"
-#       end
 
       define_simple_setter :currentIndex
 
@@ -67,11 +60,14 @@ See examples/models/demo03.rb
     public
 
       # use this instead of connecting 'activated'
+      # arg1: data, arg2: the key
       def whenActivated &block
         if block
           connect(@qtc, SIGNAL('activated(int)'), self) do |idx|
 #             tag "idx = #{idx}, data_to_transmit[idx] = #{data_at(idx).inspect}"
-            rfCallBlockBack(data_at(idx), idx, &block)
+            data = @localmodel.model_row(idx)
+	    #tag "data = #{data.inspect}"
+            rfCallBlockBack(data, @localmodel.model_value2key(data, self), &block)
           end
         else
           @qtc.activated(@qtc.currentIndex)

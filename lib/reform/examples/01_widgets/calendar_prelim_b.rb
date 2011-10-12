@@ -24,6 +24,9 @@ Reform::app {
       whenMonthChanged { }
       makecenter
     }
+    combobox {
+      locale_model
+    }
     # FIXME, ugly
     # proposed:  row[0] { minimumHeight value }
     # so a method 'row' that creates a dummy object with '[]' as method, accepting

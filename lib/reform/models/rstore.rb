@@ -3,7 +3,7 @@
 
 require 'pp'
 
-# TODO: fully persistent version of structure.rb
+# fully persistent version of structure.rb
 # And automatically persistent.
 
 =begin
@@ -13,9 +13,9 @@ require 'pp'
   'new' will connect to the rstore and hence a completely filled instance
   is always immediately at your service.
 
-  rstore will use yaml files on disk and some clever cutting algo to keep
-  things fast.
-  rstore v1 will not be transaction save.  The data may get corrupted if
+  rstore will use a configurable backend, default gdbm 
+  rstore v1 is transaction save, provided the backend is. gdbm is NOT!!!
+  The data may get corrupted if
   the application crashes or in all other cases where a transaction is
   partly executed.
 
@@ -24,7 +24,7 @@ require 'pp'
   ==================
   the database has no idea about which nodes can be reached from the root!
   Therefor it must be periodically scanned and cleaned using a true GC.
-  NOT IMPLEMENTED YET: and hence it will grow and grow. FIXME
+  To do this use 'compact' now and then.
 
 =============================
   MAD SCIENTIST ALERT!!!!
@@ -96,6 +96,11 @@ module Reform
 
     private # RStoreNode methods
 
+      # Basic model constructor
+      # +parent+ is the parent model and +parent+.+key+ should refer to this node again
+      # +value+ is the object or array or hash to wrap
+      # +oid+ is the oid in the rstore.  
+      # This is an internal method, do not call directly
       def initialize parent, key, value, oid
         raise "BOGO key #{key.inspect}" if !(nil == key || Symbol === key || Integer === key && key < 10_000_000)
         raise 'arg' if Class === parent
@@ -105,6 +110,7 @@ module Reform
         @rstore_oid = oid
       end
 
+      # override, assign a key within the model
       def model_assign key, value, method_symbol = nil
 #        tag "model_assign[#{key}] := #{value.inspect}"
 #         raise 'WTF' if value.nil?         nothing wrong with a[2] = nil etc.
@@ -123,6 +129,8 @@ module Reform
 #         tag "model_value is now #{@model_value.inspect}"
       end
 
+      # returns true if the value is not a complex object. 
+      # complex object within a node must become nodes themselves!
       def self.rstore_atom?(value)
         case value
         # RStoreNode is not one of them!!! These classes are basicly stored 'raw'!
@@ -144,20 +152,12 @@ module Reform
                            with 3 different nodes, but each has the same oid!
 =end
       # this is the place where rstore contents is gathered and stored
-      def self.rstore_inter key, value, parent, rstore
+      def self.rstore_wrap key, value, parent, rstore
 #        tag "rstore_inter(#{key}, #{value}), id = #{value.object_id}"
-        return value if rstore_atom?(value) || RStoreNode === value
-        need_ospace_storing = false
-        if oid = rstore.objectspace[id = value.object_id]
-	  rv = rstore.revspace[oid] and return rv
-	else
-          oid = rstore.rstore_gen_oid(value)
-          need_ospace_storing = true
-        end
         case value
         when Hash
           value.each do |k, v|
-            raise "bad key #{k.inspect}" unless Symbol === k || String === k
+            #raise "bad key #{k.inspect} within value to wrap: #{value.inspect}" unless Symbol === k || String === k
             value[k] = rstore_inter(k, v, parent, rstore) unless rstore_atom?(v)
           end
         when Array
@@ -166,7 +166,7 @@ module Reform
           end
         else
           if value.respond_to?(:model_has_own_storage?) && value.model_has_own_storage?
-            STDERR.print "kind of mounted model '#{value}' detected, not stored!!!"
+#            tag "kind of mounted model '#{value}' detected, not stored!!!"
             value.model_parent = parent
             value.model_key = key
             rstore.rstore_assign_oid(oid, value) if need_ospace_storing
@@ -183,7 +183,19 @@ module Reform
             end
           end
         end
+      end
+
+      def self.rstore_inter key, value, parent, rstore
 #         tag "returning from rstore_inter, got oid #{oid}"
+        return value if rstore_atom?(value) || RStoreNode === value
+        need_ospace_storing = false
+        if oid = rstore.objectspace[id = value.object_id]
+	  rv = rstore.revspace[oid] and return rv
+	else
+          oid = rstore.rstore_gen_oid(value)
+          need_ospace_storing = true
+        end
+	rstore_wrap key, value, parent, rstore
         rv = RStoreNode.new(parent, key, value, oid)
         if need_ospace_storing
 #           tag "inter stores new oid #{oid}"
@@ -740,7 +752,7 @@ module Reform
             begin
               @model_value[name]
             rescue TypeError
-	      tag "TypeError, model_value is #@model_value"
+#	      tag "TypeError, for [#{name.inspect}].model_value is #{@model_value.inspect}"
               raise Error, tr("Bad getter '#{name.inspect}' on #{@model_value.class} value, caller = #{caller.join("\n")}")
             end
 #             nil
@@ -794,14 +806,65 @@ module Reform
 	  Hash === @model_value && @model_value[symbol] || super
       end
 
+      # this method is used to set the proper row, if 'value' is connected to it.
+      # Now the problem is that Hashes and Arrays can connect to their index or 
+      # their value.
+      #
+      # IMPORTANT saying 'key_connector:id' is not the same as leaving it 
+      # the default (also :id)
+      # Because this switches on locating the value by key
+      #
+      def model_value2index value, view
+#	tag "#{self}::model_value2index(#{value}, view:#{view})"
+        return 0 if value.nil?
+        key_connector = view.key_connector
+        key = model_value2key(value, view) or
+          key ||= value if key_connector # if key-lookup is enforced,
+#         tag "model_value2index, key_connector=#{key_connector}, key = #{key.inspect}, value was #{(value.respond_to?(:value) ? value.value : value).inspect}"
+        if @model_value.respond_to?(:each_key)
+#           tag "HASH case"
+          if key
+            @model_value.each_key.find_index(key)
+          elsif @model_value.respond_to?(:each_pair)
+#             tag "Using each_pair"
+            @model_value.each_pair.find_index { |k, v| v == value }
+          end
+          @model_value.each_key.find_index(value)
+        elsif @model_value.respond_to?(:find_index)
+#           tag "ARRAY case"
+          return nil if @model_4value.empty?
+          key = value if !key && model_value2key(@model_value[0], view) # force the use of a key if this seems to be how it should be done.
+              # but it is higher heuristics
+          if key
+            return key if key_connector == :numeric_index
+            @model_value.find_index do |value|
+#               tag "Comparing value2key #{value2key(value, view).inspect}, with key #{key.inspect}"
+              model_value2key(value, view) == key
+            end #.tap{|r|tag "find_index -> #{r.inspect}"}
+          else
+            @model_value.find_index(value)
+          end
+        else
+          0
+        end
+      end
+
   end # class RStoreNode
 
+  # RStore is the toplevel node. It is simply an extended RStoreNode and
+  # hence can wrap around any object or hash or array.
+  # RStore has extended caching tables so consume quite a lot of memory
   class RStore < RStoreNode
       ROOT_OID = '0'
       # RStore::Node == RStoreNode, for some reason
       Node = RStoreNode
-    private # RStore methods
-      def initialize dbname
+    private # RStore method
+      # Create a new rstore.
+      # The extension of dbname is important.
+      # If +dbname+ is nil, a nil-store (non persistent) is created
+      # If +init_value+ is set, it is used as initial value, provided
+      # +dbname+ was nil. Otherwise ignored
+      def initialize dbname, init_value = nil
         super(nil, nil, nil, ROOT_OID)
         # hash from object_id to oid
         @objectspace = {}
@@ -828,18 +891,21 @@ module Reform
         raise 'blech' if @rstore_db.closed?
         if rstore_root = @rstore_db[ROOT_OID]
 #           tag "rstore_db[ROOT_OID] = #{rstore_root.inspect}"
-          t = Marshal::load(rstore_root)
-          if t.nil?
-            STDERR.print "OK, attempt to fix CORRUPTED database!!! CLEANED\n"
-            clear
-          else
-#             tag "Loaded marshal-ed raw value #{t.pretty_inspect}, calling rstore_hash2value"
-            @model_value = RStoreNode::rstore_hash2value(t, self)
-#             tag "Loaded marshal-ed value #{@model_value.pretty_inspect}"
-          end
+	  if !dbname && init_value
+	    clear init_value
+	  else
+	    t = Marshal::load(rstore_root)
+	    if t.nil?
+	      STDERR.print "OK, attempt to fix CORRUPTED database!!! CLEANED\n"
+	      clear
+	    else
+  #             tag "Loaded marshal-ed raw value #{t.pretty_inspect}, calling rstore_hash2value"
+	      @model_value = RStoreNode::rstore_hash2value(t, self)
+  #             tag "Loaded marshal-ed value #{@model_value.pretty_inspect}"
+	    end
+	  end
         else
-#           @model_value = {}
-          clear
+          clear(dbname ? nil : init_value)
         end
         if block_given?
           begin
@@ -880,21 +946,21 @@ module Reform
       
     public # RStore methods
 
-      def clear 
-        @model_value = {}
+      def clear init_value = nil
         @rstore_db.clear
 	@in_tran = false
 	@objectspace = {}
 	@revspace = {}
-        # it is rather obvious that rstore_value2hash({}) == {} itself. 
+	if init_value
+	  model_pickup_tran do |tran|
+	    @model_value = init_value
+	    RStoreNode::rstore_wrap(nil, @model_value, self, self)
+	  end
+	else
+	  @model_value = {}
+	end
         @rstore_db[ROOT_OID] = Marshal::dump(RStoreNode::rstore_value2hash(@model_value, self))
       end
-      
-      # an RStore behaves like a hash, so the method to use would be 'delete'
-#       def remove *keys
-#         keys.each do |key|
-#         end
-#       end
       
         # it must be public
       def rstore_rstore
@@ -903,6 +969,9 @@ module Reform
       end
 
       attr :objectspace, :revspace
+
+      # this is important since it connects us to the controltree
+      attr_accessor :parent
 
       def tran?
         @in_tran
@@ -936,7 +1005,7 @@ module Reform
 
       def model_commit_work altered_owners
         raise ProtocolError, 'no transaction to commit' unless @in_tran
-#         tag ">>> model_commit_work, altered_owners = #{altered_owners.inspect}"
+#        tag ">>> model_commit_work, altered_owners = #{altered_owners.inspect}"
         altered_owners.each do |object_id, node|
           raise 'aaargh' unless RStoreNode === node
           raise 'aargh' unless oid = node.rstore_oid
@@ -961,7 +1030,7 @@ module Reform
       end
         
       def rstore_assign_oid oid, value
-        raise 'BOGO call' if RStoreNode === value
+        raise 'BOGO call: trying to store a wrapper??' if RStoreNode === value
         raise 'Attempt to update outside transaction' unless @in_tran
         raise 'wtf' if oid =~ /^rstore/
 #         tag "Storing node in rstore DB: oid=#{oid} => #{value.inspect}"
@@ -983,7 +1052,8 @@ module Reform
       def rstore_db_length
         @rstore_db.length
       end
-      
+     
+      # for debugging purposes
       def rstore_db_inspect
         @rstore_db.each_pair.to_a.pretty_inspect
       end
@@ -1006,6 +1076,7 @@ module Reform
 #         @model_value.compact!   no such method exists
 #         garbage_collect
 #       end
+
   end # class RStore
 
 end # module Reform

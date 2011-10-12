@@ -71,10 +71,10 @@ module Reform
 
           # If the list has 1000 rows, expect 8000 calls to this method. So it should be as fast as possible.
           def data index, role = Qt::DisplayRole
-#             tag "data at #{index.row}, role = #{role} DisplayRole=#{Qt::DisplayRole}, EditRole=#{Qt::EditRole}, SizeHintRole=#{Qt::SizeHintRole}"
-            record = localmodel.row(index.row)
+            #tag "#{self}#data at #{index.row}, role = #{role} DisplayRole=#{Qt::DisplayRole}, EditRole=#{Qt::EditRole}, SizeHintRole=#{Qt::SizeHintRole}, localmodel=#{localmodel}"
+            record = localmodel.model_row(index.row)
             is_model = record.respond_to?(:model?) && record.model?
-#             tag "localmodel= #{localmodel.value.inspect}, row = #{index.row}, record = #{record.inspect}"
+#            tag "localmodel= #{localmodel.inspect}, row = #{index.row}, record = #{record.inspect}"
             return Qt::Variant.new if record.nil?
             # it is far too dangerous defaulting this
 #             tag "Qt::SizeHintRole = #{Qt::SizeHintRole.inspect}, to_i -> #{Qt::SizeHintRole.to_i}"
@@ -176,14 +176,14 @@ module Reform
           end
 
           def mimeTypes
-            tag "mimeTypes"
+            #tag "mimeTypes"
             [localmodel.mimeType]
           end
 
           def mimeData indexes
 #             tag "mimeData"
             return nil if indexes.empty?
-            localmodel.mimeData(indexes.map { |i| localmodel.row(i.row) })
+            localmodel.mimeData(indexes.map { |i| localmodel.model_row(i.row) })
           end
       end # module QAbstractItemModel
 
@@ -192,7 +192,7 @@ module Reform
         private
           def initialize reformmodel, reformview
             super(reformmodel)
-#             tag "QItemModel.new(#{reformmodel}, #{reformview}"
+ #           tag "QItemModel.new(#{reformmodel}, #{reformview}"
             @localmodel = reformmodel # apparently.
             @view = reformview
           end
@@ -230,8 +230,11 @@ module Reform
           # the 'local' connector, that connects to the local 'model'
           # and if set is applied as 'getter' to fetch the strings belonging to each object
           # within the model
+	  # if unset the view will attempt to make something out of the data itself
           declare_connector :display, :local_connector
 
+	  # since local_connector refers to what is displayed, these aliases
+	  # make that more clear
           alias :display_connector :local_connector
           alias :display :local_connector
 
@@ -265,7 +268,7 @@ module Reform
           end
 
           def var2data variant
-            tag "var2data, type = #{@type.inspect}"
+#            tag "var2data, type = #{@type.inspect}"
             # IMPORTANT: String === String results in false!!!
             case @type.to_s
             when 'String' then variant.to_string
@@ -276,11 +279,7 @@ module Reform
             end
           end
 
-#           def label lab = nil
-#             return @label if lab.nil?
-#             @label = lab
-#           end
-
+	  # this is how the external key is referred
           def connector value = nil, &block
             return super unless value || block
             super
@@ -304,17 +303,9 @@ module Reform
             connector(hash[:external]) if hash[:external]   # otherwise unaffected
           end
 
-
       end # class ColumnRef
 
     private # AbstractItemView methods
-
-      def initialize parent, qtc
-        super
-#         tag "AbstractItemView.new"
-        # columns are controls
-#         @columns = []         So we don't really need this
-      end
 
       SelectionModeMap = { :none => Qt::AbstractItemView::NoSelection,
                            :extended => Qt::AbstractItemView::ExtendedSelection,
@@ -345,20 +336,16 @@ module Reform
       end
 
       def createColumnRef
-#         tag "createColumnRef"
+#        tag "createColumnRef"
         ColumnRef.new(self)
       end
 
       def whenCurrentItemChanged &block
-        raise 'DEPRECATED, and wrong code'
-#         connect(@qtc, SIGNAL('currentItemChanged(QTreeWidgetItem*,QTreeWidgetItem*)'), self) do |current, prev|
-#           rfCallBlockBack(current, prev, &block)
-#         end
+        raise 'DEPRECATED'
       end
 
       def whenItemChanged &block
-        raise 'DEPRECATED, and wrong code'
-#         connect(@qtc, SIGNAL('itemChanged(QTreeWidgetItem*,int)'), self) { |item, colnr| rfCallBlockBack(item, colnr, &block) }
+        raise 'DEPRECATED'
       end
 
       def setLocalModel aModel
@@ -378,12 +365,12 @@ module Reform
       end
 
       def createQModel
-#         tag "createQModel"
+#        tag "createQModel"
         QItemModel.new(@localmodel, self)
       end
 
       def column quickyhash = nil, &initblock
-#         tag "column"
+#        tag "column"
         ref = createColumnRef
         if quickyhash
           ref.setupQuickyhash(quickyhash)
@@ -411,19 +398,24 @@ module Reform
       end
 
       # override, assign to @localmodel, not to @model
-      def addModel control, hash, &block
+      def addModel control, hash = nil, &block
         control.setup hash, &block
         @localmodel = control
-        control.parent = self
+        #control.parent = self    no such method 'parent=' .. required ?
         added control
       end
 
-      # the default is :id.
+      # the default is :id. This tells the view how to retrieve the 'key'
+      # from a row.
       def key_connector value = nil
         return @key_connector unless value
         @key_connector = value
       end
 
+      # a model_connector gives us the local model, as part of the global model.
+      # For example calendermodel has 'weekdays' which can be used to fill a
+      #combobox. So a model_connector is an alternative for providing a local model
+      # otherwise. It does apply to $qApp.model or form.model
       def model_connector value = nil
         return @model_connector unless value
         @model_connector = value

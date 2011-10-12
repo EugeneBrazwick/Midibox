@@ -1,36 +1,24 @@
 
-# Copyright (c) 2010 Eugene Brazwick
+# Copyright (c) 2010-2011 Eugene Brazwick
 
 module Reform
 
   require 'reform/abstractlistview'
 
-=begin rdoc
-
-a ListView gives you the view on a single column (if applicable, and default the first)
-of a model.
-
-To populate a list:
-  - add a model to it
-  - add a 'model_connector' that retrieves a model from the passed datastructure.
-
-to get icons:
-  set iconSize or viewMode and set the 'decorator' connector
-
-=end
+  #a ListView gives you the view on a single column (if applicable, and default the first)
+  #of a model.
+  #
+  #To populate a list:
+  #  - add a model to it. That is, add a plugin instantiator like 'rstore' or 'structure'.
+  #    to wrap a simple array or hash 'struct' can also be used.
+  #  - or add a 'model_connector' that retrieves a model from the passed datastructure.
+  #
+  #to get icons:
+  #  set iconSize or viewMode and set the 'decorator' connector
+  #
   class ListView < AbstractListView
 
     private
-
-#       def initialize parent, qtc
-#         super
-#         initAbstractListView
-#       end
-
-#       def postSetup
-#         super
-#         tag "ListView::postSetup, qtc.model = #{@qtc.model}"
-#       end
 
       # override
       def setLocalModel aModel
@@ -154,7 +142,7 @@ to get icons:
       end
 
       def setCurrentIndex idx
-        tag "#{self}(qtc:#@qtc)::setCurrentIndex(#{idx}), modcol = #{@qtc.modelColumn}, qtc.model=#{@qtc.model}"
+        #tag "#{self}(qtc:#@qtc)::setCurrentIndex(#{idx}), modcol = #{@qtc.modelColumn}, qtc.model=#{@qtc.model}"
         idx = @qtc.model.index(idx, @qtc.modelColumn)
         @qtc.currentIndex = idx if idx.valid?
       end
@@ -163,10 +151,6 @@ to get icons:
 
   class QListView < Qt::ListView
     include QWidgetHackContext
-#       def paintEvent event
-#         tag "paintEvent"
-# #         super
-#       end
 
 #       def visualRect(item)
 #         r2 = super.tap{|r| tag "visualRect(#{item}) -> #{r.inspect}" }

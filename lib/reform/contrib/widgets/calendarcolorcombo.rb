@@ -23,7 +23,7 @@ module Reform
   class CalendarComboBox < ComboBox
     def initialize parent, qtc
       super
-      model   Qt::red => tr('Red'),
+      struct   Qt::red => tr('Red'),
               Qt::blue => tr('Blue'),
               Qt::black => tr('Black'),
               Qt::magenta => tr('Magenta')

@@ -53,18 +53,6 @@ module Reform
 #
   class Control < Qt::Object
 
-#       class Animation < Control
-#
-#         private # Animation methods
-#           # our parent is the parent of the DynamicAttribute so it could be a GraphicsItem.
-#           # Which is a Qt::Object, even if Qt::GraphicsItem is not
-#           def initialize attrib
-# #             tag "Assigned attrib and propertyname '#{@qtc.propertyName}'"
-#           end
-#
-#       end
-
-
     private # Control methods
 
       # create a new Control, using the frame as 'owner', and qtc as the wrapped Qt::Widget
@@ -365,6 +353,7 @@ module Reform
         end
       end
 
+      #alias :connect :connector	STUPID: connect already exists !
       def propagateModel aModel, propagation
 #         tag "#{self}#propagateModel(#{aModel}, #{propagation.inspect}"
         # we keep clear of children with their own 'effective' models, which means that the
@@ -382,11 +371,15 @@ module Reform
 #         end
       end
 
-      # data is the connector applied on the model. This is only called if we 'want data',
-      # if we have a connector,
-      # if the model has a getter for it, and
-      # if the connector is in the 'changed' list of the propagation
+      # data is the result of applying :connector on the model that was propagated to us
+      # This is only called if 
+      #  - we 'want data',
+      #  - we have a connector,
+      #  - the model has a getter for it, and
+      #  - the connector is in the 'changed' list of the propagation
       def applyModel data
+#	tag "applyModel IGNORED!!"
+	STDERR.print "WARNING: applyModel is ignored" if $VERBOSE
       end
 
     protected # Control methods
@@ -606,8 +599,10 @@ module Reform
       end
 
       # :nodoc: called by +add+ if the control was a model
-      def addModel control, hash, &block
+      def addModel control, hash = nil, &block
 #         @model ||= nil
+	# setup may use 'parent'
+        control.parent = self
         control.setup hash, &block
 #         want_data!            this is a toplevel call. There is no need to do this.
 # and it wrong for comboboxes or lists that are assigned local data.
@@ -617,7 +612,6 @@ module Reform
         @model = control
 #           @model.addObserver(self) if @model
 #         end
-        control.parent = self
         added control
       end
 
@@ -811,12 +805,15 @@ module Reform
           end
           if aModel.respond_to?(:model?) && aModel.model?
 #	    tag "apply getter '#{cid}' to aModel"
+	    STDERR.print "#{self}::updMod, get data by application of #{cid}, do_apply=#{do_apply}" if propagation.debug_track?
             data = aModel.model_apply_getter(cid)
           elsif Proc === cid
 #	    tag "apply getter '#{cid}' to aModel"
+	    STDERR.print "#{self}::updMod, get data by application of proc, do_apply=#{do_apply}" if propagation.debug_track?
             data = cid.call(aModel)
           else
 #	    tag "take aModel as is"
+	    STDERR.print "#{self}::updMod, get data 'as is', do_apply=#{do_apply}" if propagation.debug_track?
             data = aModel
           end
           # for simple fields the connected model is the container.
@@ -880,11 +877,6 @@ module Reform
       end
 
       alias :findChildren :find
-
-      # can be used as a bool too. For comboboxes and tables this may be set, while effectiveModel is nil.
-#       def model
-#         instance_variable_defined?(:@model) ? @model : nil
-#       end
 
       def geometry=(*value)
         @qtc.geometry = *value

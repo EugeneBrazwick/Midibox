@@ -24,13 +24,13 @@ module Reform
 
       QAbstractListModel = QAbstractItemModel
 
-      # this class forms the hinge between 'list' (or 'combo' etc) and any 'model' (like ruby_model/simpledata)
-      # It is meant to work with Structure
+      # this class forms the hinge between 'list' (or 'combo' etc) and any 'model' (like Structure) 
       class QModel < Qt::AbstractListModel
         include QAbstractListModel
 
         private
           def initialize reformmodel, reformview
+#	    tag "new QModel"
             if Qt::Object === reformmodel
               super(reformmodel)
             else
@@ -106,24 +106,6 @@ Not supported yet
 =end
         public
 
-#           def itemData index
-#             super.tag{|r| tag "itemData -> #{r.inspect}"}
-#           end
-#
-#           def modelReset
-#             tag "modelReset emitted"
-#             super
-#           end
-
-#           def reset
-#             tag "reset called"
-#             super
-#           end
-#
-#           def roleNames
-#             super.tag{|r| tag "roleNames -> #{r.inspect}"}
-#           end
-
       end # class QModel
 
   private # methods of AbstractListView
@@ -144,7 +126,7 @@ Not supported yet
                             :connector, :connectors
 
       def createQModel
-#         tag "creating QModel"
+#        tag "creating QModel, localmodel = #@localmodel"
         QModel.new(@localmodel, self)
       end
 
@@ -153,20 +135,19 @@ Not supported yet
   In that case it is pretty useless. Maybe handy for debugging
 =end
       def activated model, cid, idx, data_idx = nil
-        tag "YES, 'activated'!!!, idx = #{idx}, cid=#{cid}, model=#{model},
-        data_to_transmit=#{@localmodel.index2value(idx, self).inspect}, debug_track = #@debug_track"
-        # BROKEN CODE ALERT: index2value is not in Model
-        model.model_apply_setter cid, @localmodel.index2value(idx, col0), self #, debug_track: true
+        #tag "YES, 'activated'!!!, idx = #{idx}, cid=#{cid}, model=#{model},
+        data_to_transmit=#{@localmodel.model_index2value(idx, self).inspect}, debug_track = #@debug_track"
+        model.model_apply_setter cid, @localmodel.model_index2value(idx, col0), self #, debug_track: true
       end
 
       #override. Select the correct index in the view based on the single value
       # that we connect to.
       def applyModel value
-#         tag "#{self}::apply_model #{value.inspect}, #{@model}, cid=#{connector.inspect}"
-        if modcon = col0.connectors[:model]
+        #tag "#{self}::applyModel #{value.inspect}, #@model, cid=#{connector.inspect}"
+        if modcon = @model_connector
           # change the contents first
-#           tag "applying model_connector #@model_connector"
-          setLocalModel @model.model_apply_getter(modcon)#.tap{|r| tag "setLocalModel(#{r.value.inspect})!!!!!!!!!!!!!!!!!!!!!!!!!!!!!" }
+          #tag "applying model_connector #{modcon}"
+          setLocalModel @model.model_apply_getter(modcon)#.tap{|r| tag "setLocalModel(#{r.inspect})!!!!!!!!!!!!!!!!!!!!!!!!!!!!!" }
         end
         # it's not entirely clear when the events are triggered
         # - currentIndexChanged(int)
@@ -176,13 +157,14 @@ Not supported yet
         # capabilities that operate on the local model.
         # Note that the setter is supposed to accept the VALUE at the given index
         # and the getter receives the VALUE too.
-#         tag "calling value2index(#{value}, use_as_id = #{use_as_id}"
-        if i = @localmodel.value2index(value, col0)
-          raise "#{@model}.value2index(#{value.inspect}) -> #{i}???, caller=#{caller.join("\n")}" unless Fixnum === i
-#           tag "Calling setCurrentIndex(#{i})"
+        #tag "calling #{@localmodel}#model_value2index(#{value}, col0 = #{col0}"
+        if i = @localmodel.model_value2index(value, col0)
+          raise "#{@model}.model_value2index(#{value.inspect}) -> #{i}???, caller=#{caller.join("\n")}" unless Fixnum === i
+          #tag "Calling setCurrentIndex(#{i})"
           setCurrentIndex i
         else
-#           STDERR.puts tr("Warning: could not locate value %s in %s") % [value.inspect, self.to_s]
+	  #tag "COULD NOT LOCATE #{value.inspect}"
+          STDERR.print "Warning: could not locate value %s in %s\n" % [value.inspect, self.to_s] if $VERBOSE
           setCurrentIndex 0
         end
       end # def apply_model

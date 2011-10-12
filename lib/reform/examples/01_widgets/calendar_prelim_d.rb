@@ -6,33 +6,35 @@ require_relative '../../widgets/calendarwidget'
 Reform::app {
   groupbox { # generalOptionsGroupBox
     title tr('General Options')
-    size 480, 300
-#     formlayout { # outerLayout
-      combobox { # localeCombo
-        # use Qt locale languagelist, and for each locale add the
-        # countriesForLanguage(lang).
-        # the currentlocale must be made the default value and thus function
-        # as the 'connecting' modelpart, we should simply set calendar.language_and_country
-        name :language_and_country
-        model ['something']
-        labeltext tr('&Locale')  # quicky label association, becomes a 'buddy'
+    sizeHint 480, 300
+    grid {
+      formlayout {
+	combobox { # localeCombo
+	  # use Qt locale languagelist, and for each locale add the
+	  # countriesForLanguage(lang).
+	  # the currentlocale must be made the default value and thus function
+	  # as the 'connecting' modelpart, we should simply set calendar.language_and_country
+	  connector :language_and_country
+	  struct 'just', 'a', 'test', 'array', 'of', 'data'
+	  labeltext tr('&Locale')  # quicky label association, becomes a 'buddy'
+	}
+	combobox { # firstDayCombo
+	  # or datasource({k=>v,...}) or datasource Hash[k=>v,...]
+	  struct Reform::CalendarModel::WeekDaysFromSun2Sat
+	  connector :weekstart  # should return a Qt::XXXday
+	  name :weekstart # to attach the label to
+	}
+	# as demo, I write it in full, but could place 'label' in combobox here as well
+	label { # firstDayLabel
+	  text tr('Wee&k starts on:')
+	  buddy :weekstart
+	}
+	combobox { # selectionModeCombo
+	  struct Reform::CalendarWidget::PossibleSelections
+	  labeltext tr('&Selection mode:')
+	}
       }
-      combobox { # firstDayCombo
-        # or datasource({k=>v,...}) or datasource Hash[k=>v,...]
-        model CalendarModel::WeekDaysFromSun2Sat
-        name :weekstart  # should return a Qt::XXXday
-      }
-      # as demo, I write it in full, but could place 'label' in combobox here as well
-      label { # firstDayLabel
-        text tr('Wee&k starts on:')
-        buddy :weekstart
-      }
-      combobox { # selectionModeCombo
-        model CalendarWidget::PossibleSelections
-        labeltext tr('&Selection mode:')
-      }
-       hbox { # checkBoxLayout
-# FIXME: these are missing !!!!  hbox fails here, checkbox works fine!!!
+      hbox { # checkBoxLayout
         checkbox { # gridCheckBox
           text tr('&Grid')
           name :gridVisible?
@@ -43,16 +45,19 @@ Reform::app {
           checked true
         }
       } # hbox
-      combobox {# horizontalHeaderCombo
-        name :horizontalHeaderOption
-        model CalendarWidget::PossibleHorizontalHeaderOptions
-        currentIndex 1  # this alters the model on initialization, even!!
-        labeltext tr('&Horizontal header:')
+      formlayout {
+	combobox {# horizontalHeaderCombo
+	  connector :horizontalHeaderOption
+	  struct Reform::CalendarWidget::PossibleHorizontalHeaderOptions
+	  currentIndex 1  # this alters the model on initialization, even!!
+	  labeltext tr('&Horizontal header:')
+	}
+	combobox { # verticalHeaderCombo
+	  struct Reform::CalendarWidget::PossibleVerticalHeaderOptions
+	  labeltext tr('&Vertical header:')
+	}
       }
-      combobox { # verticalHeaderCombo
-        model CalendarWidget::PossibleVerticalHeaderOptions
-        labeltext tr('&Vertical header:')
-      }
-#     }  # formlayout
+    }  # grid
   } # generalOptionsGroupBox
 }
+

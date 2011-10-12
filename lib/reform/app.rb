@@ -35,7 +35,9 @@ module Kernel
     end
 
     # this is the ugly way to make 'with' in ruby. CURRENT STATE: unused
-    # also this will not work 'with x do attrib = 3'
+    # also this will not work: 'with x do attrib = 3'
+    # It should then still be: 'with x do self.attrib = 3'. Which is a lot more 
+    # complicated than 'x.attrib = 3'.
     def with arg, &block
       arg.instance_eval(&block)
     end
@@ -409,7 +411,7 @@ module Reform
               reform_class = instantiator[:reform_class]
               options = instantiator[:options]
               qt_implementor_class = instantiator[:qt_implementor_class]
-              raise ArgumentError, "Bad hash #{quicky} passed to instantiator '#{name}'" unless quicky == nil || Hash === quicky
+              raise ArgumentError, "Bad param #{quicky.inspect} passed to instantiator '#{name}'" unless quicky == nil || Hash === quicky
   #             tag "quicky hash = #{quicky.inspect}"
               # It's important to use parent_qtc_to_use, since it must be a true widget.
               # Normally, 'qparent' would be '@qtc' itself
@@ -494,19 +496,18 @@ module Reform
 
         # shortcut. You can then say simple_data 'hallo', 'world'
         def simple_data *val
-          STDERR.puts "DEPRECATED, use 'struct' iso simple_data/simpledata"
-          ruby_model value: if val.length == 1 then val[0] else val end
+          raise "DEPRECATED, use 'struct' iso simple_data/simpledata"
         end
 
-        alias :simpledata :simple_data
+       # alias :simpledata :simple_data
 
         def struct *val, &block
-#           tag "struct(#{val.inspect})"
+          #tag "struct(#{val.inspect})"
           if block
 #             tag "using block"
             addModel(Structure.new.build(&block))
           else
-            structure value: if val.length == 1 then val[0] else val end
+            addModel(Structure.new(if val.length == 1 && Hash === val[0] then val[0] else val end))
           end
         end
 
@@ -885,8 +886,7 @@ module Reform
 
         # shortcut. You can then say simple_data 'hallo', 'world'
         def simple_data *val
-          STDERR.puts "simple_data is DEPRECATED, use 'struct'"
-          ruby_model value: if val.length == 1 then val[0] else val end
+          raise "simple_data is DEPRECATED, use 'struct'"
         end
 
         alias :simpledata :simple_data
@@ -910,13 +910,12 @@ module Reform
           end
         end
 
-        def struct hash, &block
-#           tag "struct"
-	  raise 'struct now requires a hash in all cases' unless Hash === hash
+        def struct *val, &block
+#          tag "struct"
           if block
             addModel(Structure.new.build(&block))
           else
-            structure val
+            addModel(Structure.new(if val.length == 1 && Hash === val[0] then val[0] else val end))
           end
         end
 

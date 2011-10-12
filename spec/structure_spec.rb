@@ -31,6 +31,14 @@ describe Structure do
     s[:value].should == 4
   end
 
+  it "can be constructed as a simple array value" do
+    s = Structure.new [5, :whoof, :skreek, 'bla']
+    s.model_apply_getter(0).should == 5
+    s.model_apply_setter(2, 4)
+    s.model_apply_getter(2).should == 4
+    s[2].should == 4
+  end
+
   it "methods can be used to access a hash value" do
     s = Structure.new text: "Hallo world"
     s.text.should == 'Hallo world'
@@ -80,8 +88,8 @@ describe Structure do
   it "should collect changes and report these when the tran is committed" do
     s = Structure.new a: 24, b: 345, c: 'hallo', d: 'world'
     o = MyObserver.new
-    s.model_parent = o
-    s.model_parent.should == o
+    s.parent = o
+    s.parent.should == o
     s.transaction do
       s.a = 184
       s.c = 'ohayou'
@@ -153,7 +161,7 @@ describe Structure do
   it "should collect more complicated changes" do
     s = Structure.new x: 24, y: [23, 'hallo', {i: :interesting}]
     o = MyObserver.new
-    s.model_parent = o
+    s.parent = o
     s.transaction do
       #tag "inside test transaction"
       s.x *= 2

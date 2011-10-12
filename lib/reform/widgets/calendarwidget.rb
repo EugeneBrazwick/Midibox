@@ -1,124 +1,122 @@
 #!/usr/bin/ruby -w
 
-# Copyright (c) 2010 Eugene Brazwick
+# Copyright (c) 2010-2011 Eugene Brazwick
 
 require 'Qt'
 
 require_relative '../app'
+require_relative '../widget'
+require_relative '../models/calendar_model'
 
 module Reform
 
-  require_relative '../widget'
-  require_relative '../models/calendar_model'
-
+  # our wrapper for QCalendarWidget
   class CalendarWidget < Widget
     private
 
-    def initialize parent, qtc
-      super
-      connect(@qtc, SIGNAL('selectionChanged()'), self) do
-#            tag "SELCHANGE, date #{@qtc.selectedDate.inspect}"
-          # BEWARE FOR LOOP/STACKOVERFLOW. this will call updateModel
-          # which calls @qtc.selectedDate := X
-          # which MAY trigger selectionChanged(). However, it doesn't seem to do that
-          # to be safe I use options[:property]
-        rfRescue { model = effectiveModel and model.selectedDate = @qtc.selectedDate }
+      def initialize parent, qtc
+	super
+	connect(@qtc, SIGNAL('selectionChanged()'), self) do
+  #            tag "SELCHANGE, date #{@qtc.selectedDate.inspect}"
+	    # BEWARE FOR LOOP/STACKOVERFLOW. this will call updateModel
+	    # which calls @qtc.selectedDate := X
+	    # which MAY trigger selectionChanged(). However, it doesn't seem to do that
+	    # to be safe I use options[:property]
+	  rfRescue { mod = model and mod.selectedDate = @qtc.selectedDate }
+	end
       end
-    end
 
-    def minimumDate *value
-#       tag "#{self}::minimumDate, qtc=#@qtc"
-      return @qtc.minimumDate if value.empty?
-      @qtc.minimumDate = CalendarModel::to_date(*value)
-    end
-
-    def maximumDate *value
-      return @qtc.maximumDate if value.empty?
-      @qtc.maximumDate = CalendarModel::to_date(*value)
-    end
-
-    define_simple_setter :gridVisible
-
-    def whenCurrentPageChanged &block
-      if block
-        connect(@qtc, SIGNAL('currentPageChanged(int, int)'), self) do
-
-          rfCallBlockBack(&block)
-        end
-      else
-        @qtc.currentPageChanged(@qtc.yearShown, @qtc.monthShown)
+      # minimumDate accepts the same as CalendarModel::to_date
+      # without arguments it returns the current value
+      def minimumDate *value
+  #       tag "#{self}::minimumDate, qtc=#@qtc"
+	return @qtc.minimumDate if value.empty?
+	@qtc.minimumDate = CalendarModel::to_date(*value)
       end
-    end
 
-    alias :whenMonthChanged :whenCurrentPageChanged
+      # maximumDate accepts the same as CalendarModel::to_date
+      # without arguments it returns the current value
+      def maximumDate *value
+	return @qtc.maximumDate if value.empty?
+	@qtc.maximumDate = CalendarModel::to_date(*value)
+      end
 
-    PossibleSelections = { Qt::CalendarWidget::SingleSelection=>tr("Single selection"), # DEFAULT
-                           Qt::CalendarWidget::NoSelection=>tr("None") }
+      define_simple_setter :gridVisible
 
-    PossibleHorizontalHeaderOptions = {
-      Qt::CalendarWidget::SingleLetterDayNames=>tr('Single letter day names'),
-      Qt::CalendarWidget::ShortDayNames=>tr('Short day names'), # DEFAULT
-      Qt::CalendarWidget::NoHorizontalHeader=>tr('None')
-    }
+      def whenCurrentPageChanged &block
+	if block
+	  connect(@qtc, SIGNAL('currentPageChanged(int, int)'), self) do
 
-    PossibleVerticalHeaderOptions = {
-      Qt::CalendarWidget::ISOWeekNumbers=>tr('ISO week numbers'),  # DEFAULT
-      Qt::CalendarWidget::NoVerticalHeader=>tr('None') }
+	    rfCallBlockBack(&block)
+	  end
+	else
+	  @qtc.currentPageChanged(@qtc.yearShown, @qtc.monthShown)
+	end
+      end
+
+      alias :whenMonthChanged :whenCurrentPageChanged
+
 
     public
-    #override
-    @@connectingModelSem = false
-
-    def updateModel model, options = nil
-      return if @@connectingModelSem
-      @@connectingModelSem = true
-#       tag "#{self}::updateModel, qtc=#@qtc, caller=#{caller.join("\n")}, options=#{options.inspect}"
-#       with model do
-        # this is crude code. It simply assumes that model is the right one.
-      #it also assumes model is not nil
-      # RESSETTING all dateformatting first, to erase specific hacks in the
-      # calendar example.
-      @qtc.setDateTextFormat(Qt::Date.new, Qt::TextCharFormat.new)
-      @qtc.minimumDate = model.minimumDate
-      @qtc.maximumDate = model.maximumDate
-      @qtc.selectionMode = model.selectionMode
-      @qtc.horizontalHeaderFormat = model.horizontalHeaderFormat
-      @qtc.verticalHeaderFormat = model.verticalHeaderFormat
-      @qtc.navigationBarVisible = model.navigationBarVisible?
-      @qtc.gridVisible = model.gridVisible?
-      @qtc.firstDayOfWeek = model.firstDayOfWeek
-      unless options && options[:property] == :selectedDate
-        @qtc.selectedDate = model.selectedDate || Qt::Date.new
-      end
-      lang = model.locale || 'C'
-#       tag "lang := #{lang}"
-      @qtc.locale = Qt::Locale.new(lang)
-      super
-    ensure
+      #override
       @@connectingModelSem = false
-    end
 
-    def setWeekdayTextFormat *args
-      @qtc.setWeekdayTextFormat(*args)
-    end
+      # override
+      def updateModel model, propa
+	return if @@connectingModelSem
+	@@connectingModelSem = true
+  #       tag "#{self}::updateModel, qtc=#@qtc, caller=#{caller.join("\n")}, options=#{options.inspect}"
+  #       with model do
+	  # this is crude code. It simply assumes that model is the right one.
+	#it also assumes model is not nil
+	# RESSETTING all dateformatting first, to erase specific hacks in the
+	# calendar example.
+	@qtc.setDateTextFormat(Qt::Date.new, Qt::TextCharFormat.new)
+	@qtc.minimumDate = model.minimumDate
+	@qtc.maximumDate = model.maximumDate
+	@qtc.selectionMode = model.selectionMode
+	@qtc.horizontalHeaderFormat = model.horizontalHeaderFormat
+	@qtc.verticalHeaderFormat = model.verticalHeaderFormat
+	@qtc.navigationBarVisible = model.navigationBarVisible?
+	@qtc.gridVisible = model.gridVisible?
+	@qtc.firstDayOfWeek = model.firstDayOfWeek
+	#tag "assigning #{model.selectedDate.inspect} to #@qtc#selectedDate"
+	if date = model.selectedDate 
+	  @qtc.selectedDate = Qt::Date === date ? date : CalendarModel::to_date(date)
+	else
+	  @qtc.selectedDate = Qt::Date.new
+	end
+	lang = model.locale || 'C'
+  #       tag "lang := #{lang}"
+	@qtc.locale = Qt::Locale.new(lang)
+	super
+      ensure
+	@@connectingModelSem = false
+      end
 
-    def setDateTextFormat *args
-      @qtc.setDateTextFormat(*args)
-    end
+      def setWeekdayTextFormat *args
+	@qtc.setWeekdayTextFormat(*args)
+      end
 
-    define_simple_setter :headerTextFormat
+      def setDateTextFormat *args
+	@qtc.setDateTextFormat(*args)
+      end
 
-    def yearShown
-      @qtc.yearShown
-    end
+      define_simple_setter :headerTextFormat
 
-    def monthShown
-      @qtc.monthShown
-    end
+      def yearShown
+	@qtc.yearShown
+      end
+
+      def monthShown
+	@qtc.monthShown
+      end
 
   end # CalendarWidget
 
-  QCalendarWidget = Qt::CalendarWidget
+  class QCalendarWidget < Qt::CalendarWidget
+    include QWidgetHackContext
+  end
 
   createInstantiator File.basename(__FILE__, '.rb'), QCalendarWidget, CalendarWidget
 

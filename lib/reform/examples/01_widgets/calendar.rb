@@ -4,8 +4,8 @@
 
 require 'reform/app'
 
-# KNOWN ISSUES:  changing current date in 'date' edit does not change the calwidget
-# Also, changing locale may switch current year to 7999, even though maxdate is set to 1-1-3000
+# KNOWN ISSUES:  
+# changing locale may switch current year to 7999, even though maxdate is set to 1-1-3000
 # below
 # Indeed, max date changes in a weird fashion, and daterange for 'date' control
 # does not guarantee anything.
@@ -144,8 +144,9 @@ We 'can' a 'control' so 'can_control'.  But it looks like a question...
 	      currentIndex 2
 	      labeltext tr('&Weekday color:')
 	      whenActivated do |data, key|
+	  	#tag "whenActivated(#{data}, #{key.inspect})"
 		format = Qt::TextCharFormat.new
-		format.foreground = Qt::Brush.new(data) # .to_color
+		format.foreground = Qt::Brush.new(Reform::Graphical::make_color(data))
 		calendarWidget.setWeekdayTextFormat(Qt::Monday, format);
 		calendarWidget.setWeekdayTextFormat(Qt::Tuesday, format);
 		calendarWidget.setWeekdayTextFormat(Qt::Wednesday, format);
@@ -158,7 +159,7 @@ We 'can' a 'control' so 'can_control'.  But it looks like a question...
 	      currentIndex 0
 	      labeltext tr('Week&end color:')
 	      whenActivated do |data, key|
-		(format = Qt::TextCharFormat.new).foreground = Qt::Brush.new(key)
+		(format = Qt::TextCharFormat.new).foreground = Qt::Brush.new(Reform::Graphical::make_color(data))
 		calendarWidget.setWeekdayTextFormat Qt::Saturday, format
 		calendarWidget.setWeekdayTextFormat Qt::Sunday, format
 	      end
@@ -168,11 +169,12 @@ We 'can' a 'control' so 'can_control'.  But it looks like a question...
 	      labeltext tr('&Header text:')
 	      whenActivated do |data, key|
 		format = Qt::TextCharFormat.new
-		case idx
+		case key
 		when 0 then format.fontWeight = Qt::Font::Bold
 		when 1 then format.fontItalic = true
 		when 2 then format.foreground = Qt::Brush.new(Qt::green)
 		end
+		tag "set headerTextFormat"
 		calendarWidget.headerTextFormat format
 	      end
 	    }
@@ -187,14 +189,14 @@ solution 2) just ad hoc code it, similar to the example
 	  hbox { # checkBoxLayout
 	    checkbox {
 	      name :firstFridayCheckbox
-	      connector false
 	      text tr('&First Friday in blue')
+	      whenToggled { |checked| calendarModel.model_touch }
 	    }
 	    spacer stretch: 1
 	    checkbox {
 	      name :mayFirstCheckbox
-	      connector false
 	      text tr('May &1 in red')
+	      whenToggled { calendarModel.model_touch }
 	    }
 	  } # hbox
 	} # vbox
@@ -203,7 +205,8 @@ solution 2) just ad hoc code it, similar to the example
 #     tag "setting whenConnected form callback"
        # FIXME: once set, this is never unset and I cannot find how the original
        # example does this.
-    whenConnected do |model, options|
+    whenConnected do |model, propa|
+#      tag "whenConnected"
       if firstFridayCheckbox.checked?
         firstFriday = Qt::Date.new(calendarWidget.yearShown, calendarWidget.monthShown, 1)
         firstFriday = firstFriday.addDays(1) while firstFriday.dayOfWeek != Qt::Friday

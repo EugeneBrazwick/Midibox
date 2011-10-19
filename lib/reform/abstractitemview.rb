@@ -350,7 +350,7 @@ module Reform
 
       def setLocalModel aModel
         raise 'WTF' unless aModel.model?
-#         tag "#{self}::setLocalModel #{aModel}!!!!!!!!!!!!" #, caller = #{caller.join("\n")}"
+#        tag "#{self}::setLocalModel #{aModel}!!!!!!!!!!!!, caller = #{caller.join("\n")}"
         @localmodel = aModel
 #          note: Qt::ComboBox has no 'selectionModel'. Only ListView and TableView.
         qm = @qtc.model = @localmodel.qtc || createQModel
@@ -392,17 +392,20 @@ module Reform
         nil
       end
 
-      def postSetup
-        setLocalModel(@localmodel) if instance_variable_defined?(:@localmodel) && @localmodel
-        super
-      end
+#      def postSetup
+# TOO LATE. 
+#        setLocalModel(@localmodel) if instance_variable_defined?(:@localmodel) && @localmodel
+#        super
+#      end
 
       # override, assign to @localmodel, not to @model
-      def addModel control, hash = nil, &block
-        control.setup hash, &block
-        @localmodel = control
+      def addModel modl, hash = nil, &block
+	#tag "addModel"
+        modl.setup hash, &block
+        @localmodel = modl
         #control.parent = self    no such method 'parent=' .. required ?
-        added control
+        added modl
+        setLocalModel(@localmodel)
       end
 
       # the default is :id. This tells the view how to retrieve the 'key'

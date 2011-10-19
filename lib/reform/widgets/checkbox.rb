@@ -58,6 +58,7 @@ module Reform
       # note that clicked() is called from user interaction only (or click() calls)
       # but not when setChecked is used, or toggle() or setDown().
       if block
+#	tag "connecting clicked()"
         connect(@qtc, SIGNAL('clicked(bool)'), self) do |checked|
           # this does NOT overwrite the clicked() below!
           rfCallBlockBack(checked, &block)
@@ -68,8 +69,11 @@ module Reform
       end
     end #whenClicked
 
+    alias :whenChecked :whenClicked
+
     def whenToggled &block
       if block
+#	tag "connecting toggled()"
         connect(@qtc, SIGNAL('toggled(bool)'), self) { |checked| rfCallBlockBack(checked, &block) }
       else
         @qtc.toggled(@qtc.checked?)

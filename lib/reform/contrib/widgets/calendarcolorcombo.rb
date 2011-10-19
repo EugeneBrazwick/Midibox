@@ -1,5 +1,5 @@
 
-# Copyright (c) 2010 Eugene Brazwick
+# Copyright (c) 2010-2011 Eugene Brazwick
 
 module Reform
 
@@ -23,10 +23,11 @@ module Reform
   class CalendarComboBox < ComboBox
     def initialize parent, qtc
       super
-      struct   Qt::red => tr('Red'),
-              Qt::blue => tr('Blue'),
-              Qt::black => tr('Black'),
-              Qt::magenta => tr('Magenta')
+      struct Qt::red => tr('Red'),
+             Qt::blue => tr('Blue'),
+             Qt::black => tr('Black'),
+             Qt::magenta => tr('Magenta')
+      key_connector :self
     end
   end
 

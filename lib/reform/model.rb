@@ -963,13 +963,20 @@ it, the chance of names clashes must be minimized.
         when Fixnum, Qt::Enum then value.to_i
         else
           idid = view.key_connector || :id
+#	  tag "model_value2key, idid = #{idid}"
           if value.respond_to?(idid)
             value.send(idid)
           elsif Hash === value
             # just respond_to(:[]) will not work properly as x[:dd] is illegal for arrays
             value[idid]
           else
-            nil
+	   # if Hash === @model_value
+	   #   tag "searching value in hash #{@model_value.inspect} and return THE key"
+	   #   pair = @model_value.find{|k,v| v == value }
+	   #   if pair then pair[0] else nil end
+	   # else
+	      nil
+	   # end
           end
         end
       end
@@ -1018,7 +1025,8 @@ it, the chance of names clashes must be minimized.
       end
 
       # sends a propertyChanged event for each field mentioned
-      def model_touch sender, *fields
+      # A propagation is started, even if there are no fields given!
+      def model_touch sender = nil, *fields
         transaction(sender) do |tran|
           fields.each do |field|
             tran.addPropertyChange self, field, model_apply_getter(field)

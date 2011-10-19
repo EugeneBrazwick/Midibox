@@ -42,6 +42,29 @@ class MySender
   def track_propagation; $VERBOSE; end
 end
 
+describe 'plain combobox' do
+  before do
+    Reform::app { 
+      giveIt200ms 
+      combo {
+	name :combo
+	struct key1: 'avanare', key2: 'what?', v: 'illuve', w: 'atarie', nasdaq: 'olme'
+	currentIndex 3
+      }
+    }
+  end
+
+  after do
+    $qApp.exec
+  end
+
+  it "should have the third element selected" do
+    qcombo = $qApp.firstform.combo.qtc
+    qcombo.currentIndex.should == 3 
+    qcombo.currentText.should == 'atarie' 
+  end
+end
+
 describe 'combobox with hash:' do
   before do
     Reform::app { 

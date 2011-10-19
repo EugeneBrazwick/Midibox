@@ -9,7 +9,7 @@ module Reform
 =begin rdoc
 
 ComboBox is a relative of ListView.
-It works exactly the same. To incorparate this,we introduce AbstractListView with
+It works exactly the same. To incorparate this, we introduce AbstractListView with
 the complete implementation.
 
 The following datasources are supported:
@@ -54,6 +54,7 @@ See examples/models/demo03.rb
 
       # can be overriden. Called when combobox index, value has been decided
       def setCurrentIndex index
+#	tag "setCurrentIndex(#{index})"
         @qtc.currentIndex = index
       end
 
@@ -66,8 +67,9 @@ See examples/models/demo03.rb
           connect(@qtc, SIGNAL('activated(int)'), self) do |idx|
 #             tag "idx = #{idx}, data_to_transmit[idx] = #{data_at(idx).inspect}"
             data = @localmodel.model_row(idx)
-	    #tag "data = #{data.inspect}"
-            rfCallBlockBack(data, @localmodel.model_value2key(data, self), &block)
+	    key = @localmodel.model_value2key(data, self)
+	    #tag "data = #{data.inspect}, accomp key: #{key}"
+            rfCallBlockBack(data, key, &block)
           end
         else
           @qtc.activated(@qtc.currentIndex)
@@ -76,5 +78,18 @@ See examples/models/demo03.rb
 
   end # class ComboBox
 
-  createInstantiator File.basename(__FILE__, '.rb'), Qt::ComboBox, ComboBox
+  class QComboBox < Qt::ComboBox
+    def setCurrentIndex idx
+#      tag "#{self}#setCurrentIndex(#{idx})"
+      method_missing(:setCurrentIndex, idx)
+    end
+    
+    def currentIndex= idx
+#      tag "#{self}#setCurrentIndex(#{idx}), count=#{count}"
+      method_missing(:setCurrentIndex, idx)
+#      tag "currentIndex is now #{currentIndex}"
+    end
+  end
+  
+  createInstantiator File.basename(__FILE__, '.rb'), QComboBox, ComboBox
 end

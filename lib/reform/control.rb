@@ -148,6 +148,7 @@ module Reform
           n = (name.to_s + '=').to_sym
           define_method name do |value = nil|
             return @qtc.send(name) if value.nil?
+#	    tag "#@qtc.#{n} := #{value} (simple setter)"
             @qtc.send(n, value)
           end
         end

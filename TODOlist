@@ -225,9 +225,10 @@ Current state:
     after building the qtbindings gem, it cannot be loaded! Some caching issue, because it. qtbindings is inconvenient. Constructors are
     hacked and slow. 
     works after that.
-0042 Thu Sep 22 21:07:50 CEST 2011
+-0042 Thu Sep 22 21:07:50 CEST 2011
     Need RStore::Item class to create auto-persistent subclasses, that allow more complicated
     changes.
+    Wed Oct 19 22:11:32 CEST 2011
 -0043 Sun Oct  2 17:30:45 CEST 2011
     Regression: reform spectest App: ICE default IO error handler doing exit(), errno = 4
     Mon Oct  3 21:05:38 CEST 2011
@@ -258,3 +259,7 @@ Sat Oct  8 19:41:00 CEST 2011 Fixed. postSetup -> model_postSetup
 Either say 'x true' or 'x!'. 
 0047 Sat Oct 15 21:15:23 CEST 2011. qtbindings is inconvenient. Constructors are
 hacked and slow. bugs are hard to trace due to 'method_missing' crap.
+0048 Wed Oct 19 22:09:40 CEST 2011. model_value2key is broken for hash models.
+If changed it breaks combo_spec.  But in calendar.rb the whenActivated should
+receive second argument 'key'. This is always nil which is completely wrong!
+

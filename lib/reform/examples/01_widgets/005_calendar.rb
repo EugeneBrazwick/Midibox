@@ -166,6 +166,7 @@ We 'can' a 'control' so 'can_control'.  But it looks like a question...
 	    }
 	    combobox {
 	      struct tr('Bold'), tr('Italic'), tr('Green'), tr('Plain')
+	      currentIndex 3
 	      labeltext tr('&Header text:')
 	      whenActivated do |data, key|
 		format = Qt::TextCharFormat.new
@@ -174,7 +175,7 @@ We 'can' a 'control' so 'can_control'.  But it looks like a question...
 		when 1 then format.fontItalic = true
 		when 2 then format.foreground = Qt::Brush.new(Qt::green)
 		end
-		tag "set headerTextFormat"
+		#tag "set headerTextFormat"
 		calendarWidget.headerTextFormat format
 	      end
 	    }

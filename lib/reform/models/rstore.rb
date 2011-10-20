@@ -832,7 +832,7 @@ module Reform
           @model_value.each_key.find_index(value)
         elsif @model_value.respond_to?(:find_index)
 #           tag "ARRAY case"
-          return nil if @model_4value.empty?
+          return nil if @model_value.empty?
           key = value if !key && model_value2key(@model_value[0], view) # force the use of a key if this seems to be how it should be done.
               # but it is higher heuristics
           if key

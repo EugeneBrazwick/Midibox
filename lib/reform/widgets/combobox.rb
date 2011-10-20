@@ -61,15 +61,15 @@ See examples/models/demo03.rb
     public
 
       # use this instead of connecting 'activated'
-      # arg1: data, arg2: the key
+      # arg1: data, arg2: the index within the parent
       def whenActivated &block
         if block
           connect(@qtc, SIGNAL('activated(int)'), self) do |idx|
 #             tag "idx = #{idx}, data_to_transmit[idx] = #{data_at(idx).inspect}"
             data = @localmodel.model_row(idx)
-	    key = @localmodel.model_value2key(data, self)
+	    index = @localmodel.model_value2index(data, self)
 	    #tag "data = #{data.inspect}, accomp key: #{key}"
-            rfCallBlockBack(data, key, &block)
+            rfCallBlockBack(data, index, &block)
           end
         else
           @qtc.activated(@qtc.currentIndex)

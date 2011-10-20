@@ -957,6 +957,8 @@ it, the chance of names clashes must be minimized.
       # try to retrieve key from value by looking to a field called 'id'
       # Unfortunately sometimes the value is not a model but a raw hash.
       # The proces can be tweaked by setting up a key_connector.
+      # IMPORTANT: value is a kind of 'record', and 'key' means the
+      # 'primary key' in this respect.
       def model_value2key value, view # or widget
         # note that Strings have to_i as well.
         case value
@@ -970,13 +972,7 @@ it, the chance of names clashes must be minimized.
             # just respond_to(:[]) will not work properly as x[:dd] is illegal for arrays
             value[idid]
           else
-	   # if Hash === @model_value
-	   #   tag "searching value in hash #{@model_value.inspect} and return THE key"
-	   #   pair = @model_value.find{|k,v| v == value }
-	   #   if pair then pair[0] else nil end
-	   # else
-	      nil
-	   # end
+	    nil
           end
         end
       end

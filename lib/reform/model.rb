@@ -744,7 +744,7 @@ it, the chance of names clashes must be minimized.
         raise 'ouch' unless model_root == self
 #         root = self # model_root
 #        tag "model_propagateChange, self=#{self}, parent = #{@parent}, root = #{model_root}"
-        if p = parent
+        if p = model_parent
           p.updateModel self, propagation
         else
 #	  tag "ALERT, no parent..."

@@ -1,6 +1,6 @@
 #!/usr/bin/ruby
 
-# Copyright (c) 2010 Eugene Brazwick
+# Copyright (c) 2010-2011 Eugene Brazwick
 # Based on Nokia example http://doc.qt.nokia.com/4.6/widgets-charactermap.html
 
 # Solution nr 2 uses only 1 contrib widget
@@ -13,7 +13,6 @@ Reform::app {
     # the term 'widget' is used for non-containers only.
     # But a 'frame' is a pure widget as well, except it can have components
     frame {
-      name :centralWidget
       # the model connected to this form is the 'font' itself
       central
       vbox { # vcentralWidget.setLayout(centralLayout);
@@ -22,20 +21,17 @@ Reform::app {
         hbox {  #controlsLayout = Qt::HBoxLayout.new;
           label text: tr('Font:') # fontLabel
           fontcombo {
-            name :fontCombo
             connector :self    #good idea ????
             stretch 1
           }
           label text: tr('Size:') #sizeLabel);
           combobox {
-            name :sizeCombo
             stretch 1
             modelconnector :sizes  # use font.sizes as model source
             connector :pointSize # and set font.pointSize when changed
           }
           label text: tr('Style:') # styleLabel);
           combobox {
-            name :styleCombo
             stretch 1
             modelconnector :styles
             connector :styleString # and NOT :style!!!
@@ -44,16 +40,10 @@ Reform::app {
           checkbox { # fontMerging = Qt::CheckBox.new
             checked true
             stretch 1
-            whenToggled do |enable|
-              # @model here is that of the FORM, not of checkbox, but should be the same
-              tag "checkbox toggled, model=#@model"
-              @model.styleStrategy = enable ? Qt::Font::PreferDefault : Qt::Font::NoFontMerging
-            end
-            # if model supports it: 'name :fontMerging' should work as well.  TODO
+	    connector :fontMerging
           } # fontMerging
           spacer stretch: 1
         } # controlsLayout
-        #centralLayout.addWidget(scrollArea, 1);
         scrollarea { #scrollArea
           # TODO scrollArea.widget = characterWidget
           character_widget { # characterWidget

@@ -1,5 +1,5 @@
 
-#  Copyright (c) 2010 Eugene Brazwick
+#  Copyright (c) 2010-2011 Eugene Brazwick
 
 module Reform
 
@@ -349,7 +349,7 @@ module Reform
       end
 
       def setLocalModel aModel
-        raise 'WTF' unless aModel.model?
+        raise "WTF, passed non model #{aModel} to setLocalModel" unless aModel.respond_to?(:model?) && aModel.model?
 #        tag "#{self}::setLocalModel #{aModel}!!!!!!!!!!!!, caller = #{caller.join("\n")}"
         @localmodel = aModel
 #          note: Qt::ComboBox has no 'selectionModel'. Only ListView and TableView.

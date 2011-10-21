@@ -25,39 +25,36 @@ To fix this mess I make a new property, called stylestr. (Solution 3)
     include Model
 
     private
-#      def initialize(*args)
-#        puts "new FontModel(#{args.inspect})"
-#        super
-#      end
+      def initialize(*args)
+        #tag "new FontModel(#{args.inspect})"
+        super()
+      end
 
       @@fontDatabase = nil # Qt::FontDatabase.new
 
     public
 
+      def parent= _
+      end
+
       def self.db
         @@fontDatabase ||= Qt::FontDatabase.new
       end
 
+      # list of styles for the current font, like 'normal', 'bold', 'italic'
       def styles # important to cache this
+        return @styles if instance_variable_defined?(:@styles)
+	require_relative 'structure'
   #       tag "#{self}::styles, family = #{family}"
   #       return @styles if instance_variable_defined?(:@styles)
-        @styles ||= FontModel::db.styles(family)
-  #       tag "stls = #{stls.inspect}"
-  #       stls.each do |stylestr|
-  # 	font = FontModel.new(self)
-  # 	font.style = stylestr
-  # 	tag "font[#{font.style.class} #{font.style}] := '#{stylestr}'"
-  # 	@styles[font.style] = stylestr
-  #       end
-  #       tag "styles=#{@styles.inspect}"
-  #       @styles
+        @styles = Structure.new(FontModel::db.styles(family))
       end
 
       def sizes
   #       tag "self=#{self}"
         return @sizes if instance_variable_defined?(:@sizes)
         fontDatabase = FontModel::db
-        @sizes = if fontDatabase.isSmoothlyScalable(family, fontDatabase.styleString(self))
+        sizes = if fontDatabase.isSmoothlyScalable(family, fontDatabase.styleString(self))
   #         tag "using standardSizes"
           Qt::FontDatabase::standardSizes
   #           @sizeCombo.editable = true          FIXME, how can this be related ???
@@ -66,14 +63,11 @@ To fix this mess I make a new property, called stylestr. (Solution 3)
           fontDatabase.smoothSizes(family, fontDatabase.styleString(self))
   #          @sizeCombo.editable = false  ""
         end
+	require_relative 'structure'
+	@sizes = Structure.new(sizes)
   #       tag "sizes=#{@sizes.inspect}"
   #       @sizes
       end #sizes
-
-  #     def font
-  #       tag "family=#{family}"
-  # #       self
-  #     end
 
       #note that arg2 must be a string!
       def self.font family, style = 'Normal', ptsize = 10
@@ -100,7 +94,7 @@ To fix this mess I make a new property, called stylestr. (Solution 3)
 
       # override to except a string
       def style= arg
-        pickup_tran do |tran|
+        model_pickup_tran do |tran|
   #       if arg.respond_to? :to_str
   # 	tag "current family = #{family}"
   #         fontDatabase = @@fontDatabase
@@ -114,13 +108,13 @@ To fix this mess I make a new property, called stylestr. (Solution 3)
   #       else
           org = style
           super
-          tran.addPropertyChange(:style, org)
+          tran.addPropertyChange(self, :style, org)
         end
       end
 
       def styleString= arg
         font = (db = FontModel::db).font(family, arg, pointSize)
-        pickup_tran do |tran|
+        model_pickup_tran do |tran|
           org = db.styleString(self)
           # asssuming the family does not change:
           self.pointSize = font.pointSize
@@ -129,7 +123,7 @@ To fix this mess I make a new property, called stylestr. (Solution 3)
           self.fixedPitch = font.fixedPitch
           self.overline = font.overline
           self.stretch = font.stretch
-          tran.addPropertyChange(:styleString, org)
+          tran.addPropertyChange(self, :styleString, org)
   #         tag "style now set to #{font.style}, family = #{family}"
         end
       end
@@ -141,22 +135,30 @@ To fix this mess I make a new property, called stylestr. (Solution 3)
 
   #     fontDatabase.styleString(self)
       def pointSize= arg
-        pickup_tran do |tran|
+        model_pickup_tran do |tran|
   #       tag "self=#{self}, family=#{family}, arg=#{arg.class} #{arg.inspect}"
           org = pointSize
           super
   #       tag "Calling dynamicPropertyChanged(pointSize), family is now #{family}"
-          tran.addPropertyChange(:pointSize, org)
+          tran.addPropertyChange(self, :pointSize, org)
         end
       end
 
       def styleStrategy= arg
   #       tag "self=#{self}, styleStrategy:=#{arg}"
-        pickup_tran do |tran|
+        model_pickup_tran do |tran|
           org = styleStrategy
           super
-          tran.addPropertyChange(:styleStrategy, org)
+          tran.addPropertyChange(self, :styleStrategy, org)
         end
+      end
+
+      def fontMerging
+	styleStrategy == Qt::Font::PreferDefault
+      end
+
+      def fontMerging= value
+	self.styleStrategy = value ? Qt::Font::PreferDefault : Qt::Font::NoFontMerging
       end
 
       def pointSize arg = nil

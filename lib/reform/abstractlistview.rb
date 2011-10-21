@@ -150,6 +150,7 @@ Not supported yet
           setLocalModel @model.model_apply_getter(modcon)#.tap{|r| tag "setLocalModel(#{r.inspect})!!!!!!!!!!!!!!!!!!!!!!!!!!!!!" }
         end
         # it's not entirely clear when the events are triggered
+	raise "#{self} (name:#{name}) has no local model set" unless @localmodel
         # - currentIndexChanged(int)
         # - currentIndexChanged(string)
         # - editTextChanged(string). Must 'editable' be true for this??

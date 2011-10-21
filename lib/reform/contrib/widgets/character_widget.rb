@@ -71,7 +71,8 @@ module Reform
 
     def updateStyle fontStyle
       oldStrategy = @displayFont.styleStrategy
-      @displayFont = FontModel.font(@displayFont.family, fontStyle, @displayFont.pointSize)
+      require_relative '../../models/font_model'
+      @displayFont = Reform::FontModel.font(@displayFont.family, fontStyle, @displayFont.pointSize)
       @displayFont.styleStrategy = oldStrategy
       @squareSize = [24, Qt::FontMetrics.new(@displayFont).xHeight() * 3].max
       adjustSize

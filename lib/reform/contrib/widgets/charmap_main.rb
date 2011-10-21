@@ -1,6 +1,6 @@
 # encoding: utf-8
 
-# Copyright (c) 2010 Eugene Brazwick
+# Copyright (c) 2010-2011 Eugene Brazwick
 
 # qtruby version of charmap mainwindow example widget
 # Based on Nokia example http://doc.qt.nokia.com/4.6/widgets-charactermap.html
@@ -81,7 +81,7 @@ module Reform
       connect(@sizeCombo, SIGNAL('currentIndexChanged(QString)'), characterWidget, SLOT('updateSize(QString)'));
       connect(@styleCombo, SIGNAL('currentIndexChanged(QString)'), characterWidget, SLOT('updateStyle(QString)'));
       connect(characterWidget, SIGNAL('characterSelected(QString)')) do |ch|
-        tag "characterSelected(utf-8) >=> insertCharacter(#{ch.encoding})"
+        #tag "characterSelected(utf-8) >=> insertCharacter(#{ch.encoding})"
         ch.force_encoding('utf-8') # ARRGH
         insertCharacter(ch)
         # encoding goes 'pufff'
@@ -162,7 +162,7 @@ module Reform
     protected
 
     def insertCharacter(character)
-      tag "insertCharacter.encoding = #{character.encoding}"
+      #tag "insertCharacter.encoding = #{character.encoding}"
       @lineEdit.insert(character);
     end
 

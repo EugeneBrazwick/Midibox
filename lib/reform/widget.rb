@@ -99,11 +99,11 @@ module Reform
       @qtc.backgroundRole = value
     end
 
-    # enforce that parent is a layout
+    # enforce that parent is a grid layout
     def check_grid_parent tocheck
       if parent.layout?
         if !parent.is_a?(GridLayout)
-          raise ReformError, tr("'#{tocheck}' only works with a gridlayout container!")
+          raise ReformError, tr("'#{tocheck}' only works with a gridlayout container, but it is a #{parent.class}!")
         end
       else
         unless layout = parent.infused_layout

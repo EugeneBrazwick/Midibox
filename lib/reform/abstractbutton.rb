@@ -47,6 +47,17 @@ module Reform
         end
       end #whenClicked
 
+      # this will not call whenClicked
+      def checked value = nil
+	return @qtc.checked? if value.nil?
+	@qtc.checked = value
+      end
+
+      def checked?
+  #       tag "#{name}::checked? -> #{@qtc.checked?}"
+	@qtc.checked?
+      end
+
   #     def auto_layouthint
   #       :hbox
   #     end

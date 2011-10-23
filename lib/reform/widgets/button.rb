@@ -8,7 +8,7 @@ module Reform
   class Button < AbstractButton
     include MenuContext # can create a menu here
     private
-    define_simple_setter :flat, :checkable
+      define_simple_setter :flat, :checkable
 
     public
 

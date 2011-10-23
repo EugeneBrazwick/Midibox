@@ -97,7 +97,7 @@ module Reform
     public
 
       def postSetup
-        STDERR.puts("warning: menu has no title!") unless @qtc.title
+#        STDERR.puts("warning: menu has no title!") unless @qtc.title	# is OK for popups
         super
       end
 

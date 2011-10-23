@@ -21,8 +21,9 @@ Reform::app {
         hbox {  #controlsLayout = Qt::HBoxLayout.new;
           label text: tr('Font:') # fontLabel
           fontcombo {
-            connector :self    #good idea ????
+            connector :self 
             stretch 1
+	    track_propagation!
           }
           label text: tr('Size:') #sizeLabel);
           combobox {
@@ -47,6 +48,7 @@ Reform::app {
         scrollarea { #scrollArea
           # TODO scrollArea.widget = characterWidget
           character_widget { # characterWidget
+            connector :self 
             whenCharacterSelected { |ch| lineEdit.insert ch }
           }
         } # scrollArea
@@ -62,7 +64,7 @@ Reform::app {
             whenClicked do
               cb = Qt::Application::clipboard
               text = lineEdit.text
-              tag "#{cb}.setText('#{text}'), Clipboard + Selection"
+              #tag "#{cb}.setText('#{text}'), Clipboard + Selection"
               cb.setText text, Qt::Clipboard::Clipboard
               cb.setText text, Qt::Clipboard::Selection
             end

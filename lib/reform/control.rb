@@ -454,6 +454,10 @@ module Reform
         @debug_track = v
       end
 
+      def track_propagation!
+        @debug_track = true
+      end
+
       # Once a control sets a connector it then returns true here, and so will
       # all its parents, up to (but excluding) the containing form.
       # this is used when propagating modelchanges to easily skip controls

@@ -16,34 +16,38 @@ module Reform
 #     end
     private
       #override
-      def setCurrentIndex(index, font)
+      def setCurrentIndex index, font
+#	tag "setCurrentIndex(#{index}, #{font})"
 	# could be problematic if font is nil ??
 	@qtc.currentFont = font
       end
 
       # override. Use current since @data is bogus here
       def activated model, cid, idx
-  #       tag "YES, 'activated'!!!, idx = #{idx}, cid=#{cid}, model=#{model}, SELF:=#{current}"
-	model.model_apply_setter(cid, current)
+#        tag "YES, 'activated'!!!, idx = #{idx}, cid=#{cid}, model=#{model}, SELF:=#{current}"
+	font = current
+	model.transaction(self) do |tran|
+	  model.family = font.family
+	end 
       end
 
       def applyModel data
-	tag "applyModel(#{data.inspect})"
+	#tag "applyModel(#{data.inspect})"
+	@qtc.currentFont = FontModel.new(data)
       end
 
     public
 
-      
-      def whenActivated &block
-	if block
-	  connect(@qtc, SIGNAL('activated(int)'), self) do |idx|
-  # 	  tag "ACTIVATED, family = current=#{current} #{current.family}"
-	    rfCallBlockBack(current, idx, &block)
-	  end
-	else
-	  @qtc.activated(@qtc.currentIndex)
-	end
-      end
+#      def whenActivated &block
+#	if block
+#	  connect(@qtc, SIGNAL('activated(int)'), self) do |idx|
+#  # 	  tag "ACTIVATED, family = current=#{current} #{current.family}"
+#	    rfCallBlockBack(current, idx, &block)
+#	  end
+#	else
+#	  @qtc.activated(@qtc.currentIndex)
+#	end
+#      end
 
       def currentFont
 	@qtc.currentFont
@@ -54,7 +58,9 @@ module Reform
 	return @qtc.currentFont if @qtc.currentFont.is_a?(Model)
 	font = FontModel.new(@qtc.currentFont)
   #       tag "Copying font family = #{@qtc.currentFont.family}"
-	raise "FAIL: font.fam=#{font.family}, qtc.cfont.fam=#{@qtc.currentFont.family}" unless font.family == @qtc.currentFont.family
+	unless font.family == @qtc.currentFont.family
+	  raise "FAIL: font.fam=#{font.family}, qtc.cfont.fam=#{@qtc.currentFont.family}" 
+	end
   #       tag "Wrapping currentFont #{@qtc.currentFont} in #{font}"
 	# so the next time, we can return it immediately
 	@qtc.currentFont = font

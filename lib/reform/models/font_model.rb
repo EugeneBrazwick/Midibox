@@ -26,8 +26,13 @@ To fix this mess I make a new property, called stylestr. (Solution 3)
 
     private
       def initialize(*args)
-        #tag "new FontModel(#{args.inspect})"
-        super()
+	case args[0]
+	when Qt::Font, String then super(*args)
+	when Control 
+	  super()
+	  @model_parent = args[0]
+        else super()
+	end
       end
 
       @@fontDatabase = nil # Qt::FontDatabase.new
@@ -90,6 +95,15 @@ To fix this mess I make a new property, called stylestr. (Solution 3)
   #       tag "family is now #{family}"
         remove_instance_variable(:@sizes) if instance_variable_defined?(:@sizes)
         remove_instance_variable(:@styles) if instance_variable_defined?(:@styles)
+      end
+
+      def family= string
+        model_pickup_tran do |tran|
+	  org = family
+	  super
+#	  tag "addPropertyChange(:family, org=#{org})"
+          tran.addPropertyChange(self, :family, org)
+	end
       end
 
       # override to except a string

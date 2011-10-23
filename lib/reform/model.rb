@@ -93,7 +93,7 @@ module Reform
     public
       attr :sender, :keypaths
 
-      attr_writer :debug_track
+      attr_accessor :debug_track
 
       def debug_track?
         @debug_track
@@ -441,7 +441,7 @@ transaction that is immediately committed (and at that point propagation starts)
         @altered_owners = {} # indexed by object_id
         @committed = @aborted = false
         @debug_track = sender && sender.track_propagation # assuming sender is a Control
-#	tag "debug_track=#@debug_track"
+#	tag "debug_track = #@debug_track"
         @root.model_begin_work
         if block_given?
           begin
@@ -524,13 +524,14 @@ transaction that is immediately committed (and at that point propagation starts)
 
       # called from commit
       def propagate_changes
-#        tag "#{self}.COMMIT WORK, @@tran= #{@@transaction}, aborted=#@aborted, sender = #@sender"
+#        tag "#{self}#propagate_changes, @@tran= #{@@transaction}, aborted=#@aborted, sender = #@sender, sender.track_propagation=#{@sender && @sender.track_propagation}"
         # NOTE: tr() only works on Qt::Object...
         if @debug_track
-          STDERR.print "create Propagation, sender = #@sender, model=#{@root}\n"
+          STDERR.print "create Propagation, sender = #@sender, root=#{@root}\n"
         end
         propch = Propagation.new(@sender, @keypaths, @altered_owners)
         propch.debug_track = true if @debug_track
+	#tag "propch.debug_track = #{propch.debug_track}"
         @root.model_propagateChange propch
       ensure
         @stack = @keypaths = nil # cleanup memory + loads of unwanted references
@@ -740,15 +741,19 @@ it, the chance of names clashes must be minimized.
     public # Model methods
 
       def model_propagateChange propagation
+#	tag "#{self}#model_propagateChange(#{propagation}), debug_track = #propagation.debug_track"
 #         (@observers ||= nil) and @observers.each do |o|
         raise 'ouch' unless model_root == self
 #         root = self # model_root
-#        tag "model_propagateChange, self=#{self}, parent = #{@parent}, root = #{model_root}"
+#        tag "model_propagateChange, self=#{self}, parent = #{model_parent}, root = #{model_root}"
         if p = model_parent
+#	  tag "#{p}#updateModel"
           p.updateModel self, propagation
         else
 #	  tag "ALERT, no parent..."
-          STDERR.print "Warning: propagateChange is ignored if your model (#{self}) has no parent!!\n" if $VERBOSE
+	  if $VERBOSE || propagation.debug_track
+	    STDERR.print "Warning: propagateChange is ignored if your model (#{self}) has no parent!!\n" 
+	  end
         end
 #         end
       end

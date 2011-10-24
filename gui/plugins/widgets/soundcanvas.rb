@@ -8,7 +8,7 @@ require 'midibox/theme'
 class SoundCanvas < Reform::Canvas
   private
 
-    def initialize p, qp, autolayout = true
+    def initialize p, qp
       super
       backgroundBrush $theme.yellow
 #       tag "#@qtc::acceptDrops := true"

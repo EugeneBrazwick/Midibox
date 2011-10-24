@@ -6,46 +6,19 @@ require 'midibox/config' # it's unavoidable anyway
 Reform::internalize_dir File.absolute_path(File.dirname(__FILE__) + '/plugins')
 
 Reform::app {
-  struct {
-#     tag "executing block to struct, basicly executed in the Structure, self = #{self}"
-    self.configfile = filesystem {
-#         tag "creating filesystem model"
-      dirname Dir::home + '/.midibox'
-      Dir::mkdir(dirname) unless Dir::exists?(dirname)
-      klass Midibox::Config # used by yamlloader
-      filename '/config.yaml.gz'
-    }
-#     tag "self.configfile is now #{self.configfile.inspect}"
-    self.config = if configfile.exists?
-      configfile.open_file
-    else
-      configfile.file = configfile.klass.new
-    end
-  } # struct
-#   whenExiting do              TOO LATE == SEGV
-#     tag "SAVE, self = #{self}"
-#     model.configfile.save
-#   end
+  dirname = Dir::home + '/.midibox'
+  Dir::mkdir(dirname) unless Dir::exists?(dirname)
+  rstore filename: dirname + 'database.db'
+  rs = $qApp.model
+  rs.config ||= Midibox::Config.new
   mainwindow {
 #     tag "mainwindow parsed"
     title tr('Midibox <nofile>')
-    whenCanceled do
-#       tag "Save configfile"
-      begin
-        cfg = $qApp.model.configfile
-        fileSaveAction.whenClicked if cfg.dirty?
-        raise 'progerror' unless cfg.clean?
-      ensure
-        cfg.save if cfg.dirty?
-      end
-      true
-    end
     sizeHint 800, 600
     soundcanvas
-    whenShown { fileNewAction.whenClicked }
     menuBar {
       menu {
-        title tr('&File')
+        title tr('&Project')
         filesystem $qApp.model.config
         fileNew
         fileOpen

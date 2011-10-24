@@ -16,7 +16,11 @@ module Midibox
                 gray: [206, 206, 206, 180],
                 black: [:black], # solid
                 white: [:white] # solid
-              }.inject({}) { |hash, el| k, v = el; hash[k] = Reform::Graphical::make_brush(*v); hash }
+              }.inject({}) do |hash, el| 
+	      k, v = el 
+	      hash[k] = Reform::Graphical::make_qtbrush(*v) 
+	      hash 
+	    end
 
       # initial width
       UnitH = 32

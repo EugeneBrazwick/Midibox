@@ -2,16 +2,14 @@
 require 'forwardable'
 
 module Midibox
-  class Config < Reform::Structure
+  class Config 
     extend Forwardable
     private
       def initialize *args
         super
-        @value = {}
-#         tag "new config"
-        self.last_song = nil # 'default' is dangerous because not really the name to be saved
+        @last_song = nil # 'default' is dangerous because not really the name to be saved
 #         tag "creating filesystem for song"
-        self.songfile = filesystem {
+        @songfile = filesystem {
           dirname Dir::home + '/.midibox'
           default_filename 'default.mdb.yaml.gz'
           if !File.exists?(fnam = dirname + '/' + default_filename)
@@ -26,16 +24,13 @@ module Midibox
       end
 
     public
-#       def filename    ????
-#         super || 'default.mdb.yaml.gz'
-#       end\
       def fileNew
-        songfile.open_file
-        self.last_song = nil
+        @songfile.open_file
+        @last_song = nil
       end
 
       def fileOpen sender
-        songfile.open sender
+        @songfile.open sender
         self.last_song = songfile.path
       end
 

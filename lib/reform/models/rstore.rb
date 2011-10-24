@@ -865,7 +865,13 @@ module Reform
       # If +init_value+ is set, it is used as initial value, provided
       # +dbname+ was nil. Otherwise ignored
       def initialize dbname, init_value = nil
-        super(nil, nil, nil, ROOT_OID)
+	case dbname
+	when Control, App
+	  super(dbname, nil, nil, ROOT_OID)
+	else
+	  super(nil, nil, nil, ROOT_OID)
+	end
+	#tag "RStore.new(#{dbname.inspect}, init_value=#{init_value})"
         # hash from object_id to oid
         @objectspace = {}
 	# hash from oid to instance (should be an RStoreNode)
@@ -873,8 +879,23 @@ module Reform
         # transaction in progress:
         @in_tran = nil
         # backend:
+	case dbname
+	when Control, App
+	else
+	  filename dbname, init_value
+	end
+        if block_given?
+          begin
+            yield self
+          ensure
+            close
+          end
+        end
+      end
+
+      def filename dbname, init_value = nil
         @rstore_db = 
-          case dbname
+	  case dbname
           when nil 
             require_relative '../rstores/nil'
             RStoreBackend::Nil.new
@@ -906,13 +927,6 @@ module Reform
 	  end
         else
           clear(dbname ? nil : init_value)
-        end
-        if block_given?
-          begin
-            yield self
-          ensure
-            close
-          end
         end
       end
 
@@ -1078,6 +1092,8 @@ module Reform
 #       end
 
   end # class RStore
+
+  createInstantiator File.basename(__FILE__, '.rb'), nil, RStore
 
 end # module Reform
 

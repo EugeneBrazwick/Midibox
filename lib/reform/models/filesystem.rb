@@ -14,12 +14,6 @@ module Reform
           setup(parent)
         else
           hash = Hash === qtc ? qtc : {}
-#           if parent && parent.model?
-#             @root = parent.root
-#             @keypath = ?????
-#           else
-#             @root = self
-#           end
           setup(hash)
         end
       end

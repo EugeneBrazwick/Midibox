@@ -68,7 +68,7 @@ class Prelims
     class LinguisticsGem < Package
       public
         def check_reqs
-          @prelims.check_gem(nil, 'linguistics', prelims.project)
+          @prelims.check_gem(nil, 'linguistics', @prelims.project)
         end
     end
 
@@ -237,7 +237,7 @@ class Prelims
       ENV['RUBY'] ||= 'ruby'
       @project = project
       @packager = MyPackager.new(self)
-      @packages = packages.map { |packklass| packklass.new }
+      @packages = packages.map { |packklass| packklass.new(self) }
       @uihandler = UIHandler.new
 #     puts "ASSIGNING @uihandler"
       @gemcmd = @rakecmd = nil

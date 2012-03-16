@@ -19,7 +19,7 @@ if __FILE__ == $0
     prelims.check_installation
     # It is also tempting to say `exec $RUBY $PWD/gui/mainform.rb &`
     # Otherwise we get a stuck terminal.... So:
-    if !File::exists?(ARGV[0]) && ARGV[0][-3, 3] != '.rb'
+    if ARGV[0] && !File::exists?(ARGV[0]) && ARGV[0][-3, 3] != '.rb'
       spawn ENV['RUBY'], ARGV[0] + '.rb', *(ARGV[1..-1])
     else
       spawn ENV['RUBY'], *ARGV

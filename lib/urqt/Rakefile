@@ -1,0 +1,83 @@
+
+require 'rake/clean'
+require 'shellwords'
+
+CXX = 'g++'
+LIBRARY = 'liburqt.so'
+CLEAN.include '*.o', '*.d'
+CLOBBER.include LIBRARY
+$linkdirs =  {}
+$incdirs = {} 
+qt_paths = %w[ /usr/local/Qt5 /usr/Qt5 /opt/Qt5 ]
+ruby_paths = %w[ /usr/local /usr /opt/ruby ]
+ENV['QTDIR'] and qt_paths += [ENV['QTDIR']]
+QT_LINKDIRS = qt_paths.map { |path| path + '/lib' }
+QT_INCDIRS = qt_paths.map { |path| path + '/include' }
+RUBY_INCDIRS = ruby_paths.map { |path| [ path + '/include/ruby*', path + '/include/ruby*/**' ] }.flatten
+RUBY_LINKDIRS = ruby_paths.map { |path| path + '/lib' }
+#STDERR.puts("ruby_paths=#{ruby_paths}, RUBY_INCDIRS=#{RUBY_INCDIRS}")
+
+def find_X base, *paths, container, what
+  for glob in paths
+#    STDERR.puts "Globbing #{glob}"
+    for dir in Dir[glob].reverse
+#      STDERR.puts "Globbing #{dir}/#{base}"
+      for path in Dir[dir + '/' + base].reverse
+#	STDERR.puts "test -f #{path}"
+	return container[dir] = true if File.exists? path
+      end
+    end
+  end
+  raise "#{what.capitalize} #{base} not found in #{paths.join(':')}"
+end
+
+def find_lib lib, *paths
+  find_X 'lib' + lib, *paths, $linkdirs, 'library'
+end
+
+def find_inc inc, *paths
+  find_X inc, *paths, $incdirs, 'header'
+end
+
+find_lib 'Qt5Core.so', *QT_LINKDIRS
+find_lib 'ruby*.so', *RUBY_LINKDIRS
+find_inc 'QtCore/QtCore', *QT_INCDIRS
+find_inc 'ruby.h', *RUBY_INCDIRS
+find_inc 'ruby/config.h', *RUBY_INCDIRS
+find_inc 'ruby/missing.h', *RUBY_INCDIRS
+
+#STDERR.puts "$incdirs = #{$incdirs}, linkdirs=#{$linkdirs}"
+SRC = FileList['*.cpp']
+OBJ = SRC.ext 'o'
+DEPS = SRC.ext 'd'
+# -fPIC is required for Qt
+CXXFLAGS = %w[-Wall -Wextra -O3 -fPIC -Wl,-Bsymbolic-functions -Wl,-export-dynamic ] +
+	   $linkdirs.keys.map { |l| '-L' + l} +
+	   $incdirs.keys.map { |i| '-I' + i}
+
+file LIBRARY=>OBJ + DEPS do
+  cmd = "#{[CXX, *CXXFLAGS, '-shared', '-o', LIBRARY, *OBJ].shelljoin}"
+  #STDERR.puts "`#{cmd}`"
+  `#{cmd}`
+end
+
+desc 'Compiling library'
+task buildlib: LIBRARY
+
+task default: :buildlib
+
+rule '.o'=>'.cpp' do |trg|
+  cmd = "#{[CXX, *CXXFLAGS, '-c', '-o', trg.name, trg.source].shelljoin}"
+  STDERR.puts "`#{cmd}`"
+  `#{cmd}`
+end 
+
+# if .d changes than .o must be remade too
+rule '.o'=>'.d' do |trg|
+  `#{[CXX, *CXXFLAGS, '-c', '-o', trg.name, trg.source.sub(/\.d$/, '.o')].shelljoin}`
+end 
+
+rule '.d'=>'.cpp' do |trg|
+  `#{[CXX, *CXXFLAGS, '-MM', '-MT', trg.name.sub(/.cpp$/, '.o'), trg.source, '-MF', trg.name].shelljoin}`
+end 
+

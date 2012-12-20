@@ -1,3 +1,7 @@
 Makefile
+*.o
+*.d
+*.so
 *.kch
 .*.swp
+mkmf.log

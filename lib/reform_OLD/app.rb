@@ -1017,7 +1017,7 @@ module Reform
             hello = Qt::PushButton::new tr('It Just Works')
             geometry = desktop.screenGeometry
             size = geometry.size / 2
-            # ugly: qsize not excepted by moveTopLeft !!!
+            # ugly: qsize not accepted by moveTopLeft !!!
             topleft = Qt::Point.new(size.width, size.height)
             geometry.size = size
             geometry.moveTopLeft topleft / 2

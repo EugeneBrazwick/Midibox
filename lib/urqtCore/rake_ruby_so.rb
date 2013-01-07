@@ -7,9 +7,9 @@ module R
 end
 
 module R::Ake
-  TRACE = 1
+  TRACE = 2 # 0 is none, 2 is full command dumps
   CXX = 'g++'
-  CLEAN.include '*.o', '*.d'
+  CLEAN.include '*.o', '*.d', '*.moc'
   CLOBBER.include LIBRARY
   @linkdirs = {}
   @incdirs = {} 
@@ -22,8 +22,9 @@ module R::Ake
   RUBY_LINKDIRS = ruby_paths.map { |path| path + '/lib' }
 
   #STDERR.puts "incdirs = #@incdirs, linkdirs=#@linkdirs"
-  SRC = FileList['*.cpp']
-  OBJ = SRC.ext 'o'
+  MOCSRC = FileList['*.moc.cpp']
+  SRC = FileList['*.cpp'] 
+  OBJ = SRC.ext('o') + MOCSRC.sub(/\.moc\.cpp$/, '.o')
 
   def self.find_X base, *paths, container, what
     for glob in paths
@@ -71,12 +72,24 @@ module R::Ake
 
   # This uses the attributes collected above
   # -fPIC is required for Qt
-  CXXFLAGS = %w[-Wall -Wextra -fPIC -Wl,-Bsymbolic-functions -Wl,-export-dynamic ] +
-	     (DEBUG ? %w[-O0 -g -DDEBUG] : %w[-O3]) +
-	     @linkdirs.keys.map { |l| '-L' + l} +
-	     LINKDIRS.map { |l| '-L' + l} +
-	     @incdirs.keys.map { |i| '-I' + i} +
+  CXXFLAGS = %w[-Wall -Wextra -fPIC ] +
+	     @incdirs.keys.map { |i| '-I' + i} + 
+	     ['-I..'] +	  # required for local includes
 	     INCDIRS.map { |i| '-I' + i}
+
+  PWD_UP = File.dirname(`pwd`.chomp)
+  RPATH = %w[urqtCore].map{|path| PWD_UP + '/' + path}.join(':')
+
+  LDFLAGS = %w[-fPIC -Wl,-Bsymbolic-functions,-export-dynamic] +
+	    ['-Wl,-rpath,' + RPATH] +
+	    (DEBUG ? %w[-O0 -g] : %w[-O3]) +
+	    @linkdirs.keys.map { |l| '-L' + l} +
+	    LINKDIRS.map { |l| '-L' + l} 
+
+  def self.build_it trg
+    cmd = [CXX, *CXXFLAGS, '-c', '-x', 'c++', '-o', trg.name, trg.source].shelljoin
+    execute cmd, "CXX -> #{trg.name}"
+  end
 
 end # module R::Ake
  
@@ -88,14 +101,22 @@ for unit in R::Ake::SRC
   file unit.ext('.o')=>deps
 end 
 
+rule '.moc'=>'.moc.h' do |trg|
+  qtdir = ENV['QTDIR'] and moc = qtdir + '/bin/moc' or moc = 'moc'
+  cmd = [moc, trg.source].shelljoin + ' > ' + [trg.name].shelljoin
+  R::Ake::execute cmd, "MOC -> #{trg.name}"
+end 
+
 # if .cpp changes than .o must be remade
 rule '.o'=>'.cpp' do |trg|
-  cmd = [R::Ake::CXX, *R::Ake::CXXFLAGS, '-c', '-o', trg.name, trg.source].shelljoin
-  R::Ake::execute cmd, "CXX -> #{trg.name}"
+  R::Ake::build_it trg
+end 
+rule '.o'=>'.moc' do |trg|
+  R::Ake::build_it trg
 end 
 
 file LIBRARY=>R::Ake::OBJ do |trg|
-  cmd = ([R::Ake::CXX, *R::Ake::CXXFLAGS, '-shared', '-o', trg.name, 
+  cmd = ([R::Ake::CXX, *R::Ake::LDFLAGS, '-shared', '-o', trg.name, 
 	  *R::Ake::OBJ] + LIBS).shelljoin
   R::Ake::execute cmd, "LD -> #{trg.name}"
 end

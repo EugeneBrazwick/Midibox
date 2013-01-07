@@ -86,6 +86,7 @@ cApplication_exec(VALUE v_self)
 static VALUE
 init_control(VALUE mQt, VALUE cObject)
 {
+  trace("init_control");
   const VALUE cControl = rb_define_class_under(mQt, "Control", cObject);
   return cControl;
 }
@@ -93,6 +94,7 @@ init_control(VALUE mQt, VALUE cObject)
 static void
 init_application(VALUE mQt, VALUE cControl)
 {
+  trace("init_application");
   /** :rdoc:
    * class Application
    *
@@ -108,6 +110,7 @@ init_application(VALUE mQt, VALUE cControl)
 static VALUE
 init_widget(VALUE mQt, VALUE cControl)
 {
+  trace("init_widget");
   const VALUE cWidget = rb_define_class_under(mQt, "Widget", cControl);
   return cWidget;
 }
@@ -119,6 +122,8 @@ using namespace R_Qt;
 extern "C" void
 Init_liburqt()
 {
+  trace("Init_liburqt");
+  Init_liburqtCore();
   const VALUE cControl = init_control(mQt, cObject);
   const VALUE cWidget = init_widget(mQt, cControl);
   init_application(mQt, cControl);

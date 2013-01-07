@@ -30,6 +30,7 @@ cMainWindow_alloc(VALUE cMainWindow)
 void 
 init_mainwindow(VALUE mQt, VALUE cWidget)
 {
+  trace("init_mainwindow");
   const VALUE cMainWindow = rb_define_class_under(mQt, "MainWindow", cWidget);
   rb_define_alloc_func(cMainWindow, cMainWindow_alloc);
 }

@@ -2,15 +2,17 @@
 //#define TRACE
 
 #pragma implementation
-#include <ruby.h>
+//  #include "ruby++/ruby++.h"	FAILBUNNY aka CRASHBUNNY
+#include <QtCore/QTextStream>
 #include "api_utils.h"
 #include "object.h"
-#include <QtCore/QTextStream>
+#include "signalproxy.moc.h"
 
 namespace R_Qt {
 
-VALUE 
-mQt = Qnil, cObject = Qnil;
+VALUE mR = Qnil, mQt = Qnil, cObject = Qnil;
+
+//typedef RPP::DataObject<QObject> RPP_QObject;
 
 static inline void
 ZOMBIFY(VALUE v)
@@ -31,8 +33,6 @@ static void
 zombify(QObject *object)
 {
   const VALUE v_object = qt2v(object);
-  trace1("HERE, v_object=%p", (void *)v_object);
-  track1("ITER: got v_object %s", v_object);
   if (!NIL_P(v_object))
     {
       trace("zombify child");
@@ -114,9 +114,19 @@ zombify(QObject *object)
  *
  * But we have RGCGuardedValue (see alsa code) and signals are temporary
  * for sure.
+ *
+ * Uh Oh.....
+ * ==========
+ *
+ * MAJOR DESIGN FAILURE
+ * To connect a Qt signal we need a slot with the same signature.
+ * But we don't have that!
+ *
+ * Can be fixed. But we need g++, moc and ld support at RUNTIME!!
+ *
  */
 
-void 
+static void 
 cObject_delete(VALUE v_self)
 {
   if (IS_ZOMBIFIED(v_self)) return;
@@ -127,6 +137,12 @@ cObject_delete(VALUE v_self)
   track1("Freeing ruby VALUE %s", v_self);
   zombify(self);
   delete self;
+}
+
+static VALUE 
+cObject_zombified_p(VALUE v_self)
+{
+  return p(IS_ZOMBIFIED(v_self));
 }
 
 /*
@@ -172,12 +188,13 @@ static VALUE
 cObject_parent_assign(VALUE v_self, VALUE v_parent)
 {
   track2("cObject_parent_assign(%s, %s)", v_self, v_parent);
+  rb_check_frozen(v_self);
   QObject *parent = 0;
   if (!NIL_P(v_parent))
     {
       GET_STRUCT_NODECL(QObject, parent);
-      if (!rb_obj_is_instance_of(v_parent, cObject))
-	rb_bug("Tried to set parent to non-QObject");
+      if (!rb_obj_is_kind_of(v_parent, cObject))
+	rb_raise(rb_eTypeError, "Tried to set parent to non-QObject");
     }
   GET_STRUCT(QObject, self);
   trace("Calling setParent");
@@ -197,6 +214,7 @@ cObject_alloc(VALUE cObject)
 static VALUE
 cObject_objectName_assign(VALUE v_self, VALUE vNewName)
 {
+  rb_check_frozen(v_self);
   GET_STRUCT(QObject, self);
   self->setObjectName(StringValueCStr(vNewName));
   return vNewName;
@@ -220,13 +238,13 @@ cObject_initialize_arg(VALUE v_self, VALUE v_arg)
       rb_funcall(v_self, rb_intern("setupQuickyhash"), 1, v_arg);
       return;
     case T_DATA:
-      if (rb_obj_is_instance_of(v_arg, cObject))
+      if (rb_obj_is_kind_of(v_arg, cObject))
 	{
 	  cObject_parent_assign(v_self, v_arg);
 	  return;
 	}
     }
-  rb_bug("BAD argtype %s for Object.new", rb_obj_classname(v_arg));
+  rb_raise(rb_eTypeError, "BAD argtype %s for Object.new", rb_obj_classname(v_arg));
 }
 
 /** call-seq: new([parent = nil] [[,]name = nil] [[,]hash = nil] [[,] &block])
@@ -235,20 +253,19 @@ cObject_initialize_arg(VALUE v_self, VALUE v_arg)
 static VALUE
 cObject_initialize(int argc, VALUE *argv, VALUE v_self)
 {
-  trace("cObject_initialize HERE");
+  trace("cObject_initialize");
 #if defined(DEBUG)
   QObject * const self = 
 #endif
 			 v2qt(v_self); // First mark ownership
-  trace("cObject_initialize HERE2");
 #if defined(DEBUG)
   trace1("DEBUG: cObject_initialize(argc: %d), storing v_self in Property", argc);
   const VALUE vdbg = qt2v(self);
   trace1("DEBUG: vdbg=%p", (void *)vdbg);
   if (vdbg != v_self)
-    rb_bug("programming error qt2v <-> v2qt MISMATCH");
+    rb_raise(rb_eFatal, "programming error qt2v <-> v2qt MISMATCH");
 #endif
-  trace("scan args and assign parent");
+  //trace("scan args and assign parent");
   VALUE v_0, v_1, v_2;
   rb_scan_args(argc, argv, "03", &v_0, &v_1, &v_2);
   if (!NIL_P(v_0))
@@ -311,29 +328,6 @@ cObject_to_s(VALUE v_self)
   return rb_call_super(0, 0);
 }
 
-/** :call-seq: 
- *     connect(sender, signal, receiver, slot)
- *     connect(signal, receiver, slot)
- *     connect(signal, receiver, &slot)
- *     connect(sender, signal, slot)
- *     connect(signal, &slot).
- *
- *  Note that SIGNAL() and SLOT() are applied on the strings 'signal'
- *  and 'slot'.
- *
- *  If a block is used with a receiver it is executed in its context.
- *  Otherwise the original context is used.
- *  If the receiver is not set 'self' is the receiver.
- *  If the sender is not set 'self' is the sender.
- *  Signals and slots that are C++ functiontypes evade ruby. 
-static VALUE
-cObject_connect(int argc, VALUE *argv, VALUE v_self)
-{
-  GET_STRUCT(QObject, self);
-  rb_raise(rb_eNotImpError, "cObject_connect");
-}
- */
-
 /** :call-seq:
  *	children  
  *	children object-array
@@ -347,7 +341,11 @@ cObject_connect(int argc, VALUE *argv, VALUE v_self)
  * the passed objects to self. 
  * IMPORTANT: the result can be orphans. If they are not a ruby object
  * they are currently NOT FREED causing MEMORY LEAKS!!!!
+ * Apart from that, they may be Qt-internals (like QApplication has some)
+ * and the system may crash!
+ *
  * This behaviour may very well change.
+ * In fact, the rw variant should be called 'children!' 
  */
 static VALUE
 cObject_children(int argc, VALUE *argv, VALUE v_self)
@@ -359,9 +357,13 @@ cObject_children(int argc, VALUE *argv, VALUE v_self)
     {
       const VALUE r = rb_ary_new2(children.count());
       foreach (QObject *child, children) // foreach is delete/remove-safe!
-	rb_ary_push(r, qt2v(child));
+	{
+	  const VALUE v_child = qt2v(child);
+	  if (!NIL_P(v_child)) rb_ary_push(r, v_child);
+	}
       return r;
     }
+  rb_check_frozen(v_self);
   VALUE v_children;
   rb_scan_args(argc, argv, "*", &v_children);
   trace1("RARRAY_LEN=%ld", RARRAY_LEN(v_children));
@@ -382,8 +384,8 @@ cObject_children(int argc, VALUE *argv, VALUE v_self)
   long i = 0;
   for (VALUE *v_child = RARRAY_PTR(v_children); i < N; i++, v_child++)
     {
-      if (!rb_obj_is_instance_of(*v_child, cObject))
-	rb_bug("passed child %s that was not a QObject", TO_S(*v_child));
+      if (!rb_obj_is_kind_of(*v_child, cObject))
+	rb_raise(rb_eTypeError, "passed child %s that was not a QObject", TO_S(*v_child));
       trace2("i=%ld, N=%ld", i, N);
       GET_STRUCT_PTR(QObject, child);
       trace1("setParent to self on child %p", child);
@@ -392,10 +394,162 @@ cObject_children(int argc, VALUE *argv, VALUE v_self)
   return v_children;
 } // cObject_children
 
+/** iterate each direct child
+ */
 static VALUE
-init_object(VALUE mQt)
+cObject_each_child(int argc, VALUE *argv, VALUE v_self)
 {
-  cObject = rb_define_class_under(mQt, "Object", rb_cObject);
+  trace2("%s::each_child, argc=%d", TO_S(v_self), argc);
+  RETURN_ENUMERATOR(v_self, argc, argv);
+  GET_STRUCT(QObject, self);
+  const QObjectList &children = self->children();
+  foreach (QObject *child, children) // foreach is delete/remove-safe!
+    {
+      const VALUE v_child = qt2v(child);
+      if (!NIL_P(v_child)) rb_yield(v_child);
+    }
+  return Qnil;
+} // cObject_each_child
+
+static void 
+enqueue_children(VALUE v_object, VALUE v_queue, int &c)
+{
+  GET_STRUCT(QObject, object);
+  const QObjectList &children = object->children();
+  foreach (QObject *child, children)
+    {
+      const VALUE v_child = qt2v(child);
+      if (!NIL_P(v_child)) 
+	{
+	  rb_ary_push(v_queue, v_child);
+	  ++c;
+	}
+    }
+}
+
+/** breadth-first search, but it excludes SELF!!!
+ */
+static VALUE
+cObject_each_sub(int argc, VALUE *argv, VALUE v_self)
+{
+  trace2("%s::each_sub, argc=%d", TO_S(v_self), argc);
+  RETURN_ENUMERATOR(v_self, argc, argv);
+  VALUE v_queue = rb_ary_new();
+  int c = 0;
+  enqueue_children(v_self, v_queue, c); 
+  while (c)
+    {
+      VALUE v_node = rb_ary_shift(v_queue);
+      --c;
+      rb_yield(v_node);
+      enqueue_children(v_node, v_queue, c);
+    }
+  return Qnil;
+} // cObject_each_sub
+
+/** :call-seq:
+ *	connect(:symbol, proc)
+ *	connect(qt_signal_str, proc)
+ *
+ * The first one is ruby only.
+ * The second one connects the Qt signal and is C only.
+ * the '2' prefix must be removed, so it looks like:  
+ *	obj.connect('destroyed(QObject *)', proc)
+ */
+static VALUE 
+cObject_connect(VALUE v_self, VALUE v_signal, VALUE v_proc)
+{
+  rb_check_frozen(v_self);
+  track3("cObject_connect %s, %s, %s", v_self, v_signal, v_proc);
+  if (TYPE(v_signal) == T_SYMBOL)
+    {
+      // ((@connections ||= {})[symbol] ||= []) << block
+      VALUE v_connections;
+      if (TYPE(v_connections = rb_iv_get(v_self, "@connections")) != T_HASH)
+	{
+	  rb_iv_set(v_self, "@connections", v_connections = rb_hash_new());
+	}
+      VALUE v_proxylist = rb_hash_aref(v_connections, v_signal);
+      if (TYPE(v_proxylist) != T_ARRAY)
+	{
+	  rb_hash_aset(v_connections, v_signal, v_proxylist = rb_ary_new());
+	}
+      rb_ary_push(v_proxylist, v_proc);
+      return Qnil;
+    }
+  GET_STRUCT(QObject, self);
+  const char * const signal = StringValueCStr(v_signal);
+  new QSignalProxy(self, signal, v_proc); 
+  return Qnil;
+}
+
+/** :call-seq:
+ *	emit(:symbol, *args, &proc)
+ *	emit(qt_signal_str, *args, &proc)
+ */
+static VALUE
+cObject_emit(int argc, VALUE *argv, VALUE v_self)
+{
+  trace("cObject_emit");
+  VALUE v_symbol, v_args; //, v_proc;
+  rb_scan_args(argc, argv, "1*", &v_symbol, &v_args); //, &v_proc);
+  if (rb_block_given_p()) rb_raise(rb_eTypeError, "blocks not yet supported by emit");
+  if (TYPE(v_symbol) == T_SYMBOL)
+    {
+      track1("Ruby sender through %s", v_symbol);
+      /*
+	  @connections and
+	    connections = @connections[symbol] and
+	      for proxy in connections
+		proxy[*args, &block]
+	      end
+      */
+      const VALUE v_connections = rb_iv_get(v_self, "@connections");
+      track1("connections = %s", v_connections);
+      if (TYPE(v_connections) == T_HASH)
+	{
+	  const VALUE v_proxylist = rb_hash_aref(v_connections, v_symbol);
+	  if (TYPE(v_proxylist) == T_ARRAY)
+	    {
+	      const long N = RARRAY_LEN(v_proxylist);
+	      trace1("located %ld connections", N);
+	      long i = 0;
+	      /*
+	      const bool has_block = !NIL_P(v_proc);
+	      if (has_block)
+		{
+		  argc = RARRAY_LEN(v_args);
+		  argv = RARRAY_PTR(v_args);
+		}
+		*/
+	      for (VALUE *v_proxy = RARRAY_PTR(v_proxylist); i < N; i++, v_proxy++)
+		{
+		  /*
+		  if (has_block)
+		    rb_proc_call_with_block(*v_proxy, argc, argv, v_proc);
+		  else 
+		  */
+		  track1("rb_proc_call args=%s", v_args);
+		  rb_proc_call(*v_proxy, v_args);
+		}
+	    }
+	}
+      return Qnil;
+    }
+  else
+      rb_raise(rb_eNotImpError, "emitting qt-signals...");
+}
+
+static VALUE
+cObject_widget_p(VALUE v_self)
+{
+  GET_STRUCT(QObject, self);
+  return p(self->isWidgetType());
+}
+
+static VALUE
+init_object()
+{
   rb_define_alloc_func(cObject, cObject_alloc);
   rb_define_method(cObject, "initialize", RUBY_METHOD_FUNC(cObject_initialize), -1);
   rb_define_method(cObject, "parent", RUBY_METHOD_FUNC(cObject_parent), -1);
@@ -403,56 +557,25 @@ init_object(VALUE mQt)
   rb_define_method(cObject, "parent=", RUBY_METHOD_FUNC(cObject_parent_assign), 1);
   rb_define_method(cObject, "objectName", RUBY_METHOD_FUNC(cObject_objectName), -1);
   rb_define_method(cObject, "objectName=", RUBY_METHOD_FUNC(cObject_objectName_assign), 1);
-//  rb_define_method(cObject, "connect", RUBY_METHOD_FUNC(cObject_connect), -1);
   rb_define_method(cObject, "delete", RUBY_METHOD_FUNC(cObject_delete), 0);
+  rb_define_method(cObject, "zombified?", RUBY_METHOD_FUNC(cObject_zombified_p), 0);
+  rb_define_method(cObject, "widget?", RUBY_METHOD_FUNC(cObject_widget_p), 0);
+//  rb_define_method(cObject, "findChild", RUBY_METHOD_FUNC(cObject_findChild), -1);
+  rb_define_method(cObject, "each_child", RUBY_METHOD_FUNC(cObject_each_child), -1);
+  rb_define_method(cObject, "each", RUBY_METHOD_FUNC(cObject_each_child), -1);
+  rb_define_method(cObject, "each_sub", RUBY_METHOD_FUNC(cObject_each_sub), -1);
+  rb_define_private_method(cObject, "connect", RUBY_METHOD_FUNC(cObject_connect), 2);
+  rb_define_private_method(cObject, "emit", RUBY_METHOD_FUNC(cObject_emit), -1);
   rb_define_method(cObject, "to_s", RUBY_METHOD_FUNC(cObject_to_s), 0);
   return cObject;
 }
-
-/*  STUPID IDEA
- *
- *  HOWEVER....
- *  the current zombie system is NOT SAFE...
- *
- *  For example, if a Widget is zombified it changes from a QWidget
- *  to a QZombie...
- *  And Data_Get_Struct would perform an illegal cast (on v_self).
- *  
- *  We may change this to an rb_raise through GET_STRUCT.
- *  But in that case we can zombify also by storing 0 in the struct.
- *
-static VALUE
-v_zombie;
-
-static VALUE
-cZombie_alloc(VALUE cZombie)
-{
-  const VALUE v_zombie = cObjectWrap(cZombie, new QZombie);
-  rb_gc_register_address(v_zombie);
-  return v_zombie;
-}
-
-static VALUE
-cZombie_delete(VALUE v_self)
-{
-}
-
-static VALUE
-init_zombie(VALUE mQt)
-{
-  cZombie = rb_define_class_under(mQt, "Zombie", cObject);
-  rb_define_alloc_func(cZombie, cZombie_alloc);
-  v_zombie = rb_class_allocate_instance(0, 0, cZombie); 
-  rb_define_method(cZombie, "delete", RUBY_METHOD_FUNC(cZombie_delete), 0);
-}
-*/
 
 /** :call-seq: tr(source, [disambiguation = '',] count = -1)
  *
  * Note that the encoding must be utf-8
  */
-static VALUE
-mReform_tr(int argc, VALUE *argv, VALUE /*v_self*/)
+static VALUE 
+mReform_tr(int argc, VALUE *argv, VALUE/*v_self*/)
 {
   VALUE vSource, vDisambiguation, vCount;
   rb_scan_args(argc, argv, "12", &vSource, &vDisambiguation, &vCount);
@@ -470,18 +593,27 @@ mReform_tr(int argc, VALUE *argv, VALUE /*v_self*/)
 					   NIL_P(vCount) ? -1 : NUM2INT(vCount)));
 }
 
+static inline void
+init_qt()
+{
+  mR = rb_define_module("R");
+  mQt = rb_define_module_under(mR, "Qt");
+  cObject = rb_define_class_under(mQt, "Object", rb_cObject);
+}
+
 } // namespace R_Qt 
 
 using namespace R_Qt;
 
-extern "C" void
+void
 Init_liburqtCore()
 {
-  const VALUE mR = rb_define_module("R"); 
-  mQt = rb_define_module_under(mR, "Qt");
+  static bool loaded = false;
+  if (loaded) return;
+  init_qt();
   const VALUE mReform = rb_define_module_under(mR, "EForm");
   rb_define_module_function(mReform, "tr", RUBY_METHOD_FUNC(mReform_tr), -1);
   init_rvalue(); // assigns RVALUE_ID
-  init_object(mQt);
-  //init_zombie(mQt);
+  init_object();
+  loaded = true;
 }

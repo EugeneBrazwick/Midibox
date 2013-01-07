@@ -1,8 +1,8 @@
 #if !defined (_URQT_API_UTILS_H_) 
 #define _URQT_API_UTILS_H_
-#include <ruby.h>
 #include <QtCore/QObject>
 #include <QtCore/QVariant>
+// #include "ruby++/ruby++.h"
 #include "rvalue.h"
 
 #if defined(TRACE)
@@ -80,12 +80,34 @@ to_ary(VALUE any)
   return v;
 }
 
+static inline VALUE 
+to_hash(VALUE any)
+{
+  const VALUE v = rb_check_hash_type(any);
+  if (NIL_P(v)) rb_bug("Could not convert %s to a hash", TO_S(any));
+  return v;
+}
+
+static inline VALUE
+p(bool x)
+{
+  return x ? Qtrue : Qfalse;
+}
+
 static inline const char *qString2cstr(const QString &s)
 {
   return s.toUtf8().data();
 }
 
 extern VALUE qString2v(const QString &s);
+
+/*
+inline RPP::String qString2rpp(const QString &s)
+{
+  return RPP::String(qString2cstr(s)).to_utf8();
+}
+*/
+
 } // namespace R_Qt 
 
 #endif // _URQT_API_UTILS_H_

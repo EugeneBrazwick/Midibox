@@ -2,6 +2,7 @@ Makefile
 *.o
 *.d
 *.so
+*.moc
 *.kch
 .*.swp
 mkmf.log

@@ -112,7 +112,7 @@ module R::EForm
 	  # that we already loaded the file:
 	  return if private_method_defined?(name)
     # failing components do not stop the setup process.
-	  tag "Defining method #{self}.#{name}"  
+	  #tag "Defining method #{self}.#{name}"  
 	  define_proxy_method name, thePath
 	  # make it private to complete it:
 	  private name
@@ -272,7 +272,10 @@ ObjectSpace::define_finalizer(app, -> id { puts "DEBUG: Finalizing Application #
     end
 end # module R::EForm
 
+Reform = R::EForm
+
 module R::Qt
+
     class Object  # ie Qt::Object
       public # methods of Object
     end # class Object
@@ -293,16 +296,17 @@ ObjectSpace::define_finalizer(c, -> id { puts "Finalizing #{klass} #{id}" })  # 
     end # class Control
 
     class Application < Control
-      include R::EForm::ModelContext, R::EForm::ControlContext,
-	      R::EForm::GraphicContext
+      include Reform::ModelContext, Reform::ControlContext,
+	      Reform::GraphicContext
 
       private # methods of Application
-	# run (show) first form defined.
+	# run (show) first widget defined.
         # if a model is set, propagate it
-	# It is bad to do nothing, if there is no form available (shown)
+	# It is bad to do nothing, if there is no widget available (shown)
         # then Qt will just hang about.
+        # returns toplevel widget if show works
 	def setupForms
-	  raise NotImplementedError
+	  findChild(&:widget?).show
 	end # setupForms
    
       public # methods of Application
@@ -318,14 +322,16 @@ ObjectSpace::define_finalizer(c, -> id { puts "Finalizing #{klass} #{id}" })  # 
 
 	# setup + Qt eventloop start
 	def execute
-	  setupForms
-	  exec
+	  setupForms and exec
 	end #  execute
     end # class Application
 end # module R::Qt
 
-if __FILE__ == $0
-  R::EForm.app {
-  } # app
+if File.basename($0) == 'rspec'
+  include R::EForm
+  describe "R::EForm" do
+    R::EForm.app {
+    } # app
+  end
 end
 

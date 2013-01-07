@@ -9,27 +9,46 @@
 //   FAILS namespace R_Qt {
 
 #define T_RVALUE RValue
+#define T_RGCGUARDEDVALUE RGCGuardedValue
 
 class RValue 
 {
-  private:
-    VALUE V;
-  public:
-    RValue(VALUE v): V(v) {}
-    RValue(): V(Qnil) {}
-    RValue(const RValue &other): V(other.V) {}
-    ~RValue() {}
-    VALUE v() const { return V; }
-    std::istream &read_from(std::istream &i) { return i >> V; }
-    operator VALUE() const { return V; }
-    VALUE operator*() const { return V; }
+private:
+  VALUE V;
+public:
+  RValue(VALUE v): V(v) {}
+  RValue(): V(Qnil) {}
+  RValue(const RValue &other): V(other.V) {}
+  ~RValue() {}
+  VALUE v() const { return V; }
+  std::istream &read_from(std::istream &i) { return i >> V; }
+  operator VALUE() const { return V; }
+  VALUE operator*() const { return V; }
+};
+
+class RGCGuardedValue 
+{
+private:
+  VALUE V;
+private:
+  void release() { if (!NIL_P(V)) rb_gc_unregister_address(&V); }
+  void lock() { if (!NIL_P(V)) rb_gc_register_address(&V); }
+public:
+  RGCGuardedValue(VALUE v): V(v) { lock(); }
+  RGCGuardedValue(): V(Qnil) {}
+  RGCGuardedValue(const RGCGuardedValue &other): V(other.V) { lock(); }
+  ~RGCGuardedValue() { release(); }
+  VALUE v() const { return V; }
+  std::istream &read_from(std::istream &i) { release(); i >> V; lock(); return i; }
+  operator VALUE() const { return V; }
+  VALUE operator*() const { return V; }
 };
 
 namespace R_Qt {
 extern void init_rvalue();
 
 // id of the R_Qt::RValue type.
-extern int RVALUE_ID;
+extern int RVALUE_ID, RGCGUARDEDVALUE_ID;
 
 } // namespace R_Qt
 
@@ -39,6 +58,8 @@ extern int RVALUE_ID;
 extern std::ostream &operator<<(std::ostream &o, const RValue &v);
 extern std::istream &operator>>(std::istream &i, RValue &v);
 
+extern std::ostream &operator<<(std::ostream &o, const RGCGuardedValue &v);
+extern std::istream &operator>>(std::istream &i, RGCGuardedValue &v);
 /* Usage:
  *    QVariant v = RValue(vX); 
  *    if (v.canConvert<RValue>())  // and it can

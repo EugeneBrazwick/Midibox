@@ -1,9 +1,9 @@
 
 DEBUG = true
 LIBRARY = 'liburqtCore.so'
-LIBS = %w[ -lQt5Core ]
+LIBS = %w[-lQt5Core] #  -lruby++ ]
 INCDIRS = []
-LINKDIRS = []
+LINKDIRS = [] # %w[../ruby++]
 require_relative 'rake_ruby_so'
 
 task default: :buildlib

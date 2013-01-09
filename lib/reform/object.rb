@@ -25,6 +25,10 @@ module R::Qt
   #
     class Object
       private # methods of Object
+	def self.create_qt_signal s
+	  '2' + s
+	end
+
 	# Note that using a hash or a block should not matter ONE YOTA
 	# that's why we call the getters here, and expect them to be setters!
 	def setupQuickyhash hash
@@ -39,11 +43,38 @@ module R::Qt
 	  end # for
 	end # setupQuickyhash
 
-	def self.create_qt_signal s
-	  '2' + s
+	## the default calls new on klass, then addToParent on the result
+	# It returns the instant.
+	# NOTE: if addToParent can fail somehow it must delete itself
+        def instantiate_child klass, parent
+	  #tag "instantiate_child: #{klass}"
+          r = klass.new 
+	  begin
+	    r.addToParent parent
+	  rescue 
+	    r.delete unless r.parent
+	    raise
+	  end
+	  r
+        end
+
+      protected # methods of Object
+
+	# the default assigns the parent
+	def addObject child
+	  child.parent = self
 	end
 
+	def setup hash = nil, &initblock
+	  instance_eval(&initblock) if initblock 
+	  setupQuickyhash hash if hash
+	end # setup
       public # methods of Object
+
+	## the default calls addObject 
+	def addToParent parent
+	  parent.addObject self
+	end
 
 	# guarantees free of the C++ instance.
 	def scope 
@@ -54,23 +85,64 @@ module R::Qt
 
 	# always recursive unless opts[:recursive] is false
 	# if name is not a string and a block is passed 
-	# we bypass the Qt system but use the same semantics
-        def findChild name = nil, opts = nil 
+	# we bypass the Qt system but use the same semantics.
+	#
+	# Options:
+	#   - recursive, default true
+	#   - include root, default false
+        def findChild *args
+	  #tag "findChild args=#{args.inspect}, block_given=#{block_given?}"
+	  name = klass = opts = nil 
+	  args.each do |arg|
+	    #tag "testing arg #{arg}"
+	    case arg
+	    when Class then klass = arg
+	    when Hash then opts = arg
+	    else name = arg.to_str
+	    end
+	  end
+	  recursive = opts ? opts[:recursive] : true
+	  include_root = opts && opts[:include_root]
+	  each = recursive ? include_root ? each_sub_with_root : each_sub
+			   : include_root ? each_child_with_root : each_child 
+	  #tag "klass=#{klass}, name=#{name}, block_given=#{block_given?}"
+	  #tag "recursive=#{recursive}, include_root=#{include_root}"
+	  #tag "each = #{each.to_a}"
+	  for candidate in each 
+	    #tag "testing #{candidate}"
+	    return candidate unless klass && !candidate.kind_of?(klass) ||  
+				    name && candidate.objectName != name ||
+				    block_given? && !yield(candidate)
+	  end 
+	end
+
+	# Like Enumerable and findChild, but it enumerates them
+        def find_all *args
+	  return enum_for(:find_all) if args.empty? && !block_given?
+	  name = klass = opts = nil 
+	  args.each do |arg|
+	    case arg
+	    when Class then klass = arg
+	    when Hash then opts = arg
+	    else name = arg.to_str
+	    end
+	  end
+	  recursive = opts ? opts[:recursive] : true
+	  include_root = opts && opts[:include_root]
+	  each = recursive ? include_root ? each_sub_with_root : each_sub
+			   : include_root ? each_child_with_root : each_child 
+	  for candidate in each 
+	    yield(candidate) unless klass && !candidate.kind_of?(klass) ||  
+				    name && candidate.objectName != name ||
+				    block_given? && !yield(candidate)
+	  end 
 	end
 
 	def self.signal *signals
-	  for method in signals
-	    m = method.to_s.sub(/\(.*/, '')
+	  for signal in signals
+	    m = signal.to_s.sub(/\(.*/, '').to_sym # !
 	    define_method m do |*args, &block|
-	      #tag "signal method #{m} called"
-	      if block && args.empty?
-		#tag "connecting signal to block"
-		connect method, block
-	      else
-		tag "emitting signal with args #{args}"
-		# IMPORTANT object.cpp has no support for blocks
-		emit method, *args, &block 
-	      end
+	      signal_implementation m, signal, args, block
 	    end
 	  end
 	end # signal
@@ -81,190 +153,3 @@ module R::Qt
   public # methods of R::Qt
 
 end # module R::Qt
-
-# I decided to port QObject more or less complete.
-# Since it should all work and most features are pretty handy!
-
-if File.basename($0) == 'rspec'
-  include R
-  describe "Qt::Object" do
-    it "should create new instances without objectName, parent or children" do
-      o = Qt::Object.new
-      o.objectName.should == ''
-      o.parent.should == nil
-      o.children.should be_empty
-      o.delete
-    end
-
-    it "should get and set objectName" do
-      o = Qt::Object.new
-      o.objectName = 'hallo'
-      o.objectName.should == 'hallo'
-      o.delete
-    end
-
-    it "should set with a get too" do
-      o = Qt::Object.new
-      o.objectName 'Blurb'
-      o.objectName.should == 'Blurb'
-      o.delete
-    end
-
-    it "should become a zombie with delete" do
-      o = Qt::Object.new
-      o.delete
-      o.should be_zombified
-    end
-
-    it "should become a zombie when going out of scope" do
-      p = nil
-      Qt::Object.new.scope { |o| p = o }
-      p.should be_zombified
-    end
-
-    it "we can pass a name, or a parent or a parameterhash in any order " +
-       "and they execute in sequence" do
-      Qt::Object.new('fifi', objectName: 'frodo') do |frodo|
-	frodo.objectName.should == 'frodo'
-      end
-    end
-
-    it "you can pass a block and it is executed in the context of the object" do
-      Qt::Object.new { objectName 'froome' }.scope do |froome|
-	froome.objectName.should == 'froome'
-      end
-    end
-
-    it "you can set a parent and it kills the child with it" do
-      fifi = nil
-      Qt::Object.new { objectName 'froome' }.scope do |froome|
-	fifi = Qt::Object.new(froome, 'fifi')
-	fifi.objectName.should == 'fifi'
-	fifi.parent.should == froome
-      end
-      fifi.should be_zombified
-    end
-
-    it "checks the type for the parent correctly" do
-      Qt::Object.new { objectName 'froome' }.scope do |froome|
-	expect { froome.parent = 'bart' }.to raise_error TypeError
-      end
-    end
-
-    it "does not like zombies for parents too" do
-      fifi = Qt::Object.new
-      fifi.delete
-      expect { Qt::Object.new fifi }.to raise_error TypeError
-    end
-
-    it "can be parented using a hash too" do
-      fifi = nil
-      Qt::Object.new(objectName: 'froome').scope do |froome|
-	fifi = Qt::Object.new parent: froome, objectName: 'fifi'
-	fifi.objectName.should == 'fifi'
-	fifi.parent.should == froome
-      end
-      fifi.should be_zombified
-    end
-
-    it "we can replace all children, but a child can only have one parent" do
-      Qt::Object.new(objectName: 'froome').scope do |froome|
-	frodo = Qt::Object.new froome, 'frodo'
-	fifi = Qt::Object.new 'fifi', frodo
-	fifi.parent.should == frodo
-	frodo.children.should == [fifi]
-	froome.children fifi
-	fifi.parent.should == froome
-	frodo.children.should be_empty
-	frodo.parent.should == nil
-	frodo.delete # ... ensure???
-      end
-    end
-
-    it "will delete zombified children" do
-      Qt::Object.new(objectName: 'froome').scope do |froome|
-	frodo = Qt::Object.new froome, 'frodo'
-	froome.children.should == [frodo]
-	frodo.delete
-	froome.children.should be_empty
-      end
-    end
-
-    it "is OK to delete a zombie" do
-      frodo = Qt::Object.new
-      frodo.delete
-      frodo.delete
-      frodo.delete
-    end
-
-    it "is BAD to try Qt stuff on zombies" do
-      frodo = Qt::Object.new
-      frodo.delete
-      expect { frodo.objectName = 'pete' }.to raise_error TypeError
-    end
-
-    it "supports ruby signals and slots" do
-
-      # the signal and slot system, the code I wished I had:
-      class Counter < Qt::Object
-	  def initialize value = 0
-	    super()
-	    @value = value 
-	  end
-
-	  attr_reader :value
-
-	  def value= v
-	    valueChanged @value = v
-	  end
-
-	  signal :valueChanged
-      end
-
-      Counter.new(3).scope do |counter|
-	counter2 = Counter.new { parent counter }
-	counter.valueChanged { |v| counter2.value = v }
-	counter.instance_variable_get("@connections").length.should == 1
-	# a disadvantage is that you cannot pass a block as a single argument to a
-	# signal. In that case, use a lambda...
-	# counter.valueChanged -> v { puts 'weird idea' }
-	# Anyway, you should not use the signal like that.
-	counter2.value.should == 0
-	counter.value = 4
-	counter2.value.should == 4
-      end # scope
-    end 
-
-    # it "supports blockSignals on ruby signals"
-
-    it "supports native Qt signals, but not slots" do
-      $glob = 14
-      Qt::Object.new(objectName: 'fifi').scope do |fifi|
-	fifi.destroyed { |who| who.should == fifi; $glob = 2 }
-      end # scope
-      $glob.should == 2
-    end # it
-
-    it "can enumerate all immediate ruby children" do
-      Qt::Object.new(objectName: 'fifi').scope do |fifi|
-	frodo, linda = Qt::Object.new('frodo'), Qt::Object.new('linda')
-	fifi.children frodo, linda
-	fifi.each.to_a.should == [frodo, linda]
-      end
-    end # it
-
-    it "can enumerate all subs breadth-first" do
-      def o name; Qt::Object.new name; end
-
-      Qt::Object.new(objectName: 'fifi').scope do |fifi|
-	frodo, linda = o('frodo'), o('linda')
-	carl, philip, emmanuel = %w[carl philip emmanuel].map{|b| o b}
-	johan = o 'johan'
-	fifi.children frodo, linda
-	frodo.children carl, philip, emmanuel
-	linda.children johan
-	fifi.each_sub.to_a.should == [frodo, linda, carl, philip, emmanuel, johan]
-      end
-    end # it
-  end # describe
-end # if

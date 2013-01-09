@@ -1,5 +1,5 @@
 
-//#define TRACE
+#define TRACE
 
 #pragma implementation
 //  #include "ruby++/ruby++.h"	FAILBUNNY aka CRASHBUNNY
@@ -38,6 +38,7 @@ zombify(QObject *object)
       trace("zombify child");
       ZOMBIFY(v_object);
     }
+  traqt1("%s::children", QTCLASS(object));
   const QObjectList &children = object->children();
   foreach (QObject *child, children) 
     {
@@ -136,6 +137,7 @@ cObject_delete(VALUE v_self)
 	 self->children().count());
   track1("Freeing ruby VALUE %s", v_self);
   zombify(self);
+  traqt2("delete %s(%p)", QTCLASS(self), self);
   delete self;
 }
 
@@ -163,14 +165,17 @@ cObject_mark(QObject *object)
 {
   trace3("cObject_mark(qptr=%p, class=%s, #children=%d)", object, 
 	 object->metaObject()->className(), object->children().count());
+  traqt1("%s::children", QTCLASS(object));
   foreach (QObject *child, object->children())
     {
       const VALUE vChild = qt2v(child);
       if (!NIL_P(vChild))
 	rb_gc_mark(vChild);
     }
+  traqt1("%s::dynamicPropertyNames", QTCLASS(object));
   foreach (const QByteArray &propname, object->dynamicPropertyNames())
     {
+      traqt2("%s::property(%s)", QTCLASS(object), propname.data());
       const QVariant &var = object->property(propname);
       if (var.canConvert<RValue>())
 	rb_gc_mark(var.value<RValue>());
@@ -198,6 +203,7 @@ cObject_parent_assign(VALUE v_self, VALUE v_parent)
     }
   GET_STRUCT(QObject, self);
   trace("Calling setParent");
+  traqt2("%s::setParent(%s)", QTCLASS(self), QTCLASS(parent));
   self->setParent(parent);
   return v_parent;
 }
@@ -207,6 +213,7 @@ cObject_alloc(VALUE cObject)
 {
   trace("cObject_alloc");
   QObject * const object = new QObject;
+  traqt1("new QObject -> %p", object);
   trace1("cApplication_alloc -> qptr %p", object);
   return cObjectWrap(cObject, object);
 }
@@ -216,6 +223,7 @@ cObject_objectName_assign(VALUE v_self, VALUE vNewName)
 {
   rb_check_frozen(v_self);
   GET_STRUCT(QObject, self);
+  traqt1("%s::setObjectName", QTCLASS(self));
   self->setObjectName(StringValueCStr(vNewName));
   return vNewName;
 }
@@ -300,11 +308,16 @@ static VALUE
 cObject_parent(int argc, VALUE *argv, VALUE v_self)
 {
   GET_STRUCT(QObject, self);
-  if (argc == 0) return qt2v(self->parent());
+  if (argc == 0) 
+    {
+      traqt1("%s::parent", QTCLASS(self));
+      return qt2v(self->parent());
+    }
   VALUE v_new_parent;
   rb_scan_args(argc, argv, "1", &v_new_parent);
   cObject_parent_assign(v_self, v_new_parent);
   GET_STRUCT(QObject, new_parent);
+  traqt2("%s::setParent(%s)", QTCLASS(self), QTCLASS(new_parent));
   self->setParent(new_parent);
   return v_new_parent;
 }
@@ -316,8 +329,10 @@ cObject_to_s(VALUE v_self)
   // since to_s is used for debugging it is convenient if it accept zombies:
   if (IS_ZOMBIFIED(v_self)) return rb_str_new_cstr("zombie");
   GET_STRUCT(QObject, self);
-  trace1("self=%p", self);
+  trace1("self=%p, not zombified", self);
+  traqt1("%s::objectName", QTCLASS(self));
   const QString &objectName = self->objectName();
+  trace1("objectName='%s'", qString2cstr(objectName));
   if (!objectName.isEmpty())
     {
       QString s;
@@ -325,7 +340,10 @@ cObject_to_s(VALUE v_self)
       t << rb_obj_classname(v_self) << ":" << objectName;
       return qString2v(s);
     }
-  return rb_call_super(0, 0);
+  trace1("rb_call_super: to_s, self.qClass=%s", self->metaObject()->className());
+  VALUE r = rb_call_super(0, 0);
+  trace1("parent::to_s OK -> '%s'", StringValueCStr(r));
+  return r;
 }
 
 /** :call-seq:
@@ -352,6 +370,7 @@ cObject_children(int argc, VALUE *argv, VALUE v_self)
 {
   trace2("%s::children, argc=%d", TO_S(v_self), argc);
   GET_STRUCT(QObject, self);
+  traqt1("%s::children", QTCLASS(self));
   const QObjectList &children = self->children();
   if (argc == 0)
     {
@@ -375,6 +394,7 @@ cObject_children(int argc, VALUE *argv, VALUE v_self)
   foreach (QObject *child, children)
     {
       trace1("setParent to 0 on child %p", child);
+      traqt1("%s::setParent(0)", QTCLASS(child));
       child->setParent(0);
     }
   trace("rb_check_array_type");
@@ -389,6 +409,7 @@ cObject_children(int argc, VALUE *argv, VALUE v_self)
       trace2("i=%ld, N=%ld", i, N);
       GET_STRUCT_PTR(QObject, child);
       trace1("setParent to self on child %p", child);
+      traqt2("%s::setParent(%s)", QTCLASS(child), QTCLASS(self));
       child->setParent(self);
     }
   return v_children;
@@ -402,6 +423,7 @@ cObject_each_child(int argc, VALUE *argv, VALUE v_self)
   trace2("%s::each_child, argc=%d", TO_S(v_self), argc);
   RETURN_ENUMERATOR(v_self, argc, argv);
   GET_STRUCT(QObject, self);
+  traqt1("%s::children", QTCLASS(self));
   const QObjectList &children = self->children();
   foreach (QObject *child, children) // foreach is delete/remove-safe!
     {
@@ -411,10 +433,26 @@ cObject_each_child(int argc, VALUE *argv, VALUE v_self)
   return Qnil;
 } // cObject_each_child
 
+static VALUE
+cObject_each_child_with_root(int argc, VALUE *argv, VALUE v_self)
+{
+  RETURN_ENUMERATOR(v_self, argc, argv);
+  rb_yield(v_self);
+  GET_STRUCT(QObject, self);
+  traqt1("%s::children", QTCLASS(self));
+  foreach (QObject *child, self->children())
+    {
+      const VALUE v_child = qt2v(child);
+      if (!NIL_P(v_child)) rb_yield(v_child);
+    }
+  return Qnil;
+}
+
 static void 
 enqueue_children(VALUE v_object, VALUE v_queue, int &c)
 {
   GET_STRUCT(QObject, object);
+  traqt1("%s::children", QTCLASS(object));
   const QObjectList &children = object->children();
   foreach (QObject *child, children)
     {
@@ -427,13 +465,9 @@ enqueue_children(VALUE v_object, VALUE v_queue, int &c)
     }
 }
 
-/** breadth-first search, but it excludes SELF!!!
- */
 static VALUE
-cObject_each_sub(int argc, VALUE *argv, VALUE v_self)
+each_sub(VALUE v_self)
 {
-  trace2("%s::each_sub, argc=%d", TO_S(v_self), argc);
-  RETURN_ENUMERATOR(v_self, argc, argv);
   VALUE v_queue = rb_ary_new();
   int c = 0;
   enqueue_children(v_self, v_queue, c); 
@@ -445,11 +479,31 @@ cObject_each_sub(int argc, VALUE *argv, VALUE v_self)
       enqueue_children(v_node, v_queue, c);
     }
   return Qnil;
+}
+
+/** breadth-first search, but it excludes SELF!!!
+ */
+static VALUE
+cObject_each_sub(int argc, VALUE *argv, VALUE v_self)
+{
+  trace2("%s::each_sub, argc=%d", TO_S(v_self), argc);
+  RETURN_ENUMERATOR(v_self, argc, argv);
+  return each_sub(v_self);
 } // cObject_each_sub
 
+/** breadth-first search, and includes self (as first result)
+ */
+static VALUE
+cObject_each_sub_with_root(int argc, VALUE *argv, VALUE v_self)
+{
+  RETURN_ENUMERATOR(v_self, argc, argv);
+  rb_yield(v_self);
+  return each_sub(v_self);
+}
+
 /** :call-seq:
- *	connect(:symbol, proc)
- *	connect(qt_signal_str, proc)
+ *	self connect(:symbol, proc)
+ *	self connect(qt_signal_str, proc)
  *
  * The first one is ruby only.
  * The second one connects the Qt signal and is C only.
@@ -459,6 +513,7 @@ cObject_each_sub(int argc, VALUE *argv, VALUE v_self)
 static VALUE 
 cObject_connect(VALUE v_self, VALUE v_signal, VALUE v_proc)
 {
+  trace("cObject_connect");
   rb_check_frozen(v_self);
   track3("cObject_connect %s, %s, %s", v_self, v_signal, v_proc);
   if (TYPE(v_signal) == T_SYMBOL)
@@ -479,21 +534,62 @@ cObject_connect(VALUE v_self, VALUE v_signal, VALUE v_proc)
     }
   GET_STRUCT(QObject, self);
   const char * const signal = StringValueCStr(v_signal);
+  trace1("native Qt signal '%s'", signal);
   new QSignalProxy(self, signal, v_proc); 
-  return Qnil;
+  return v_self;
+}
+
+/* WARNING: in case of emit v_args is extended!! 
+ * */
+VALUE 
+cObject_signal_implementation(VALUE v_self, VALUE v_method, 
+			      VALUE v_signal, VALUE v_args, VALUE v_block)
+{
+  track1("cObject_signal_implementation for method %s", v_method);
+  if (TYPE(v_method) != T_SYMBOL) 
+    rb_raise(rb_eTypeError, "method is not a symbol");
+  v_args = to_ary(v_args); // PARANOIA
+  const long N = RARRAY_LEN(v_args);
+  if (!NIL_P(v_block))
+    {
+      trace("block given call 'connect'");
+      if (N) rb_raise(rb_eTypeError, "cannot use args with block");
+      // AARGHHHH      const VALUE v_connect = RQT2SYM(connect);
+      trace("rb_funcall");
+      //rb_raise(rb_eRuntimeError, "err...."); // SEGV ?
+      rb_funcall(v_self, rb_intern("connect"), 2, v_signal, v_block);
+      trace("connected");
+    }
+  else
+    {
+      /* NOT REQUIRED
+      VALUE v_new_ary = rb_ary_new2(RARRAY_LEN(v_args) + 1);
+      rb_ary_push(v_new_ary, v_method);
+      int i = 0;
+      for (VALUE *v_el = RARRAY_PTR(v_args); i < N; i++, v_el++)
+	rb_ary_push(v_new_ary, *v_el);
+      // SEGV ??
+       */
+      rb_ary_unshift(v_args, v_method);
+      trace2("rb_funcall2 -> emit(%s), #args=%ld", INSPECT(v_method),
+	     RARRAY_LEN(v_args));
+      rb_funcall2(v_self, rb_intern("emit"), RARRAY_LEN(v_args), RARRAY_PTR(v_args));
+    }
+  return v_self;
 }
 
 /** :call-seq:
- *	emit(:symbol, *args, &proc)
- *	emit(qt_signal_str, *args, &proc)
+ *	self emit(:symbol, *args, &proc)
+ *	self emit(qt_signal_str, *args, &proc)
  */
 static VALUE
 cObject_emit(int argc, VALUE *argv, VALUE v_self)
 {
-  trace("cObject_emit");
+  trace1("%s::emit", TO_S(v_self));
   VALUE v_symbol, v_args; //, v_proc;
   rb_scan_args(argc, argv, "1*", &v_symbol, &v_args); //, &v_proc);
-  if (rb_block_given_p()) rb_raise(rb_eTypeError, "blocks not yet supported by emit");
+  if (rb_block_given_p()) rb_raise(rb_eTypeError, "blocks cannnot be passed to emit");
+  track1("symbol=%s", v_symbol);
   if (TYPE(v_symbol) == T_SYMBOL)
     {
       track1("Ruby sender through %s", v_symbol);
@@ -509,6 +605,7 @@ cObject_emit(int argc, VALUE *argv, VALUE v_self)
       if (TYPE(v_connections) == T_HASH)
 	{
 	  const VALUE v_proxylist = rb_hash_aref(v_connections, v_symbol);
+	  track1("proxylist = %s", v_proxylist);
 	  if (TYPE(v_proxylist) == T_ARRAY)
 	    {
 	      const long N = RARRAY_LEN(v_proxylist);
@@ -529,12 +626,16 @@ cObject_emit(int argc, VALUE *argv, VALUE v_self)
 		    rb_proc_call_with_block(*v_proxy, argc, argv, v_proc);
 		  else 
 		  */
-		  track1("rb_proc_call args=%s", v_args);
+		  track2("rb_proc_call proxy %s with args=%s", *v_proxy, v_args);
 		  rb_proc_call(*v_proxy, v_args);
 		}
 	    }
 	}
-      return Qnil;
+      else
+	{
+	  trace("NO CONNECTIONS");
+	}
+      return v_self;
     }
   else
       rb_raise(rb_eNotImpError, "emitting qt-signals...");
@@ -544,17 +645,20 @@ static VALUE
 cObject_widget_p(VALUE v_self)
 {
   GET_STRUCT(QObject, self);
+  traqt1("%s::isWidgetType", QTCLASS(self));
+  trace1("cObject_widget_p, isWidgetType -> %d", self->isWidgetType());
   return p(self->isWidgetType());
 }
 
 static VALUE
 init_object()
 {
+  trace("init_object");
   rb_define_alloc_func(cObject, cObject_alloc);
   rb_define_method(cObject, "initialize", RUBY_METHOD_FUNC(cObject_initialize), -1);
   rb_define_method(cObject, "parent", RUBY_METHOD_FUNC(cObject_parent), -1);
-  rb_define_method(cObject, "children", RUBY_METHOD_FUNC(cObject_children), -1);
   rb_define_method(cObject, "parent=", RUBY_METHOD_FUNC(cObject_parent_assign), 1);
+  rb_define_method(cObject, "children", RUBY_METHOD_FUNC(cObject_children), -1);
   rb_define_method(cObject, "objectName", RUBY_METHOD_FUNC(cObject_objectName), -1);
   rb_define_method(cObject, "objectName=", RUBY_METHOD_FUNC(cObject_objectName_assign), 1);
   rb_define_method(cObject, "delete", RUBY_METHOD_FUNC(cObject_delete), 0);
@@ -564,9 +668,16 @@ init_object()
   rb_define_method(cObject, "each_child", RUBY_METHOD_FUNC(cObject_each_child), -1);
   rb_define_method(cObject, "each", RUBY_METHOD_FUNC(cObject_each_child), -1);
   rb_define_method(cObject, "each_sub", RUBY_METHOD_FUNC(cObject_each_sub), -1);
+  rb_define_method(cObject, "each_sub_with_root", 
+		   RUBY_METHOD_FUNC(cObject_each_sub_with_root), -1);
+  rb_define_method(cObject, "each_child_with_root", 
+		   RUBY_METHOD_FUNC(cObject_each_child_with_root), -1);
   rb_define_private_method(cObject, "connect", RUBY_METHOD_FUNC(cObject_connect), 2);
   rb_define_private_method(cObject, "emit", RUBY_METHOD_FUNC(cObject_emit), -1);
+  rb_define_private_method(cObject, "signal_implementation", 
+			   RUBY_METHOD_FUNC(cObject_signal_implementation), 4);
   rb_define_method(cObject, "to_s", RUBY_METHOD_FUNC(cObject_to_s), 0);
+  trace("init_object OK");
   return cObject;
 }
 
@@ -596,6 +707,7 @@ mReform_tr(int argc, VALUE *argv, VALUE/*v_self*/)
 static inline void
 init_qt()
 {
+  trace("init_qt");
   mR = rb_define_module("R");
   mQt = rb_define_module_under(mR, "Qt");
   cObject = rb_define_class_under(mQt, "Object", rb_cObject);
@@ -609,6 +721,7 @@ void
 Init_liburqtCore()
 {
   static bool loaded = false;
+  trace1("Init_liburqtCore, loaded=%d", loaded);
   if (loaded) return;
   init_qt();
   const VALUE mReform = rb_define_module_under(mR, "EForm");
@@ -616,4 +729,5 @@ Init_liburqtCore()
   init_rvalue(); // assigns RVALUE_ID
   init_object();
   loaded = true;
+  trace("Init_liburqtCore OK");
 }

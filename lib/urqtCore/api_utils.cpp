@@ -4,6 +4,26 @@
 #include <ruby/encoding.h>
 
 namespace R_Qt {
+
+#if defined(DEBUG)
+
+VALUE qt2v(QObject *q)
+{
+  if (!q) return Qnil;
+  trace1("qt2v(%p)", q);
+  traqt2("%s::property(%s)", QTCLASS(q), R_QT_INTERNAL_PROPERTY_PREFIX "rvalue");
+  const QVariant &rvalue = q->property(R_QT_INTERNAL_PROPERTY_PREFIX "rvalue");
+  traqt("QVariant::isValid");
+  if (!rvalue.isValid()) return Qnil;
+  traqt("QVariant::value<RValue>");
+  const RValue &rv = rvalue.value<RValue>();
+  trace2("qt2v(%p) -> rv %p", q, &rv);
+  trace2("qt2v(%p) -> VALUE = %p", q, (void *)rv.v());
+  trace2("qt2v(%p) -> INSPECT -> %s", q, INSPECT(rv)); 
+  return rv; 
+}
+#endif // DEBUG
+
 VALUE 
 qString2v(const QString &s)
 {

@@ -3,7 +3,7 @@
 // Copyright (c) 2012-2013 Eugene Brazwick
 
 // Comment the following out to remove the DEBUG tags:
-#define TRACE
+//#define TRACE
 
 /** :rdoc:
 
@@ -16,6 +16,7 @@ Also it contains the libraries initialization method that defines all other clas
 #include <QtWidgets/QApplication>
 #include <ruby.h>
 #include <errno.h>
+#include <assert.h>
 #include "application.h"
 #include "api_utils.h"
 #include "object.h"
@@ -57,6 +58,7 @@ cApplication_alloc(VALUE cApplication)
       if (!(_argv[i] = strdup(StringValueCStr(*p))))
 	rb_syserr_fail(errno, strerror(errno));
     }
+  traqt("new QApplication");
   QApplication * const app = new QApplication(_argc, _argv);
   trace1("cApplication_alloc -> qptr %p", app);
   return cObjectWrap(cApplication, app);
@@ -65,30 +67,60 @@ cApplication_alloc(VALUE cApplication)
 /** call-seq: new()
  */
 static VALUE
-cApplication_initialize(VALUE vSelf)
+cApplication_initialize(VALUE v_self)
 {
   trace("cApplication_initialize");
   rb_call_super(0, 0);
-  rb_iv_set(vSelf, "@whenExiting", Qnil);
-  //rb_gv_set("$app", vSelf); // Give it a reference... Just for show. Not used...
+  rb_iv_set(v_self, "@toplevel_widgets", rb_ary_new());
+  rb_iv_set(v_self, "@quit", Qfalse);
+  rb_gv_set("$app", v_self);
   return Qnil;
 }
 
 static VALUE
 cApplication_exec(VALUE v_self)
 {
+  // Qt ignores quit if called before 'exec()' is started.
+  // That is stupid
+  const VALUE v_quit = rb_iv_get(v_self, "@quit");
+  //  const int quit = RTEST(v_quit) ? NUM2INT(v_quit) : 0;
+  if (RTEST(v_quit))
+    return v_quit; 
+  rb_iv_set(v_self, "@quit", Qnil);
   // should be == qApp anyway
   GET_STRUCT(QApplication, self);
-  trace("QApplication::exec");
+  trace("QApplication::exec()");
+  traqt1("%s::exec", QTCLASS(self));
   return INT2NUM(self->exec());
 }
 
 static VALUE
-init_control(VALUE mQt, VALUE cObject)
+cApplication_quit(VALUE v_self)
 {
-  trace("init_control");
-  const VALUE cControl = rb_define_class_under(mQt, "Control", cObject);
-  return cControl;
+  GET_STRUCT(QApplication, self);
+  trace("QApplication::quit()");
+  rb_iv_set(v_self, "@quit", INT2NUM(0));
+  traqt1("%s::quit", QTCLASS(self));
+  self->quit();
+  return v_self;
+}
+
+static VALUE
+cApplication_quit_p(VALUE v_self)
+{
+  GET_STRUCT(QApplication, self);
+  return rb_iv_get(v_self, "@quit");
+}
+
+static VALUE
+cApplication_exit(VALUE v_self, VALUE v_exitcode)
+{
+  GET_STRUCT(QApplication, self);
+  track1("QApplication::exit(%s)", v_exitcode);
+  rb_iv_set(v_self, "@quit", v_exitcode);
+  traqt1("%s::exit", QTCLASS(self));
+  self->exit(NUM2INT(v_exitcode));
+  return v_self;
 }
 
 static void
@@ -103,16 +135,22 @@ init_application(VALUE mQt, VALUE cControl)
    */
   const VALUE cApplication = rb_define_class_under(mQt, "Application", cControl);
   rb_define_alloc_func(cApplication, cApplication_alloc);
-  rb_define_method(cApplication, "initialize", RUBY_METHOD_FUNC(cApplication_initialize), 0);
+  rb_define_method(cApplication, "initialize", 
+		   RUBY_METHOD_FUNC(cApplication_initialize), 0);
+  // actually in core(!):
   rb_define_method(cApplication, "exec", RUBY_METHOD_FUNC(cApplication_exec), 0);
+  // actually in core(!):
+  rb_define_method(cApplication, "quit", RUBY_METHOD_FUNC(cApplication_quit), 0);
+  rb_define_method(cApplication, "exit", RUBY_METHOD_FUNC(cApplication_exit), 1);
+  rb_define_method(cApplication, "quit?", RUBY_METHOD_FUNC(cApplication_quit_p), 0);
 }
 
 static VALUE
-init_widget(VALUE mQt, VALUE cControl)
+init_control(VALUE mQt, VALUE cObject)
 {
-  trace("init_widget");
-  const VALUE cWidget = rb_define_class_under(mQt, "Widget", cControl);
-  return cWidget;
+  trace("init_control");
+  const VALUE cControl = rb_define_class_under(mQt, "Control", cObject);
+  return cControl;
 }
 
 } // namespace R_Qt 

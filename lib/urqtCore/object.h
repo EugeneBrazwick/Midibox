@@ -9,8 +9,19 @@ extern VALUE mQt, mR;
 extern VALUE cObject;
 
 extern void cObject_mark(QObject *object);
+extern VALUE cObject_signal_implementation(VALUE v_self, VALUE v_method, VALUE v_signal,
+					   VALUE v_args, VALUE v_block);
+// cannot be overloaded!
+static inline void 
+cObject_signal_impl(VALUE v_self, const char *method, VALUE v_args, 
+		    VALUE v_block)
+{
+  const VALUE v_method = ID2SYM(rb_intern(method));
+  cObject_signal_implementation(v_self, v_method, v_method, v_args, v_block);
+}
 
-static inline VALUE cObjectWrap(VALUE klass, QObject *object)
+static inline VALUE 
+cObjectWrap(VALUE klass, QObject *object)
 {
   return Data_Wrap_Struct(klass, cObject_mark, 0, object);
 }

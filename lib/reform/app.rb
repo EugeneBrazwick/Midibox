@@ -1,5 +1,5 @@
 
-require_relative '../urqt/liburqt' 
+require_relative '../urqt/liburqt'
 require_relative 'object'
 
 module R
@@ -14,6 +14,10 @@ module R
       rescue IOError => exception
         msg = "#{exception.message}\n"
       rescue StandardError, RuntimeError => exception
+	tag "got exception"
+	tag "exception class: #{exception.class}"
+	tag "exception msg: #{exception}"
+	tag "exception backtrace: #{exception.backtrace.join "\n"}"
         msg = "#{exception.class}: #{exception}\n" + exception.backtrace.join("\n")
       end
       $stderr << msg
@@ -55,26 +59,28 @@ module R::EForm
       private # methods of Instantiator
 	# It may return nil on exceptions... This is by design
 	def define_proxy_method name, thePath
+	  #tag "define_proxy_method(#{name}, #{thePath})"
 	  define_method name do |quicky = nil, &block|
 	    R::escue do
 	      # are we registered at this point?
 	      # this is done by the require which executes createInstantiator.
 	      unless @@instantiator[name]
-                tag "arrived in #{self}##{name}, first time, loading file, just in time style"
+                #tag "arrived in #{self}##{name}, first time, loading file, just in time style"
 		require_relative thePath
 		# the loaded module should call createInstantiator (and so registerControlClass) which alters
 		# @@instantiator
 		raise "'#{name}' did not register an instantiator!!!" unless @@instantiator[name]
 	      end
-              tag "HERE, name = #{name}"
+              #tag "HERE, name = #{name}"
 	      klass = @@instantiator[name]
 	      unless quicky == nil || Hash === quicky
 		raise ArgumentError, "Bad param #{quicky.inspect} passed to instantiator '#{name}'" 
 	      end
-  #             tag "quicky hash = #{quicky.inspect}"
+#             tag "quicky hash = #{quicky.inspect}"
 	      # It's important to use parent_qtc_to_use, since it must be a true widget.
 	      parent = quicky && quicky[:parent] || parent2use4(klass)
-	      instantiate_child klass, parent
+	      child = instantiate_child klass, parent
+	      child.setup(quicky, &block)
 	    end # R::escue
 	  end  # define_method
 	end # define_proxy_method
@@ -112,7 +118,7 @@ module R::EForm
 	  # that we already loaded the file:
 	  return if private_method_defined?(name)
     # failing components do not stop the setup process.
-	  #tag "Defining method #{self}.#{name}"  
+	  #tag "Defining proxy_method #{self}.#{name}"  
 	  define_proxy_method name, thePath
 	  # make it private to complete it:
 	  private name
@@ -159,7 +165,7 @@ module R::EForm
 	#override
 	def self.define_proxy_method name, thePath
 	  define_method name do |quicky = nil, &block|
-	    tag "#{self.class}::#{name} called, creating Macro!"
+	    #tag "#{self.class}::#{name} called, creating Macro!"
 	    Macro.new self, name, quicky, block
 	  end # define_method
 	end # define_proxy_method
@@ -246,14 +252,16 @@ module R::EForm
     # create a Qt application, read the plugins, execute the block
     # in the context of the Qt::Application 
     def self.app &block
-      app = R::Qt::Application.new
-ObjectSpace::define_finalizer(app, -> id { puts "DEBUG: Finalizing Application #{id}" })  # FIXME
-      # note that app is identical to $qApp
-      internalize_dir '.' # FIXME , 'contrib'
-      block and app.instance_eval(&block)
-      app.execute
-    ensure
-      app.whenExiting
+      R::Qt::Application.new.scope do |app|
+	begin
+	  # note that app is identical to $qApp
+	  internalize_dir '.' # FIXME , 'contrib'
+	  app.instance_eval &block if block	
+	  app.execute
+	ensure
+	  app.cleanup
+	end
+      end # scope
     end # app
 
     # delegator. see Instantiator::registerControlClassProxy
@@ -287,12 +295,6 @@ module R::Qt
 	  self
 	end	  
 
-        def instantiate_child klass, parent
-	  tag "#{klass}.new(#{parent})"
-          c = klass.new parent
-ObjectSpace::define_finalizer(c, -> id { puts "Finalizing #{klass} #{id}" })  # FIXME
-	  c
-        end
     end # class Control
 
     class Application < Control
@@ -300,38 +302,41 @@ ObjectSpace::define_finalizer(c, -> id { puts "Finalizing #{klass} #{id}" })  # 
 	      Reform::GraphicContext
 
       private # methods of Application
+
 	# run (show) first widget defined.
         # if a model is set, propagate it
 	# It is bad to do nothing, if there is no widget available (shown)
         # then Qt will just hang about.
-        # returns toplevel widget if show works
+        # returns toplevel widget.
 	def setupForms
-	  findChild(&:widget?).show
+	  #tag "setupForms, children=#{children}"
+	  top = @toplevel_widgets[0] and top.show
+	  #tag "located top: #{top}"
+	  top
 	end # setupForms
    
       public # methods of Application
-  
-	# User can set this callback. Called by 'app'
-	def whenExiting &callback
-	  if callback
-	    @whenExiting = callback
-	  else
-	    @whenExiting[] if @whenExiting
-	  end
-	end # whenExiting
+
+	def addWidget widget
+	  @toplevel_widgets << widget
+	end
 
 	# setup + Qt eventloop start
 	def execute
 	  setupForms and exec
 	end #  execute
+
+	def cleanup
+	  #tag "Application::cleanup, #toplevel_widgets = #{@toplevel_widgets.length}"
+	  @toplevel_widgets.each &:delete 
+	  $app = nil
+	end
     end # class Application
 end # module R::Qt
 
-if File.basename($0) == 'rspec'
-  include R::EForm
-  describe "R::EForm" do
-    R::EForm.app {
-    } # app
-  end
+if __FILE__ == $0
+  Reform.app {
+    tag "END OF APP"
+  }
+  tag "CLEANED UP OK!"
 end
-

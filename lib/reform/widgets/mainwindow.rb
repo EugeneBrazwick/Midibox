@@ -12,7 +12,7 @@ module R::Qt
     end # class MainWindow
 end # module R::Qt
 
-R::EForm::createInstantiator __FILE__, R::Qt::MainWindow
+Reform::createInstantiator __FILE__, R::Qt::MainWindow
 
 if __FILE__ == $0
   R::EForm.app {

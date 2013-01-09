@@ -1,5 +1,8 @@
 
-#define TRACE
+// This document adheres to the GNU coding standard
+// Copyright (c) 2013 Eugene Brazwick
+
+//#define TRACE
 
 #pragma implementation
 #include <ruby.h>
@@ -30,9 +33,11 @@ cMainWindow_alloc(VALUE cMainWindow)
 void 
 init_mainwindow(VALUE mQt, VALUE cWidget)
 {
-  trace("init_mainwindow");
+  trace2("init_mainwindow, mQt=%p, cWidget=%p", (void *)mQt, (void *)cWidget);
   const VALUE cMainWindow = rb_define_class_under(mQt, "MainWindow", cWidget);
+  trace("HERE");
   rb_define_alloc_func(cMainWindow, cMainWindow_alloc);
+  trace("init_mainwindow OK");
 }
 
 } // namespace R_Qt 

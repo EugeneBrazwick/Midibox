@@ -7,7 +7,8 @@ module R
 end
 
 module R::Ake
-  TRACE = 2 # 0 is none, 2 is full command dumps
+  TRACE = 2 # 0 is none, 2 is full command dumps of the build itself
+  TRACE_QT_API = true # or false, output all Qt calls on stderr. Requires rake clean.
   CXX = 'g++'
   CLEAN.include '*.o', '*.d', '*.moc'
   CLOBBER.include LIBRARY
@@ -74,6 +75,8 @@ module R::Ake
   # -fPIC is required for Qt
   CXXFLAGS = %w[-Wall -Wextra -fPIC ] +
 	     @incdirs.keys.map { |i| '-I' + i} + 
+	     (DEBUG ? %w[-O0 -g -DDEBUG] : %w[-O3]) +
+	     (TRACE_QT_API ? ['-DTRACE_QT_API'] : []) +
 	     ['-I..'] +	  # required for local includes
 	     INCDIRS.map { |i| '-I' + i}
 

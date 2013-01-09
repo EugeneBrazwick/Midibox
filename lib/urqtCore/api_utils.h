@@ -28,6 +28,20 @@
 #define track4(arg, a, b, c, d)
 #endif
 
+#if defined(TRACE_QT_API)
+#define traqt(arg) fprintf(stderr, "TRAQT: " arg "\n");
+#define traqt1(arg, a) fprintf(stderr, "TRAQT: " arg "\n", a);
+#define traqt2(arg, a, b) fprintf(stderr, "TRAQT: " arg "\n", a, b);
+#define traqt3(arg, a, b, c) fprintf(stderr, "TRAQT: " arg "\n", a, b, c);
+#define traqt4(arg, a, b, c, d) fprintf(stderr, "TRAQT: " arg "\n", a, b, c, d);
+#else // !TRACE_QT_API
+#define traqt(arg)
+#define traqt1(arg, a)
+#define traqt2(arg, a, b)
+#define traqt3(arg, a, b, c)
+#define traqt4(arg, a, b, c, d)
+#endif
+
 #define INSPECT(x) RSTRING_PTR(rb_inspect(x))
 #define TO_S(x) RSTRING_PTR(rb_any_to_s(x))
 #define STRINGIFY_INTERNAL(t) #t
@@ -46,6 +60,8 @@
 
 namespace R_Qt {
 
+#define R_QT_INTERNAL_PROPERTY_PREFIX "R_Qt::"
+
 // Stores v inside its own q object and returns that object
 // Just use GET_STRUCT to simply go from v_x to x
 static inline QObject *
@@ -53,24 +69,25 @@ v2qt(VALUE v_q)
 {
   track1("v2qt(%s)", v_q);
   GET_STRUCT(QObject, q);
-  q->setProperty("R_Qt::rvalue", QVariant::fromValue(RValue(v_q)));
+  q->setProperty(R_QT_INTERNAL_PROPERTY_PREFIX "rvalue", 
+		 QVariant::fromValue(RValue(v_q)));
   return q;
 }
 
 // Returns ruby instance for q. If invalid returns Qnil
+
+#if defined(DEBUG)
+extern VALUE qt2v(QObject *);
+#else
 static inline VALUE
 qt2v(QObject *q)
 {
   if (!q) return Qnil;
-  trace1("qt2v(%p)", q);
-  const QVariant &rvalue = q->property("R_Qt::rvalue");
+  const QVariant &rvalue = q->property(R_QT_INTERNAL_PROPERTY_PREFIX "rvalue");
   if (!rvalue.isValid()) return Qnil;
-  const RValue &rv = rvalue.value<RValue>();
-  trace2("qt2v(%p) -> rv %p", q, &rv);
-  trace2("qt2v(%p) -> VALUE = %p", q, (void *)rv.v());
-  trace2("qt2v(%p) -> INSPECT -> %s", q, INSPECT(rv));
-  return rv;
+  return rvalue.value<RValue>();
 }
+#endif // DEBUG
 
 static inline VALUE 
 to_ary(VALUE any)
@@ -108,6 +125,30 @@ inline RPP::String qString2rpp(const QString &s)
 }
 */
 
+static inline VALUE
+cstr2sym(const char *s) 
+{
+  return ID2SYM(rb_intern(s));
+}
+
+#define CSTR2SYM(s) cstr2sym(s)
+// don't confuse the two!
+#define RQT2SYM(s) cstr2sym(#s)
+
+static inline const char *
+QTCLASS(const QObject *o)
+{
+  return o ? o->metaObject()->className() : "NULL";
+}
+
+static inline const char *
+QTCLASS(const QObject &o)
+{
+  return o.metaObject()->className();
+}
+
 } // namespace R_Qt 
+
+#define override virtual
 
 #endif // _URQT_API_UTILS_H_

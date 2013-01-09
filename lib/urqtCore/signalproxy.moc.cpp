@@ -13,7 +13,10 @@ QSignalProxy::QSignalProxy(QObject *parent, const char *signal, VALUE v_block):
 inherited(parent),
 Block(v_block)
 {
+  if (!parent) rb_raise(rb_eTypeError, "Bad parent");
+  traqt("QMetaObject::normalizedSignature");
   QByteArray qsig = QMetaObject::normalizedSignature(signal);
+  traqt1("%s::metaObject", QTCLASS(parent));
   const QMetaObject &meta_parent = *parent->metaObject();
   signal = qsig.data();
   const char * const brop = strchr(signal, '(');
@@ -26,13 +29,18 @@ Block(v_block)
   QByteArray qslot;
   qslot.append("handle");
   qslot.append(brop);
+  traqt("QSignalProxy::metaObject");
   const QMetaObject &meta = *QSignalProxy::metaObject();
+  traqt("QMetaObject::indexOfSlot");
   const int i_slot = meta.indexOfSlot(qslot);
   if (i_slot == -1)
     rb_raise(rb_eRuntimeError, "no broker available for signal %s", signal);
+  traqt("QMetaObject::method");
   QMetaMethod method_parent = meta_parent.method(i_parent_signal);
+  traqt("QMetaObject::method");
   QMetaMethod method = meta.method(i_slot);
   trace("slot located");
+  traqt1("%s::connect", QTCLASS(this));
   const QMetaObject::Connection c = connect(parent, method_parent, this, method);
   if (!c)
     rb_raise(rb_eRuntimeError, "invalid connection on signal %s", signal);

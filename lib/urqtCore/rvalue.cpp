@@ -18,7 +18,9 @@ void
 init_rvalue()
 {
   trace1("init_rvalue(%s)", STRINGIFY(T_RVALUE));
+  traqt("qRegisterMetaType<T_RVALUE>");
   RVALUE_ID = qRegisterMetaType<T_RVALUE>(STRINGIFY(T_RVALUE));
+  traqt("qRegisterMetaType<T_RGCGUARDEDVALUE>");
   RGCGUARDEDVALUE_ID = qRegisterMetaType<T_RGCGUARDEDVALUE>(STRINGIFY(T_RGCGUARDEDVALUE));
 }
 

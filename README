@@ -1,12 +1,42 @@
-IN A HURRY? Then run
-  ./midibox
-in this directory. It may ask for confirmation to install packages if they are missing.
-If started on a clean Ubuntu Lucid it will be able to run successfully, provided you
-allow it to install stuff. But maybe you want to do this by hand.
 
-In that case, read on:
+# NOTE THIS WAS DONE ON A DIRTY QUETZL QUARTL QUIZZL  
+Building debug version qt-5 from open source:
+  ./configure -prefix /usr/local/Qt5 -developer-build -debug -nomake tests \
+	      -nomake examples -confirm-license \
+	      -opensource 
+  # use -j(processors times 2)
+  # the docs say that -jN works, but there are in fact raceconditions!
+  make module-qtbase module-qtsvg module-qtimageformats \
+       module-qtgraphicaleffects module-qtdoc \
+       install
+Building debug version ruby-1.9.3: 
+  apt-get install libyaml-dev libreadline6-dev
+  optflags=-O0 debugflags='-DDEBUG -g' ./configure --prefix=/usr --sysconfdir=/etc \
+  --localstatedir=/var --program-suffix=1.9.1 \
+  --enable-shared --enable-debug-env --with-out-ext=sdbm,syck
+  # sdbm and syck do not compile
+  make -j4 all install
 
-requirements:
+-----------------------------------------------------------------------------------------
+=========================================================================================
+*****************************************************************************************
+
+
+
+
+
+
+
+
+
+
+
+
+
+DEPRECATED
+
+
+requirements for alsa+DEPRECATED stuff:
     - ruby1.9.2 or higher, including rdoc, gem etc.
     - libasound2-dev (on Ubuntu at least), alsa development headers
     - rspec, testing machinery (sudo gem install rspec)
@@ -15,112 +45,9 @@ requirements:
     - the environment variable $RUBYLIB should contain the 'lib' dir, for example:
     export RUBYLIB=/home/eugene/Midibox/lib:/usr/local/lib/site_ruby/1.9.1:/usr/local/lib/site_ruby/1.9.1/x86_64-linux
 
-BUILD: just run
-    rake
-in the toplevel dir.
-
 Hm.. qtruby4.6.3.1 contains a bug. A simple 'Qt::Variant::new(0.0)' immediately fails!
 To fix patch it:
   sudo patch -p0 -E < qtruby4631.patch
 
 INSTALL: cannot be done yet. But isn't really required at the moment.
 
-Current state (oct 6 2010)
-    Rakefile - seems to do its task OK (if the requirements are met)
-    lib/rrts/driver - the low level ALSA wrapper. Only contains sequencer/MIDI related API.
-                      But it should work.
-    lib/rrts - higher level ruby ALSA sequencer interface. The basics are finished.
-    lib/rrts/node - even higher level API based on message passing threads and fibers.
-    lib/reform - qt GUI declarative interface. Still a running target. Very busy playing and tinkering with it.
-    bin - contains working examples of literal implementations of C tools like rrecordmidi and rplaymidi,
-          and the rrts powered versions rrecordmidi++ and rplaymidi++ along asorted goodies like 'panic'
-    bin/rrecordmidi++ -p 'UM-2 MIDI 1' /tmp/t   is BROKEN. Nothing much happens.
-
-HANDS ON.
-Run
-    bin/node_identity.rb -l
-Output is perhaps something like:
-  Port    Client name                      Port name
-  14:0    Midi Through                     Midi Through Port-0
-  24:0    UM-2                             UM-2 MIDI 1
-  24:1    UM-2                             UM-2 MIDI 2
-IMPORTANT: /usr/bin/ruby should be ruby1.9 or else you must use pe 'ruby1.9 bin/node_identity.rb ...'
-Now record:
-  bin/node_identity.rb --input='UM-2 MIDI 1' --output=/tmp/t.yaml'
-And play back:
-  bin/node_identity.rb --output='UM-2 MIDI 2' --input=/tmp/t.yaml
-
-Plan de campagne:
-    1a implement Alsa MIDI API. Done. 14 days.
-    1b rdocs, alsa docs are unfortunately rather vague. Tried rdoc, needs tuning a lot.
-    1c testset for 1a
-    2a build OO ruby framework around 1
-    2b rdocs
-    2c testset
-    - Node framework a la Blender nodes, except for tracks, effects etc..
-    - Extending basic framework with loop tools
-    - Style tools, for example morphing + random adaptation
-    - Chord support, including automatic harmonies
-    - Support for building/constructing/supporting a song based on general layout
-
-===
-Postgres database.
-Requires postgres, presumably libpg-dev
-
-POSTGRESQL configuration on ubuntu
-=============================================================================
-See https://help.ubuntu.com/community/PostgreSQL
-> sudo -u postgres psql postgres
-postgres=# \password postgres
-postgres=# ^D
-> sudo -u postgres createdb tagdb
-# add yourself as plain user:
-> sudo -u postgres createuser $USER
-> sudo -u postgres psql
-postgres=# \password <yourlognamehere>
-# Nevertheless, connections will not require passwords in Ubuntu.
-# As long as the username in postgres is the same as the one in /etc/passwd
-# At this point pgadmin should work, but it DOES require a password.
-============================================================================
-
-> gem install pg
-> gem install rails --include-dependencies
-#in Midibox rootdir:
-> rails --database=postgresql --git tagdb
-
-# Generate first migration
-> cd tagdb
-> script/generate migration create_database
-> kate db/migrate/<timestamp>_create_database.rb
-
-================ MIGRATION =============================
-The 'create_table' method
-  Options: id: boolean, false to not add it
-           primary_key: name, default 'id'
-           options: SQL code to add at end
-           temporary
-           force: drop the table if it existed
-The 'column' method
-  Types: :primary_key, :string, :text, :integer, :float, :decimal,
-         :datetime, :timestamp, :time, :date, :binary, :boolean.
-  Options: limit for :string, :text, (both in chars) :binary and :integer (both in bytes)
-           default, default value 'nil' is NULL
-           null, true if it can be null
-           precision: for :decial, number of total sign. digts
-           scale: nr of digits after decimal point, also for :decimal type.
-  After a type a columnlist can follow, but the options are shared.
-
-The 'timestamps' method adds 'created_at' and 'updated_at' as columns
-The 'references <tbl>... ' method adds a tbl_id column, and a tbl_type column if polymorhic: true
-is supplied. Examples
-    t.references :other_table
-    t.references :other_table polymorhic: true
-    t.references :other_table polymorhic: { default: 'Device' }
-
-======================
-POSTGRESQL 101
-======================
-Executing sql script:   psql --dbname=tagdb --file=create.sql
-GRANTING: sudo -u postgres psql --dbname=tagdb --command="GRANT CREATE ON DATABASE tagdb TO $USER"
-table definitions: never use CHAR, use VARCHAR or TEXT, it is faster and more flexible.
-TODO: make these rake tasks

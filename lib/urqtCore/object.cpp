@@ -163,7 +163,9 @@ cObject_zombified_p(VALUE v_self)
 void
 cObject_mark(QObject *object)
 {
-  trace3("cObject_mark(qptr=%p, class=%s, #children=%d)", object, 
+  if (!object) return;
+  trace1("cObject_mark(qptr=%p)", object);
+  trace2("class=%s, #children=%d)", 
 	 object->metaObject()->className(), object->children().count());
   traqt1("%s::children", QTCLASS(object));
   foreach (QObject *child, object->children())

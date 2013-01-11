@@ -3,7 +3,7 @@
 // Copyright (c) 2012-2013 Eugene Brazwick
 
 // Comment the following out to remove the DEBUG tags:
-//#define TRACE
+#define TRACE
 
 /** :rdoc:
 
@@ -25,43 +25,63 @@ namespace R_Qt {
 
 //static VALUE cApplication = Qnil;
 
-/* The only sensible way to get argv seems to be converting ARGV.
- * But we must make sure ruby can't free the strings.
- */
-static VALUE
-cApplication_alloc(VALUE cApplication)
+static int _argc = 0;
+static char **_argv = 0;
+
+static void 
+cApplication_free(QApplication * /*app*/)
 {
-  trace("cApplication_alloc");
-  const VALUE vARGV = to_ary(rb_get_argv()); // rb_const_get(rb_mKernel, rb_intern("ARGV"));
-  //VALUE vARGV0 = rb_argv0; // -- expect 'ruby' here! unless 'chmod +x' is used
-  VALUE vARGV0 = rb_gv_get("$0");
-  track2("vARGV=%s, vARGV0=%s", vARGV, vARGV0);
-  static int _argc = 0;
-  static char **_argv = 0;
+  // normally an app runs once. So this is for debugging/speccing only
   if (_argv)
     {
       char **p = _argv;
       for (int i = 0; i <= _argc; i++, p++)
-	free((void *)*p);
+	{
+	  trace2("free argv[%d] '%s'", i, *p);
+	  free((void *)*p);
+	}
+      trace1("free argv ptr %p", _argv);
       free((void *)_argv);
+      _argv = 0;
     }
-  _argc = 1 + RARRAY_LEN(vARGV);
-  _argv = (char **)malloc(_argc * sizeof(char *)); // never freed...
-  if (!_argv) rb_syserr_fail(errno, strerror(errno));
-  _argv[0] = strdup(StringValueCStr(vARGV0));
-  if (!_argv[0]) rb_syserr_fail(errno, strerror(errno));
+}
+
+/* The only sensible way to get argv seems to be converting ARGV.
+ * But we must make sure ruby can't free the strings.
+ *
+ * THOSE STATICS ARE KILLING...
+ * Why? because if we start 2 apps in the same binary
+ * the second will kill the argv of the first, but that's
+ * also his own!!
+ */
+static VALUE
+cApplication_alloc(VALUE cApplication)
+{
+  trace2("cApplication_alloc, _argc=%d, _argv=%p", _argc, _argv);
+  const VALUE vARGV = to_ary(rb_get_argv()); // rb_const_get(rb_mKernel, rb_intern("ARGV"));
+  //VALUE vARGV0 = rb_argv0; // -- expect 'ruby' here! unless 'chmod +x' is used
+  VALUE vARGV0 = rb_gv_get("$0");
+  track2("vARGV=%s, vARGV0=%s", vARGV, vARGV0);
+  const int c = 1 + RARRAY_LEN(vARGV);
+  char **v = (char **)malloc(c * sizeof(char *)); 
+  if (!v) rb_syserr_fail(errno, strerror(errno));
+  trace1("allocated argv->%p", v);
+  v[0] = strdup(StringValueCStr(vARGV0));
+  if (!v[0]) rb_syserr_fail(errno, strerror(errno));
   VALUE *p = RARRAY_PTR(vARGV);
-  trace1("argc = %d", _argc);
+  trace1("argc = %d", c);
   // Note that _argc is 1 bigger than ARGV.length !!
   for (int i = 1; i < _argc; i++, p++)
     {
-      if (!(_argv[i] = strdup(StringValueCStr(*p))))
+      if (!(v[i] = strdup(StringValueCStr(*p))))
 	rb_syserr_fail(errno, strerror(errno));
     }
+  _argc = c;
+  _argv = v;
   traqt("new QApplication");
   QApplication * const app = new QApplication(_argc, _argv);
   trace1("cApplication_alloc -> qptr %p", app);
-  return cObjectWrap(cApplication, app);
+  return Data_Wrap_Struct(cApplication, cObject_mark, cApplication_free, app);
 }
 
 /** call-seq: new()

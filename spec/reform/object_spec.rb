@@ -217,8 +217,41 @@ describe "Qt::Object" do
     Qt::Object.new.scope do |parent|   
       tricky = child = Qt::Object.new(parent)
       child.delete
-      ObjectSpace.garbage_collect
       tricky.should be_zombified
+      child.should be_zombified
+      tag "GC"
+      ObjectSpace.garbage_collect
+      # this will GC child, but that should not leave tricky DEAD.
+      tag "tricky test"
+      tricky.should be_zombified
+      # OK, he's only a zombie
     end
-  end
+  end #it
+
+  it "should not zombify tricky children" do
+    # is it possible to leave a DEAD ruby instance in a live Qt instance?
+    herman = nil
+    Qt::Object.new('leo').scope do |leo| 
+      ch = Qt::Object.new(leo, 'herman')
+      ch = nil
+      ObjectSpace.garbage_collect
+      herman = leo.findChild('herman')
+      herman.objectName.should == 'herman'
+      herman.parent = nil
+    end
+    herman.objectName.should == 'herman'
+  end #it
+
+  it "should not try to confuse the programmer with tricky children" do
+    # is it possible to leave a DEAD ruby instance in a live Qt instance?
+    herman = nil
+    Qt::Object.new('leo').scope do |leo| 
+      ch = Qt::Object.new(leo, 'herman')
+      ch = nil
+      ObjectSpace.garbage_collect
+      herman = leo.findChild('herman')
+      herman.objectName.should == 'herman'
+    end
+    herman.should be_zombified
+  end #it
 end # describe

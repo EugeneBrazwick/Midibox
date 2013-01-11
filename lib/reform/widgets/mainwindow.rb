@@ -1,6 +1,4 @@
 
-require_relative '../app'
-
 module R::Qt
     require_relative 'widget'
 
@@ -12,10 +10,11 @@ module R::Qt
     end # class MainWindow
 end # module R::Qt
 
-Reform::createInstantiator __FILE__, R::Qt::MainWindow
+Reform.createInstantiator __FILE__, R::Qt::MainWindow
 
 if __FILE__ == $0
-  R::EForm.app {
+  require_relative '../app'
+  Reform.app {
     whenExiting { $stderr.puts "Exiting cleanly" }
     mainwindow {
     } # mainwindow

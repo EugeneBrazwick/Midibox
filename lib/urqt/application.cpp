@@ -3,7 +3,7 @@
 // Copyright (c) 2012-2013 Eugene Brazwick
 
 // Comment the following out to remove the DEBUG tags:
-#define TRACE
+//#define TRACE
 
 /** :rdoc:
 
@@ -108,7 +108,7 @@ cApplication_exec(VALUE v_self)
     return v_quit; 
   rb_iv_set(v_self, "@quit", Qnil);
   // should be == qApp anyway
-  GET_STRUCT(QApplication, self);
+  RQTDECLSELF(QApplication);
   trace("QApplication::exec()");
   traqt1("%s::exec", QTCLASS(self));
   return INT2NUM(self->exec());
@@ -117,7 +117,7 @@ cApplication_exec(VALUE v_self)
 static VALUE
 cApplication_quit(VALUE v_self)
 {
-  GET_STRUCT(QApplication, self);
+  RQTDECLSELF(QApplication);
   trace("QApplication::quit()");
   rb_iv_set(v_self, "@quit", INT2NUM(0));
   traqt1("%s::quit", QTCLASS(self));
@@ -128,14 +128,14 @@ cApplication_quit(VALUE v_self)
 static VALUE
 cApplication_quit_p(VALUE v_self)
 {
-  GET_STRUCT(QApplication, self);
+  RQTDECLSELF(QApplication);
   return rb_iv_get(v_self, "@quit");
 }
 
 static VALUE
 cApplication_exit(VALUE v_self, VALUE v_exitcode)
 {
-  GET_STRUCT(QApplication, self);
+  RQTDECLSELF(QApplication);
   track1("QApplication::exit(%s)", v_exitcode);
   rb_iv_set(v_self, "@quit", v_exitcode);
   traqt1("%s::exit", QTCLASS(self));
@@ -186,6 +186,9 @@ Init_liburqt()
   const VALUE cWidget = init_widget(mQt, cControl);
   init_application(mQt, cControl);
   init_mainwindow(mQt, cWidget);
+  init_label(mQt, cWidget);
+  init_graphicsview(mQt, cWidget);
+  init_graphicsscene(mQt, cControl);
   //  rb_define_method(cApplication, "initialize", RUBY_METHOD_FUNC(cApplication_initialize), 0);
 }
 

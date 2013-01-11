@@ -46,6 +46,7 @@
 #define TO_S(x) RSTRING_PTR(rb_any_to_s(x))
 #define STRINGIFY_INTERNAL(t) #t
 #define STRINGIFY(t) STRINGIFY_INTERNAL(t)
+      /* Check_Type(v, T_DATA);  seems not required in My_Data_Get_Struct */
 #define My_Data_Get_Struct(v, Type, ptr) \
   do \
     { \
@@ -54,11 +55,52 @@
     } \
   while (false)
 
+// IMPORTANT: Data_Get_Struct is TYPE UNSAFE!!!!!  And so are these:
 #define GET_STRUCT_NODECL(Type, var) My_Data_Get_Struct(v_##var, Type, var)
 #define GET_STRUCT(Type, var) Type *var; GET_STRUCT_NODECL(Type, var)
 #define GET_STRUCT_PTR(Type, var) Type *var; My_Data_Get_Struct(*v_##var, Type, var)
 
+static inline const char *
+QTCLASS(const QObject *o)
+{
+  return o ? o->metaObject()->className() : "NULL";
+}
+
+static inline const char *
+QTCLASS(const QObject &o)
+{
+  return o.metaObject()->className();
+}
+
 namespace R_Qt {
+
+extern VALUE cObject;
+
+template <typename T> static inline void
+GetQObject_noDecl(VALUE v_o, T *&q)
+{
+#if defined(DEBUG)
+  if (!rb_obj_is_kind_of(v_o, cObject))
+    rb_raise(rb_eTypeError, "SERIOUS PROGRAMMING ERROR: very bad cast to QObject");
+#endif // DEBUG
+  GET_STRUCT(QObject, o);
+  q = dynamic_cast<T *>(o);
+  if (!q) rb_raise(rb_eTypeError, "Bad cast to %s", QTCLASS(o));
+}
+
+/* use this macro if not using self, and not using QObject either.
+ This macro is typesafe in DEBUG mode only. Otherwise it is almost
+ typesafe but someone might pass a T_DATA item that is not a QObject
+ pointer.
+ Also, T must inherit QObject, but this is checked at compile time
+*/
+#define RQTDECLARE(T, var) T *var; GetQObject_noDecl<T>(v_##var, var)
+
+#if defined(DEBUG)
+#define RQTDECLSELF(T) RQTDECLARE(T, self)
+#else // !DEBUG
+#define RQTDECLSELF(T) GET_STRUCT(T, self)
+#endif // !DEBUG
 
 #define R_QT_INTERNAL_PROPERTY_PREFIX "R_Qt::"
 
@@ -78,7 +120,7 @@ v2qt(VALUE v_q)
 
 #if defined(DEBUG)
 extern VALUE qt2v(QObject *);
-#else
+#else // !DEBUG
 static inline VALUE
 qt2v(QObject *q)
 {
@@ -87,7 +129,7 @@ qt2v(QObject *q)
   if (!rvalue.isValid()) return Qnil;
   return rvalue.value<RValue>();
 }
-#endif // DEBUG
+#endif // !DEBUG
 
 static inline VALUE 
 to_ary(VALUE any)
@@ -116,6 +158,7 @@ static inline const char *qString2cstr(const QString &s)
   return s.toUtf8().data();
 }
 
+// qString2v makes a new rb string and sets the encoding to utf-8
 extern VALUE qString2v(const QString &s);
 
 /*
@@ -135,20 +178,21 @@ cstr2sym(const char *s)
 // don't confuse the two!
 #define RQT2SYM(s) cstr2sym(#s)
 
-static inline const char *
-QTCLASS(const QObject *o)
-{
-  return o ? o->metaObject()->className() : "NULL";
-}
-
-static inline const char *
-QTCLASS(const QObject &o)
-{
-  return o.metaObject()->className();
-}
-
 } // namespace R_Qt 
 
 #define override virtual
+
+/* COTCHAS:   klass must be WITHOUT prefix Q
+ *	      you must be inside namespace R_Qt
+ */
+#define R_QT_DEF_ALLOCATOR(klass) \
+  static VALUE \
+  c##klass##_alloc(VALUE c##klass) \
+  { \
+    trace("c" #klass "_alloc"); \
+    Q##klass * const q = new Q##klass; \
+    traqt1("new Q" #klass " -> %p", q); \
+    return cObjectWrap(c##klass, q); \
+  }
 
 #endif // _URQT_API_UTILS_H_

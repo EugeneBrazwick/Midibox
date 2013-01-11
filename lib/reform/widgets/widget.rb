@@ -1,19 +1,35 @@
 
-require_relative '../app' # for Reform::createInstantiator
+require_relative '../control'
+require_relative '../context'
 
 module R::Qt
   class Widget < Control
+      # you can include any widget inside any other:
+      include Reform::WidgetContext
+
     public # methods of Widget
+      # override
+      def addWidget widget
+	widget.parent = self
+      end
+
       # override
       def addToParent parent
 	parent.addWidget self
-      end
-  end
-end
+      end # addToParent
 
-Reform::createInstantiator __FILE__, R::Qt::Widget
+      attr_dynamic String, :title, :caption, :windowTitle
+      attr_dynamic Reform::Size, :size
+
+  end # class Widget
+
+  # req. for a plugin:
+  Reform.createInstantiator __FILE__, Widget
+
+end # module R_Qt
 
 if __FILE__ == $0
+  require_relative '../app' # for Reform::createInstantiator
   Reform.app {
     widget {
       size 320, 240

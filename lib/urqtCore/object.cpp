@@ -10,7 +10,7 @@
 
 namespace R_Qt {
 
-VALUE mR = Qnil, mQt = Qnil, cObject = Qnil;
+VALUE mR = Qnil, mQt = Qnil;
 
 //typedef RPP::DataObject<QObject> RPP_QObject;
 
@@ -131,7 +131,7 @@ static void
 cObject_delete(VALUE v_self)
 {
   if (IS_ZOMBIFIED(v_self)) return;
-  GET_STRUCT(QObject, self);
+  RQTDECLSELF(QObject);
   trace4("cObject_free(qptr=%p, class=%s, name='%s', #children=%d)", self, 
 	 self->metaObject()->className(), qString2cstr(self->objectName()),
 	 self->children().count());
@@ -194,16 +194,17 @@ cObject_mark(QObject *object)
 static VALUE 
 cObject_parent_assign(VALUE v_self, VALUE v_parent)
 {
+  trace("cObject_parent_assign");
   track2("cObject_parent_assign(%s, %s)", v_self, v_parent);
   rb_check_frozen(v_self);
   QObject *parent = 0;
   if (!NIL_P(v_parent))
     {
+      trace("retrieve QObject");
       GET_STRUCT_NODECL(QObject, parent);
-      if (!rb_obj_is_kind_of(v_parent, cObject))
-	rb_raise(rb_eTypeError, "Tried to set parent to non-QObject");
     }
-  GET_STRUCT(QObject, self);
+  trace("retrieve self");
+  RQTDECLSELF(QObject);
   trace("Calling setParent");
   traqt2("%s::setParent(%s)", QTCLASS(self), QTCLASS(parent));
   self->setParent(parent);
@@ -224,7 +225,7 @@ static VALUE
 cObject_objectName_assign(VALUE v_self, VALUE vNewName)
 {
   rb_check_frozen(v_self);
-  GET_STRUCT(QObject, self);
+  RQTDECLSELF(QObject);
   traqt1("%s::setObjectName", QTCLASS(self));
   self->setObjectName(StringValueCStr(vNewName));
   return vNewName;
@@ -297,10 +298,16 @@ cObject_initialize(int argc, VALUE *argv, VALUE v_self)
 }
 
 static VALUE
+cObject_objectName_get(VALUE v_self)
+{
+  RQTDECLSELF(QObject);
+  return qString2v(self->objectName());
+}
+
+static VALUE
 cObject_objectName(int argc, VALUE *argv, VALUE v_self)
 {
-  GET_STRUCT(QObject, self);
-  if (argc == 0) return qString2v(self->objectName());
+  if (argc == 0) return cObject_objectName_get(v_self);
   VALUE vNewName;
   rb_scan_args(argc, argv, "1", &vNewName);
   return cObject_objectName_assign(v_self, vNewName);
@@ -309,7 +316,8 @@ cObject_objectName(int argc, VALUE *argv, VALUE v_self)
 static VALUE
 cObject_parent(int argc, VALUE *argv, VALUE v_self)
 {
-  GET_STRUCT(QObject, self);
+  trace("cObject_parent");
+  RQTDECLSELF(QObject);
   if (argc == 0) 
     {
       traqt1("%s::parent", QTCLASS(self));
@@ -318,9 +326,6 @@ cObject_parent(int argc, VALUE *argv, VALUE v_self)
   VALUE v_new_parent;
   rb_scan_args(argc, argv, "1", &v_new_parent);
   cObject_parent_assign(v_self, v_new_parent);
-  GET_STRUCT(QObject, new_parent);
-  traqt2("%s::setParent(%s)", QTCLASS(self), QTCLASS(new_parent));
-  self->setParent(new_parent);
   return v_new_parent;
 }
 
@@ -330,9 +335,9 @@ cObject_to_s(VALUE v_self)
   trace("cObject_to_s");
   // since to_s is used for debugging it is convenient if it accept zombies:
   if (IS_ZOMBIFIED(v_self)) return rb_str_new_cstr("zombie");
-  GET_STRUCT(QObject, self);
+  RQTDECLSELF(QObject);
   trace1("self=%p, not zombified", self);
-  traqt1("%s::objectName", QTCLASS(self));
+  // traqt1("%s::objectName", QTCLASS(self));
   const QString &objectName = self->objectName();
   trace1("objectName='%s'", qString2cstr(objectName));
   if (!objectName.isEmpty())
@@ -371,7 +376,7 @@ static VALUE
 cObject_children(int argc, VALUE *argv, VALUE v_self)
 {
   trace2("%s::children, argc=%d", TO_S(v_self), argc);
-  GET_STRUCT(QObject, self);
+  RQTDECLSELF(QObject);
   traqt1("%s::children", QTCLASS(self));
   const QObjectList &children = self->children();
   if (argc == 0)
@@ -424,7 +429,7 @@ cObject_each_child(int argc, VALUE *argv, VALUE v_self)
 {
   trace2("%s::each_child, argc=%d", TO_S(v_self), argc);
   RETURN_ENUMERATOR(v_self, argc, argv);
-  GET_STRUCT(QObject, self);
+  RQTDECLSELF(QObject);
   traqt1("%s::children", QTCLASS(self));
   const QObjectList &children = self->children();
   foreach (QObject *child, children) // foreach is delete/remove-safe!
@@ -440,7 +445,7 @@ cObject_each_child_with_root(int argc, VALUE *argv, VALUE v_self)
 {
   RETURN_ENUMERATOR(v_self, argc, argv);
   rb_yield(v_self);
-  GET_STRUCT(QObject, self);
+  RQTDECLSELF(QObject);
   traqt1("%s::children", QTCLASS(self));
   foreach (QObject *child, self->children())
     {
@@ -534,7 +539,7 @@ cObject_connect(VALUE v_self, VALUE v_signal, VALUE v_proc)
       rb_ary_push(v_proxylist, v_proc);
       return Qnil;
     }
-  GET_STRUCT(QObject, self);
+  RQTDECLSELF(QObject);
   const char * const signal = StringValueCStr(v_signal);
   trace1("native Qt signal '%s'", signal);
   new QSignalProxy(self, signal, v_proc); 
@@ -646,7 +651,7 @@ cObject_emit(int argc, VALUE *argv, VALUE v_self)
 static VALUE
 cObject_widget_p(VALUE v_self)
 {
-  GET_STRUCT(QObject, self);
+  RQTDECLSELF(QObject);
   traqt1("%s::isWidgetType", QTCLASS(self));
   trace1("cObject_widget_p, isWidgetType -> %d", self->isWidgetType());
   return p(self->isWidgetType());
@@ -662,6 +667,8 @@ init_object()
   rb_define_method(cObject, "parent=", RUBY_METHOD_FUNC(cObject_parent_assign), 1);
   rb_define_method(cObject, "children", RUBY_METHOD_FUNC(cObject_children), -1);
   rb_define_method(cObject, "objectName", RUBY_METHOD_FUNC(cObject_objectName), -1);
+  // _get is required for Control::dynamic_attr.
+  rb_define_method(cObject, "objectName_get", RUBY_METHOD_FUNC(cObject_objectName_get), 0);
   rb_define_method(cObject, "objectName=", RUBY_METHOD_FUNC(cObject_objectName_assign), 1);
   rb_define_method(cObject, "delete", RUBY_METHOD_FUNC(cObject_delete), 0);
   rb_define_method(cObject, "zombified?", RUBY_METHOD_FUNC(cObject_zombified_p), 0);

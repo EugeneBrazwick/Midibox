@@ -8,8 +8,6 @@
 #include <ruby.h>
 #include <QtWidgets/QMainWindow>
 #include "application.h"
-#include "api_utils.h"
-#include "object.h"
 
 namespace R_Qt {
 
@@ -21,14 +19,7 @@ namespace R_Qt {
  * Also the allocator cannot be given any arguments. 
  * So time to pray...
  */
-static VALUE
-cMainWindow_alloc(VALUE cMainWindow)
-{
-  trace("cMainWindow_alloc");
-  QMainWindow * const mw = new QMainWindow;
-  trace1("cMainWindow_alloc -> qptr %p", mw);
-  return cObjectWrap(cMainWindow, mw);
-}
+R_QT_DEF_ALLOCATOR(MainWindow)
 
 void 
 init_mainwindow(VALUE mQt, VALUE cWidget)

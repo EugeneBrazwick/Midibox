@@ -1,5 +1,4 @@
 
-DEBUG = true
 LIBRARY = 'liburqt.so'
 LIBS = %w[ -lQt5Widgets -lurqtCore ]
 INCDIRS = %w[ ../urqtCore ]

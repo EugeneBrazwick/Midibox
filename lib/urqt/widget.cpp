@@ -3,7 +3,7 @@
 // Copyright (c) 2013 Eugene Brazwick
 
 // Comment the following out to remove the DEBUG tags:
-//#define TRACE
+#define TRACE
 
 /** :rdoc:
 
@@ -21,18 +21,13 @@ This file contains the QWidget wrapper.
 
 namespace R_Qt {
 
-static VALUE
-cWidget_alloc(VALUE cWidget)
-{
-  trace("cWidget_alloc");
-  return cObjectWrap(cWidget, new QWidget);
-}
+R_QT_DEF_ALLOCATOR(Widget)
 
 static VALUE
 cWidget_show(VALUE v_self)
 {
   trace("cWidget_show");
-  GET_STRUCT(QWidget, self);
+  RQTDECLSELF(QWidget);
   traqt1("%s::show", QTCLASS(self));
   self->show();
   return v_self;
@@ -47,7 +42,7 @@ static VALUE
 cWidget_resize(int argc, VALUE *argv, VALUE v_self)
 {
   rb_check_frozen(v_self);
-  GET_STRUCT(QWidget, self);
+  RQTDECLSELF(QWidget);
   trace("cWidget_resize");
   VALUE v_x, v_y;
   rb_scan_args(argc, argv, "02", &v_x, &v_y);
@@ -59,24 +54,15 @@ cWidget_resize(int argc, VALUE *argv, VALUE v_self)
 
 /** :call-seq:
  *
- *	size int
- *	size int, int
  *	size -> int, int
  */
 static VALUE
-cWidget_size(int argc, VALUE *argv, VALUE v_self)
+cWidget_size_get(VALUE v_self)
 {
-  GET_STRUCT(QWidget, self);
-  if (argc == 0)
-    {
-      traqt1("%s::size", QTCLASS(self));
-      const QSize r = self->size();
-      VALUE v_r = rb_ary_new2(2);
-      rb_ary_push(v_r, INT2NUM(r.width())); 
-      rb_ary_push(v_r, INT2NUM(r.height())); 
-      return v_r;
-    }
-  return cWidget_resize(argc, argv, v_self);
+  RQTDECLSELF(QWidget);
+  traqt1("%s::size", QTCLASS(self));
+  const QSize r = self->size();
+  return rb_ary_new3(2, INT2NUM(r.width()), INT2NUM(r.height())); 
 }
 
 static VALUE cWidget;
@@ -89,11 +75,11 @@ cWidget_parent_assign(VALUE v_self, VALUE v_parent)
   QWidget *parent = 0;
   if (!NIL_P(v_parent))
     {
-      GET_STRUCT_NODECL(QWidget, parent);
-      if (!rb_obj_is_kind_of(v_parent, cWidget))
-	rb_raise(rb_eTypeError, "Tried to set parent to non-QWidget");
+      const VALUE v_p = v_parent;
+      RQTDECLARE(QWidget, p);
+      parent = p;
     }
-  GET_STRUCT(QWidget, self);
+  RQTDECLSELF(QWidget);
   trace("Calling setParent");
   traqt2("%s::setParent(%s)", QTCLASS(self), QTCLASS(parent));
   self->setParent(parent);
@@ -103,26 +89,26 @@ cWidget_parent_assign(VALUE v_self, VALUE v_parent)
 static VALUE
 cWidget_parent(int argc, VALUE *argv, VALUE v_self)
 {
-  GET_STRUCT(QWidget, self);
+  RQTDECLSELF(QWidget);
   if (argc == 0) return qt2v(self->parent());
   VALUE v_new_parent;
   rb_scan_args(argc, argv, "1", &v_new_parent);
   cWidget_parent_assign(v_self, v_new_parent);
-  GET_STRUCT(QWidget, new_parent);
-  traqt2("%s::setParent(%s)", QTCLASS(self), QTCLASS(new_parent));
-  self->setParent(new_parent);
   return v_new_parent;
 }
 
 static VALUE
-cWidget_title(int argc, VALUE *argv, VALUE v_self)
+cWidget_title_get(VALUE v_self)
 {
-  GET_STRUCT(QWidget, self);
-  if (argc == 0) 
-    {
-      traqt1("%s::windowTitle", QTCLASS(self));
-      return qString2v(self->windowTitle());
-    }
+  RQTDECLSELF(QWidget);
+  traqt1("%s::windowTitle", QTCLASS(self));
+  return qString2v(self->windowTitle());
+} // Widget#title
+
+static VALUE
+cWidget_title_assign(int argc, VALUE *argv, VALUE v_self)
+{
+  RQTDECLSELF(QWidget);
   rb_check_frozen(v_self);
   VALUE v_title;
   rb_scan_args(argc, argv, "1", &v_title);
@@ -231,7 +217,7 @@ cWidget_shown(int argc, VALUE *argv, VALUE v_self)
 {
   trace1("cWidget_shown, argc=%d", argc);
   // FIXME macro req.  EVENT_TRIGGERED_SIGNAL...
-  GET_STRUCT(QWidget, self);
+  RQTDECLSELF(QWidget);
   EventSignalBroker *esb = 0;
   traqt2("%s::property(%s)", QTCLASS(self), ESB_PropertyId);
   QVariant v = self->property(ESB_PropertyId);
@@ -269,10 +255,14 @@ init_widget(VALUE mQt, VALUE cControl)
   rb_define_method(cWidget, "parent", RUBY_METHOD_FUNC(cWidget_parent), -1);
   rb_define_method(cWidget, "parent=", RUBY_METHOD_FUNC(cWidget_parent_assign), 1);
   rb_define_method(cWidget, "resize", RUBY_METHOD_FUNC(cWidget_resize), -1);
-  rb_define_method(cWidget, "size", RUBY_METHOD_FUNC(cWidget_size), -1);
-  rb_define_method(cWidget, "title", RUBY_METHOD_FUNC(cWidget_title), -1);
-  rb_define_method(cWidget, "caption", RUBY_METHOD_FUNC(cWidget_title), -1);
-  rb_define_method(cWidget, "windowTitle", RUBY_METHOD_FUNC(cWidget_title), -1);
+  rb_define_method(cWidget, "size=", RUBY_METHOD_FUNC(cWidget_resize), -1);
+  rb_define_method(cWidget, "size_get", RUBY_METHOD_FUNC(cWidget_size_get), 0);
+  rb_define_method(cWidget, "title=", RUBY_METHOD_FUNC(cWidget_title_assign), -1);
+  rb_define_method(cWidget, "caption=", RUBY_METHOD_FUNC(cWidget_title_assign), -1);
+  rb_define_method(cWidget, "windowTitle=", RUBY_METHOD_FUNC(cWidget_title_assign), -1);
+  rb_define_method(cWidget, "title_get", RUBY_METHOD_FUNC(cWidget_title_get), 0);
+  rb_define_method(cWidget, "caption_get", RUBY_METHOD_FUNC(cWidget_title_get), 0);
+  rb_define_method(cWidget, "windowTitle_get", RUBY_METHOD_FUNC(cWidget_title_get), 0);
   rb_define_method(cWidget, "shown", RUBY_METHOD_FUNC(cWidget_shown), -1);
   return cWidget;
 }

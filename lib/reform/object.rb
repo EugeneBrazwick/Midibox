@@ -10,6 +10,15 @@ module Kernel
 
 end # module Kernel
 
+module R
+  module EForm 
+      Size = Array
+      Point = Array
+  end
+end
+
+Reform = R::EForm
+
 module R::Qt
 
   ## 

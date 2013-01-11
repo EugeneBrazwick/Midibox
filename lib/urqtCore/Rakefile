@@ -1,5 +1,4 @@
 
-DEBUG = true
 LIBRARY = 'liburqtCore.so'
 LIBS = %w[-lQt5Core] #  -lruby++ ]
 INCDIRS = []

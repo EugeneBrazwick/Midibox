@@ -340,6 +340,9 @@ module Reform
       #          Reform::app {
       #            timer
       #            edit connector: current
+      #
+      #            # or even
+      #            edit -> { current }
       #          }
       #
       # BANG! A clock.

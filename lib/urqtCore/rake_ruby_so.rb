@@ -7,8 +7,11 @@ module R
 end
 
 module R::Ake
+  DEBUG = true
   TRACE = 2 # 0 is none, 2 is full command dumps of the build itself
+  #TRACE = 0 # 0 is none, 2 is full command dumps of the build itself
   TRACE_QT_API = true # or false, output all Qt calls on stderr. Requires rake clean.
+  #TRACE_QT_API = false
   CXX = 'g++'
   CLEAN.include '*.o', '*.d', '*.moc'
   CLOBBER.include LIBRARY

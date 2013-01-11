@@ -6,7 +6,6 @@
 
 namespace R_Qt {
 extern VALUE mQt, mR;
-extern VALUE cObject;
 
 extern void cObject_mark(QObject *object);
 extern VALUE cObject_signal_implementation(VALUE v_self, VALUE v_method, VALUE v_signal,

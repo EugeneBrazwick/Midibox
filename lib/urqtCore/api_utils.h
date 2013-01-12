@@ -89,10 +89,15 @@ GetQObject_noDecl(VALUE v_o, T *&q)
 }
 
 /* use this macro if not using self, and not using QObject either.
- This macro is typesafe in DEBUG mode only. Otherwise it is almost
+ This macro is almost typesafe in DEBUG mode only. Otherwise it is reasonable
  typesafe but someone might pass a T_DATA item that is not a QObject
  pointer.
  Also, T must inherit QObject, but this is checked at compile time
+
+IMPORTANT: even in DEBUG mode, if a DATA was passed inside a cObject
+instance, that is NOT a QObject, SEGV follows, and this can't ever
+be detected, obviously.
+An example would be the GraphicsItem classes.
 */
 #define RQTDECLARE(T, var) T *var; GetQObject_noDecl<T>(v_##var, var)
 
@@ -129,6 +134,7 @@ qt2v(QObject *q)
   if (!rvalue.isValid()) return Qnil;
   return rvalue.value<RValue>();
 }
+
 #endif // !DEBUG
 
 static inline VALUE 
@@ -185,14 +191,17 @@ cstr2sym(const char *s)
 /* COTCHAS:   klass must be WITHOUT prefix Q
  *	      you must be inside namespace R_Qt
  */
-#define R_QT_DEF_ALLOCATOR(klass) \
+#define R_QT_DEF_ALLOCATOR_BASE(klass, base) \
   static VALUE \
   c##klass##_alloc(VALUE c##klass) \
   { \
     trace("c" #klass "_alloc"); \
     Q##klass * const q = new Q##klass; \
     traqt1("new Q" #klass " -> %p", q); \
-    return cObjectWrap(c##klass, q); \
+    return c##base##Wrap(c##klass, q); \
   }
+
+#define R_QT_DEF_ALLOCATOR(klass) R_QT_DEF_ALLOCATOR_BASE(klass, Object)
+#define R_QT_DEF_GRALLOCATOR(klass) R_QT_DEF_ALLOCATOR_BASE(klass, GraphicsItem)
 
 #endif // _URQT_API_UTILS_H_

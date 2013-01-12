@@ -184,11 +184,13 @@ Init_liburqt()
   Init_liburqtCore();
   const VALUE cControl = init_control(mQt, cObject);
   const VALUE cWidget = init_widget(mQt, cControl);
+  const VALUE cGraphicsItem = init_graphicsitem(mQt, cControl);
   init_application(mQt, cControl);
   init_mainwindow(mQt, cWidget);
   init_label(mQt, cWidget);
   init_graphicsview(mQt, cWidget);
   init_graphicsscene(mQt, cControl);
+  init_qtellipse(mQt, cGraphicsItem);
   //  rb_define_method(cApplication, "initialize", RUBY_METHOD_FUNC(cApplication_initialize), 0);
 }
 

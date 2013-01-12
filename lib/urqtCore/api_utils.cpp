@@ -25,6 +25,7 @@ VALUE qt2v(QObject *q)
   trace2("qt2v(%p) -> INSPECT -> %s", q, INSPECT(rv)); 
   return rv; 
 }
+
 #endif // DEBUG
 
 VALUE 

@@ -7,28 +7,30 @@ module R
 end
 
 module R::Ake
-  DEBUG = true
-  TRACE = 2 # 0 is none, 2 is full command dumps of the build itself
+  DEBUG = true # add some PARANOIA checks, but not a bad idea.
+  TRACE = 2 # 0 is none, 2 is full command dumps of the build itself. Works for rake only.
   #TRACE = 0 # 0 is none, 2 is full command dumps of the build itself
-  TRACE_QT_API = true # or false, output all Qt calls on stderr. Requires rake clean.
-  #TRACE_QT_API = false
-  CXX = 'g++'
-  CLEAN.include '*.o', '*.d', '*.moc'
+  #  TRACE_QT_API = true # or false, output all Qt calls on stderr. Requires rake clean.
+  #  works globally and causes heaps of stderr-output!
+  TRACE_QT_API = false
+  CXX = ENV['CXX'] || ENV['CC'] || 'g++'
+  TMPDIR = '.tmp'
+  CLEAN.include TMPDIR
   CLOBBER.include LIBRARY
   @linkdirs = {}
   @incdirs = {} 
-  qt_paths = %w[ /usr/local/Qt5 /usr/Qt5 /opt/Qt5 ]
-  ruby_paths = %w[ /usr/local /usr /opt/ruby ]
+  qt_paths = FileList['/usr/local/Qt5', '/usr/Qt5', '/opt/Qt5']
+  ruby_paths = FileList['/usr/local', '/usr', '/opt/ruby']
   ENV['QTDIR'] and qt_paths += [ENV['QTDIR']]
-  QT_LINKDIRS = qt_paths.map { |path| path + '/lib' }
-  QT_INCDIRS = qt_paths.map { |path| path + '/include' }
+  QT_LINKDIRS = qt_paths.sub(/$/, '/lib')
+  QT_INCDIRS = qt_paths.sub(/$/, '/include')
   RUBY_INCDIRS = ruby_paths.map { |path| [ path + '/include/ruby*', path + '/include/ruby*/**' ] }.flatten
-  RUBY_LINKDIRS = ruby_paths.map { |path| path + '/lib' }
+  RUBY_LINKDIRS = ruby_paths.sub(/$/, '/lib')
 
   #STDERR.puts "incdirs = #@incdirs, linkdirs=#@linkdirs"
   MOCSRC = FileList['*.moc.cpp']
   SRC = FileList['*.cpp'] 
-  OBJ = SRC.ext('o') + MOCSRC.sub(/\.moc\.cpp$/, '.o')
+  OBJ = (SRC.ext('o') + MOCSRC.sub(/\.moc\.cpp$/, '.o')).sub(/^/, TMPDIR + '/')
 
   def self.find_X base, *paths, container, what
     for glob in paths
@@ -56,6 +58,7 @@ module R::Ake
     find_X inc, *paths, @incdirs, 'header'
   end
 
+  # returns the resulting text on stdout
   def self.execute cmd, short
     case TRACE
     when 1, true
@@ -83,6 +86,7 @@ module R::Ake
 	     ['-I..'] +	  # required for local includes
 	     INCDIRS.map { |i| '-I' + i}
 
+  # parent directory
   PWD_UP = File.dirname(`pwd`.chomp)
   RPATH = %w[urqtCore].map{|path| PWD_UP + '/' + path}.join(':')
 
@@ -97,24 +101,49 @@ module R::Ake
     execute cmd, "CXX -> #{trg.name}"
   end
 
+  def self.src2dep src
+    File.join(TMPDIR, src.ext('.d'))
+  end
+
+  # where unit is a .cpp file
+  def self.deps unit
+    STDERR.puts "deps(#{unit})"
+    FileUtils.mkdir(TMPDIR) unless File.exists? TMPDIR
+    dep = src2dep unit
+    depcmd = [CXX, *CXXFLAGS, '-MM', unit].shelljoin
+    r = execute(depcmd, 'CPP -> dependencies')
+    STDERR.puts "r=#{r}, Now writing to #{dep}"
+    File.open(dep, 'w') { |f| f.write r }
+    r # !
+  end
 end # module R::Ake
- 
+
+directory R::Ake::TMPDIR
+
 for unit in R::Ake::SRC
-  cmd = [R::Ake::CXX, *R::Ake::CXXFLAGS, '-MM', unit].shelljoin
-  R::Ake::execute(cmd, "CPP -> dependencies");
-  deps = `#{cmd}`.gsub(/^\S+:|\\$/, '').split
+  dep = R::Ake::src2dep unit
+  deps = nil
+  if File.exists? dep
+    File.open(dep) { |f| deps = f.read }
+  else
+    deps = R::Ake::deps unit
+  end
+#  STDERR.puts "deps=#{deps}"	OK
+  deps = deps.gsub(/^\S+:|\\$/, '').split
   #STDERR.puts "deps=#{deps.inspect}\nSynthing rake file rule"
-  file unit.ext('.o')=>deps
+  file File.join(R::Ake::TMPDIR,unit.ext('.o'))=>deps
+  file File.join(R::Ake::TMPDIR,unit.ext('.d'))=>deps
 end 
 
-rule '.moc'=>'.moc.h' do |trg|
+rule %r[^\.tmp/.*\.moc$]=>[->tn { tn.sub %r[^\.tmp/(.*)], '.h'}] do |trg|
   qtdir = ENV['QTDIR'] and moc = qtdir + '/bin/moc' or moc = 'moc'
   cmd = [moc, trg.source].shelljoin + ' > ' + [trg.name].shelljoin
   R::Ake::execute cmd, "MOC -> #{trg.name}"
 end 
 
 # if .cpp changes than .o must be remade
-rule '.o'=>'.cpp' do |trg|
+rule(%r[^\.tmp/.*\.o$]=>[->tn{tn.tap{|t|STDERR.puts "tn=#{t.inspect}"}.
+				 sub %r[^\.tmp/(.*)\.o$], '\1'}]) do |trg|
   R::Ake::build_it trg
 end 
 rule '.o'=>'.moc' do |trg|
@@ -160,6 +189,6 @@ BECAUSE THE CURRENT METHOD ALWAYS calcs the d's.
 =end
 
 desc 'Compiling library'
-task buildlib: LIBRARY
+task buildlib: [R::Ake::TMPDIR, LIBRARY]
 
 

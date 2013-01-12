@@ -2,7 +2,7 @@
 // This document adheres to the GNU coding standard
 // Copyright (c) 2013 Eugene Brazwick
 
-#define TRACE
+//#define TRACE
 
 #include <QtWidgets/QGraphicsView>
 #include "application.h"

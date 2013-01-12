@@ -10,6 +10,8 @@ extern VALUE mQt, mR;
 extern void cObject_mark(QObject *object);
 extern VALUE cObject_signal_implementation(VALUE v_self, VALUE v_method, VALUE v_signal,
 					   VALUE v_args, VALUE v_block);
+extern void cObject_initialize_arg(VALUE v_self, VALUE v_arg);
+
 // cannot be overloaded!
 static inline void 
 cObject_signal_impl(VALUE v_self, const char *method, VALUE v_args, 
@@ -24,6 +26,20 @@ cObjectWrap(VALUE klass, QObject *object)
 {
   return Data_Wrap_Struct(klass, cObject_mark, 0, object);
 }
+
+// ANY T_DATA instance
+static inline void
+ZOMBIFY(VALUE v)
+{
+  DATA_PTR(v) = 0;
+}
+
+static inline bool
+IS_ZOMBIFIED(VALUE v)
+{
+  return DATA_PTR(v) == 0;
+}
+
 } // namespace R_Qt 
 
 extern "C" void Init_liburqtCore();

@@ -1,5 +1,8 @@
 
-#define TRACE
+// This document adheres to the GNU coding standard
+// Copyright (c) 2013 Eugene Brazwick
+
+//#define TRACE
 
 #pragma implementation
 //  #include "ruby++/ruby++.h"	FAILBUNNY aka CRASHBUNNY
@@ -13,18 +16,6 @@ namespace R_Qt {
 VALUE mR = Qnil, mQt = Qnil;
 
 //typedef RPP::DataObject<QObject> RPP_QObject;
-
-static inline void
-ZOMBIFY(VALUE v)
-{
-  DATA_PTR(v) = 0;
-}
-
-static inline bool
-IS_ZOMBIFIED(VALUE v)
-{
-  return DATA_PTR(v) == 0;
-}
 
 /* delete of object will also delete all subs.
  * So any ruby reference into it must die!
@@ -141,6 +132,7 @@ cObject_delete(VALUE v_self)
   delete self;
 }
 
+// Does not use QObject
 static VALUE 
 cObject_zombified_p(VALUE v_self)
 {
@@ -235,15 +227,18 @@ cObject_objectName_assign(VALUE v_self, VALUE vNewName)
  * String sets name,
  * hash sets everything in it
  * cObject sets parent.
+ *
+ * Can be used without self being a QObject
  */
-static void
+void
 cObject_initialize_arg(VALUE v_self, VALUE v_arg)
 {
   track2("cObject_initialize_arg(%s, %s)", v_self, v_arg);
   switch (TYPE(v_arg))
     {
     case T_STRING:
-      cObject_objectName_assign(v_self, v_arg);
+      rb_funcall(v_self, rb_intern("objectName="), 1, v_arg);
+      //      cObject_objectName_assign(v_self, v_arg);	  this uses QObject.
       return;
     case T_HASH:
       rb_funcall(v_self, rb_intern("setupQuickyhash"), 1, v_arg);
@@ -251,9 +246,10 @@ cObject_initialize_arg(VALUE v_self, VALUE v_arg)
     case T_DATA:
       if (rb_obj_is_kind_of(v_arg, cObject))
 	{
-	  cObject_parent_assign(v_self, v_arg);
+	  rb_funcall(v_self, rb_intern("parent="), 1, v_arg);
 	  return;
 	}
+      break;
     }
   rb_raise(rb_eTypeError, "BAD argtype %s for Object.new", rb_obj_classname(v_arg));
 }
@@ -304,13 +300,14 @@ cObject_objectName_get(VALUE v_self)
   return qString2v(self->objectName());
 }
 
+// Does not use QObject!
 static VALUE
 cObject_objectName(int argc, VALUE *argv, VALUE v_self)
 {
-  if (argc == 0) return cObject_objectName_get(v_self);
-  VALUE vNewName;
-  rb_scan_args(argc, argv, "1", &vNewName);
-  return cObject_objectName_assign(v_self, vNewName);
+  if (argc == 0) return rb_funcall(v_self, rb_intern("objectName_get"), 0);
+  VALUE v_newname;
+  rb_scan_args(argc, argv, "1", &v_newname);
+  return rb_funcall(v_self, rb_intern("objectName="), 1, v_newname);
 }
 
 static VALUE
@@ -325,32 +322,30 @@ cObject_parent(int argc, VALUE *argv, VALUE v_self)
     }
   VALUE v_new_parent;
   rb_scan_args(argc, argv, "1", &v_new_parent);
-  cObject_parent_assign(v_self, v_new_parent);
-  return v_new_parent;
+  return cObject_parent_assign(v_self, v_new_parent);
 }
 
+// Does not rely on QObject.
 static VALUE
 cObject_to_s(VALUE v_self)
 {
   trace("cObject_to_s");
   // since to_s is used for debugging it is convenient if it accept zombies:
   if (IS_ZOMBIFIED(v_self)) return rb_str_new_cstr("zombie");
-  RQTDECLSELF(QObject);
-  trace1("self=%p, not zombified", self);
   // traqt1("%s::objectName", QTCLASS(self));
-  const QString &objectName = self->objectName();
-  trace1("objectName='%s'", qString2cstr(objectName));
-  if (!objectName.isEmpty())
+  VALUE v_objectName = rb_funcall(v_self, rb_intern("objectName"), 0);
+  track1("objectName->%s", v_objectName);
+  v_objectName = rb_funcall(v_objectName, rb_intern("to_s"), 0);
+  track1("rb_any_to_s->%s", v_objectName);
+  const char * const objectName = StringValueCStr(v_objectName);
+  if (*objectName)
     {
       QString s;
       QTextStream t(&s);
-      t << rb_obj_classname(v_self) << ":" << objectName;
+      t << rb_obj_classname(v_self) << ":'" << objectName << "'";
       return qString2v(s);
     }
-  trace1("rb_call_super: to_s, self.qClass=%s", self->metaObject()->className());
-  VALUE r = rb_call_super(0, 0);
-  trace1("parent::to_s OK -> '%s'", StringValueCStr(r));
-  return r;
+  return rb_call_super(0, 0);
 }
 
 /** :call-seq:

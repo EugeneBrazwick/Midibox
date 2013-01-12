@@ -13,6 +13,7 @@ module R::Qt
 	parent.addScene self
       end # addToParent
 
+      alias :addGraphicsItem :addItem
   end # class GraphicsScene
 
   Reform.createInstantiator __FILE__, GraphicsScene

@@ -8,7 +8,7 @@ end
 
 module R::Ake
   DEBUG = true # add some PARANOIA checks, but not a bad idea.
-  TRACE = 2 # 0 is none, 2 is full command dumps of the build itself. Works for rake only.
+  TRACE = 1 # 0 is none, 2 is full command dumps of the build itself. Works for rake only.
   #TRACE = 0 # 0 is none, 2 is full command dumps of the build itself
   #  TRACE_QT_API = true # or false, output all Qt calls on stderr. Requires rake clean.
   #  works globally and causes heaps of stderr-output!
@@ -30,7 +30,8 @@ module R::Ake
   #STDERR.puts "incdirs = #@incdirs, linkdirs=#@linkdirs"
   MOCSRC = FileList['*.moc.cpp']
   SRC = FileList['*.cpp'] 
-  OBJ = (SRC.ext('o') + MOCSRC.sub(/\.moc\.cpp$/, '.o')).sub(/^/, TMPDIR + '/')
+  OBJ = (SRC.ext('.o') + MOCSRC.sub(/\.moc\.cpp$/, '.o')).sub(/^/, TMPDIR + '/')
+  DEP = OBJ.ext '.d'
 
   def self.find_X base, *paths, container, what
     for glob in paths
@@ -83,7 +84,7 @@ module R::Ake
 	     @incdirs.keys.map { |i| '-I' + i} + 
 	     (DEBUG ? %w[-O0 -g -DDEBUG] : %w[-O3]) +
 	     (TRACE_QT_API ? ['-DTRACE_QT_API'] : []) +
-	     ['-I..'] +	  # required for local includes
+	     %w[-I.. -I.] +	  # required for local includes
 	     INCDIRS.map { |i| '-I' + i}
 
   # parent directory
@@ -107,12 +108,12 @@ module R::Ake
 
   # where unit is a .cpp file
   def self.deps unit
-    STDERR.puts "deps(#{unit})"
+    #STDERR.puts "deps(#{unit})"
     FileUtils.mkdir(TMPDIR) unless File.exists? TMPDIR
     dep = src2dep unit
     depcmd = [CXX, *CXXFLAGS, '-MM', unit].shelljoin
     r = execute(depcmd, 'CPP -> dependencies')
-    STDERR.puts "r=#{r}, Now writing to #{dep}"
+    #STDERR.puts "Now writing to #{dep}"
     File.open(dep, 'w') { |f| f.write r }
     r # !
   end
@@ -120,7 +121,8 @@ end # module R::Ake
 
 directory R::Ake::TMPDIR
 
-for unit in R::Ake::SRC
+# NO 'for' please
+R::Ake::SRC.each do |unit|
   dep = R::Ake::src2dep unit
   deps = nil
   if File.exists? dep
@@ -132,25 +134,33 @@ for unit in R::Ake::SRC
   deps = deps.gsub(/^\S+:|\\$/, '').split
   #STDERR.puts "deps=#{deps.inspect}\nSynthing rake file rule"
   file File.join(R::Ake::TMPDIR,unit.ext('.o'))=>deps
-  file File.join(R::Ake::TMPDIR,unit.ext('.d'))=>deps
+  #STDERR.puts "ISSUE file #{dep}=>[#{deps[0]},...]"
+  file dep=>deps do |trg|
+     R::Ake::deps unit
+  end 
 end 
 
-rule %r[^\.tmp/.*\.moc$]=>[->tn { tn.sub %r[^\.tmp/(.*)], '.h'}] do |trg|
+rule %r[^\.tmp/.*\.moc$]=>[->tn { tn.sub %r[^\.tmp/(.*)], '\1.h'}] do |trg|
   qtdir = ENV['QTDIR'] and moc = qtdir + '/bin/moc' or moc = 'moc'
   cmd = [moc, trg.source].shelljoin + ' > ' + [trg.name].shelljoin
   R::Ake::execute cmd, "MOC -> #{trg.name}"
 end 
 
 # if .cpp changes than .o must be remade
-rule(%r[^\.tmp/.*\.o$]=>[->tn{tn.tap{|t|STDERR.puts "tn=#{t.inspect}"}.
-				 sub %r[^\.tmp/(.*)\.o$], '\1'}]) do |trg|
-  R::Ake::build_it trg
-end 
-rule '.o'=>'.moc' do |trg|
+rule(%r[^\.tmp/.*\.o$]=>[->tn{tn.
+				 #tap{|t|STDERR.puts "tn=#{t.inspect}"}.
+				 sub %r[^\.tmp/(.*)\.o$], '\1.cpp'}]) do |trg|
   R::Ake::build_it trg
 end 
 
-file LIBRARY=>R::Ake::OBJ do |trg|
+rule %r[^\.tmp/.*\.o$]=>[ ->tn {tn.
+				  sub(%[^\.tmp/], '').ext('.moc') #.
+				  #tap{|t|STDERR.puts "tn=#{t.inspect}"}
+			        }] do |trg|
+  R::Ake::build_it trg
+end 
+
+file LIBRARY=>(R::Ake::DEP + R::Ake::OBJ) do |trg|
   cmd = ([R::Ake::CXX, *R::Ake::LDFLAGS, '-shared', '-o', trg.name, 
 	  *R::Ake::OBJ] + LIBS).shelljoin
   R::Ake::execute cmd, "LD -> #{trg.name}"

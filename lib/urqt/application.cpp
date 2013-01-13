@@ -188,6 +188,7 @@ Init_liburqt()
   init_application(mQt, cControl);
   init_mainwindow(mQt, cWidget);
   init_label(mQt, cWidget);
+  init_slider(mQt, cWidget);
   init_graphicsview(mQt, cWidget);
   init_graphicsscene(mQt, cControl);
   init_qtellipse(mQt, cGraphicsItem);

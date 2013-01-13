@@ -61,5 +61,5 @@ init_label(VALUE mQt, VALUE cWidget)
   rb_define_method(cLabel, "get_text", RUBY_METHOD_FUNC(cLabel_get_text), 0);
   rb_define_method(cLabel, "get_rawtext", RUBY_METHOD_FUNC(cLabel_get_text), 0);
   rb_define_method(cLabel, "get_html", RUBY_METHOD_FUNC(cLabel_get_text), 0);
-} // int_label
+} // init_label
 } // namespace R_Qt {

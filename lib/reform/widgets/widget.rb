@@ -1,4 +1,5 @@
 
+require_relative '../../urqt/liburqt'
 require_relative '../control'
 require_relative '../context'
 

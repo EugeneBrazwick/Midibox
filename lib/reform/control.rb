@@ -32,12 +32,36 @@ module R::Qt
 
       alias :objectName_Object :objectName
 
+      def apply_dynamic_getter method
+	send method.to_s + '_get'
+      end
+
+    protected #methods of Control
+
       def apply_dynamic_setter method, *args
 	send method.to_s + '=', *args
       end
 
-      def apply_dynamic_getter method
-	send method.to_s + '_get'
+      def connector value = nil, &block
+	if z = value || block
+	  @connector = z
+	  want_data
+	else
+	  @connector
+	end
+      end
+
+      # connect ourselves to the closest model upwards.
+      # This includes self(?)
+      def want_data path = []
+	path.unshift self
+	if @model
+	  @model.model_add_listener path 
+	elsif par = parent
+	  par.want_data path
+	else
+	  raise Reform::Error, "no model found to connect to"
+	end
       end
 
     public #methods of Control

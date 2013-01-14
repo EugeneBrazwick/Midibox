@@ -68,9 +68,9 @@ cWidget_size_get(VALUE v_self)
 static VALUE cWidget;
 
 static VALUE 
-cWidget_parent_assign(VALUE v_self, VALUE v_parent)
+cWidget_qtparent_set(VALUE v_self, VALUE v_parent)
 {
-  track2("cObject_parent_assign(%s, %s)", v_self, v_parent);
+  track2("cObject_parent_set(%s, %s)", v_self, v_parent);
   rb_check_frozen(v_self);
   QWidget *parent = 0;
   if (!NIL_P(v_parent))
@@ -87,17 +87,6 @@ cWidget_parent_assign(VALUE v_self, VALUE v_parent)
 }
 
 static VALUE
-cWidget_parent(int argc, VALUE *argv, VALUE v_self)
-{
-  RQTDECLSELF(QWidget);
-  if (argc == 0) return qt2v(self->parent());
-  VALUE v_new_parent;
-  rb_scan_args(argc, argv, "1", &v_new_parent);
-  cWidget_parent_assign(v_self, v_new_parent);
-  return v_new_parent;
-}
-
-static VALUE
 cWidget_title_get(VALUE v_self)
 {
   RQTDECLSELF(QWidget);
@@ -106,7 +95,7 @@ cWidget_title_get(VALUE v_self)
 } // Widget#title
 
 static VALUE
-cWidget_title_assign(int argc, VALUE *argv, VALUE v_self)
+cWidget_title_set(int argc, VALUE *argv, VALUE v_self)
 {
   RQTDECLSELF(QWidget);
   rb_check_frozen(v_self);
@@ -252,14 +241,13 @@ init_widget(VALUE mQt, VALUE cControl)
   cWidget = rb_define_class_under(mQt, "Widget", cControl);
   rb_define_alloc_func(cWidget, cWidget_alloc);
   rb_define_method(cWidget, "show", RUBY_METHOD_FUNC(cWidget_show), 0);
-  rb_define_method(cWidget, "parent", RUBY_METHOD_FUNC(cWidget_parent), -1);
-  rb_define_method(cWidget, "parent=", RUBY_METHOD_FUNC(cWidget_parent_assign), 1);
+  rb_define_method(cWidget, "qtparent=", RUBY_METHOD_FUNC(cWidget_qtparent_set), 1);
   rb_define_method(cWidget, "resize", RUBY_METHOD_FUNC(cWidget_resize), -1);
   rb_define_method(cWidget, "size=", RUBY_METHOD_FUNC(cWidget_resize), -1);
   rb_define_method(cWidget, "size_get", RUBY_METHOD_FUNC(cWidget_size_get), 0);
-  rb_define_method(cWidget, "title=", RUBY_METHOD_FUNC(cWidget_title_assign), -1);
-  rb_define_method(cWidget, "caption=", RUBY_METHOD_FUNC(cWidget_title_assign), -1);
-  rb_define_method(cWidget, "windowTitle=", RUBY_METHOD_FUNC(cWidget_title_assign), -1);
+  rb_define_method(cWidget, "title=", RUBY_METHOD_FUNC(cWidget_title_set), -1);
+  rb_define_method(cWidget, "caption=", RUBY_METHOD_FUNC(cWidget_title_set), -1);
+  rb_define_method(cWidget, "windowTitle=", RUBY_METHOD_FUNC(cWidget_title_set), -1);
   rb_define_method(cWidget, "title_get", RUBY_METHOD_FUNC(cWidget_title_get), 0);
   rb_define_method(cWidget, "caption_get", RUBY_METHOD_FUNC(cWidget_title_get), 0);
   rb_define_method(cWidget, "windowTitle_get", RUBY_METHOD_FUNC(cWidget_title_get), 0);

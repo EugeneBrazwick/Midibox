@@ -1,4 +1,6 @@
 
+#  Copyright (c) 2013 Eugene Brazwick
+
 require_relative '../urqt/liburqt'
 require_relative 'control'
 require_relative 'context'
@@ -14,10 +16,10 @@ module R
       rescue IOError => exception
         msg = "#{exception.message}\n"
       rescue StandardError, RuntimeError => exception
-	tag "got exception"
-	tag "exception class: #{exception.class}"
-	tag "exception msg: #{exception}"
-	tag "exception backtrace: #{exception.backtrace.join "\n"}"
+	#tag "got exception"
+	#tag "exception class: #{exception.class}"
+	#tag "exception msg: #{exception}"
+	#tag "exception backtrace: #{exception.backtrace.join "\n"}"
         msg = "#{exception.class}: #{exception}\n" + exception.backtrace.join("\n")
       end
       $stderr << msg
@@ -26,9 +28,6 @@ module R
 end # module R
 
 module Reform
-
-    class Error < StandardError
-    end # class Error
 
   private # methods of EForm
 
@@ -54,7 +53,7 @@ module Reform
 	end # for
 	symlinks.each { |key, value| registerClassProxy klass, key, value }
       end # for
-      raise Error, tr("incorrect plugin directory '#{dirprefix}'") unless located
+      raise Reform::Error, tr("incorrect plugin directory '#{dirprefix}'") unless located
     end
 
     # scan given dirs for fixed set of subdirectories. Each maps to a context
@@ -62,7 +61,8 @@ module Reform
 #       tag "internalize_dir #{dirs.inspect}"
       for dir in dirs
 #         tag "Calling internalize #{dir}"
-	internalize dir, widgets: R::Qt::Widget, graphics: R::Qt::GraphicsItem
+	internalize dir, widgets: R::Qt::Widget, graphics: R::Qt::GraphicsItem,
+			 models: R::Qt::Model
       end
     end # internalize_dir
 
@@ -111,12 +111,28 @@ module R::Qt
 	  #tag "located top: #{top}"
 	  top
 	end # setupForms
-   
+ 
+      protected # methods of Application
+
+	# override
+	def each_extrachild
+	  #tag "each_extrachild, toplevel_widgets=#@toplevel_widgets"
+	  @toplevel_widgets.each { |tlw| yield tlw }
+	end
+
       public # methods of Application
+
+	def children_get
+	  super + @toplevel_widgets
+	end
+
+	alias :children :children_get
 
 	# override, kind of
 	def addWidget widget
 	  @toplevel_widgets << widget
+	  #tag  "#{widget}.@parent := self"
+	  widget.instance_variable_set :@parent, self
 	end
 
 	## setup + Qt eventloop start
@@ -135,7 +151,7 @@ end # module R::Qt
 
 if __FILE__ == $0
   Reform.app {
-    tag "END OF APP"
+    $stderr.puts "END OF APP"
   }
-  tag "CLEANED UP OK!"
+  $stderr.puts "CLEANED UP OK!"
 end

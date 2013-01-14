@@ -6,7 +6,7 @@ module R::Qt
     public #methods of GraphicsView
     
       def addScene scene
-	scene.parent = self
+	scene.qtparent = self
 	self.scene = scene
       end
   end

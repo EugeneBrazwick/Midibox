@@ -15,12 +15,17 @@ module R::Qt
     public # methods of GraphicsItem
 
       # override
-      def addToParent parent
+      def parent= parent
 	parent.addGraphicsItem self
       end # addToParent
 
+      # override. Because they are not QObjects in the first place
+      def addObject child
+	raise TypeError, "cannot only add GraphicsItems to a GraphicsItem"
+      end
+
       def addGraphicsItem item
-	item.parent = self
+	item.qtparent = self
       end # addGraphicsItem
   end # class GraphicsItem
 

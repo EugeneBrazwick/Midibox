@@ -14,6 +14,9 @@ module R
   module EForm 
       Size = Array
       Point = Array
+
+      class Error < RuntimeError
+      end
   end
 end
 
@@ -52,37 +55,86 @@ module R::Qt
 	  end # for
 	end # setupQuickyhash
 
-	## the default calls new on klass, then addToParent on the result
+	## the default calls new on klass, then parent on the result
 	# It returns the instant.
-	# NOTE: if addToParent can fail somehow it must delete itself
+	# NOTE: if parent can fail somehow it must delete itself
         def instantiate_child klass, parent
-	  #tag "instantiate_child: #{klass}"
+	  #tag "#{self}.instantiate_child: #{klass}, parent=#{parent}"
           r = klass.new 
 	  begin
-	    r.addToParent parent
+	    r.parent = parent
 	  rescue 
-	    r.delete unless r.parent
+	    r.delete unless r.parent_get
 	    raise
 	  end
 	  r
         end
 
+	def method_missing method, *arg
+	  m = method.to_s
+	  #tag "#{self}::method_missing(#{m}), iterating each_child"
+	  each_child do |child|
+	    #tag "checking #{child}"
+	    return child if child.objectName == m
+	  end
+	  super
+	end
+
+	# this is a shortcut to avoid	
+	#    rubydata data: 4
+	# you can now say:
+	#    data 4
+	def data arg
+	  rubydata data: arg
+	end
+
       protected # methods of Object
+
+	# called internally and should yield all 'extra' children.
+	def each_extrachild
+	end
 
 	# the default assigns the parent
 	def addObject child
-	  child.parent = self
-	end
+	  child.qtparent = self
+	end # addObject
 
+	# any object, except graphicsitem can have a model
+	# this includes models. Delegating is more flexible
+	def addModel child
+	  model and raise Reform::Error, "object already has a model"
+	  @model = child
+	  addObject child
+	end # addModel
+
+	# callback, called after the instance is parented
 	def setup hash = nil, &initblock
 	  instance_eval(&initblock) if initblock 
 	  setupQuickyhash hash if hash
 	end # setup
+
       public # methods of Object
 
+	alias :parent_get :qtparent_get
+	alias :children_get :qtchildren_get
+	alias :children :qtchildren_get
+
+	attr :model
+
 	## the default calls addObject 
-	def addToParent parent
+	def parent= parent
 	  parent.addObject self
+	end
+
+	# either parent_set or parent_get
+	def parent parent = nil
+	  if parent
+	    #tag "#{self}.parent_set #{parent}"
+	    self.parent = parent
+	  else
+	    #tag "#{self}.parent_get"
+	    parent_get
+	  end
 	end
 
 	# guarantees free of the C++ instance.

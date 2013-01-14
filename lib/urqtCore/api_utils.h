@@ -108,6 +108,7 @@ An example would be the GraphicsItem classes.
 #endif // !DEBUG
 
 #define R_QT_INTERNAL_PROPERTY_PREFIX "R_Qt::"
+#define R_QT_RVALUE_PROPERTYID R_QT_INTERNAL_PROPERTY_PREFIX "rvalue"
 
 // Stores v inside its own q object and returns that object
 // Just use GET_STRUCT to simply go from v_x to x
@@ -116,24 +117,28 @@ v2qt(VALUE v_q)
 {
   track1("v2qt(%s)", v_q);
   GET_STRUCT(QObject, q);
-  q->setProperty(R_QT_INTERNAL_PROPERTY_PREFIX "rvalue", 
-		 QVariant::fromValue(RValue(v_q)));
+  q->setProperty(R_QT_RVALUE_PROPERTYID, QVariant::fromValue(RValue(v_q)));
   return q;
-}
+} // v2qt
 
 // Returns ruby instance for q. If invalid returns Qnil
 
 #if defined(DEBUG)
 extern VALUE qt2v(QObject *);
+extern VALUE prop2v(QObject *q, const char *id);
 #else // !DEBUG
+static inline VALUE
+prop2v(QObject *q, const char *id)
+{
+  const QVariant &rvalue = q->property(id);
+  return rvalue.isValid() ? rvalue.value<RValue>().v() : Qnil;
+}
+
 static inline VALUE
 qt2v(QObject *q)
 {
-  if (!q) return Qnil;
-  const QVariant &rvalue = q->property(R_QT_INTERNAL_PROPERTY_PREFIX "rvalue");
-  if (!rvalue.isValid()) return Qnil;
-  return rvalue.value<RValue>();
-}
+  return q ? prop2v(q, R_QT_RVALUE_PROPERTYID) : Qnil;
+} // qt2v
 
 #endif // !DEBUG
 

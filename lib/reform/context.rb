@@ -2,7 +2,7 @@
 module R
   module Qt
     #forwards:
-    class AbstractModel < Control; end
+    class Model < Control; end
     class AbstractState < Control; end
     class AbstractAction < Control; end
     class Animation < Control; end
@@ -173,7 +173,7 @@ module Reform  # aka R::EForm
     end # module ActionContext
 
     Contexts = { R::Qt::Widget=>[WidgetContext], # , MacroContext],
-		 R::Qt::AbstractModel=>[ModelContext],
+		 R::Qt::Model=>[ModelContext],
 		 R::Qt::Object=>[ModelContext],
 		 R::Qt::GraphicsItem=>[GraphicContext], # , MacroContext],
 		 R::Qt::Animation=>[AnimationContext], # , MacroContext],

@@ -10,12 +10,10 @@ cObject = Qnil;
 
 #if defined(DEBUG)
 
-VALUE qt2v(QObject *q)
+VALUE prop2v(QObject *q, const char *id)
 {
-  if (!q) return Qnil;
-  trace1("qt2v(%p)", q);
   //  traqt2("%s::property(%s)", QTCLASS(q), R_QT_INTERNAL_PROPERTY_PREFIX "rvalue");
-  const QVariant &rvalue = q->property(R_QT_INTERNAL_PROPERTY_PREFIX "rvalue");
+  const QVariant &rvalue = q->property(id);
   //  traqt("QVariant::isValid");     
   if (!rvalue.isValid()) return Qnil;
   //traqt("QVariant::value<RValue>");
@@ -24,6 +22,13 @@ VALUE qt2v(QObject *q)
   trace2("qt2v(%p) -> VALUE = %p", q, (void *)rv.v());
   trace2("qt2v(%p) -> INSPECT -> %s", q, INSPECT(rv)); 
   return rv; 
+}
+
+VALUE qt2v(QObject *q)
+{
+  if (!q) return Qnil;
+  trace1("qt2v(%p)", q);
+  return prop2v(q, R_QT_RVALUE_PROPERTYID);
 }
 
 #endif // DEBUG

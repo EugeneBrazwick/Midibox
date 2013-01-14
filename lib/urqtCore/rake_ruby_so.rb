@@ -31,7 +31,7 @@ module R::Ake
   MOCSRC = FileList['*.moc.cpp']
   SRC = FileList['*.cpp'] 
   OBJ = (SRC.ext('.o') + MOCSRC.sub(/\.moc\.cpp$/, '.o')).sub(/^/, TMPDIR + '/')
-  DEP = OBJ.ext '.d'
+  DEP = SRC.sub(/(.*)\.cpp/, TMPDIR + '/\1.d')
 
   def self.find_X base, *paths, container, what
     for glob in paths

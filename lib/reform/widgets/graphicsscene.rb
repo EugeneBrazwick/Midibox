@@ -9,9 +9,15 @@ module R::Qt
 
     public # methods of GraphicsScene
 
-      def addToParent parent
+      # override
+      def parent= parent
 	parent.addScene self
       end # addToParent
+
+      # here 'children' reverts to 'items'. 
+      def addObject child
+	raise TypeError, "cannot only add GraphicsItems to a GraphicsScene"
+      end
 
       alias :addGraphicsItem :addItem
   end # class GraphicsScene

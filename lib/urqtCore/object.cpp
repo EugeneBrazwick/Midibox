@@ -7,6 +7,7 @@
 #pragma implementation
 //  #include "ruby++/ruby++.h"	FAILBUNNY aka CRASHBUNNY
 #include <QtCore/QTextStream>
+#include <QtCore/QQueue>
 #include "api_utils.h"
 #include "object.h"
 #include "signalproxy.moc.h"
@@ -16,28 +17,6 @@ namespace R_Qt {
 VALUE mR = Qnil, mQt = Qnil;
 
 //typedef RPP::DataObject<QObject> RPP_QObject;
-
-/* delete of object will also delete all subs.
- * So any ruby reference into it must die!
- */
-static void
-zombify(QObject *object)
-{
-  const VALUE v_object = qt2v(object);
-  if (!NIL_P(v_object))
-    {
-      trace("zombify child");
-      ZOMBIFY(v_object);
-    }
-  traqt1("%s::children", QTCLASS(object));
-  const QObjectList &children = object->children();
-  foreach (QObject *child, children) 
-    {
-      trace1("ITER: cObject.child %s", child->metaObject()->className());
-      // If the object is OWNED by ruby, do NOT let Qt free it (at least here)
-      zombify(child);
-    }
-}
 
 /* SIGNALS
  * =========
@@ -118,6 +97,42 @@ zombify(QObject *object)
  *
  */
 
+/* delete of object will also delete all subs.
+ * So any ruby reference into it must die!
+ *
+ * We cannot use 'self.children' or 'self.each_child' 
+ * since that would skip trees that may still contain ruby values.
+ *
+ * However we can use each_sub!
+ * But then again, there is no need to do so, since 'delete'
+ * will not delete these anyway.
+ * Hm.... Technically it SHOULD. But note that both
+ * 'app' and 'scene' have pseudo-children. But the Qt API
+ * will in fact delete the scene children!
+ * So do not touch.
+ */
+static void
+zombify(QObject *object)
+{
+  const VALUE v_object = qt2v(object);
+  if (!NIL_P(v_object))
+    {
+      trace("zombify child");
+      ZOMBIFY(v_object);
+    }
+  traqt1("%s::children", QTCLASS(object));
+  const QObjectList &children = object->children();
+  foreach (QObject *child, children) 
+    {
+      trace1("ITER: cObject.child %s", child->metaObject()->className());
+      // If the object is OWNED by ruby, do NOT let Qt free it (at least here)
+      zombify(child);
+    }
+}
+
+ /** 
+  * zombify the ENTIRE tree.
+  */
 static void 
 cObject_delete(VALUE v_self)
 {
@@ -133,6 +148,12 @@ cObject_delete(VALUE v_self)
 }
 
 // Does not use QObject
+/** :call-seq:
+ *	  zombified? -> bool
+ * 
+ * Returns:
+ *    true if the C++ object belonging to this ruby-instance was deleted.
+ */
 static VALUE 
 cObject_zombified_p(VALUE v_self)
 {
@@ -169,38 +190,13 @@ cObject_mark(QObject *object)
   traqt1("%s::dynamicPropertyNames", QTCLASS(object));
   foreach (const QByteArray &propname, object->dynamicPropertyNames())
     {
+      if (strncmp(propname.data(), R_QT_INTERNAL_PROPERTY_PREFIX, strlen(R_QT_INTERNAL_PROPERTY_PREFIX))
+	  != 0) continue;
       traqt2("%s::property(%s)", QTCLASS(object), propname.data());
       const QVariant &var = object->property(propname);
       if (var.canConvert<RValue>())
 	rb_gc_mark(var.value<RValue>());
     }
-}
-
-/** :call-seq: parent= newParent
- *
- * The object is always removed from the children list of the old
- * parent (if set).
- * If newParent is nil nothing else happens.
- * Otherwise the object is added to the 'children' list of parent.
-*/
-static VALUE 
-cObject_parent_assign(VALUE v_self, VALUE v_parent)
-{
-  trace("cObject_parent_assign");
-  track2("cObject_parent_assign(%s, %s)", v_self, v_parent);
-  rb_check_frozen(v_self);
-  QObject *parent = 0;
-  if (!NIL_P(v_parent))
-    {
-      trace("retrieve QObject");
-      GET_STRUCT_NODECL(QObject, parent);
-    }
-  trace("retrieve self");
-  RQTDECLSELF(QObject);
-  trace("Calling setParent");
-  traqt2("%s::setParent(%s)", QTCLASS(self), QTCLASS(parent));
-  self->setParent(parent);
-  return v_parent;
 }
 
 static VALUE
@@ -213,8 +209,11 @@ cObject_alloc(VALUE cObject)
   return cObjectWrap(cObject, object);
 }
 
+/** :call-seq:
+ *	objectName = string
+ */
 static VALUE
-cObject_objectName_assign(VALUE v_self, VALUE vNewName)
+cObject_objectName_set(VALUE v_self, VALUE vNewName)
 {
   rb_check_frozen(v_self);
   RQTDECLSELF(QObject);
@@ -237,8 +236,8 @@ cObject_initialize_arg(VALUE v_self, VALUE v_arg)
   switch (TYPE(v_arg))
     {
     case T_STRING:
-      rb_funcall(v_self, rb_intern("objectName="), 1, v_arg);
-      //      cObject_objectName_assign(v_self, v_arg);	  this uses QObject.
+      rb_funcall(v_self, rb_intern("objectName"), 1, v_arg);
+      //      cObject_objectName_set(v_self, v_arg);	  this uses QObject.
       return;
     case T_HASH:
       rb_funcall(v_self, rb_intern("setupQuickyhash"), 1, v_arg);
@@ -246,7 +245,7 @@ cObject_initialize_arg(VALUE v_self, VALUE v_arg)
     case T_DATA:
       if (rb_obj_is_kind_of(v_arg, cObject))
 	{
-	  rb_funcall(v_self, rb_intern("parent="), 1, v_arg);
+	  rb_funcall(v_self, rb_intern("parent"), 1, v_arg);
 	  return;
 	}
       break;
@@ -256,6 +255,9 @@ cObject_initialize_arg(VALUE v_self, VALUE v_arg)
 
 /** call-seq: new([parent = nil] [[,]name = nil] [[,]hash = nil] [[,] &block])
  *
+ * If a name is passed it is assigned using objectName=.
+ * If a hash is passed it is passed to setupQuickyhash. :parent and :objectName are valid keys.
+ * If a block is passed it is executed in the context of self.
 */
 static VALUE
 cObject_initialize(int argc, VALUE *argv, VALUE v_self)
@@ -293,6 +295,58 @@ cObject_initialize(int argc, VALUE *argv, VALUE v_self)
   return Qnil;
 }
 
+/** :call-seq: qtparent= newParent
+ *
+ * The object is always removed from the children list of the old
+ * parent (if set).
+ * If newParent is nil nothing else happens.
+ * Otherwise the object is added to the 'children' list of parent.
+*/
+static VALUE 
+cObject_qtparent_set(VALUE v_self, VALUE v_parent)
+{
+  trace("cObject_qtparent_set");
+  track2("cObject_qtparent_set(%s, %s)", v_self, v_parent);
+  rb_check_frozen(v_self);
+  QObject *parent = 0;
+  if (!NIL_P(v_parent))
+    {
+      trace("retrieve QObject");
+      GET_STRUCT_NODECL(QObject, parent);
+    }
+  trace("retrieve self");
+  RQTDECLSELF(QObject);
+  trace("Calling setParent");
+  traqt2("%s::setParent(%s)", QTCLASS(self), QTCLASS(parent));
+  self->setParent(parent);
+  return v_parent;
+}
+
+static VALUE
+cObject_qtparent_get(VALUE v_self)
+{
+  trace("cObject_qtparent_get");
+  RQTDECLSELF(QObject);
+  traqt1("%s::parent", QTCLASS(self));
+  return qt2v(self->parent());
+}
+
+/** :call-seq:
+ *	qtparent -> Object
+ *	qtparent new_parent
+static VALUE
+cObject_qtparent(int argc, VALUE *argv, VALUE v_self)
+{
+  trace("cObject_qtparent");
+  if (argc == 0) 
+    return cObject_qtparent_get(v_self);
+  RQTDECLSELF(QObject);
+  VALUE v_new_parent;
+  rb_scan_args(argc, argv, "1", &v_new_parent);
+  return cObject_qtparent_set(v_self, v_new_parent);
+}
+ */
+
 static VALUE
 cObject_objectName_get(VALUE v_self)
 {
@@ -301,28 +355,18 @@ cObject_objectName_get(VALUE v_self)
 }
 
 // Does not use QObject!
+/** :call-seq:
+ *	objectName -> string
+ *	objectName new_name
+ */
 static VALUE
 cObject_objectName(int argc, VALUE *argv, VALUE v_self)
 {
   if (argc == 0) return rb_funcall(v_self, rb_intern("objectName_get"), 0);
   VALUE v_newname;
   rb_scan_args(argc, argv, "1", &v_newname);
+  // BAD IDEA v_newname = rb_funcall(v_newname, rb_intern("to_sym"), 0);
   return rb_funcall(v_self, rb_intern("objectName="), 1, v_newname);
-}
-
-static VALUE
-cObject_parent(int argc, VALUE *argv, VALUE v_self)
-{
-  trace("cObject_parent");
-  RQTDECLSELF(QObject);
-  if (argc == 0) 
-    {
-      traqt1("%s::parent", QTCLASS(self));
-      return qt2v(self->parent());
-    }
-  VALUE v_new_parent;
-  rb_scan_args(argc, argv, "1", &v_new_parent);
-  return cObject_parent_assign(v_self, v_new_parent);
 }
 
 // Does not rely on QObject.
@@ -348,42 +392,29 @@ cObject_to_s(VALUE v_self)
   return rb_call_super(0, 0);
 }
 
-/** :call-seq:
- *	children  
- *	children object-array
- *	children object1, object2, ...
- *
- * The first form returns an array (copy) of the children, possibly
- * empty.
- *
- * The second form assigns the given objects by removing the
- * parent of its own children, then setting the parent of 
- * the passed objects to self. 
- * IMPORTANT: the result can be orphans. If they are not a ruby object
- * they are currently NOT FREED causing MEMORY LEAKS!!!!
- * Apart from that, they may be Qt-internals (like QApplication has some)
- * and the system may crash!
- *
- * This behaviour may very well change.
- * In fact, the rw variant should be called 'children!' 
- */
 static VALUE
-cObject_children(int argc, VALUE *argv, VALUE v_self)
+cObject_qtchildren_get(VALUE v_self)
 {
-  trace2("%s::children, argc=%d", TO_S(v_self), argc);
+  trace1("%s::children_get", TO_S(v_self));
   RQTDECLSELF(QObject);
   traqt1("%s::children", QTCLASS(self));
   const QObjectList &children = self->children();
-  if (argc == 0)
+  const VALUE r = rb_ary_new2(children.count());
+  foreach (QObject *child, children) // foreach is delete/remove-safe!
     {
-      const VALUE r = rb_ary_new2(children.count());
-      foreach (QObject *child, children) // foreach is delete/remove-safe!
-	{
-	  const VALUE v_child = qt2v(child);
-	  if (!NIL_P(v_child)) rb_ary_push(r, v_child);
-	}
-      return r;
+      const VALUE v_child = qt2v(child);
+      if (!NIL_P(v_child)) rb_ary_push(r, v_child);
     }
+  return r;
+}
+
+static VALUE
+cObject_qtchildren_set(int argc, VALUE *argv, VALUE v_self)
+{
+  trace2("%s::children_set, argc=%d", TO_S(v_self), argc);
+  RQTDECLSELF(QObject);
+  traqt1("%s::children", QTCLASS(self));
+  const QObjectList &children = self->children();
   rb_check_frozen(v_self);
   VALUE v_children;
   rb_scan_args(argc, argv, "*", &v_children);
@@ -417,13 +448,45 @@ cObject_children(int argc, VALUE *argv, VALUE v_self)
   return v_children;
 } // cObject_children
 
-/** iterate each direct child
+/* TOO DANGEROUS
+ * :call-seq:
+ *	qtchildren  
+ *	qtchildren object-array
+ *	qtchildren object1, object2, ...
+ *
+ * The first form returns an array (copy) of the children, possibly
+ * empty.
+ *
+ * The second form assigns the given objects by removing the
+ * parent of its own children, then setting the parent of 
+ * the passed objects to self. 
+ * IMPORTANT: the result can be orphans. If they are not a ruby object
+ * they are currently NOT FREED causing MEMORY LEAKS!!!!
+ * Apart from that, they may be Qt-internals (like QApplication has some)
+ * and the system may crash!
+ *
+ * This behaviour may very well change.
+ * In fact, the rw variant should be called 'children!' 
+static VALUE
+cObject_qtchildren(int argc, VALUE *argv, VALUE v_self)
+{
+  if (argc == 0) return cObject_qtchildren_get(v_self);
+  return cObject_qtchildren_set(argc, argv, v_self);
+}
+ */
+
+/** iterate each direct child.
+ *
+ * To make it easier for subclasses to create overrides for childlist,
+ * as we need for Application, GraphicsScene and GraphicsItem and
+ * probably more, we callback on 'each_extrachild' which should
+ * iterate more children. These may not be QObjects.
  */
 static VALUE
-cObject_each_child(int argc, VALUE *argv, VALUE v_self)
+cObject_each_child(VALUE v_self)
 {
   trace2("%s::each_child, argc=%d", TO_S(v_self), argc);
-  RETURN_ENUMERATOR(v_self, argc, argv);
+  RETURN_ENUMERATOR(v_self, 0, 0);
   RQTDECLSELF(QObject);
   traqt1("%s::children", QTCLASS(self));
   const QObjectList &children = self->children();
@@ -432,53 +495,81 @@ cObject_each_child(int argc, VALUE *argv, VALUE v_self)
       const VALUE v_child = qt2v(child);
       if (!NIL_P(v_child)) rb_yield(v_child);
     }
+  trace("pass control to each_extrachild");
+  rb_funcall_passing_block(v_self, rb_intern("each_extrachild"), 0, 0);
   return Qnil;
 } // cObject_each_child
 
 static VALUE
-cObject_each_child_with_root(int argc, VALUE *argv, VALUE v_self)
+cObject_each_child_with_root(VALUE v_self)
 {
-  RETURN_ENUMERATOR(v_self, argc, argv);
+  RETURN_ENUMERATOR(v_self, 0, 0);
   rb_yield(v_self);
-  RQTDECLSELF(QObject);
-  traqt1("%s::children", QTCLASS(self));
-  foreach (QObject *child, self->children())
-    {
-      const VALUE v_child = qt2v(child);
-      if (!NIL_P(v_child)) rb_yield(v_child);
-    }
+  return cObject_each_child(v_self);
+}
+
+struct MyData {
+  QQueue<QObject*> &queue;
+  int &c;
+  MyData(QQueue<QObject*> &aQueue, int &aC): queue(aQueue), c(aC) {}
+};
+
+// callback block for enqueue_children
+static VALUE 
+MyEnqueueBlock(VALUE v_child, VALUE context, int /*argc*/, VALUE * /*argv*/)
+{
+  MyData &data = *(MyData *)context;
+  GET_STRUCT(QObject, child);
+  data.queue.enqueue(child);
+  ++data.c;
   return Qnil;
 }
 
+/* SUBTLETY:
+ * A tree that has a non-ruby root may still hold ruby leaves!
+ * So on our search we cannot use NIL_P(v_child) to skip enqueueing.
+ *
+ * And also we must enqueue QObject* and not VALUE.
+ *
+ * Similarly we cannot use 'each_child' since it only can enumerate
+ * VALUEs.
+ * 
+ * QObject specific! QGraphicsItem needs overrides!!
+ */
 static void 
-enqueue_children(VALUE v_object, VALUE v_queue, int &c)
+enqueue_children(VALUE v_self, QObject *object, QQueue<QObject*> &queue, int &c)
 {
-  GET_STRUCT(QObject, object);
   traqt1("%s::children", QTCLASS(object));
   const QObjectList &children = object->children();
   foreach (QObject *child, children)
     {
-      const VALUE v_child = qt2v(child);
-      if (!NIL_P(v_child)) 
-	{
-	  rb_ary_push(v_queue, v_child);
-	  ++c;
-	}
+      queue.enqueue(child);
+      ++c;
     }
+  MyData data(queue, c);
+  rb_block_call(v_self, rb_intern("each_extrachild"), 0, 0, RUBY_METHOD_FUNC(MyEnqueueBlock),
+	        VALUE(&data));
 }
 
+/* SUBTLETY:
+ * A tree that has a non-ruby root may still hold ruby leaves!
+ * So on our search we cannot use NIL_P(v_child) to skip enqueueing
+ */
 static VALUE
 each_sub(VALUE v_self)
 {
-  VALUE v_queue = rb_ary_new();
+  GET_STRUCT(QObject, self);
+  QQueue<QObject *>queue;
   int c = 0;
-  enqueue_children(v_self, v_queue, c); 
+  enqueue_children(v_self, self, queue, c); 
   while (c)
     {
-      VALUE v_node = rb_ary_shift(v_queue);
+      QObject * const node = queue.dequeue();
       --c;
-      rb_yield(v_node);
-      enqueue_children(v_node, v_queue, c);
+      const VALUE v_node = qt2v(node);
+      if (!NIL_P(v_node))
+	rb_yield(v_node);
+      enqueue_children(v_node, node, queue, c);
     }
   return Qnil;
 }
@@ -486,19 +577,19 @@ each_sub(VALUE v_self)
 /** breadth-first search, but it excludes SELF!!!
  */
 static VALUE
-cObject_each_sub(int argc, VALUE *argv, VALUE v_self)
+cObject_each_sub(VALUE v_self)
 {
   trace2("%s::each_sub, argc=%d", TO_S(v_self), argc);
-  RETURN_ENUMERATOR(v_self, argc, argv);
+  RETURN_ENUMERATOR(v_self, 0, 0);
   return each_sub(v_self);
 } // cObject_each_sub
 
 /** breadth-first search, and includes self (as first result)
  */
 static VALUE
-cObject_each_sub_with_root(int argc, VALUE *argv, VALUE v_self)
+cObject_each_sub_with_root(VALUE v_self)
 {
-  RETURN_ENUMERATOR(v_self, argc, argv);
+  RETURN_ENUMERATOR(v_self, 0, 0);
   rb_yield(v_self);
   return each_sub(v_self);
 }
@@ -658,24 +749,29 @@ init_object()
   trace("init_object");
   rb_define_alloc_func(cObject, cObject_alloc);
   rb_define_method(cObject, "initialize", RUBY_METHOD_FUNC(cObject_initialize), -1);
-  rb_define_method(cObject, "parent", RUBY_METHOD_FUNC(cObject_parent), -1);
-  rb_define_method(cObject, "parent=", RUBY_METHOD_FUNC(cObject_parent_assign), 1);
-  rb_define_method(cObject, "children", RUBY_METHOD_FUNC(cObject_children), -1);
+  rb_define_method(cObject, "qtparent_get", RUBY_METHOD_FUNC(cObject_qtparent_get), 0);
+  rb_define_method(cObject, "qtparent=", RUBY_METHOD_FUNC(cObject_qtparent_set), 1);	
+  // qtparent is used through parent sometimes as in	  'Object.new parent: bart'
+  //  rb_define_method(cObject, "qtparent", RUBY_METHOD_FUNC(cObject_qtparent), -1);
+  rb_define_method(cObject, "qtchildren_get", RUBY_METHOD_FUNC(cObject_qtchildren_get), 0);
+  rb_define_method(cObject, "qtchildren=", RUBY_METHOD_FUNC(cObject_qtchildren_set), -1);
+  //rb_define_alias(cObject, "children", "qtchildren_get");
   rb_define_method(cObject, "objectName", RUBY_METHOD_FUNC(cObject_objectName), -1);
+  rb_define_alias(cObject, "name", "objectName");
   // _get is required for Control::dynamic_attr.
   rb_define_method(cObject, "objectName_get", RUBY_METHOD_FUNC(cObject_objectName_get), 0);
-  rb_define_method(cObject, "objectName=", RUBY_METHOD_FUNC(cObject_objectName_assign), 1);
+  rb_define_method(cObject, "objectName=", RUBY_METHOD_FUNC(cObject_objectName_set), 1);
   rb_define_method(cObject, "delete", RUBY_METHOD_FUNC(cObject_delete), 0);
   rb_define_method(cObject, "zombified?", RUBY_METHOD_FUNC(cObject_zombified_p), 0);
   rb_define_method(cObject, "widget?", RUBY_METHOD_FUNC(cObject_widget_p), 0);
 //  rb_define_method(cObject, "findChild", RUBY_METHOD_FUNC(cObject_findChild), -1);
-  rb_define_method(cObject, "each_child", RUBY_METHOD_FUNC(cObject_each_child), -1);
-  rb_define_method(cObject, "each", RUBY_METHOD_FUNC(cObject_each_child), -1);
-  rb_define_method(cObject, "each_sub", RUBY_METHOD_FUNC(cObject_each_sub), -1);
+  rb_define_method(cObject, "each_child", RUBY_METHOD_FUNC(cObject_each_child), 0);
+  rb_define_method(cObject, "each", RUBY_METHOD_FUNC(cObject_each_child), 0);
+  rb_define_method(cObject, "each_sub", RUBY_METHOD_FUNC(cObject_each_sub), 0);
   rb_define_method(cObject, "each_sub_with_root", 
-		   RUBY_METHOD_FUNC(cObject_each_sub_with_root), -1);
+		   RUBY_METHOD_FUNC(cObject_each_sub_with_root), 0);
   rb_define_method(cObject, "each_child_with_root", 
-		   RUBY_METHOD_FUNC(cObject_each_child_with_root), -1);
+		   RUBY_METHOD_FUNC(cObject_each_child_with_root), 0);
   rb_define_private_method(cObject, "connect", RUBY_METHOD_FUNC(cObject_connect), 2);
   rb_define_private_method(cObject, "emit", RUBY_METHOD_FUNC(cObject_emit), -1);
   rb_define_private_method(cObject, "signal_implementation", 

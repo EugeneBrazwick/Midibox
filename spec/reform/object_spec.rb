@@ -62,10 +62,17 @@ describe "Qt::Object" do
     end
     fifi.should be_zombified
   end
+  
+  it "makes a named child available as a method under its parent" do
+    Qt::Object.new('froome').scope do |froome|
+      fifi = Qt::Object.new(froome, 'fifi')
+      fifi.should == froome.fifi
+    end
+  end
 
   it "checks the type for the parent correctly" do
     Qt::Object.new { objectName 'froome' }.scope do |froome|
-      expect { froome.parent = 'bart' }.to raise_error TypeError
+      expect { froome.qtparent = 'bart' }.to raise_error TypeError
     end
   end
 
@@ -91,7 +98,7 @@ describe "Qt::Object" do
       fifi = Qt::Object.new 'fifi', frodo
       fifi.parent.should == frodo
       frodo.children.should == [fifi]
-      froome.children fifi
+      froome.qtchildren = fifi
       fifi.parent.should == froome
       frodo.children.should be_empty
       frodo.parent.should == nil
@@ -164,7 +171,7 @@ describe "Qt::Object" do
   it "can enumerate all immediate ruby children" do
     Qt::Object.new(objectName: 'fifi').scope do |fifi|
       frodo, linda = Qt::Object.new('frodo'), Qt::Object.new('linda')
-      fifi.children frodo, linda
+      fifi.qtchildren = frodo, linda
       fifi.each.to_a.should == [frodo, linda]
     end
   end # it
@@ -177,9 +184,9 @@ describe "Qt::Object" do
       frodo, linda = o('frodo'), o('linda')
       carl, philip, emmanuel = %w[carl philip emmanuel].map{|b| o b}
       johan = o 'johan'
-      fifi.children frodo, linda
-      frodo.children carl, philip, emmanuel
-      linda.children johan
+      fifi.qtchildren = frodo, linda
+      frodo.qtchildren = carl, philip, emmanuel
+      linda.qtchildren = johan
       fifi.each_sub.to_a.should == [frodo, linda, carl, philip, emmanuel, johan]
       fifi.each_sub_with_root.to_a.should == [fifi, frodo, linda, carl, philip, emmanuel, johan]
       fifi.each_child.to_a.should == [frodo, linda]
@@ -194,9 +201,9 @@ describe "Qt::Object" do
       frodo, linda = d('frodo'), o('linda')
       carl, philip, emmanuel = %w[carl philip emmanuel].map{|b| o b}
       johan = d 'johan'
-      fifi.children frodo, linda
-      frodo.children carl, philip, emmanuel
-      linda.children johan
+      fifi.qtchildren = frodo, linda
+      frodo.qtchildren = carl, philip, emmanuel
+      linda.qtchildren = johan
       fifi.findChild('frodo').should == frodo
       fifi.findChild('frodo', Qt::Object).should == frodo
       fifi.findChild(Dog, 'johan').should == johan
@@ -219,10 +226,10 @@ describe "Qt::Object" do
       child.delete
       tricky.should be_zombified
       child.should be_zombified
-      tag "GC"
+      #tag "GC"
       ObjectSpace.garbage_collect
       # this will GC child, but that should not leave tricky DEAD.
-      tag "tricky test"
+      #tag "tricky test"
       tricky.should be_zombified
       # OK, he's only a zombie
     end
@@ -237,7 +244,7 @@ describe "Qt::Object" do
       ObjectSpace.garbage_collect
       herman = leo.findChild('herman')
       herman.objectName.should == 'herman'
-      herman.parent = nil
+      herman.qtparent = nil
     end
     herman.objectName.should == 'herman'
   end #it

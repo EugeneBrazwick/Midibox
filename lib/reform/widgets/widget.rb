@@ -1,4 +1,6 @@
 
+#  Copyright (c) 2013 Eugene Brazwick
+
 require_relative '../../urqt/liburqt'
 require_relative '../control'
 require_relative '../context'
@@ -9,15 +11,22 @@ module R::Qt
       include Reform::WidgetContext
 
     public # methods of Widget
-      # override
-      def addWidget widget
-	widget.parent = self
-      end
 
       # override
-      def addToParent parent
+      def parent_get
+	#tag "#{self}::parent_get, @parent=#{@parent}"
+	qtparent_get || @parent
+      end # parent_get
+
+      # override
+      def addWidget widget
+	widget.qtparent = self
+      end # addWidget
+
+      # override
+      def parent= parent 
 	parent.addWidget self
-      end # addToParent
+      end # parent=
 
       attr_dynamic String, :title, :caption, :windowTitle
       attr_dynamic Reform::Size, :size
@@ -39,7 +48,7 @@ if __FILE__ == $0
       # the idea is that you can say this too: 
       #	    shown(send_to: $app) { quit }
     } # widget
-    tag "END OF APP"
+    $stderr.puts "END OF APP"
   } # app
-  tag "CLEANED UP OK!"
+  $stderr.puts "CLEANED UP OK!"
 end  # example/test

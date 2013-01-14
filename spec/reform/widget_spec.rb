@@ -28,5 +28,21 @@ Or better, we must generate it.
     } # app
     ok.should == true
   end # it
+
+  it "should set up a clean parent-children tree" do
+    Reform.app {
+      widget {
+	name 'peteWidget'
+	# break from the eventloop immediately!
+	shown { $app.quit }
+      }
+      # avoid calling it more than once so the trace remains clean:
+      pete = peteWidget
+      #tag "calling #{pete}::parent(), parent=#{pete.parent}"
+      self.should == $app # OK
+      pete.parent.should == self # OK
+      children.should == [pete]
+    }
+  end # it
 end # describe
 

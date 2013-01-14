@@ -18,7 +18,7 @@ R_QT_DEF_GRALLOCATOR(GraphicsEllipseItem)
  *	rect = x, y, w, h
  */
 static VALUE
-cGraphicsEllipseItem_rect_assign(int argc, VALUE *argv, VALUE v_self)
+cGraphicsEllipseItem_rect_set(int argc, VALUE *argv, VALUE v_self)
 {
   rb_check_frozen(v_self);
   RQTDECLSELF_GI(QGraphicsEllipseItem);
@@ -54,7 +54,7 @@ init_qtellipse(VALUE mQt, VALUE cGraphicsItem)
 {
   const VALUE cGraphicsEllipseItem = rb_define_class_under(mQt, "GraphicsEllipseItem", cGraphicsItem);
   rb_define_alloc_func(cGraphicsEllipseItem, cGraphicsEllipseItem_alloc);
-  rb_define_method(cGraphicsEllipseItem, "rect=", RUBY_METHOD_FUNC(cGraphicsEllipseItem_rect_assign), -1);
+  rb_define_method(cGraphicsEllipseItem, "rect=", RUBY_METHOD_FUNC(cGraphicsEllipseItem_rect_set), -1);
   rb_define_method(cGraphicsEllipseItem, "rect_get", RUBY_METHOD_FUNC(cGraphicsEllipseItem_rect_get), 0);
 }
 

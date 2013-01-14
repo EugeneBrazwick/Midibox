@@ -124,9 +124,9 @@ cGraphicsItem_delete(VALUE v_self)
 }
 
 static VALUE 
-cGraphicsItem_parent_assign(VALUE v_self, VALUE v_parent)
+cGraphicsItem_parent_set(VALUE v_self, VALUE v_parent)
 {
-  trace("cGraphicsItem_parent_assign");
+  trace("cGraphicsItem_parent_set");
   rb_check_frozen(v_self);
   QGraphicsItem *parent = 0;
   if (!NIL_P(v_parent))
@@ -139,7 +139,7 @@ cGraphicsItem_parent_assign(VALUE v_self, VALUE v_parent)
 }
 
 static VALUE
-cGraphicsItem_objectName_assign(VALUE v_self, VALUE v_newname)
+cGraphicsItem_objectName_set(VALUE v_self, VALUE v_newname)
 {
   rb_check_frozen(v_self);
   RQTDECLSELF_GI(QGraphicsItem);
@@ -168,7 +168,7 @@ cGraphicsItem_parent(int argc, VALUE *argv, VALUE v_self)
     }
   VALUE v_new_parent;
   rb_scan_args(argc, argv, "1", &v_new_parent);
-  return cGraphicsItem_parent_assign(v_self, v_new_parent);
+  return cGraphicsItem_parent_set(v_self, v_new_parent);
 }
 
 static VALUE
@@ -321,10 +321,10 @@ init_graphicsitem(VALUE mQt, VALUE cControl)
   rb_define_method(cGraphicsItem, "initialize", RUBY_METHOD_FUNC(cGraphicsItem_initialize), -1);
   rb_define_method(cGraphicsItem, "delete", RUBY_METHOD_FUNC(cGraphicsItem_delete), 0);
   rb_define_method(cGraphicsItem, "parent", RUBY_METHOD_FUNC(cGraphicsItem_parent), -1);
-  rb_define_method(cGraphicsItem, "parent=", RUBY_METHOD_FUNC(cGraphicsItem_parent_assign), 1);
+  rb_define_method(cGraphicsItem, "parent=", RUBY_METHOD_FUNC(cGraphicsItem_parent_set), 1);
   rb_define_method(cGraphicsItem, "children", RUBY_METHOD_FUNC(cGraphicsItem_children), -1);
   rb_define_method(cGraphicsItem, "objectName_get", RUBY_METHOD_FUNC(cGraphicsItem_objectName_get), 0);
-  rb_define_method(cGraphicsItem, "objectName=", RUBY_METHOD_FUNC(cGraphicsItem_objectName_assign), 1);
+  rb_define_method(cGraphicsItem, "objectName=", RUBY_METHOD_FUNC(cGraphicsItem_objectName_set), 1);
   rb_define_method(cGraphicsItem, "delete", RUBY_METHOD_FUNC(cGraphicsItem_delete), 0);
   rb_define_method(cGraphicsItem, "widget?", RUBY_METHOD_FUNC(cGraphicsItem_widget_p), 0);
   rb_define_method(cGraphicsItem, "each_child", RUBY_METHOD_FUNC(cGraphicsItem_each_child), -1);

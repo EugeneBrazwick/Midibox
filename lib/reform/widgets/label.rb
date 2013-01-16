@@ -1,9 +1,11 @@
 
+#  Copyright (c) 2013 Eugene Brazwick
+
 require_relative 'widget'
 
 module R::Qt
   class Label < Widget 
-    public #methods of label
+    public #methods of Label
       attr_dynamic String, :text, :html, :rawtext
   end
 

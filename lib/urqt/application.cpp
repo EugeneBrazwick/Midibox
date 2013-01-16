@@ -143,7 +143,7 @@ cApplication_exit(VALUE v_self, VALUE v_exitcode)
   return v_self;
 }
 
-static void
+void
 init_application(VALUE mQt, VALUE cControl)
 {
   trace("init_application");
@@ -177,21 +177,18 @@ init_control(VALUE mQt, VALUE cObject)
 
 using namespace R_Qt;
 
+#define RQT_APP_SETUP_CONTROL(t, qt) const VALUE c##qt = init_##t(mQt, cControl)
+#define RQT_APP_SETUP_CONTROL0(t) init_##t(mQt, cControl)
+#define RQT_APP_SETUP_GRAPHICSITEM(t) init_##t(mQt, cGraphicsItem)
+#define RQT_APP_SETUP_WIDGET(t) init_##t(mQt, cWidget)
+
 extern "C" void
 Init_liburqt()
 {
   trace("Init_liburqt");
   Init_liburqtCore();
   const VALUE cControl = init_control(mQt, cObject);
-  const VALUE cWidget = init_widget(mQt, cControl);
-  const VALUE cGraphicsItem = init_graphicsitem(mQt, cControl);
-  init_application(mQt, cControl);
-  init_mainwindow(mQt, cWidget);
-  init_label(mQt, cWidget);
-  init_slider(mQt, cWidget);
-  init_graphicsview(mQt, cWidget);
-  init_graphicsscene(mQt, cControl);
-  init_qtellipse(mQt, cGraphicsItem);
+  RQT_APP_SETUP_ALL
   //  rb_define_method(cApplication, "initialize", RUBY_METHOD_FUNC(cApplication_initialize), 0);
 }
 

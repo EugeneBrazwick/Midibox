@@ -24,6 +24,7 @@ module R::Qt
 
       # every node in the path can have a connector set
       def model_init_path path
+	tag "model_init_path(#{path.inspect})"
 	v = self
 	lastcontrol = nil
 	path.each do |control|
@@ -31,6 +32,7 @@ module R::Qt
 	  cid = control.connector and
 	    v = v.model_apply_getter(cid)
 	end
+	tag "lastcontrol=#{lastcontrol}"
 	lastcontrol.apply_model(v) if lastcontrol
       end # model_init_path
 
@@ -46,6 +48,22 @@ module R::Qt
 	listeners[:value] ||= {}
 	model_merge_listener_path listeners[:value], path
       end # model_merge_listener_path
+
+      def model_apply_setter cid, value, sender
+	tag "model_apply_setter(#{cid.inspect}, #{value}, #{sender})"
+	case cid
+	when Proc 
+	  # ignore
+	when Array
+	  # apply them in order
+	  sub = cid[0..-1].inject(self) { |v, nm| v && v.model_apply_getter(nm) } and
+	    sub.model_apply_setter(cid[-1], value, sender)
+	else
+	  cid = cid.to_s
+	  cid = cid[0...-1] if cid[-1] == '?'
+	  send(cid + '=', value)
+	end
+      end # model_apply_setter
 
     public # methods of Model
 
@@ -68,11 +86,28 @@ module R::Qt
       # add_listener [g]
       #	  {a=>{b=>{c=>nil, f=>nil}, d=>{e=>nil}}, g=>nil}
       def model_add_listener path
-	#tag "model_add_listener(#{path.inspect})"
+	tag "model_add_listener(#{path.inspect})"
 	Model::model_merge_listener_path @model_listeners, path
 	#tag "listeners=(#{@model_listeners.inspect})"
 	model_init_path path
       end # model_add_listener
+
+      def model_push_data value, sender, path
+	tag "model_push_data(#{value}, #{sender}, #{path})"
+	v = self
+	lastcontrol = nil
+	path.each do |control|
+	  lastcontrol and
+	    cid = lastcontrol.connector and
+	      v = v.model_apply_getter(cid)
+	  lastcontrol = control
+	end
+	tag "lastcontrol=#{lastcontrol}, cid=#{lastcontrol && lastcontrol.connector}"
+	if lastcontrol && cid = lastcontrol.connector
+	  tag "lastcontrol=#{lastcontrol}, cid=#{cid}"
+	  v.model_apply_setter cid, value, sender
+	end
+      end
 
   end # class Model
 
@@ -81,9 +116,13 @@ end # module R::Qt
 if __FILE__ == $0
 require 'reform/app'
 Reform::app {
+  # data X is a shortcut for 'rubydata { data X }'
   data 'Hallo World!'
   widget {
     name 'bert'
+    # we connect 'title' to 'data.self', which is 'data' itself.
+    # 'connector' will look upwards in the widgettree, and uses
+    # the first model it finds
     title connector: :self 
   }
 } # app

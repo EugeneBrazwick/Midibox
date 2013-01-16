@@ -47,6 +47,12 @@ Block(v_block)
 }
 
 void 
+QSignalProxy::handle() const
+{
+  rb_proc_call(Block, rb_ary_new());
+}
+
+void 
 QSignalProxy::handle(QObject *object) const
 {
   VALUE v_object = qt2v(object);

@@ -64,6 +64,17 @@ module R::Qt
 	end
       end
 
+      def push_data value, sender = nil, path = []
+	tag "#{self}::push_data(#{value})"
+	sender ||= self
+	path.unshift self
+	if @model
+	  @model.model_push_data value, sender, path 
+	elsif par = parent
+	  par.push_data value, sender, path
+	end
+      end
+
     public #methods of Control
 
       # the last method can in fact be an option-hash

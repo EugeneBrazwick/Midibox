@@ -15,6 +15,9 @@ module R
         return yield
       rescue IOError => exception
         msg = "#{exception.message}\n"
+      rescue Reform::Error => exception
+	raise if $app.fail_on_instantiation_errors?
+        msg = "#{exception.class}: #{exception}\n" + exception.backtrace.join("\n")
       rescue StandardError, RuntimeError => exception
 	#tag "got exception"
 	#tag "exception class: #{exception.class}"
@@ -67,6 +70,7 @@ module Reform
     end # internalize_dir
 
   public # methods of R::EForm
+
     # create a Qt application, read the plugins, execute the block
     # in the context of the Qt::Application 
     def self.app &block
@@ -112,6 +116,10 @@ module R::Qt
 	  top
 	end # setupForms
  
+	def fail_on_instantiation_errors value
+	  @fail_on_instantiation_errors = value
+	end
+
       protected # methods of Application
 
 	# override
@@ -122,9 +130,14 @@ module R::Qt
 
       public # methods of Application
 
+	def fail_on_instantiation_errors?
+	  @fail_on_instantiation_errors
+	end
+
+	# override
 	def children_get
 	  super + @toplevel_widgets
-	end
+	end # children_get
 
 	alias :children :children_get
 
@@ -133,7 +146,7 @@ module R::Qt
 	  @toplevel_widgets << widget
 	  #tag  "#{widget}.@parent := self"
 	  widget.instance_variable_set :@parent, self
-	end
+	end # addWidget
 
 	## setup + Qt eventloop start
 	def execute

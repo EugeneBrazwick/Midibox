@@ -1,4 +1,6 @@
 
+#  Copyright (c) 2013 Eugene Brazwick
+
 require_relative '../urqtCore/liburqtCore' 
 
 module Kernel
@@ -43,6 +45,7 @@ module R::Qt
 
 	# Note that using a hash or a block should not matter ONE YOTA
 	# that's why we call the getters here, and expect them to be setters!
+	# Context: setup
 	def setupQuickyhash hash
 	  #tag "setupQuickyhash(#{hash})"
 	  for k, v in hash
@@ -107,12 +110,6 @@ module R::Qt
 	  addObject child
 	end # addModel
 
-	# callback, called after the instance is parented
-	def setup hash = nil, &initblock
-	  instance_eval(&initblock) if initblock 
-	  setupQuickyhash hash if hash
-	end # setup
-
       public # methods of Object
 
 	alias :parent_get :qtparent_get
@@ -120,6 +117,17 @@ module R::Qt
 	alias :children :qtchildren_get
 
 	attr :model
+
+	# callback, if DynamicAttribute is given a 'connector'
+	def connect_attribute attrname, dynattr
+	  raise Reform::Error, "No support for connecting attribute #{self}::#{attrname}"
+	end
+
+	# callback, called after the instance is parented
+	def setup hash = nil, &initblock
+	  instance_eval(&initblock) if initblock 
+	  setupQuickyhash hash if hash
+	end # setup
 
 	## the default calls addObject 
 	def parent= parent

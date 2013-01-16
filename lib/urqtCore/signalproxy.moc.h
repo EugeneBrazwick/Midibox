@@ -15,6 +15,8 @@ private:
   typedef QObject inherited;
   VALUE Block; // must be gc'ed !
 private slots:
+  // These are the brokers:
+  void handle() const;
   void handle(QObject *) const;
 public:
   QSignalProxy(QObject *parent, const char *signal, VALUE v_block);

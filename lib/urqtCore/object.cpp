@@ -485,7 +485,7 @@ cObject_qtchildren(int argc, VALUE *argv, VALUE v_self)
 static VALUE
 cObject_each_child(VALUE v_self)
 {
-  trace2("%s::each_child, argc=%d", TO_S(v_self), argc);
+  trace1("%s::each_child", TO_S(v_self));
   RETURN_ENUMERATOR(v_self, 0, 0);
   RQTDECLSELF(QObject);
   traqt1("%s::children", QTCLASS(self));
@@ -579,7 +579,7 @@ each_sub(VALUE v_self)
 static VALUE
 cObject_each_sub(VALUE v_self)
 {
-  trace2("%s::each_sub, argc=%d", TO_S(v_self), argc);
+  trace1("%s::each_sub", TO_S(v_self));
   RETURN_ENUMERATOR(v_self, 0, 0);
   return each_sub(v_self);
 } // cObject_each_sub
@@ -602,11 +602,17 @@ cObject_each_sub_with_root(VALUE v_self)
  * The second one connects the Qt signal and is C only.
  * the '2' prefix must be removed, so it looks like:  
  *	obj.connect('destroyed(QObject *)', proc)
+ *
+ * However, there is no need to use connect to achieve this.
+ *
+ * 1) declare the signal:	signal 'editingFinished()'
+ * 2) connect it:		editingFinished do .... end
+ * 3) emit it:			editingFinished
  */
 static VALUE 
 cObject_connect(VALUE v_self, VALUE v_signal, VALUE v_proc)
 {
-  trace("cObject_connect");
+  track1("cObject_connect, signal=%s", v_signal);
   rb_check_frozen(v_self);
   track3("cObject_connect %s, %s, %s", v_self, v_signal, v_proc);
   if (TYPE(v_signal) == T_SYMBOL)
@@ -614,14 +620,10 @@ cObject_connect(VALUE v_self, VALUE v_signal, VALUE v_proc)
       // ((@connections ||= {})[symbol] ||= []) << block
       VALUE v_connections;
       if (TYPE(v_connections = rb_iv_get(v_self, "@connections")) != T_HASH)
-	{
-	  rb_iv_set(v_self, "@connections", v_connections = rb_hash_new());
-	}
+	rb_iv_set(v_self, "@connections", v_connections = rb_hash_new());
       VALUE v_proxylist = rb_hash_aref(v_connections, v_signal);
       if (TYPE(v_proxylist) != T_ARRAY)
-	{
-	  rb_hash_aset(v_connections, v_signal, v_proxylist = rb_ary_new());
-	}
+	rb_hash_aset(v_connections, v_signal, v_proxylist = rb_ary_new());
       rb_ary_push(v_proxylist, v_proc);
       return Qnil;
     }

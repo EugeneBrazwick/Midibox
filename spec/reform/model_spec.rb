@@ -30,4 +30,15 @@ describe "R::Qt::Data" do
       bert.title.should == '' 
     } # app
   end # it
+
+  it "you cannot create more than 1 model in any control" do
+    expect {
+      Reform::app {
+	fail_on_instantiation_errors true
+	data TITLE
+	data TITLE
+      }
+    }.to raise_error Reform::Error
+  end # it
+
 end # describe

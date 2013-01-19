@@ -67,18 +67,22 @@ cApplication_alloc(VALUE cApplication)
   if (!v) rb_syserr_fail(errno, strerror(errno));
   trace1("allocated argv->%p", v);
   v[0] = strdup(StringValueCStr(vARGV0));
+  trace1("v[0] := '%s'", v[0]);
   if (!v[0]) rb_syserr_fail(errno, strerror(errno));
   VALUE *p = RARRAY_PTR(vARGV);
   trace1("argc = %d", c);
-  // Note that _argc is 1 bigger than ARGV.length !!
-  for (int i = 1; i < _argc; i++, p++)
+  // Note that c is 1 bigger than ARGV.length !!
+  for (int i = 1; i < c; i++, p++)
     {
       if (!(v[i] = strdup(StringValueCStr(*p))))
 	rb_syserr_fail(errno, strerror(errno));
+      trace2("v[%d] := '%s'", i, v[i]);
     }
   _argc = c;
   _argv = v;
+  trace2("new QApplication, _argc=%d, _argv=%p", c, v);
   traqt("new QApplication");
+  // CRASHES with chance 25%:
   QApplication * const app = new QApplication(_argc, _argv);
   trace1("cApplication_alloc -> qptr %p", app);
   return Data_Wrap_Struct(cApplication, cObject_mark, cApplication_free, app);
@@ -143,6 +147,28 @@ cApplication_exit(VALUE v_self, VALUE v_exitcode)
   return v_self;
 }
 
+// override
+static VALUE 
+cApplication_enqueue_children(VALUE v_self, VALUE v_queue)
+{
+  rb_call_super(1, &v_queue);
+  VALUE v_widgets = rb_iv_get(v_self, "@toplevel_widgets");
+  v_widgets = to_ary(v_widgets);
+  const long N = RARRAY_LEN(v_widgets);
+  long i = 0;
+  const bool yield = !NIL_P(v_queue);
+  if (!yield)
+    v_queue = to_ary(v_queue);
+  for (VALUE *v_wdgt = RARRAY_PTR(v_widgets); i < N; i++, v_wdgt++)
+    {
+      if (yield)
+	rb_yield(*v_wdgt);
+      else
+	rb_ary_push(v_queue, *v_wdgt);
+    }
+  return Qnil;
+}
+
 void
 init_application(VALUE mQt, VALUE cControl)
 {
@@ -163,6 +189,7 @@ init_application(VALUE mQt, VALUE cControl)
   rb_define_method(cApplication, "quit", RUBY_METHOD_FUNC(cApplication_quit), 0);
   rb_define_method(cApplication, "exit", RUBY_METHOD_FUNC(cApplication_exit), 1);
   rb_define_method(cApplication, "quit?", RUBY_METHOD_FUNC(cApplication_quit_p), 0);
+  rb_define_private_method(cApplication, "enqueue_children", RUBY_METHOD_FUNC(cApplication_enqueue_children), 1);
 }
 
 static VALUE

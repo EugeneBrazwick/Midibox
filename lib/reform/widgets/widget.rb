@@ -1,8 +1,6 @@
 
 #  Copyright (c) 2013 Eugene Brazwick
 
-require_relative '../../urqt/liburqt'
-require_relative '../control'
 require_relative '../context'
 
 module R::Qt
@@ -14,13 +12,19 @@ module R::Qt
 
       # override
       def parent_get
-	#tag "#{self}::parent_get, @parent=#{@parent}"
-	qtparent_get || @parent
+	#tag "#{self}::parent_get, @parent=#{@parent}" 
+	# the iv always overrides
+	@parent || qtparent_get
       end # parent_get
 
       # override
       def addWidget widget
 	widget.qtparent = self
+      end # addWidget
+
+      def addLayout layout
+	raise Reform::Error, "a widget can only have one layout" if self.layout
+	self.layout = layout
       end # addWidget
 
       # override
@@ -31,6 +35,11 @@ module R::Qt
       attr_dynamic String, :title, :caption, :windowTitle
       attr_dynamic Reform::Size, :size
 
+      def children
+	each_child.to_a
+	#tag "called each_child.to_a -> #{r.inspect}"
+	#r
+      end
   end # class Widget
 
   # req. for a plugin:

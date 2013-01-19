@@ -74,11 +74,18 @@ module R::Qt
         end
 
 	def method_missing method, *arg
-	  m = method.to_s
-	  #tag "#{self}::method_missing(#{m}), iterating each_child"
-	  each_child do |child|
-	    #tag "checking #{child}"
-	    return child if child.objectName == m
+	  case method
+	  # avoid iterating children for ruby internals:
+	  when :to_ary, :to_str
+	  else
+	    m = method.to_s
+	    #tag "#{self}::method_missing(#{m}), iterating each_child"
+	    each_child do |child|
+	      #raise FatalError, "programming error: objectName is sym???" if Symbol === child.objectName
+	      #tag "child.objectName = #{child.objectName.inspect}, to_s='#{child.objectName.to_s.inspect}"
+	      #tag "checking #{child} comp #{child.objectName.inspect} vs #{m.inspect}"
+	      return child if child.objectName == m
+	    end
 	  end
 	  super
 	end
@@ -92,10 +99,6 @@ module R::Qt
 	end
 
       protected # methods of Object
-
-	# called internally and should yield all 'extra' children.
-	def each_extrachild
-	end
 
 	# the default assigns the parent
 	def addObject child

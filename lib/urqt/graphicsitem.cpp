@@ -190,8 +190,9 @@ cGraphicsItem_children(int argc, VALUE *argv, VALUE v_self)
   rb_check_frozen(v_self);
   VALUE v_children;
   rb_scan_args(argc, argv, "*", &v_children);
-  VALUE v_t = RARRAY_LEN(v_children) == 1 ? rb_check_array_type(rb_ary_entry(v_children, 0)) 
-					  : Qnil;
+  VALUE v_t = RARRAY_LEN(v_children) == 1 
+	      ? rb_check_array_type(rb_ary_entry(v_children, 0)) 
+	      : Qnil;
   if (RTEST(v_t)) v_children = v_t;
   foreach (QGraphicsItem *child, children)
     child->setParentItem(0);
@@ -200,7 +201,8 @@ cGraphicsItem_children(int argc, VALUE *argv, VALUE v_self)
   for (VALUE *v_child = RARRAY_PTR(v_children); i < N; i++, v_child++)
     {
       if (!rb_obj_is_kind_of(*v_child, cGraphicsItem))
-	rb_raise(rb_eTypeError, "passed child %s that was not a QGraphicsItem", TO_S(*v_child));
+	rb_raise(rb_eTypeError, "passed child %s that was not a QGraphicsItem", 
+		 TO_CSTR(*v_child));
       trace2("i=%ld, N=%ld", i, N);
       GET_STRUCT_PTR(QGraphicsItem, child);
       traqt("QGraphicsItem::setParentItem");
@@ -210,9 +212,9 @@ cGraphicsItem_children(int argc, VALUE *argv, VALUE v_self)
 } // cObject_children
 
 static VALUE
-cGraphicsItem_each_child(int argc, VALUE *argv, VALUE v_self)
+cGraphicsItem_each_child(VALUE v_self)
 {
-  RETURN_ENUMERATOR(v_self, argc, argv);
+  RETURN_ENUMERATOR(v_self, 0, 0);
   RQTDECLSELF_GI(QGraphicsItem);
   traqt("QGraphicsItem::childItems");
   const QList<QGraphicsItem*> &children = self->childItems();
@@ -225,18 +227,11 @@ cGraphicsItem_each_child(int argc, VALUE *argv, VALUE v_self)
 } // cGraphicsItem_each_child
 
 static VALUE
-cGraphicsItem_each_child_with_root(int argc, VALUE *argv, VALUE v_self)
+cGraphicsItem_each_child_with_root(VALUE v_self)
 {
-  RETURN_ENUMERATOR(v_self, argc, argv);
+  RETURN_ENUMERATOR(v_self, 0, 0);
   rb_yield(v_self);
-  RQTDECLSELF_GI(QGraphicsItem);
-  traqt("QGraphicsItem::childItems");
-  foreach (QGraphicsItem *child, self->childItems())
-    {
-      const VALUE v_child = item2v(child);
-      if (!NIL_P(v_child)) rb_yield(v_child);
-    }
-  return Qnil;
+  return cGraphicsItem_each_child(v_self);
 }
 
 static void 
@@ -273,18 +268,18 @@ each_sub(VALUE v_self)
 /** breadth-first search, but it excludes SELF!!!
  */
 static VALUE
-cGraphicsItem_each_sub(int argc, VALUE *argv, VALUE v_self)
+cGraphicsItem_each_sub(VALUE v_self)
 {
-  RETURN_ENUMERATOR(v_self, argc, argv);
+  RETURN_ENUMERATOR(v_self, 0, 0);
   return each_sub(v_self);
 } // cObject_each_sub
 
 /** breadth-first search, and includes self (as first result)
  */
 static VALUE
-cGraphicsItem_each_sub_with_root(int argc, VALUE *argv, VALUE v_self)
+cGraphicsItem_each_sub_with_root(VALUE v_self)
 {
-  RETURN_ENUMERATOR(v_self, argc, argv);
+  RETURN_ENUMERATOR(v_self, 0, 0);
   rb_yield(v_self);
   return each_sub(v_self);
 }
@@ -327,13 +322,13 @@ init_graphicsitem(VALUE mQt, VALUE cControl)
   rb_define_method(cGraphicsItem, "objectName=", RUBY_METHOD_FUNC(cGraphicsItem_objectName_set), 1);
   rb_define_method(cGraphicsItem, "delete", RUBY_METHOD_FUNC(cGraphicsItem_delete), 0);
   rb_define_method(cGraphicsItem, "widget?", RUBY_METHOD_FUNC(cGraphicsItem_widget_p), 0);
-  rb_define_method(cGraphicsItem, "each_child", RUBY_METHOD_FUNC(cGraphicsItem_each_child), -1);
-  rb_define_method(cGraphicsItem, "each", RUBY_METHOD_FUNC(cGraphicsItem_each_child), -1);
-  rb_define_method(cGraphicsItem, "each_sub", RUBY_METHOD_FUNC(cGraphicsItem_each_sub), -1);
+  rb_define_method(cGraphicsItem, "each_child", RUBY_METHOD_FUNC(cGraphicsItem_each_child), 0);
+  rb_define_method(cGraphicsItem, "each", RUBY_METHOD_FUNC(cGraphicsItem_each_child), 0);
+  rb_define_method(cGraphicsItem, "each_sub", RUBY_METHOD_FUNC(cGraphicsItem_each_sub), 0);
   rb_define_method(cGraphicsItem, "each_sub_with_root", 
-		   RUBY_METHOD_FUNC(cGraphicsItem_each_sub_with_root), -1);
+		   RUBY_METHOD_FUNC(cGraphicsItem_each_sub_with_root), 0);
   rb_define_method(cGraphicsItem, "each_child_with_root", 
-		   RUBY_METHOD_FUNC(cGraphicsItem_each_child_with_root), -1);
+		   RUBY_METHOD_FUNC(cGraphicsItem_each_child_with_root), 0);
   rb_define_private_method(cGraphicsItem, "connect", RUBY_METHOD_FUNC(cGraphicsItem_connect), 2);
   rb_define_private_method(cGraphicsItem, "emit", RUBY_METHOD_FUNC(cGraphicsItem_emit), -1);
   return cGraphicsItem;

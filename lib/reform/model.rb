@@ -24,7 +24,7 @@ module R::Qt
 
       # every node in the path can have a connector set
       def model_init_path path
-	tag "model_init_path(#{path.inspect})"
+	#tag "model_init_path(#{path.inspect})"
 	v = self
 	lastcontrol = nil
 	path.each do |control|
@@ -32,7 +32,7 @@ module R::Qt
 	  cid = control.connector and
 	    v = v.model_apply_getter(cid)
 	end
-	tag "lastcontrol=#{lastcontrol}"
+	#tag "lastcontrol=#{lastcontrol}"
 	lastcontrol.apply_model(v) if lastcontrol
       end # model_init_path
 
@@ -86,7 +86,7 @@ module R::Qt
       # add_listener [g]
       #	  {a=>{b=>{c=>nil, f=>nil}, d=>{e=>nil}}, g=>nil}
       def model_add_listener path
-	tag "model_add_listener(#{path.inspect})"
+	#tag "model_add_listener(#{path.inspect})"
 	Model::model_merge_listener_path @model_listeners, path
 	#tag "listeners=(#{@model_listeners.inspect})"
 	model_init_path path

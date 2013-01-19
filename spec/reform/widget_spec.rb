@@ -32,7 +32,7 @@ Or better, we must generate it.
   it "should set up a clean parent-children tree" do
     Reform.app {
       widget {
-	name 'peteWidget'
+	name :peteWidget
 	# break from the eventloop immediately!
 	shown { $app.quit }
       }

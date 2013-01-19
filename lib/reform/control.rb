@@ -36,6 +36,12 @@ module R::Qt
 	send method.to_s + '_get'
       end
 
+      def collect_names v = nil
+	return @collect_names if v == nil
+	#tag "#{self}::@collect_names := #{v}"
+	@collect_names = v
+      end
+
     protected #methods of Control
 
       def apply_dynamic_setter method, *args
@@ -65,7 +71,7 @@ module R::Qt
       end
 
       def push_data value, sender = nil, path = []
-	tag "#{self}::push_data(#{value})"
+	#tag "#{self}::push_data(#{value})"
 	sender ||= self
 	path.unshift self
 	if @model
@@ -88,6 +94,28 @@ module R::Qt
 	for method in methods
 	  define_method method do |*args, &block|
 	    handle_dynamics klass, method, options, *args, &block
+	  end
+	end
+      end
+
+      # override
+      def setup hash = nil, &block
+	#tag "#{self}::setup"
+	super
+	#tag "#{self}::collect_names = #@collect_names"
+	if @collect_names
+	  #tag "er oh, each_sub=#{each_sub.to_a.inspect}"
+	  each_sub do |child|
+	    if name = child.objectName 
+	      tag "define_method #{self}::#{name}"
+	      m = method(name) rescue nil
+unless m
+	      raise NameError, "the name '#{name}' is already in use" if m
+	      define_singleton_method name do
+		child
+	      end
+end
+	    end
 	  end
 	end
       end

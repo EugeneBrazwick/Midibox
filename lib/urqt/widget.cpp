@@ -3,7 +3,7 @@
 // Copyright (c) 2013 Eugene Brazwick
 
 // Comment the following out to remove the DEBUG tags:
-//#define TRACE
+#define TRACE
 
 /** :rdoc:
 
@@ -12,7 +12,9 @@ widget.cpp
 This file contains the QWidget wrapper.
 */
 #pragma implementation
+#include <QtCore/QQueue>
 #include <QtWidgets/QWidget>
+#include <QtWidgets/QLayout>
 #include <QtGui/QResizeEvent>
 #include <ruby.h>
 #include "application.h"
@@ -234,6 +236,71 @@ cWidget_shown(int argc, VALUE *argv, VALUE v_self)
   return Qnil;
 } // Widget#shown
 
+static bool
+locate_layout_child(QLayout *layout, QObject *child)
+{
+  const int N = layout->count();
+  for (int i = 0; i < N; i++)
+    {
+      if (layout->itemAt(i)->widget() == child)
+	return true;
+    }
+  return false;
+}
+
+static VALUE
+cWidget_enqueue_children(VALUE v_self, VALUE v_queue)
+{
+  trace1("%s::each_child", TO_CSTR(v_self));
+  RETURN_ENUMERATOR(v_self, 0, 0);
+  // do not call super here
+  RQTDECLSELF(QWidget);
+  traqt1("%s::children", QTCLASS(self));
+  const QObjectList &children = self->children();
+  QLayout * const layout = self->layout(); // can be null
+  if (!layout)
+    return rb_call_super(1, &v_queue);
+  const bool yield = !NIL_P(v_queue);
+  if (!yield)
+    v_queue = to_ary(v_queue);
+  foreach (QObject *child, children)
+    {
+      /* We must not add widgets WITHIN a layout, since they are virtually
+        parented to that layout.
+	However that is not the same a widgets WITH a layout!
+      */
+      trace("check for isWidgetType and layout");
+      if (layout && child->isWidgetType() && locate_layout_child(layout, child))
+	continue;
+      if (yield)
+	{
+	  const VALUE v_child = qt2v(child);
+	  trace3("child=%s, isWidgetType=%d, layout=%p", INSPECT(v_child), child->isWidgetType(), child->isWidgetType() ? ((QWidget *)child)->layout() : (void *)0);
+	  if (!NIL_P(v_child)) rb_yield(v_child);
+	}
+      else
+	  rb_ary_push(v_queue, Data_Wrap_Struct(cObject, 0, 0, child));
+    }
+  return Qnil;
+} // cWidget_enqueue_children
+
+static VALUE
+cWidget_layout(VALUE v_self)
+{
+  RQTDECLSELF(QWidget);
+  QLayout * const layout = self->layout();
+  return layout ? qt2v(layout) : Qnil;
+}
+
+static VALUE
+cWidget_layout_set(VALUE v_self, VALUE v_layout)
+{
+  RQTDECLSELF(QWidget);
+  RQTDECLARE(QLayout, layout);
+  self->setLayout(layout);
+  return v_self;
+} 
+
 VALUE
 init_widget(VALUE mQt, VALUE cControl)
 {
@@ -252,6 +319,9 @@ init_widget(VALUE mQt, VALUE cControl)
   rb_define_method(cWidget, "caption_get", RUBY_METHOD_FUNC(cWidget_title_get), 0);
   rb_define_method(cWidget, "windowTitle_get", RUBY_METHOD_FUNC(cWidget_title_get), 0);
   rb_define_method(cWidget, "shown", RUBY_METHOD_FUNC(cWidget_shown), -1);
+  rb_define_method(cWidget, "layout", RUBY_METHOD_FUNC(cWidget_layout), 0);
+  rb_define_method(cWidget, "layout=", RUBY_METHOD_FUNC(cWidget_layout_set), 1);
+  rb_define_method(cWidget, "enqueue_children", RUBY_METHOD_FUNC(cWidget_enqueue_children), 1);
   return cWidget;
 }
 

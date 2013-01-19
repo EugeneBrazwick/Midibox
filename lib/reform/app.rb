@@ -1,8 +1,6 @@
 
 #  Copyright (c) 2013 Eugene Brazwick
 
-require_relative '../urqt/liburqt'
-require_relative 'control'
 require_relative 'context'
 
 module R
@@ -73,14 +71,16 @@ module Reform
 
     # create a Qt application, read the plugins, execute the block
     # in the context of the Qt::Application 
-    def self.app &block
+    def self.app quickyhash = nil, &block
       R::Qt::Application.new.scope do |app|
 	begin
 	  # note that app is identical to $app
 	  internalize_dir '.', 'contrib'
-	  app.instance_eval &block if block	
+	  #tag "calling #{app}.setup" 
+	  app.setup quickyhash, &block 
 	  app.execute
 	ensure
+	  #tag "calling cleanup"
 	  app.cleanup
 	end
       end # scope
@@ -120,13 +120,9 @@ module R::Qt
 	  @fail_on_instantiation_errors = value
 	end
 
-      protected # methods of Application
+	signal :created
 
-	# override
-	def each_extrachild
-	  #tag "each_extrachild, toplevel_widgets=#@toplevel_widgets"
-	  @toplevel_widgets.each { |tlw| yield tlw }
-	end
+      protected # methods of Application
 
       public # methods of Application
 
@@ -150,12 +146,15 @@ module R::Qt
 
 	## setup + Qt eventloop start
 	def execute
-	  setupForms and exec
+	  if setupForms 
+	    created
+	    exec
+	  end
 	end #  execute
 
 	## delete the toplevel widgets and the global $app variable
 	def cleanup
-	  #tag "Application::cleanup, #toplevel_widgets = #{@toplevel_widgets.length}"
+	  # tag "Application::cleanup, #toplevel_widgets = #{@toplevel_widgets.length}"
 	  @toplevel_widgets.each &:delete 
 	  $app = nil
 	end

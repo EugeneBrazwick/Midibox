@@ -1,5 +1,9 @@
 #if !defined (_URQT_API_UTILS_H_) 
 #define _URQT_API_UTILS_H_
+
+// This document adheres to the GNU coding standard
+// Copyright (c) 2013 Eugene Brazwick
+
 #include <QtCore/QObject>
 #include <QtCore/QVariant>
 // #include "ruby++/ruby++.h"
@@ -43,7 +47,8 @@
 #endif
 
 #define INSPECT(x) RSTRING_PTR(rb_inspect(x))
-#define TO_S(x) RSTRING_PTR(rb_any_to_s(x))
+#define RQT_TO_S(x) rb_funcall(x, rb_intern("to_s"), 0)
+#define TO_CSTR(x) RSTRING_PTR(RQT_TO_S(x))
 #define STRINGIFY_INTERNAL(t) #t
 #define STRINGIFY(t) STRINGIFY_INTERNAL(t)
       /* Check_Type(v, T_DATA);  seems not required in My_Data_Get_Struct */
@@ -146,7 +151,7 @@ static inline VALUE
 to_ary(VALUE any)
 {
   const VALUE v = rb_check_array_type(any);
-  if (NIL_P(v)) rb_bug("Could not convert %s to an array", TO_S(any));
+  if (NIL_P(v)) rb_bug("Could not convert %s to an array", TO_CSTR(any));
   return v;
 }
 
@@ -154,7 +159,7 @@ static inline VALUE
 to_hash(VALUE any)
 {
   const VALUE v = rb_check_hash_type(any);
-  if (NIL_P(v)) rb_bug("Could not convert %s to a hash", TO_S(any));
+  if (NIL_P(v)) rb_bug("Could not convert %s to a hash", TO_CSTR(any));
   return v;
 }
 

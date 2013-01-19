@@ -1,4 +1,8 @@
 
+#STDERR.puts "loading liburqt.so"
+require_relative '../urqt/liburqt'
+require_relative 'control'
+
 module R
   module Qt
     #forwards:

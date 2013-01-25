@@ -2,21 +2,22 @@
 // This document adheres to the GNU coding standard
 // Copyright (c) 2013 Eugene Brazwick
 
-//#define TRACE
+#define TRACE
 
 #pragma implementation
 #include "graphicsitem.h"
 #include "api_utils.h"
 #include "object.h"
 #include <assert.h>
+#include <QtGui/QBrush>
 
 namespace R_Qt {
 
 VALUE 
-cRectF = Qnil;
+cRectF = Qnil, cBrush = Qnil, cColor = Qnil, cPen = Qnil;
 
 VALUE
-cGraphicsItem = Qnil;
+cGraphicsItem = Qnil, cAbstractGraphicsShapeItem = Qnil;
 
 void
 cRectF_free(QRectF *rect)
@@ -26,13 +27,219 @@ cRectF_free(QRectF *rect)
   delete rect;
 }
 
-R_QT_DEF_ALLOCATOR_BASE(RectF, RectF)
+void
+cBrush_free(QBrush *brush)
+{
+  traqt1("delete QBrush %p", brush);
+  delete brush;
+}
+
+static void
+cColor_free(QColor *color)
+{
+  traqt1("delete QColor %p", color);
+  delete color;
+}
+
+static inline VALUE
+cColorWrap(QColor *color)
+{
+  return Data_Wrap_Struct(cColor, 0, cColor_free, color);
+}
+
+R_QT_DEF_ALLOCATOR_BASE1(RectF)
+R_QT_DEF_ALLOCATOR_BASE1(Brush)
+R_QT_DEF_ALLOCATOR_BASE1(Color)
 
 static void 
 init_rect(VALUE mQt)
 {
   cRectF = rb_define_class_under(mQt, "Rectangle", rb_cObject);
   rb_define_alloc_func(cRectF, cRectF_alloc);
+}
+
+static void 
+init_brush(VALUE mQt)
+{
+  cBrush = rb_define_class_under(mQt, "Brush", cNoQtControl);
+  rb_define_alloc_func(cBrush, cBrush_alloc);
+  rb_define_const(cBrush, "NoBrush", Qt::NoBrush);
+}
+
+static VALUE
+cColor_sym2color(VALUE v_self, VALUE v_sym)
+{
+  VALUE v_colors = rb_iv_get(v_self, "@color");
+  if (NIL_P(v_colors))
+    {
+      v_colors = rb_hash_new();
+      rb_iv_set(v_self, "@color", v_colors);
+#define QTCOLOR_DO(sym) \
+      rb_hash_aset(v_colors, CSTR2SYM(#sym), INT2NUM(Qt::sym))
+      QTCOLOR_DO(white);
+      QTCOLOR_DO(black);
+      QTCOLOR_DO(yellow);
+      QTCOLOR_DO(blue);
+      QTCOLOR_DO(green);
+      QTCOLOR_DO(red);
+      QTCOLOR_DO(darkYellow);
+      QTCOLOR_DO(darkBlue);
+      QTCOLOR_DO(darkGreen);
+      QTCOLOR_DO(darkRed);
+      QTCOLOR_DO(cyan);
+      QTCOLOR_DO(darkCyan);
+      QTCOLOR_DO(magenta);
+      QTCOLOR_DO(darkMagenta);
+      QTCOLOR_DO(gray);
+      QTCOLOR_DO(darkGray);
+      QTCOLOR_DO(lightGray);
+      QTCOLOR_DO(transparent);
+    }
+  Check_Type(T_HASH, v_colors);
+  return rb_hash_aref(v_colors, v_sym);
+}
+
+// where hex is in range '0'..'9' or 'A'..'F'
+static inline int
+hex2int(int hex)
+{
+  return hex - (hex >= 'A' ? 'A' - 10 : '0');
+}
+
+/** :call-seq:
+    Color.new :white					   # or any other QGlobalColor. These are cached.
+    Color.new Color
+    Color.new Color, alpha
+    Color.new Brush
+    Color.new '#rgb'					    # must be hexadecimals, case insensitive
+    Color.new '#rrggbb'
+    Color.new '#rrrgggbbb'
+    Color.new '#rrrrggggbbbb'
+    Color.new '#rgba'					    # etc
+    Color.new red, green, blue, opaqueness = 255	    # all values must be between 0 and 255
+    Color.new gray_value, opaqueness = 255  
+    Color.new red, green, blue, opaqueness = 1.0	    # all values must be between 0.0 and 1.0
+    Color.new gray_value, opaqueness = 1.0  
+    Color.new [array_args]				    # splatted
+    Color.new Hash					    # same as Control constructor
+    Color.new { initblock }				    # same as Control constructor
+
+    Colors have neither parents nor children
+ */
+static VALUE
+cColor_initialize(int argc, VALUE *argv, VALUE v_self)
+{
+  RQTDECLARE_COLOR(self);
+  VALUE v_colorsym, v_g, v_b, v_a;
+  rb_scan_args(argc, argv, "13", &v_colorsym, &v_g, &v_b, &v_a);
+  track4("cColor_initialize(%s, %s, %s, %s)", v_colorsym, v_g, v_b, v_a);
+  switch (TYPE(v_colorsym))
+    {
+    case T_DATA:
+	if (rb_obj_is_kind_of(v_colorsym, cColor)) 
+	  {
+	    if (!NIL_P(v_g))
+	      rb_funcall(v_colorsym, rb_intern("alpha="), 1, v_g);
+	    return v_colorsym;
+	  }
+	if (rb_obj_is_kind_of(v_colorsym, cBrush))
+	  return rb_funcall(v_colorsym, rb_intern("color"), 0);
+	break;
+    case T_STRING:
+      {
+	char *s = StringValueCStr(v_colorsym);
+	if (*s == '#')
+	  {
+	    const size_t l = strlen(s);
+	    char t[l + 1];
+	    strcpy(t, s);
+	    s = t;
+	    for (char *t = s; *t; t++)
+	      *t = toupper(*t);
+	    switch (l)
+	      {
+	      case 5:
+		{
+		  // 17 * 0xf = 17 * 15 = 255. How nice.
+		  const int alpha = hex2int(s[4]) * 17;
+		  s[4] = 0;
+		  QColor * const r = new QColor(s);
+		  r->setAlpha(alpha);
+		  return cColorWrap(r);
+		}
+	      case 9:
+		{
+		  const int alpha = hex2int(s[7]) * 16 + hex2int(s[8]);
+		  s[7] = 0;
+		  QColor * const r = new QColor(s);
+		  r->setAlpha(alpha);
+		  return cColorWrap(r);
+		}
+	      case 13:
+		{
+		  const int alpha = hex2int(s[10]) * 256 + hex2int(s[11]) * 16 + hex2int(s[12]);
+		  s[10] = 0;
+		  QColor * const r = new QColor(s);
+		  r->setAlphaF(alpha / 4096.0);
+		  return cColorWrap(r);
+		}
+	      case 17:
+		{
+		  const int alpha = hex2int(s[13]) * 65536 + hex2int(s[14]) * 256 
+				    + hex2int(s[15]) * 16 + hex2int(s[16]);
+		  s[13] = 0;
+		  QColor * const r = new QColor(s);
+		  r->setAlphaF(alpha / 65536.0);
+		  return cColorWrap(r);
+		}
+	      default:
+		  break;
+	      } // switch strlen
+	    return cColorWrap(new QColor(s));
+	  } // strings starting with '#'
+	// ordinary string
+	return cColorWrap(new QColor(s));
+      }
+    case T_ARRAY:
+	return cColor_initialize(RARRAY_LEN(v_colorsym), RARRAY_PTR(v_colorsym), v_self);
+    case T_FIXNUM:
+      {
+	if (NIL_P(v_b))
+	  {
+	    const int gray = NUM2INT(v_colorsym);
+	    const int alpha = NIL_P(v_g) ? 255 : NUM2INT(v_g);
+	    return cColorWrap(new QColor(gray, gray, gray, alpha));
+	  }
+	const int alpha = NIL_P(v_a) ? 255 : NUM2INT(v_a);
+	return cColorWrap(new QColor(NUM2INT(v_colorsym), NUM2INT(v_g), NUM2INT(v_b), alpha));
+      }
+    case T_FLOAT:
+      {
+	if (NIL_P(v_b))
+	  {
+	    const double gray = NUM2DBL(v_colorsym);
+	    const double alpha = NIL_P(v_g) ? 1.0 : NUM2DBL(v_g);
+	    return cColorWrap(new QColor(gray, gray, gray, alpha));
+	  }
+	const double alpha = NIL_P(v_a) ? 1.0 : NUM2DBL(v_a);
+	return cColorWrap(new QColor(NUM2DBL(v_colorsym), NUM2DBL(v_g), NUM2DBL(v_b), alpha));
+      }
+    case T_SYMBOL:
+	return cColor_sym2color(cColor, v_colorsym);
+    } // switch TYPE v_colorsym
+  rb_raise(rb_eArgError, "invalid color %s, %s, %s, %s", INSPECT(v_colorsym), INSPECT(v_g),
+	   INSPECT(v_b), INSPECT(v_a));
+} // cColor_initialize
+
+static void 
+init_color(VALUE mQt)
+{
+  trace("init_color");
+  cColor = rb_define_class_under(mQt, "Color", cNoQtControl);
+  rb_define_alloc_func(cColor, cColor_alloc);
+  rb_define_module_function(cColor, "sym2color", RUBY_METHOD_FUNC(cColor_sym2color), 1);
+  rb_define_private_method(cColor, "initialize", RUBY_METHOD_FUNC(cColor_initialize), -1);
+  trace("DONE init_color");
 }
 
 void 
@@ -84,6 +291,7 @@ zombify(QGraphicsItem *item)
     zombify(child);
 }
 
+// NOTICE: do NOT call super here!!
 static VALUE
 cGraphicsItem_initialize(int argc, VALUE *argv, VALUE v_self)
 {
@@ -172,116 +380,61 @@ cGraphicsItem_parent(int argc, VALUE *argv, VALUE v_self)
 }
 
 static VALUE
-cGraphicsItem_children(int argc, VALUE *argv, VALUE v_self)
-{
-  RQTDECLSELF_GI(QGraphicsItem);
-  traqt("QGraphicsItem::childItems");
-  const QList<QGraphicsItem*>&children = self->childItems();
-  if (argc == 0)
-    {
-      const VALUE r = rb_ary_new2(children.count());
-      foreach (QGraphicsItem *child, children) // foreach is delete/remove-safe!
-	{
-	  const VALUE v_child = item2v(child);
-	  if (!NIL_P(v_child)) rb_ary_push(r, v_child);
-	}
-      return r;
-    }
-  rb_check_frozen(v_self);
-  VALUE v_children;
-  rb_scan_args(argc, argv, "*", &v_children);
-  VALUE v_t = RARRAY_LEN(v_children) == 1 
-	      ? rb_check_array_type(rb_ary_entry(v_children, 0)) 
-	      : Qnil;
-  if (RTEST(v_t)) v_children = v_t;
-  foreach (QGraphicsItem *child, children)
-    child->setParentItem(0);
-  const long N = RARRAY_LEN(v_children);
-  long i = 0;
-  for (VALUE *v_child = RARRAY_PTR(v_children); i < N; i++, v_child++)
-    {
-      if (!rb_obj_is_kind_of(*v_child, cGraphicsItem))
-	rb_raise(rb_eTypeError, "passed child %s that was not a QGraphicsItem", 
-		 TO_CSTR(*v_child));
-      trace2("i=%ld, N=%ld", i, N);
-      GET_STRUCT_PTR(QGraphicsItem, child);
-      traqt("QGraphicsItem::setParentItem");
-      child->setParentItem(self);
-    }
-  return v_children;
-} // cObject_children
-
-static VALUE
-cGraphicsItem_each_child(VALUE v_self)
-{
-  RETURN_ENUMERATOR(v_self, 0, 0);
-  RQTDECLSELF_GI(QGraphicsItem);
-  traqt("QGraphicsItem::childItems");
-  const QList<QGraphicsItem*> &children = self->childItems();
-  foreach (QGraphicsItem *child, children) // foreach is delete/remove-safe!
-    {
-      const VALUE v_child = item2v(child);
-      if (!NIL_P(v_child)) rb_yield(v_child);
-    }
-  return Qnil;
-} // cGraphicsItem_each_child
-
-static VALUE
-cGraphicsItem_each_child_with_root(VALUE v_self)
-{
-  RETURN_ENUMERATOR(v_self, 0, 0);
-  rb_yield(v_self);
-  return cGraphicsItem_each_child(v_self);
-}
-
-static void 
-enqueue_children(VALUE v_item, VALUE v_queue, int &c)
-{
-  GET_STRUCT(QGraphicsItem, item);
-  traqt("QGraphicsItem::childItems");
-  const QList<QGraphicsItem*> &children = item->childItems();
-  foreach (QGraphicsItem *child, children)
-    {
-      const VALUE v_child = item2v(child);
-      if (NIL_P(v_child)) continue;
-      rb_ary_push(v_queue, v_child);
-      ++c;
-    }
-}
-
-static VALUE
-each_sub(VALUE v_self)
-{
-  VALUE v_queue = rb_ary_new();
-  int c = 0;
-  enqueue_children(v_self, v_queue, c); 
-  while (c)
-    {
-      VALUE v_node = rb_ary_shift(v_queue);
-      --c;
-      rb_yield(v_node);
-      enqueue_children(v_node, v_queue, c);
-    }
-  return Qnil;
-}
-
-/** breadth-first search, but it excludes SELF!!!
- */
-static VALUE
 cGraphicsItem_each_sub(VALUE v_self)
 {
+  trace1("%s::each_sub", TO_CSTR(v_self));
   RETURN_ENUMERATOR(v_self, 0, 0);
-  return each_sub(v_self);
+  RQTDECLSELF_GI(QGraphicsItem);
+  VALUE v_queue = rb_ary_new();
+  trace("calling enqueue_children");
+  // do NOT pass block. We use the 'fillqueue' variant
+  rb_funcall(v_self, rb_intern("enqueue_children"), 1, v_queue);
+  while (RARRAY_LEN(v_queue))
+    {
+      VALUE v_node = rb_ary_shift(v_queue);
+      track2("%s::each_sub, dequeued %s", v_self, v_node);
+      QGraphicsItem *node;
+      Data_Get_Struct(v_node, QGraphicsItem, node);
+      const VALUE v_truenode = item2v(node);
+      if (!NIL_P(v_truenode))
+	{
+	  rb_yield(v_truenode);
+	  v_node = v_truenode; // otherwise cObject_enqueue_children is always called...
+	}
+      rb_funcall(v_node, rb_intern("enqueue_children"), 1, v_queue);
+    }
+  trace1("DONE %s::each_sub", TO_CSTR(v_self));
+  return Qnil;
 } // cObject_each_sub
 
-/** breadth-first search, and includes self (as first result)
- */
-static VALUE
-cGraphicsItem_each_sub_with_root(VALUE v_self)
+static VALUE 
+cGraphicsItem_enqueue_children(VALUE v_self, VALUE v_queue)
 {
-  RETURN_ENUMERATOR(v_self, 0, 0);
-  rb_yield(v_self);
-  return each_sub(v_self);
+  trace("cGraphicsItem_enqueue_children");
+  track2("%s::enqueue_children(%s)", v_self, v_queue);
+  RQTDECLSELF_GI(QGraphicsItem);
+  traqt1("%s::childItems", QTCLASS(self));
+  const QList<QGraphicsItem*> &children = self->childItems();
+  trace1("#children = %d", children.count());
+  const bool yield = NIL_P(v_queue);
+  foreach (QGraphicsItem *child, children)
+    {
+      const VALUE v_child = item2v(child);
+      if (yield)
+	{
+	  if (!NIL_P(v_child)) 
+	    rb_yield(v_child);
+	}
+      else
+	{
+	  Check_Type(v_queue, T_ARRAY);
+	  if (NIL_P(v_child)) 
+	    rb_ary_push(v_queue, Data_Wrap_Struct(cGraphicsItem, 0, 0, child));
+	  else
+	    rb_ary_push(v_queue, v_child);
+	}
+    }
+  return Qnil;
 }
 
 static VALUE
@@ -302,35 +455,42 @@ cGraphicsItem_emit(int argc, VALUE *argv, VALUE /*v_self*/)
 }
 
 static VALUE
-cGraphicsItem_widget_p(VALUE /*v_self*/)
+cAbstractGraphicsShapeItem_brush_set(VALUE v_self, VALUE v_brush)
 {
-  return Qfalse;
+  RQTDECLSELF_GI(QAbstractGraphicsShapeItem);
+  RQTDECLARE_BRUSH(brush);
+  self->setBrush(*brush);
+  return v_brush;
+}
+
+static VALUE
+cAbstractGraphicsShapeItem_brush_get(VALUE v_self)
+{
+  RQTDECLSELF_GI(QAbstractGraphicsShapeItem);
+  return cBrushWrap(new QBrush(self->brush()));
 }
 
 VALUE
-init_graphicsitem(VALUE mQt, VALUE cControl)
+init_graphicsitem(VALUE mQt, VALUE /*cControl*/)
 {
   init_rect(mQt);
-  cGraphicsItem = rb_define_class_under(mQt, "GraphicsItem", cControl);
-  // IMPORTANT overrides to hide all QObject method that actually use the Qt pointer 
-  rb_define_method(cGraphicsItem, "initialize", RUBY_METHOD_FUNC(cGraphicsItem_initialize), -1);
+  init_brush(mQt);
+  init_color(mQt);
+  cGraphicsItem = rb_define_class_under(mQt, "GraphicsItem", cNoQtControl);
+  rb_define_private_method(cGraphicsItem, "initialize", RUBY_METHOD_FUNC(cGraphicsItem_initialize), -1);
   rb_define_method(cGraphicsItem, "delete", RUBY_METHOD_FUNC(cGraphicsItem_delete), 0);
   rb_define_method(cGraphicsItem, "parent", RUBY_METHOD_FUNC(cGraphicsItem_parent), -1);
   rb_define_method(cGraphicsItem, "parent=", RUBY_METHOD_FUNC(cGraphicsItem_parent_set), 1);
-  rb_define_method(cGraphicsItem, "children", RUBY_METHOD_FUNC(cGraphicsItem_children), -1);
+  rb_define_method(cGraphicsItem, "enqueue_children", RUBY_METHOD_FUNC(cGraphicsItem_enqueue_children), 1);
   rb_define_method(cGraphicsItem, "objectName_get", RUBY_METHOD_FUNC(cGraphicsItem_objectName_get), 0);
   rb_define_method(cGraphicsItem, "objectName=", RUBY_METHOD_FUNC(cGraphicsItem_objectName_set), 1);
   rb_define_method(cGraphicsItem, "delete", RUBY_METHOD_FUNC(cGraphicsItem_delete), 0);
-  rb_define_method(cGraphicsItem, "widget?", RUBY_METHOD_FUNC(cGraphicsItem_widget_p), 0);
-  rb_define_method(cGraphicsItem, "each_child", RUBY_METHOD_FUNC(cGraphicsItem_each_child), 0);
-  rb_define_method(cGraphicsItem, "each", RUBY_METHOD_FUNC(cGraphicsItem_each_child), 0);
   rb_define_method(cGraphicsItem, "each_sub", RUBY_METHOD_FUNC(cGraphicsItem_each_sub), 0);
-  rb_define_method(cGraphicsItem, "each_sub_with_root", 
-		   RUBY_METHOD_FUNC(cGraphicsItem_each_sub_with_root), 0);
-  rb_define_method(cGraphicsItem, "each_child_with_root", 
-		   RUBY_METHOD_FUNC(cGraphicsItem_each_child_with_root), 0);
   rb_define_private_method(cGraphicsItem, "connect", RUBY_METHOD_FUNC(cGraphicsItem_connect), 2);
   rb_define_private_method(cGraphicsItem, "emit", RUBY_METHOD_FUNC(cGraphicsItem_emit), -1);
+  cAbstractGraphicsShapeItem = rb_define_class_under(mQt, "AbstractGraphicsShapeItem", cGraphicsItem);
+  rb_define_method(cAbstractGraphicsShapeItem, "brush=", RUBY_METHOD_FUNC(cAbstractGraphicsShapeItem_brush_set), 1);
+  rb_define_method(cAbstractGraphicsShapeItem, "brush_get", RUBY_METHOD_FUNC(cAbstractGraphicsShapeItem_brush_get), 0);
   return cGraphicsItem;
 };
 

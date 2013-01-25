@@ -22,6 +22,16 @@ cGraphicsView_scene_set(VALUE v_self, VALUE v_scene)
   return v_scene;
 }
 
+static VALUE
+cGraphicsView_initialize(int argc, VALUE *argv, VALUE v_self)
+{
+  rb_call_super(argc, argv); 
+  RQTDECLSELF(QGraphicsView);
+  self->setRenderHints(QPainter::Antialiasing | QPainter::SmoothPixmapTransform
+		       | QPainter::HighQualityAntialiasing);
+  return Qnil;
+}
+
 void
 init_graphicsview(VALUE mQt, VALUE cWidget)
 {
@@ -29,5 +39,8 @@ init_graphicsview(VALUE mQt, VALUE cWidget)
   const VALUE cGraphicsView = rb_define_class_under(mQt, "GraphicsView", cWidget);
   rb_define_alloc_func(cGraphicsView, cGraphicsView_alloc);
   rb_define_method(cGraphicsView, "scene=", RUBY_METHOD_FUNC(cGraphicsView_scene_set), 1);
+  rb_define_private_method(cGraphicsView, "initialize", 
+			   RUBY_METHOD_FUNC(cGraphicsView_initialize), -1);
 } // init_graphicsview
+
 } // namespace R_Qt 

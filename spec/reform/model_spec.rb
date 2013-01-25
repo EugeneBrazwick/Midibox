@@ -27,6 +27,7 @@ describe "R::Qt::Data" do
 	}
 	shown { $app.quit }
       } # widget
+      data TITLE
       bert.title.should == '' 
     } # app
   end # it

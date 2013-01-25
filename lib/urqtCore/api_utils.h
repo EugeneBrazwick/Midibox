@@ -10,15 +10,15 @@
 #include "rvalue.h"
 
 #if defined(TRACE)
-#define trace(arg) fprintf(stderr, arg "\n");
-#define trace1(arg, a) fprintf(stderr, arg "\n", a);
-#define trace2(arg, a, b) fprintf(stderr, arg "\n", a, b);
-#define trace3(arg, a, b, c) fprintf(stderr, arg "\n", a, b, c);
-#define trace4(arg, a, b, c, d) fprintf(stderr, arg "\n", a, b, c, d);
-#define track1(arg, a) fprintf(stderr, arg "\n", INSPECT(a));
-#define track2(arg, a, b) fprintf(stderr, arg "\n", INSPECT(a), INSPECT(b));
-#define track3(arg, a, b, c) fprintf(stderr, arg "\n", INSPECT(a), INSPECT(b), INSPECT(c));
-#define track4(arg, a, b, c, d) fprintf(stderr, arg "\n", INSPECT(a), INSPECT(b), \
+#define trace(arg) fprintf(stderr, __FILE__ ":%d:" arg "\n", __LINE__);
+#define trace1(arg, a) fprintf(stderr, __FILE__ ":%d:" arg "\n", __LINE__, a);
+#define trace2(arg, a, b) fprintf(stderr, __FILE__ ":%d:" arg "\n", __LINE__, a, b);
+#define trace3(arg, a, b, c) fprintf(stderr, __FILE__ ":%d:" arg "\n", __LINE__, a, b, c);
+#define trace4(arg, a, b, c, d) fprintf(stderr, __FILE__ ":%d:" arg "\n", __LINE__, a, b, c, d);
+#define track1(arg, a) fprintf(stderr, __FILE__ ":%d:" arg "\n", __LINE__, INSPECT(a));
+#define track2(arg, a, b) fprintf(stderr, __FILE__ ":%d:" arg "\n", __LINE__, INSPECT(a), INSPECT(b));
+#define track3(arg, a, b, c) fprintf(stderr, __FILE__ ":%d:" arg "\n", __LINE__, INSPECT(a), INSPECT(b), INSPECT(c));
+#define track4(arg, a, b, c, d) fprintf(stderr, __FILE__ ":%d:" arg "\n", __LINE__, INSPECT(a), INSPECT(b), \
 					INSPECT(c), INSPECT(d));
 #else
 #define trace(arg)
@@ -79,7 +79,7 @@ QTCLASS(const QObject &o)
 
 namespace R_Qt {
 
-extern VALUE cObject;
+extern VALUE cObject, cControl, cNoQtControl;
 
 template <typename T> static inline void
 GetQObject_noDecl(VALUE v_o, T *&q)
@@ -151,7 +151,7 @@ static inline VALUE
 to_ary(VALUE any)
 {
   const VALUE v = rb_check_array_type(any);
-  if (NIL_P(v)) rb_bug("Could not convert %s to an array", TO_CSTR(any));
+  if (NIL_P(v)) rb_raise(rb_eTypeError, "Could not convert %s to an array", TO_CSTR(any));
   return v;
 }
 
@@ -159,7 +159,7 @@ static inline VALUE
 to_hash(VALUE any)
 {
   const VALUE v = rb_check_hash_type(any);
-  if (NIL_P(v)) rb_bug("Could not convert %s to a hash", TO_CSTR(any));
+  if (NIL_P(v)) rb_raise(rb_eTypeError, "Could not convert %s to a hash", TO_CSTR(any));
   return v;
 }
 
@@ -176,6 +176,8 @@ static inline const char *qString2cstr(const QString &s)
 
 // qString2v makes a new rb string and sets the encoding to utf-8
 extern VALUE qString2v(const QString &s);
+// qString2v_nil is like qString2v but returns nil for ""
+extern VALUE qString2v_nil(const QString &s);
 
 /*
 inline RPP::String qString2rpp(const QString &s)
@@ -209,6 +211,16 @@ cstr2sym(const char *s)
     Q##klass * const q = new Q##klass; \
     traqt1("new Q" #klass " -> %p", q); \
     return c##base##Wrap(c##klass, q); \
+  }
+
+#define R_QT_DEF_ALLOCATOR_BASE1(base) \
+  static VALUE \
+  c##base##_alloc(VALUE /*c##base*/) \
+  { \
+    trace("c" #base "_alloc"); \
+    Q##base * const q = new Q##base; \
+    traqt1("new Q" #base " -> %p", q); \
+    return c##base##Wrap(q); \
   }
 
 #define R_QT_DEF_ALLOCATOR(klass) R_QT_DEF_ALLOCATOR_BASE(klass, Object)

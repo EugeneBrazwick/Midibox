@@ -1,5 +1,4 @@
 
-#include "api_utils.h"
 #include "object.h"
 #pragma interface
 
@@ -24,6 +23,7 @@ extern void init_##t(VALUE mQt, VALUE cGraphicsItem)
   RQT_APP_SETUP_CONTROL0(layout); \
   RQT_APP_SETUP_GRAPHICSITEM(qtellipse); \
   RQT_APP_SETUP_WIDGET(label); \
+  RQT_APP_SETUP_WIDGET(button); \
   RQT_APP_SETUP_WIDGET(lineedit); \
   RQT_APP_SETUP_WIDGET(slider); \
   RQT_APP_SETUP_WIDGET(graphicsview); \

@@ -151,14 +151,16 @@ cApplication_exit(VALUE v_self, VALUE v_exitcode)
 static VALUE 
 cApplication_enqueue_children(VALUE v_self, VALUE v_queue)
 {
+  trace("cApplication_enqueue_children");
   rb_call_super(1, &v_queue);
   VALUE v_widgets = rb_iv_get(v_self, "@toplevel_widgets");
   v_widgets = to_ary(v_widgets);
   const long N = RARRAY_LEN(v_widgets);
   long i = 0;
-  const bool yield = !NIL_P(v_queue);
+  const bool yield = NIL_P(v_queue);
   if (!yield)
     v_queue = to_ary(v_queue);
+  trace2("N=%ld, yield=%d", N, yield);
   for (VALUE *v_wdgt = RARRAY_PTR(v_widgets); i < N; i++, v_wdgt++)
     {
       if (yield)
@@ -189,7 +191,7 @@ init_application(VALUE mQt, VALUE cControl)
   rb_define_method(cApplication, "quit", RUBY_METHOD_FUNC(cApplication_quit), 0);
   rb_define_method(cApplication, "exit", RUBY_METHOD_FUNC(cApplication_exit), 1);
   rb_define_method(cApplication, "quit?", RUBY_METHOD_FUNC(cApplication_quit_p), 0);
-  rb_define_private_method(cApplication, "enqueue_children", RUBY_METHOD_FUNC(cApplication_enqueue_children), 1);
+  rb_define_protected_method(cApplication, "enqueue_children", RUBY_METHOD_FUNC(cApplication_enqueue_children), 1);
 }
 
 static VALUE

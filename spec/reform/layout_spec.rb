@@ -34,6 +34,28 @@ describe "Reform::Layout" do
     $shown.should == true
   end # it
 
+  it "should end up in each_sub of application" do
+    Reform.app {
+      widget {
+	name 'wdgt'
+	size 320, 240
+  	shown { $app.quit }
+	vbox {
+	  name 'vbx'
+	  edit name: 'edt'
+	} # vbox
+      } # widget
+      created do
+	$app.should == self
+	children.should == [wdgt]
+	wdgt.vbx.each_sub.to_a.should == [wdgt.vbx.edt] 
+	wdgt.each_child.to_a.should == [wdgt.vbx]
+	wdgt.each_sub.to_a.should == [wdgt.vbx, wdgt.vbx.edt]
+	each_sub.to_a.should == [wdgt, wdgt.vbx, wdgt.vbx.edt]
+      end # created
+    } # app
+  end #it
+
   it "with collect_names all items become more readily available" do
     Reform.app {
       collect_names true
@@ -52,8 +74,10 @@ describe "Reform::Layout" do
 	$app.should == self
 	# this causes a method_missing storm!  Not good coding practice...
 	children.should == [rdata, wdgt]
+	# note that 'collect_names' uses each_sub, so that must work first.
+	each_sub.to_a.should == [rdata, wdgt, wdgt.vbx, wdgt.vbx.edt]
 	vbx.each_sub.to_a.should == [edt]
-	tag "wdgt.each_sub = #{wdgt.each_sub.to_a.inspect}"
+	#tag "wdgt.each_sub = #{wdgt.each_sub.to_a.inspect}"
 	wdgt.each_sub.to_a.should == [vbx, edt]
 	wdgt.parent.should == self
 	wdgt.children.should == [vbx]

@@ -93,8 +93,13 @@ require 'reform/app'
        item, and not manipulate the color internally...
 
        REASON: pen { size: 6 }  and pen { size 6  }
-       is interpreted as a dynamic attribute. They are neither. Any item containing of components
+       is interpreted as a dynamic attribute. They are neither. Any item consisting out of components
        cannot be dynamic as this causes terrible ambiguities.
+
+       STUPID. it just implies	  brush connector:.... should in fact always connect to the 
+       most likely component, ie 'color'.
+       Same for 'edit' where you would normally connect to the contents.
+       It just means that a 'Brush' cannot be 'data', or we must support both Pen and Color.
 =end
       def fill *args, &block
 #         tag "#{self}::fill(#{args.inspect}), block=#{block}"

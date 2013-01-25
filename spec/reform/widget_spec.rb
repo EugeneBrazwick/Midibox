@@ -44,5 +44,16 @@ Or better, we must generate it.
       children.should == [pete]
     }
   end # it
+
+  it "should accept a lambda for a signal handler" do
+    shown_it = false
+    Reform.app {
+      widget {
+	shown -> { shown_it = true; $app.quit }
+      }
+    } # app
+    shown_it.should == true
+  end
+
 end # describe
 

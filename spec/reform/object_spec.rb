@@ -8,7 +8,7 @@ include R
 describe "Qt::Object" do
   it "should create new instances without objectName, parent or children" do
     o = Qt::Object.new
-    o.objectName.should == ''
+    o.objectName.should == nil	# nil is much more convenient than ''
     o.parent.should == nil
     o.children.should be_empty
     o.delete

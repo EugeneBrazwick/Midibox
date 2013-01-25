@@ -117,8 +117,12 @@ module R::Qt
 
 	alias :parent_get :qtparent_get
 	alias :children_get :qtchildren_get
+
+	# it might be a better idea using 'each_child.to_a' here as well.
+	# the idea is that each_child.to_a is relatively slow.
 	alias :children :qtchildren_get
 
+	# you can 'mount' a model into any object.
 	attr :model
 
 	# callback, if DynamicAttribute is given a 'connector'

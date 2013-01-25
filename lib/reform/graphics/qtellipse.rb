@@ -4,7 +4,7 @@ require_relative '../graphicsitem'
 module R::Qt
   # inconvenient 'pos' of topleft, where I expect center.
   # also GraphicsItems are NOT QGraphicsItems. Because they are QObjects...
-  class GraphicsEllipseItem < GraphicsItem
+  class GraphicsEllipseItem < AbstractGraphicsShapeItem
     public # methods of Circle_TopLeft
       attr_dynamic Rectangle, :rect 
   end 

@@ -2,6 +2,8 @@
 #define _URQT_OBJECT_H_
 
 // #include "ruby++/ruby++.h"
+#include <ruby/ruby.h> /* rather unavoidable anyway */
+#include "api_utils.h" /* "" */
 #pragma interface
 
 namespace R_Qt {

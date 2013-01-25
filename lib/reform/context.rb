@@ -10,7 +10,7 @@ module R
     class AbstractState < Control; end
     class AbstractAction < Control; end
     class Animation < Control; end
-    class GraphicsItem < Control; end
+    class GraphicsItem < NoQtControl; end
     class Menu < Control; end
     class Widget < Control; end
   end # module Qt

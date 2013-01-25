@@ -2,7 +2,7 @@
 // This document adheres to the GNU coding standard
 // Copyright (c) 2013 Eugene Brazwick
 
-#define TRACE
+//#define TRACE
 
 #pragma implementation
 //  #include "ruby++/ruby++.h"	FAILBUNNY aka CRASHBUNNY
@@ -349,7 +349,7 @@ static VALUE
 cObject_objectName_get(VALUE v_self)
 {
   RQTDECLSELF(QObject);
-  return qString2v(self->objectName());
+  return qString2v_nil(self->objectName());
 }
 
 // Does not use QObject!
@@ -371,14 +371,14 @@ cObject_objectName(int argc, VALUE *argv, VALUE v_self)
 static VALUE
 cObject_to_s(VALUE v_self)
 {
-  trace("cObject_to_s");
+  //trace("cObject_to_s");
   // since to_s is used for debugging it is convenient if it accept zombies:
   if (IS_ZOMBIFIED(v_self)) return rb_str_new_cstr("zombie");
   // traqt1("%s::objectName", QTCLASS(self));
   VALUE v_objectName = rb_funcall(v_self, rb_intern("objectName"), 0);
-  track1("objectName->%s", v_objectName);
+  //track1("objectName->%s", v_objectName);
   v_objectName = RQT_TO_S(v_objectName);
-  track1("RQT_TO_S->%s", v_objectName);
+  //track1("RQT_TO_S->%s", v_objectName);
   const char * const objectName = StringValueCStr(v_objectName);
   if (*objectName)
     {
@@ -454,24 +454,28 @@ cObject_qtchildren_set(int argc, VALUE *argv, VALUE v_self)
  *
  * Note that object.children is an alias for object.qt_children.
  * Since this is much faster than object.each.to_a.
- * However for more complicated lists it seems smarter to use the
- * each so the code only occurs once.
+ * However for more complicated lists it seems smarter to use
+ * 'each_child.to_a' so the code only occurs once.
  *
+ * DOES NOT USE QObject anywhere
  */
 static VALUE
 cObject_each_child(VALUE v_self)
 {
   trace1("%s::each_child", TO_CSTR(v_self));
   RETURN_ENUMERATOR(v_self, 0, 0);
-  return rb_funcall(v_self, rb_intern("enqueue_children"), 1, Qnil);
+  trace2("calling enqueue_children on %s, class=%s", TO_CSTR(v_self), rb_obj_classname(v_self));
+  VALUE args = Qnil;
+  return rb_funcall_passing_block(v_self, rb_intern("enqueue_children"), 1, &args);
 } // cObject_each_child
 
+// DOES NOT USE QObject anywhere
 static VALUE
 cObject_each_child_with_root(VALUE v_self)
 {
   RETURN_ENUMERATOR(v_self, 0, 0);
   rb_yield(v_self);
-  return rb_funcall(v_self, rb_intern("each_child"), 0, 0);
+  return rb_funcall_passing_block(v_self, rb_intern("each_child"), 0, 0);
 }
 
 /* SUBTLETY:
@@ -492,28 +496,36 @@ cObject_each_child_with_root(VALUE v_self)
  * on it!
  * However, overriden methods do not suffer from this as they can only be called
  * if their wrapper is not a cObject to begin with.
+ *
+ * NOTE: do not use RETURN_ENUMERATOR here. This method is not supposed to be called
+ * directly!
  */
 static VALUE 
 cObject_enqueue_children(VALUE v_self, VALUE v_queue)
 {
+  trace("cObject_enqueue_children");
+  track2("%s::enqueue_children(%s)", v_self, v_queue);
   RQTDECLARE(QObject, self);
   traqt1("%s::children", QTCLASS(self));
   const QObjectList &children = self->children();
-  const bool yield = !NIL_P(v_queue);
-  if (!yield)
-    v_queue = to_ary(v_queue);
+  trace1("#children = %d", children.count());
+  const bool yield = NIL_P(v_queue);
   foreach (QObject *child, children)
     {
-      trace4("%s(%s)::children ENQUEUE %s, c := %ld", QTCLASS(self), qString2cstr(self->objectName()),
-	     QTCLASS(child), yield ? -1 : RARRAY_LEN(v_queue) + 1);
+      const VALUE v_child = qt2v(child);
       if (yield)
 	{
-	  const VALUE v_child = qt2v(child);
 	  if (!NIL_P(v_child)) 
 	    rb_yield(v_child);
 	}
       else
-	  rb_ary_push(v_queue, Data_Wrap_Struct(cObject, 0, 0, child));
+	{
+	  Check_Type(v_queue, T_ARRAY);
+	  if (NIL_P(v_child)) 
+	    rb_ary_push(v_queue, Data_Wrap_Struct(cObject, 0, 0, child));
+	  else
+	    rb_ary_push(v_queue, v_child);
+	}
     }
   return Qnil;
 }
@@ -550,20 +562,28 @@ cObject_enqueue_children(VALUE v_self, VALUE v_queue)
  * qObject_enqueue_children(v_self, v_queue)
  * {
  * }
+ *
+ * DOES USE QObject  !
+ */
+/** breadth-first search, but it excludes SELF!!!
+ *
+ * DOES USE QObject
  */
 static VALUE
-each_sub(VALUE v_self)
+cObject_each_sub(VALUE v_self)
 {
-  track1("%s::each_sub", v_self);
-  GET_STRUCT(QObject, self);
+  trace1("%s::each_sub", TO_CSTR(v_self));
+  RETURN_ENUMERATOR(v_self, 0, 0);
+  RQTDECLSELF(QObject);
   VALUE v_queue = rb_ary_new();
+  trace("calling enqueue_children");
+  // do NOT pass block. We use the 'fillqueue' variant
   rb_funcall(v_self, rb_intern("enqueue_children"), 1, v_queue);
-  trace2("%s::each_sub, dequeue %ld children", TO_CSTR(v_self), RARRAY_LEN(v_queue));
   while (RARRAY_LEN(v_queue))
     {
       VALUE v_node = rb_ary_shift(v_queue);
-      QObject *node;
-      Data_Get_Struct(v_node, QObject, node);
+      track2("%s::each_sub, dequeued %s", v_self, v_node);
+      RQTDECLARE(QObject, node);
       const VALUE v_truenode = qt2v(node);
       if (!NIL_P(v_truenode))
 	{
@@ -572,30 +592,25 @@ each_sub(VALUE v_self)
 	  rb_yield(v_truenode);
 	  v_node = v_truenode; // otherwise cObject_enqueue_children is always called...
 	}
+      else
+	{
+	  trace1("skipping NILnode %p, enqueue_children on fake node", node);
+	}
       rb_funcall(v_node, rb_intern("enqueue_children"), 1, v_queue);
     }
-  trace2("DONE %s::each_sub, c = %ld", TO_CSTR(v_self), RARRAY_LEN(v_queue));
+  trace1("DONE %s::each_sub", TO_CSTR(v_self));
   return Qnil;
-}
-
-/** breadth-first search, but it excludes SELF!!!
- */
-static VALUE
-cObject_each_sub(VALUE v_self)
-{
-  trace1("%s::each_sub", TO_CSTR(v_self));
-  RETURN_ENUMERATOR(v_self, 0, 0);
-  return each_sub(v_self);
 } // cObject_each_sub
 
 /** breadth-first search, and includes self (as first result)
+ * DOES NOT USE QObject
  */
 static VALUE
 cObject_each_sub_with_root(VALUE v_self)
 {
   RETURN_ENUMERATOR(v_self, 0, 0);
   rb_yield(v_self);
-  return rb_funcall(v_self, rb_intern("each_sub"), 0, 0);
+  return rb_funcall_passing_block(v_self, rb_intern("each_sub"), 0, 0);
 }
 
 /** :call-seq:
@@ -639,7 +654,10 @@ cObject_connect(VALUE v_self, VALUE v_signal, VALUE v_proc)
 }
 
 /* WARNING: in case of emit v_args is extended!! 
- * */
+ *
+ * NOTICE: if v_block is not set and v_args[-1] is a lambda 
+ * we use that instead.
+ **/
 VALUE 
 cObject_signal_implementation(VALUE v_self, VALUE v_method, 
 			      VALUE v_signal, VALUE v_args, VALUE v_block)
@@ -648,7 +666,20 @@ cObject_signal_implementation(VALUE v_self, VALUE v_method,
   if (TYPE(v_method) != T_SYMBOL) 
     rb_raise(rb_eTypeError, "method is not a symbol");
   v_args = to_ary(v_args); // PARANOIA
-  const long N = RARRAY_LEN(v_args);
+  long N = RARRAY_LEN(v_args);
+  track1("v_args = %s", v_args);
+  trace2("N = %ld, block given = %d", N, !NIL_P(v_block));
+  if (N == 1 && NIL_P(v_block))
+    {
+      VALUE v_proc = *RARRAY_PTR(v_args);
+      if (rb_obj_is_proc(v_proc) == Qtrue && rb_proc_lambda_p(v_proc))
+	{
+	  trace("Using lambda iso block");
+	  v_block = *RARRAY_PTR(v_args);
+	  N = 0;
+	  //v_args = Qnil; // not used anymore
+	}
+    }
   if (!NIL_P(v_block))
     {
       trace("block given call 'connect'");
@@ -661,14 +692,7 @@ cObject_signal_implementation(VALUE v_self, VALUE v_method,
     }
   else
     {
-      /* NOT REQUIRED
-      VALUE v_new_ary = rb_ary_new2(RARRAY_LEN(v_args) + 1);
-      rb_ary_push(v_new_ary, v_method);
-      int i = 0;
-      for (VALUE *v_el = RARRAY_PTR(v_args); i < N; i++, v_el++)
-	rb_ary_push(v_new_ary, *v_el);
-      // SEGV ??
-       */
+      trace("prepare to call emit by storing v_method in v_args");
       rb_ary_unshift(v_args, v_method);
       trace2("rb_funcall2 -> emit(%s), #args=%ld", INSPECT(v_method),
 	     RARRAY_LEN(v_args));
@@ -754,7 +778,7 @@ init_object()
 {
   trace("init_object");
   rb_define_alloc_func(cObject, cObject_alloc);
-  rb_define_method(cObject, "initialize", RUBY_METHOD_FUNC(cObject_initialize), -1);
+  rb_define_private_method(cObject, "initialize", RUBY_METHOD_FUNC(cObject_initialize), -1);
   rb_define_method(cObject, "qtparent_get", RUBY_METHOD_FUNC(cObject_qtparent_get), 0);
   rb_define_method(cObject, "qtparent", RUBY_METHOD_FUNC(cObject_qtparent_get), 0);
   rb_define_method(cObject, "qtparent=", RUBY_METHOD_FUNC(cObject_qtparent_set), 1);	
@@ -783,8 +807,8 @@ init_object()
   rb_define_private_method(cObject, "emit", RUBY_METHOD_FUNC(cObject_emit), -1);
   rb_define_private_method(cObject, "signal_implementation", 
 			   RUBY_METHOD_FUNC(cObject_signal_implementation), 4);
-  rb_define_private_method(cObject, "enqueue_children", 
-			   RUBY_METHOD_FUNC(cObject_enqueue_children), 2);
+  rb_define_protected_method(cObject, "enqueue_children", 
+			     RUBY_METHOD_FUNC(cObject_enqueue_children), 1);
   rb_define_method(cObject, "to_s", RUBY_METHOD_FUNC(cObject_to_s), 0);
   trace("init_object OK");
   return cObject;
@@ -822,6 +846,91 @@ init_qt()
   cObject = rb_define_class_under(mQt, "Object", rb_cObject);
 }
 
+static VALUE
+cNoQtControl_initialize(int argc, VALUE *argv, VALUE v_self)
+{
+  trace("cNoQtControl_initialize");
+  //trace("scan args and assign parent");
+  VALUE v_hash;
+  rb_scan_args(argc, argv, "01", &v_hash);
+  if (!NIL_P(v_hash))
+    rb_funcall(v_self, rb_intern("setupQuickyhash"), 1, v_hash);
+  else if (rb_block_given_p())
+    rb_obj_instance_eval(0, 0, v_self);
+  trace("cNoQtControl_initialize OK");
+  return Qnil;
+}
+
+static VALUE
+cNoQtControl_enqueue_children(VALUE, VALUE)
+{
+  return Qnil;
+}
+
+static VALUE 
+cNoQtControl_objectName_get(VALUE)
+{
+  return Qnil;
+}
+
+static VALUE
+cNoQtControl_objectName_set(VALUE v_self, VALUE)
+{
+  rb_raise(rb_eArgError, "cannot assign objectName to a %s", rb_obj_classname(v_self));
+}
+
+static VALUE
+cNoQtControl_widget_p(VALUE)
+{
+  return Qfalse;
+}
+
+static VALUE
+cNoQtControl_qtparent_set(VALUE v_self, VALUE)
+{
+  rb_raise(rb_eArgError, "cannot assign a parent to a %s", rb_obj_classname(v_self));
+}
+
+static VALUE
+cNoQtControl_qtparent_get(VALUE)
+{
+  return Qnil;
+}
+
+static VALUE
+cNoQtControl_qtchildren_set(VALUE v_self, VALUE)
+{
+  rb_raise(rb_eArgError, "cannot assign children to a %s", rb_obj_classname(v_self));
+}
+
+static VALUE
+cNoQtControl_qtchildren_get(VALUE)
+{
+  return rb_ary_new();
+}
+
+static inline void
+init_control()
+{
+  cControl = rb_define_class_under(mQt, "Control", cObject);
+  cNoQtControl = rb_define_class_under(mQt, "NoQtControl", cControl);
+  rb_define_private_method(cNoQtControl, "initialize", RUBY_METHOD_FUNC(cNoQtControl_initialize), -1);
+  rb_define_method(cNoQtControl, "objectName_get", RUBY_METHOD_FUNC(cNoQtControl_objectName_get), 0);
+  rb_define_method(cNoQtControl, "objectName=", RUBY_METHOD_FUNC(cNoQtControl_objectName_set), 1);
+  rb_define_method(cNoQtControl, "widget?", RUBY_METHOD_FUNC(cNoQtControl_widget_p), 0);
+  rb_define_method(cNoQtControl, "enqueue_children", RUBY_METHOD_FUNC(cNoQtControl_enqueue_children), 1);
+  rb_define_method(cNoQtControl, "qtparent_get", RUBY_METHOD_FUNC(cNoQtControl_qtparent_get), 0);
+  rb_define_method(cNoQtControl, "qtparent", RUBY_METHOD_FUNC(cNoQtControl_qtparent_get), 0);
+  rb_define_method(cNoQtControl, "qtparent=", RUBY_METHOD_FUNC(cNoQtControl_qtparent_set), 1);	
+  // qtparent is used through parent sometimes as in	  'Object.new parent: bart'
+  //  rb_define_method(cNoQtControl, "qtparent", RUBY_METHOD_FUNC(cNoQtControl_qtparent), -1);
+  rb_define_method(cNoQtControl, "qtchildren_get", RUBY_METHOD_FUNC(cNoQtControl_qtchildren_get), 0);
+  rb_define_method(cNoQtControl, "qtchildren=", RUBY_METHOD_FUNC(cNoQtControl_qtchildren_set), -1);
+  rb_define_alias(cNoQtControl, "qtchildren", "qtchildren_get");
+  rb_define_alias(cNoQtControl, "parent_get", "qtparent_get");
+  rb_define_alias(cNoQtControl, "children_get", "qtchildren_get");
+}
+
 } // namespace R_Qt 
 
 using namespace R_Qt;
@@ -837,6 +946,7 @@ Init_liburqtCore()
   rb_define_module_function(mReform, "tr", RUBY_METHOD_FUNC(mReform_tr), -1);
   init_rvalue(); // assigns RVALUE_ID
   init_object();
+  init_control();
   loaded = true;
   trace("Init_liburqtCore OK");
 }

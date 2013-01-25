@@ -7,12 +7,12 @@ module R::Qt
   class DynamicAttribute < Control
     private # methods of DynamicAttribute
       def initialize parent, klass, methodname, options, quickyhash = nil, &initblock
-	tag "DynamicAttribute.new(#{parent}, #{klass}, #{methodname})"
+	#tag "DynamicAttribute.new(#{parent}, #{klass}, #{methodname})"
 	super(parent) {}
 	@klass, @methodname, @options = klass, methodname, options
-	tag "setup(#{quickyhash.inspect})"
+	#tag "setup(#{quickyhash.inspect})"
 	setup quickyhash, &initblock
-	tag "connector = #{connector.inspect}"
+	#tag "connector = #{connector.inspect}"
 	connector and
 	  parent.connect_attribute @methodname, self
       end

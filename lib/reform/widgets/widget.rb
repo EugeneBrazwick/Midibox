@@ -22,10 +22,11 @@ module R::Qt
 	widget.qtparent = self
       end # addWidget
 
+      # override
       def addLayout layout
 	raise Reform::Error, "a widget can only have one layout" if self.layout
 	self.layout = layout
-      end # addWidget
+      end # addLayout
 
       # override
       def parent= parent 
@@ -35,10 +36,18 @@ module R::Qt
       attr_dynamic String, :title, :caption, :windowTitle
       attr_dynamic Reform::Size, :size
 
+      # override
       def children
 	each_child.to_a
 	#tag "called each_child.to_a -> #{r.inspect}"
 	#r
+      end # children
+
+      #override
+      def connect_attribute methodname, dynattr
+	if methodname != :windowTitle
+	  super
+	end
       end
   end # class Widget
 

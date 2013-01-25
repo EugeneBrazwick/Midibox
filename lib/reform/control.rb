@@ -107,7 +107,7 @@ module R::Qt
 	  #tag "er oh, each_sub=#{each_sub.to_a.inspect}"
 	  each_sub do |child|
 	    if name = child.objectName 
-	      tag "define_method #{self}::#{name}"
+	      #tag "define_method #{self}::#{name}"
 	      m = method(name) rescue nil
 unless m
 	      raise NameError, "the name '#{name}' is already in use" if m
@@ -124,6 +124,19 @@ end
 
   end # class Control
 
+
+  class NoQtControl < Control
+    public # methods of NoQtControl
+      def children
+	each_child.to_a
+      end # children
+
+      # override. Because they are not QObjects in the first place
+      def addObject child
+	raise TypeError, "cannot add indiscrimate objects to a #{self.class}"
+      end
+
+  end  # class NoQtControl
 end # module R::Qt
 
 if __FILE__ == $0

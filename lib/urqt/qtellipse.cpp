@@ -46,13 +46,13 @@ cGraphicsEllipseItem_rect_get(VALUE v_self)
 {
   RQTDECLSELF_GI(QGraphicsEllipseItem);
   const QRectF &rect = self->rect();
-  return cRectFWrap(cRectF, new QRectF(rect));
+  return cRectFWrap(new QRectF(rect));
 }
 
 void 
-init_qtellipse(VALUE mQt, VALUE cGraphicsItem)
+init_qtellipse(VALUE mQt, VALUE /*cGraphicsItem*/)
 {
-  const VALUE cGraphicsEllipseItem = rb_define_class_under(mQt, "GraphicsEllipseItem", cGraphicsItem);
+  const VALUE cGraphicsEllipseItem = rb_define_class_under(mQt, "GraphicsEllipseItem", cAbstractGraphicsShapeItem);
   rb_define_alloc_func(cGraphicsEllipseItem, cGraphicsEllipseItem_alloc);
   rb_define_method(cGraphicsEllipseItem, "rect=", RUBY_METHOD_FUNC(cGraphicsEllipseItem_rect_set), -1);
   rb_define_method(cGraphicsEllipseItem, "rect_get", RUBY_METHOD_FUNC(cGraphicsEllipseItem_rect_get), 0);

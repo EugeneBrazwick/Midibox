@@ -62,31 +62,9 @@ GetQGraphicsItem_noDecl(VALUE v_o, T *&q)
   if (!q) rb_raise(rb_eTypeError, "Bad cast to some kind of QGraphicsItem");
 }
 
-extern VALUE cRectF, cBrush, cColor, cPen;
-
-static inline void
-GetQBrush_noDecl(VALUE v_q, QBrush *&q)
-{
-#if defined(DEBUG)
-  if (!rb_obj_is_kind_of(v_q, cBrush))
-    rb_raise(rb_eTypeError, "SERIOUS PROGRAMMING ERROR: very bad cast to QBrush");
-#endif // DEBUG
-  GET_STRUCT_NODECL(QBrush, q);
-}
-
-static inline void
-GetQColor_noDecl(VALUE v_q, QColor *&q)
-{
-#if defined(DEBUG)
-  if (!rb_obj_is_kind_of(v_q, cColor))
-    rb_raise(rb_eTypeError, "SERIOUS PROGRAMMING ERROR: very bad cast to QColor");
-#endif // DEBUG
-  GET_STRUCT_NODECL(QColor, q);
-}
+extern VALUE cRectF, cPen;
 
 #define RQTDECLARE_GI(T, var) T *var; GetQGraphicsItem_noDecl<T>(v_##var, var)
-#define RQTDECLARE_BRUSH(var) QBrush *var; GetQBrush_noDecl(v_##var, var)
-#define RQTDECLARE_COLOR(var) QColor *var; GetQColor_noDecl(v_##var, var)
 
 #if defined(DEBUG)
 #define RQTDECLSELF_GI(T) RQTDECLARE_GI(T, self)
@@ -109,18 +87,11 @@ v2rect(VALUE v)
 };
 
 extern void cRectF_free(QRectF *rect);
-extern void cBrush_free(QBrush *brush);
 
 static inline VALUE
 cRectFWrap(QRectF *rect)
 {
   return Data_Wrap_Struct(cRectF, 0, cRectF_free, rect);
-}
-
-static inline VALUE
-cBrushWrap(QBrush *brush)
-{
-  return Data_Wrap_Struct(cBrush, 0, cBrush_free, brush);
 }
 
 } // namespace R_Qt 

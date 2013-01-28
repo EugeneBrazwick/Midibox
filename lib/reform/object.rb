@@ -47,7 +47,7 @@ module R::Qt
 	# that's why we call the getters here, and expect them to be setters!
 	# Context: setup
 	def setupQuickyhash hash
-	  #tag "setupQuickyhash(#{hash})"
+	  tag "#{self}.setupQuickyhash(#{hash})"
 	  for k, v in hash
 	    case v
 	    when Array

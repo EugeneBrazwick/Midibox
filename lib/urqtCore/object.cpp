@@ -846,6 +846,12 @@ init_qt()
   cObject = rb_define_class_under(mQt, "Object", rb_cObject);
 }
 
+/** :call-seq:
+ *
+ *	NoQtControl.new inithash
+ *	NoQtControl.new { initcode }
+ *
+ */
 static VALUE
 cNoQtControl_initialize(int argc, VALUE *argv, VALUE v_self)
 {
@@ -857,6 +863,8 @@ cNoQtControl_initialize(int argc, VALUE *argv, VALUE v_self)
     rb_funcall(v_self, rb_intern("setupQuickyhash"), 1, v_hash);
   else if (rb_block_given_p())
     rb_obj_instance_eval(0, 0, v_self);
+  else if (argc)
+    rb_raise(rb_eArgError, "%d %s ignored in constructor", argc, argc > 1 ? "arguments" : "argument");
   trace("cNoQtControl_initialize OK");
   return Qnil;
 }

@@ -24,6 +24,7 @@ module R
         msg = "#{exception.class}: #{exception}\n" + exception.backtrace.join("\n")
       end
       $stderr << msg
+      nil
     end # escue
 
 end # module R

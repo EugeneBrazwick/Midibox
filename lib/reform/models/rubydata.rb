@@ -67,6 +67,7 @@ module R::Qt
       end
   end # class RubyDataNode
 
+  ## this class wraps around any ruby data (with some limitations)
   class RubyData < Model
 
       Node = RubyDataNode
@@ -88,6 +89,10 @@ module R::Qt
 
     protected # methods of RubyData
 
+    public # methods of RubyData
+      alias :self= :overwrite_with
+
+      # override
       def model_apply_getter methodname
 	case @rubydata_node
 	when Node
@@ -99,6 +104,7 @@ module R::Qt
 	  Node::Basic.new(@rubydata_node).model_apply_getter methodname
 	end
       end
+
   end # class RubyData
 
   Reform.createInstantiator __FILE__, RubyData

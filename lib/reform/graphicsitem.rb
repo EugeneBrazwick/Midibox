@@ -20,34 +20,6 @@ module R::Qt
 	@solidBrush[key] ||= Brush.new(Color.sym2color(key) || Brush::NoBrush)
       end
 
-    ## :call-seq:
-    #	  make_brush
-    #
-    # convert anything into a QBrush
-      def make_brush *args, &block
-	args = args[0] if args.length <= 1
-	case args
-	when Brush then args
-	when false, :none, :nobrush, :no_brush then solidBrush :none
-	when nil
-	  if block
-	    Brush.new(&block)
-	  else
-	    solidBrush :none
-	  end
-	when Hash then Brush.new args
-	when String
-	  if args[0, 7] == 'file://'
-	    raise NotImplemtedError, "loading pixmaps for brushes"
-	  else
-	    Brush.new Color.new args
-	  end
-	when Array then Brush.new Color.new(*args)
-	when Color then Brush.new args
-	else Brush.new Color.new args
-	end
-      end
-      
     public # methods of GraphicsItem
 
       # override
@@ -68,12 +40,8 @@ module R::Qt
       def brush *args, &block
 	arg0 = args[0]
 	return brush_get unless arg0 || block
-	self.brush = case arg0
-		     #when Symbol then make_brush(self, *args)
-		     when Brush then arg0
-		     when nil then Brush.new(&block)
-		     else make_brush(*args)
-		     end
+	self.brush = Brush.new(*args, &block)
+	tag "#{self}.brush := #{brush_get}"
       end # brush
 
       alias :fill :brush

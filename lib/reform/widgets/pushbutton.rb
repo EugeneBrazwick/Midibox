@@ -41,19 +41,23 @@ if __FILE__ == $0
   Reform.app {
     data 'blue'
     widget {
+      title 'Red and Blue'
       size 240, 200
       hbox {
 	canvas {
 	  scene {
 	    qtcircle {
+	      name 'gi_circle'
 	      rect 10, 10, 100, 100
 	      brush 'blue' #  connector: :self
 	    }
 	  } # scene
 	} # canvas
 	vbox {
-	  button text: 'Blue', connector: :self, value: 'blue'
-	  button text: 'Red', connector: :self, value: 'red'
+	  button name: 'pb_blue', text: 'Blue', connector: :self, value: 'blue'
+	  button name: 'pb_red', text: 'Red', connector: :self, value: 'red'
+	  # SEGV when clicked on one, then the other.
+	  # But not when pressing the same.
 	} # vbox
       } # hbox
     } # widget

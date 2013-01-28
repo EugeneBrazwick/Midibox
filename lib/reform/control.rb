@@ -48,15 +48,6 @@ module R::Qt
 	send method.to_s + '=', *args
       end
 
-      def connector value = nil, &block
-	if z = value || block
-	  @connector = z
-	  want_data
-	else
-	  @connector
-	end
-      end
-
       # connect ourselves to the closest model upwards.
       # This includes self(?)
       def want_data path = []
@@ -82,6 +73,15 @@ module R::Qt
       end
 
     public #methods of Control
+
+      def connector value = nil, &block
+	if z = value || block
+	  @connector = z
+	  want_data
+	else
+	  @connector
+	end
+      end
 
       # the last method can in fact be an option-hash
       def self.attr_dynamic klass, *methods

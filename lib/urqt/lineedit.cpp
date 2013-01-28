@@ -56,6 +56,6 @@ init_lineedit(VALUE mQt, VALUE cWidget)
   rb_define_method(cLineEdit, "text_get", RUBY_METHOD_FUNC(cLineEdit_text_get), 0);
   rb_define_method(cLineEdit, "readonly?", RUBY_METHOD_FUNC(cLineEdit_readonly_p), 0);
   rb_define_method(cLineEdit, "readOnly?", RUBY_METHOD_FUNC(cLineEdit_readonly_p), 0);
-  rb_define_method(cLineEdit, "isReadOnly?", RUBY_METHOD_FUNC(cLineEdit_readonly_p), 0);
+  rb_define_method(cLineEdit, "isReadOnly", RUBY_METHOD_FUNC(cLineEdit_readonly_p), 0);
 } // init_lineedit
 } // namespace R_Qt

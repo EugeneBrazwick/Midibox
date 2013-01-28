@@ -15,6 +15,7 @@
 #define trace2(arg, a, b) fprintf(stderr, __FILE__ ":%d:" arg "\n", __LINE__, a, b);
 #define trace3(arg, a, b, c) fprintf(stderr, __FILE__ ":%d:" arg "\n", __LINE__, a, b, c);
 #define trace4(arg, a, b, c, d) fprintf(stderr, __FILE__ ":%d:" arg "\n", __LINE__, a, b, c, d);
+#define trace5(arg, a, b, c, d, e) fprintf(stderr, __FILE__ ":%d:" arg "\n", __LINE__, a, b, c, d, e);
 #define track1(arg, a) fprintf(stderr, __FILE__ ":%d:" arg "\n", __LINE__, INSPECT(a));
 #define track2(arg, a, b) fprintf(stderr, __FILE__ ":%d:" arg "\n", __LINE__, INSPECT(a), INSPECT(b));
 #define track3(arg, a, b, c) fprintf(stderr, __FILE__ ":%d:" arg "\n", __LINE__, INSPECT(a), INSPECT(b), INSPECT(c));
@@ -26,6 +27,7 @@
 #define trace2(arg, a, b)
 #define trace3(arg, a, b, c)
 #define trace4(arg, a, b, c, d)
+#define trace5(arg, a, b, c, d, e)
 #define track1(arg, a)
 #define track2(arg, a, b)
 #define track3(arg, a, b, c)

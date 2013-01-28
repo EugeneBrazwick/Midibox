@@ -566,7 +566,7 @@ do_event_output(bool ch_ref, snd_seq_t *seq, VALUE v_seq, VALUE v_ev, snd_seq_ev
           VALUE val4 = rb_ary_new3(4, v_seq, vev, retval, v_func);
           // I hope this cast is valid?
           trace1("calling rb_iterate on v_channel, v_channel=%s", INSPECT(v_channel))
-          rb_iterate(rb_each, v_channel, (VALUE (*)(...))send_callback, val4);
+          rb_iterate(rb_each, v_channel, RUBY_METHOD_FUNC(send_callback), val4);
           // return r; This is the enum!! (so v_channel)
           return rb_ary_entry(val4, 2);
         }

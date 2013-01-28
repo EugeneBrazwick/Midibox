@@ -24,7 +24,7 @@ module R::Qt
 	  editingFinished do
 	    unless zombified?
 	      # for some reason this event sometimes arrives when the app is being deleted
-	      tag "#{self}::editingFinished(), sender = dynattr #{dynattr}"
+	      #tag "#{self}::editingFinished(), sender = dynattr #{dynattr}"
 	      dynattr.push_data(@mem_text = text) unless @mem_text == text 
 	    end
 	  end
@@ -41,7 +41,7 @@ module R::Qt
 	  editingFinished do
 	    unless zombified?
 	      # for some reason this event sometimes arrives when the app is being deleted
-	      tag "#{self}::editingFinished()"
+	      #tag "#{self}::editingFinished()"
 	      push_data(@mem_text = text) unless @mem_text == text 
 	    end
 	  end

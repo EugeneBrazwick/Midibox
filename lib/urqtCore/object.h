@@ -42,6 +42,21 @@ IS_ZOMBIFIED(VALUE v)
   return DATA_PTR(v) == 0;
 }
 
+/* This class behaves similar to VALUE except that the Garbage Collector will
+automatically leave it alone.
+*/
+class GCSafeValue
+{
+private:
+  VALUE V;
+public:
+  GCSafeValue(VALUE v): V(v) { rb_gc_register_address(&V); }
+  ~GCSafeValue() { rb_gc_unregister_address(&V); }
+  VALUE operator ->() const { return V; }
+  VALUE operator *() const { return V; }
+  operator VALUE() const { return V; }
+};
+
 } // namespace R_Qt 
 
 extern "C" void Init_liburqtCore();

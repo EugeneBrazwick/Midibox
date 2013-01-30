@@ -215,6 +215,7 @@ cstr2sym(const char *s)
     return c##base##Wrap(c##klass, q); \
   }
 
+// in case klass == base this can be used. For example for Color,Rect,Brush etc.
 #define R_QT_DEF_ALLOCATOR_BASE1(base) \
   static VALUE \
   c##base##_alloc(VALUE /*c##base*/) \

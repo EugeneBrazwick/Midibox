@@ -47,7 +47,7 @@ module R::Qt
 	# that's why we call the getters here, and expect them to be setters!
 	# Context: setup
 	def setupQuickyhash hash
-	  tag "#{self}.setupQuickyhash(#{hash})"
+	  #tag "#{self}.setupQuickyhash(#{hash})"
 	  for k, v in hash
 	    case v
 	    when Array
@@ -115,12 +115,14 @@ module R::Qt
 
       public # methods of Object
 
-	alias :parent_get :qtparent_get
-	alias :children_get :qtchildren_get
-
 	# it might be a better idea using 'each_child.to_a' here as well.
 	# the idea is that each_child.to_a is relatively slow.
-	alias :children :qtchildren_get
+	def children 
+	  each_child.to_a
+	end
+
+	alias :parent_get :qtparent_get
+	alias :children_get :children
 
 	# you can 'mount' a model into any object.
 	attr :model
@@ -192,7 +194,7 @@ module R::Qt
 	  end 
 	end
 
-	# Like Enumerable and findChild, but it enumerates them
+	# Like Enumerable 
         def find_all *args
 	  return enum_for(:find_all) if args.empty? && !block_given?
 	  name = klass = opts = nil 
@@ -205,13 +207,15 @@ module R::Qt
 	  end
 	  recursive = opts ? opts[:recursive] : true
 	  include_root = opts && opts[:include_root]
-	  each = recursive ? include_root ? each_sub_with_root : each_sub
+	  enum = recursive ? include_root ? each_sub_with_root : each_sub
 			   : include_root ? each_child_with_root : each_child 
-	  for candidate in each 
-	    yield(candidate) unless klass && !candidate.kind_of?(klass) ||  
-				    name && candidate.objectName != name ||
-				    block_given? && !yield(candidate)
+	  r = []
+	  enum.each do |candidate|
+	    r << candidate unless klass && !candidate.kind_of?(klass) ||  
+				  name && candidate.objectName != name ||
+				  block_given? && !yield(candidate)
 	  end 
+	  r
 	end
 
 	def self.signal *signals

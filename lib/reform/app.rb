@@ -17,6 +17,7 @@ module R
 	raise if $app.fail_on_instantiation_errors?
         msg = "#{exception.class}: #{exception}\n" + exception.backtrace.join("\n")
       rescue StandardError, RuntimeError => exception
+	raise if $app.fail_on_instantiation_errors?
 	#tag "got exception"
 	#tag "exception class: #{exception.class}"
 	#tag "exception msg: #{exception}"
@@ -130,13 +131,6 @@ module R::Qt
 	def fail_on_instantiation_errors?
 	  @fail_on_instantiation_errors
 	end
-
-	# override
-	def children_get
-	  super + @toplevel_widgets
-	end # children_get
-
-	alias :children :children_get
 
 	# override, kind of
 	def addWidget widget

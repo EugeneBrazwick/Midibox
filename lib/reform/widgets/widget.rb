@@ -36,13 +36,6 @@ module R::Qt
       attr_dynamic String, :title, :caption, :windowTitle
       attr_dynamic Reform::Size, :size
 
-      # override
-      def children
-	each_child.to_a
-	#tag "called each_child.to_a -> #{r.inspect}"
-	#r
-      end # children
-
       #override
       def connect_attribute methodname, dynattr
 	if methodname != :windowTitle

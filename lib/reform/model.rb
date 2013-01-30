@@ -19,14 +19,14 @@ module R::Qt
 
       # every node in the controlpath can have a connector set
       def model_init_path controlpath
-	#tag "model_init_path(#{controlpath.inspect})"
+	$stderr.puts "model_init_path(#{controlpath.inspect})" if controlpath[-1].trace_propagation
 	v = self
 	lastcontrol = nil
 	controlpath.each do |control|
 	  v &&= Model::model_apply_connector v, control
 	  lastcontrol = control
 	end
-	#tag "lastcontrol=#{lastcontrol}"
+	#tag "lastcontrol=#{lastcontrol}, v =#{v}"
 	lastcontrol.apply_model(v) if v && lastcontrol
       end # model_init_path
 
@@ -39,20 +39,20 @@ module R::Qt
       end # model_apply_connector
 
       def self.model_apply_cid v, cid, cidpath
-	tag "model_apply_cid on #{v}, cid = #{cid.inspect}"
+	#tag "model_apply_cid on #{v}, cid = #{cid.inspect}"
 	case cid
 	when NilClass
-	  tag "nil"
+	  #tag "nil"
 	  v
 	when Proc
 	  cid[v]
 	when Array
-	  tag "Array, apply them in order"
+	  #tag "Array, apply them in order"
 	  cid.inject(v) do |w, nm|
 	    w && model_apply_cid(w, nm, cidpath) 
 	  end
 	else
-	  tag "should be symbol, delegate to model_apply_getter"
+	  #tag "should be symbol, delegate to model_apply_getter"
 	  cidpath << cid if cidpath
 	  v.model_apply_getter cid
 	end # case
@@ -66,7 +66,9 @@ module R::Qt
       end
 
       def self.model_propagate_cid cidpath, control, cid, value, sender, v, subs
-	tag "PROPAGATE_CID(#{cidpath.inspect}, #{cid.inspect}, on #{v}, subs = #{subs})"
+	if sender.trace_propagation
+	  $stderr.puts "PROPAGATE_CID(#{cidpath.inspect}, #{cid.inspect}, on #{v}, subs = #{subs})"
+	end
 	case cid
 	when NilClass
 	when Proc
@@ -79,16 +81,21 @@ module R::Qt
 	  return v
 	else
 	  if cidpath
-	    return nil unless cidpath[0] == cid
-	    cidpath.shift
+	    unless cidpath[0] == cid
+	      #tag "cid conflict #{cid} vs #{cidpath[0]}, STOP propagation"
+	      return nil 
+	    end
+	    # BAD IDEA cidpath.shift,  this alters the caller
+	    cidpath = if cidpath.length == 1 then nil else cidpath[1..-1] end
 	  end
 	  v = v.model_apply_getter cid
 	end
 	if subs
+	  #tag "propagate to subs #{subs.inspect}"
 	  model_propagate_i cidpath, value, sender, v, subs
 	else
 	  unless control.equal? sender
-	    tag "ARRIVAL at accepting endpoint #{control}, v = #{v}"
+	    #tag "ARRIVAL at accepting endpoint #{control}, v = #{v}"
 	    control.apply_model(v) if v
 	  end
 	end
@@ -111,13 +118,16 @@ module R::Qt
     # We must inform all controls that connect to cidpath and reattach
     # by calling control.apply_model
       def self.model_propagate_i cidpath, value, sender, v, listeners
-	tag "PROPAGATE(#{cidpath.inspect}, #{value}, on #{v}, listeners = #{listeners})"
+	if sender.trace_propagation
+	  $stderr.puts "PROPAGATE(#{cidpath.inspect}, #{value}, on #{v}, listeners = #{listeners})"
+	end
 	listeners.each do |listener|
 	  if Array === listener 
 	    control, *subs = listener
 	  else
 	    control, subs = listener, nil
 	  end
+	  #tag "control = #{control}"
 	  model_propagate_cid cidpath, control, control.connector, value, sender, v, subs
 	end # each
       end # model_propagate_i
@@ -204,12 +214,12 @@ module R::Qt
       def model_add_listener path
 	#tag "model_add_listener(#{path.inspect})"
 	Model::model_merge_listener_path @model_listeners, path
-	tag "listeners=(#{@model_listeners.inspect})"
+	#tag "listeners=(#{@model_listeners.inspect})"
 	model_init_path path
       end # model_add_listener
 
       def model_push_data value, sender, controlpath
-	tag "model_push_data(#{value}, #{sender}, #{controlpath})"
+	$stderr.puts "model_push_data(#{value}, #{sender}, #{controlpath})" if sender.trace_propagation
 	v = self
 	cidpath = []
 	lastcontrol = controlpath[-1]
@@ -230,7 +240,9 @@ module R::Qt
       end
 
       def model_apply_setter methodname, value, sender
-	tag "model_apply_setter(#{methodname.inspect}, #{value.inspect}, #{sender})"
+	if sender.trace_propagation
+	  $stderr.puts "model_apply_setter(#{methodname.inspect}, #{value.inspect}, #{sender})"
+	end
 	methodname = methodname.to_s
 	methodname = methodname[0...-1] if methodname[-1] == '?'
 	send(methodname + '=', value)

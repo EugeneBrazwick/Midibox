@@ -10,29 +10,123 @@
 
 namespace R_Qt {
 
-/*  This was of course, far too easy
- *
- * The ruby object now does illegal casts to QWidget,
- * because we inherit cWidget, and RQTDECLSELF is NOT typesafe.
+static VALUE 
+cGraphicsScene = Qnil;
+
+/* NOTE: _mark methods may NOT allocate or free ruby values.
+ * This includes TO_CSTR debug statements.
  */
-R_QT_DEF_ALLOCATOR(GraphicsScene)
+void
+cGraphicsScene_mark(QGraphicsScene *object)
+{
+  trace("cGraphicsScene_mark");
+  cObject_mark(object);
+  foreach (QGraphicsItem *child, object->items())
+    {
+      const VALUE vChild = item2v(child);
+      if (!NIL_P(vChild)) rb_gc_mark(vChild);
+    }
+}
+
+static VALUE
+cGraphicsSceneWrap(QGraphicsScene *object)
+{
+  trace1("cGraphicsSceneWrap(%p)", object);
+  return Data_Wrap_Struct(cGraphicsScene, cGraphicsScene_mark, 0, object);
+}
+
+R_QT_DEF_ALLOCATOR_BASE1(GraphicsScene)
 
 static VALUE
 cGraphicsScene_addItem(VALUE v_self, VALUE v_item)
 {
+  track2("cGraphicsScene_addItem(%s, %s)", v_self, v_item);
   RQTDECLSELF(QGraphicsScene);
   RQTDECLARE_GI(QGraphicsItem, item);
+  trace2("item(%p).childItems.count= %d", item, item->childItems().count());
+  traqt1("%s::addItem", QTCLASS(self));
   self->addItem(item);
+  // Technically v_item could be toplevel in another scene, or it could be not 
+  // a toplevel at all.
+  VALUE v_old_parent = rb_iv_get(v_item, "@parent");
+  if (!NIL_P(v_old_parent))
+    {
+      RQTDECLARE(QGraphicsScene, old_parent);
+      traqt1("%s::addItem", QTCLASS(old_parent));
+      old_parent->removeItem(item);
+    }
+  trace("assign @parent in item");
+  rb_iv_set(v_item, "@parent", v_self); // otherwise they lack this
   return v_self;
+}
+
+static VALUE
+cGraphicsScene_parent_set(VALUE v_self, VALUE v_parent)
+{
+  trace("cGraphicsScene_parent_set");
+  return rb_funcall(v_parent, rb_intern("addScene"), 1, v_self);
+}
+
+static VALUE
+cGraphicsScene_addObject(VALUE /*v_self*/, VALUE /*v_child*/)
+{
+  trace("cGraphicsScene_addObject");
+  rb_raise(rb_eTypeError, "can only add GraphicsItems to a GraphicsScene");
+}
+
+static VALUE
+cGraphicsScene_children(VALUE v_self)
+{
+  trace("cGraphicsScene_children");
+  return rb_funcall(rb_funcall(v_self, rb_intern("each_child"), 0),
+		    rb_intern("to_a"), 0);
+}
+
+static VALUE
+cGraphicsScene_enqueue_children(VALUE v_self, VALUE v_queue)
+{
+  trace("cGraphicsScene_enqueue_children");
+  RQTDECLSELF(QGraphicsScene);
+  rb_call_super(1, &v_queue);
+  const bool yield = NIL_P(v_queue);
+  foreach (QGraphicsItem *child, self->items())
+    {
+      trace3("yield=%d, item(%p).childItems.count= %d", yield, child, child->childItems().count());
+      const VALUE v_child = item2v(child);
+      if (yield)
+	{
+	  if (!NIL_P(v_child)) 
+	    rb_yield(v_child);
+	}
+      else
+	{
+	  Check_Type(v_queue, T_ARRAY);
+	  if (NIL_P(v_child)) 
+	      rb_ary_push(v_queue, Data_Wrap_Struct(cGraphicsItem, 0, 0, child));
+	  else
+	    {
+	      trace("add child to v_queue");
+	      trace3("yield=%d, item(%p).childItems.count= %d", yield, child, child->childItems().count());
+	      rb_ary_push(v_queue, v_child);
+	    }
+	}
+    }
+  return Qnil;
 }
 
 void
 init_graphicsscene(VALUE mQt, VALUE cControl)
 {
   trace1("init_graphicsscene, define R::Qt::GraphicsScene, mQt=%p", (void *)mQt);
-  const VALUE cGraphicsScene = rb_define_class_under(mQt, "GraphicsScene", cControl);
+  cGraphicsScene = rb_define_class_under(mQt, "GraphicsScene", cControl);
   rb_define_alloc_func(cGraphicsScene, cGraphicsScene_alloc);
   rb_define_method(cGraphicsScene, "addItem", RUBY_METHOD_FUNC(cGraphicsScene_addItem), 1);
+  rb_define_method(cGraphicsScene, "addObject", RUBY_METHOD_FUNC(cGraphicsScene_addObject), 1);
+  rb_define_method(cGraphicsScene, "parent=", RUBY_METHOD_FUNC(cGraphicsScene_parent_set), 1);
+  rb_define_method(cGraphicsScene, "children", RUBY_METHOD_FUNC(cGraphicsScene_children), 0);
+  rb_define_method(cGraphicsScene, "enqueue_children", 
+		   RUBY_METHOD_FUNC(cGraphicsScene_enqueue_children), 1);
+  rb_define_alias(cGraphicsScene, "addGraphicsItem", "addItem");
 }
 
 } // namespace R_Qt 

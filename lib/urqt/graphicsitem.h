@@ -14,6 +14,7 @@ namespace R_Qt {
 
 extern void cGraphicsItem_mark(QGraphicsItem *item);
 
+// used for R_QT_DEF_GRALLOCATOR:
 static inline VALUE 
 cGraphicsItemWrap(VALUE klass, QGraphicsItem *item)
 {

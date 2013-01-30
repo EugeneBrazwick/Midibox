@@ -13,8 +13,8 @@ module R::Qt
       # handle_dynamics must move to C++ since it is required for many Qt 
       # classes as well!
       def handle_dynamics klass, method, options, *args, &block
-	require_relative 'dynamic_attr'
 	#tag "handle_dynamics #{method}->#{klass}"
+	require_relative 'dynamic_attr'
 	return apply_dynamic_getter method if args.empty? && !block
 	case arg0 = args[0]
 	when Hash, nil
@@ -51,10 +51,12 @@ module R::Qt
       # connect ourselves to the closest model upwards.
       # This includes self(?)
       def want_data path = []
+	#tag "#{self}::want_data #{path.inspect}"
 	path.unshift self
 	if @model
 	  @model.model_add_listener path 
 	elsif par = parent
+	  #tag "#{self}::want_data -> recurse into parent #{par}"
 	  par.want_data path
 	else
 	  raise Reform::Error, "no model found to connect to"
@@ -70,6 +72,11 @@ module R::Qt
 	elsif par = parent
 	  par.push_data value, sender, path
 	end
+      end
+
+      def trace_propagation v = nil
+	return @trace_propagation if v.nil? 
+	@trace_propagation = v
       end
 
     public #methods of Control
@@ -104,17 +111,15 @@ module R::Qt
 	super
 	#tag "#{self}::collect_names = #@collect_names"
 	if @collect_names
-	  #tag "er oh, each_sub=#{each_sub.to_a.inspect}"
+	  tag "COLLECTING NAMES, each_sub=>#{each_sub.to_a.inspect}"
 	  each_sub do |child|
 	    if name = child.objectName 
 	      #tag "define_method #{self}::#{name}"
 	      m = method(name) rescue nil
-unless m
 	      raise NameError, "the name '#{name}' is already in use" if m
 	      define_singleton_method name do
 		child
 	      end
-end
 	    end
 	  end
 	end
@@ -126,15 +131,25 @@ end
 
 
   class NoQtControl < Control
-    public # methods of NoQtControl
-      def children
-	each_child.to_a
-      end # children
-
+    protected # methods of NoQtControl
       # override. Because they are not QObjects in the first place
       def addObject child
 	raise TypeError, "cannot add indiscrimate objects to a #{self.class}"
       end
+
+    public # methods of NoQtControl
+
+      def parent_get
+	tag "#{self}::parent_get @parent = #@parent"
+        @parent
+      end
+
+      def objectName_get
+        @objectName
+      end
+
+      # overrides
+      attr_writer :objectName, :parent 
 
   end  # class NoQtControl
 end # module R::Qt

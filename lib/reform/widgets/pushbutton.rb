@@ -39,6 +39,8 @@ end
 if __FILE__ == $0
   require 'reform/app'
   Reform.app {
+    fail_on_instantiation_errors true
+    collect_names true
     data 'blue'
     widget {
       title 'Red and Blue'
@@ -49,7 +51,8 @@ if __FILE__ == $0
 	    qtcircle {
 	      name 'gi_circle'
 	      rect 10, 10, 100, 100
-	      brush 'blue' #  connector: :self
+	      #  FAILS, since qtcircle is not a QObject.... destroyed { STDERR.puts "Errr.....??" }
+	      brush name: 'br_dyn', connector: :self
 	    }
 	  } # scene
 	} # canvas

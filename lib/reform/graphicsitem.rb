@@ -14,18 +14,12 @@ module R::Qt
 
     private # methods of GraphicsItem
 
-      @solidBrush = {}
-
-      def self.solidBrush key
-	@solidBrush[key] ||= Brush.new(Color.sym2color(key) || Brush::NoBrush)
-      end
-
     public # methods of GraphicsItem
 
       # override
       def parent= parent
 	parent.addGraphicsItem self
-      end # addToParent
+      end # parent=
 
       def addGraphicsItem item
 	item.qtparent = self
@@ -37,11 +31,23 @@ module R::Qt
       #	  brush QBrush
       #	  brush { initblock }
       #	  brush inithash: .... 
+      #
+      #	PROBLEM:  getting a brush always makes a copy,
+      #	and setting it too, actually.
+      #
+      #	Hence the VALUE returned by brush differs from the one last set.
+      #	Now:
+      #	    self.brush = Brush.new(self, *args, &block)
+      # may call back en call self->setBrush().  For example if there is a block or a hash
+      # containing 'connector'.
+      #
+      # This example shows that connector should NOT immediately fetch the required data.
+      # However, my solution is now to revert the assigning of the brush to the brush constructor
       def brush *args, &block
 	arg0 = args[0]
 	return brush_get unless arg0 || block
-	self.brush = Brush.new(*args, &block)
-	tag "#{self}.brush := #{brush_get}"
+	tag "calling Brush.new with parent #{self}"
+	Brush.new(self, *args, &block)
       end # brush
 
       alias :fill :brush

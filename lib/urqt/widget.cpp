@@ -3,7 +3,7 @@
 // Copyright (c) 2013 Eugene Brazwick
 
 // Comment the following out to remove the DEBUG tags:
-//#define TRACE
+#define TRACE
 
 /** :rdoc:
 
@@ -269,7 +269,7 @@ cWidget_enqueue_children(VALUE v_self, VALUE v_queue)
     {
       /* We must not add widgets WITHIN a layout, since they are virtually
         parented to that layout.
-	However that is not the same a widgets WITH a layout!
+	However that is not the same as widgets WITH a layout!
       */
       trace("check for isWidgetType and layout");
       if (layout && child->isWidgetType() && locate_layout_child(layout, child))

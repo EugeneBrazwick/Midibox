@@ -1,5 +1,5 @@
 
-#define TRACE
+//#define TRACE
 
 #pragma implementation
 
@@ -47,7 +47,7 @@ Block(v_block)
 }
 
 static VALUE 
-sp_handle_callback(VALUE v_yielded, VALUE v_arg)
+sp_handle_callback(VALUE /*v_yielded*/, VALUE v_arg)
 {
   track2("sp_handle_callback(yielded: %s, %s)", v_yielded, v_arg);
   // v_arg is always an Array

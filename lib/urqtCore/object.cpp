@@ -262,6 +262,23 @@ cObject_initialize_arg(VALUE v_self, VALUE v_arg)
   rb_raise(rb_eTypeError, "BAD argtype %s for Object.new", rb_obj_classname(v_arg));
 }
 
+static VALUE
+cObject_mark_ownership(VALUE v_self)
+{
+#if defined(DEBUG)
+  QObject * const self = 
+#endif
+			 v2qt(v_self); 
+#if defined(DEBUG)
+  trace("DEBUG: cObject_mark_ownership, storing v_self in Property");
+  const VALUE vdbg = qt2v(self);
+  trace1("DEBUG: vdbg=%p", (void *)vdbg);
+  if (vdbg != v_self)
+    rb_raise(rb_eFatal, "programming error qt2v <-> v2qt MISMATCH");
+#endif
+  return Qnil;
+}
+
 /** call-seq: new([parent = nil] [[,]name = nil] [[,]hash = nil] [[,] &block])
  *
  * If a name is passed it is assigned using objectName=.
@@ -272,17 +289,7 @@ static VALUE
 cObject_initialize(int argc, VALUE *argv, VALUE v_self)
 {
   trace("cObject_initialize");
-#if defined(DEBUG)
-  QObject * const self = 
-#endif
-			 v2qt(v_self); // First mark ownership
-#if defined(DEBUG)
-  trace1("DEBUG: cObject_initialize(argc: %d), storing v_self in Property", argc);
-  const VALUE vdbg = qt2v(self);
-  trace1("DEBUG: vdbg=%p", (void *)vdbg);
-  if (vdbg != v_self)
-    rb_raise(rb_eFatal, "programming error qt2v <-> v2qt MISMATCH");
-#endif
+  rb_funcall(v_self, rb_intern("mark_ownership"), 0);
   //trace("scan args and assign parent");
   VALUE v_0, v_1, v_2;
   rb_scan_args(argc, argv, "03", &v_0, &v_1, &v_2);
@@ -371,14 +378,14 @@ cObject_objectName(int argc, VALUE *argv, VALUE v_self)
 static VALUE
 cObject_to_s(VALUE v_self)
 {
-  //trace("cObject_to_s");
+  trace("cObject_to_s");
   // since to_s is used for debugging it is convenient if it accept zombies:
   if (IS_ZOMBIFIED(v_self)) return rb_str_new_cstr("zombie");
   // traqt1("%s::objectName", QTCLASS(self));
   VALUE v_objectName = rb_funcall(v_self, rb_intern("objectName"), 0);
-  //track1("objectName->%s", v_objectName);
+  track1("objectName->%s", v_objectName);
   v_objectName = RQT_TO_S(v_objectName);
-  //track1("RQT_TO_S->%s", v_objectName);
+  track1("RQT_TO_S->%s", v_objectName);
   const char * const objectName = StringValueCStr(v_objectName);
   if (*objectName)
     {
@@ -558,23 +565,16 @@ cObject_enqueue_children(VALUE v_self, VALUE v_queue)
  * No that's useless. The point is that we need storage for QObject*.
  * But we can use Data_Wrap_Struct for that. No mark or free is required.
  *
- * static VALUE
- * qObject_enqueue_children(v_self, v_queue)
- * {
- * }
- *
- * DOES USE QObject  !
  */
 /** breadth-first search, but it excludes SELF!!!
  *
- * DOES USE QObject
+ * DOES NOT USE QObject
  */
 static VALUE
 cObject_each_sub(VALUE v_self)
 {
   trace1("%s::each_sub", TO_CSTR(v_self));
   RETURN_ENUMERATOR(v_self, 0, 0);
-  RQTDECLSELF(QObject);
   VALUE v_queue = rb_ary_new();
   trace("calling enqueue_children");
   // do NOT pass block. We use the 'fillqueue' variant
@@ -583,19 +583,7 @@ cObject_each_sub(VALUE v_self)
     {
       VALUE v_node = rb_ary_shift(v_queue);
       track2("%s::each_sub, dequeued %s", v_self, v_node);
-      RQTDECLARE(QObject, node);
-      const VALUE v_truenode = qt2v(node);
-      if (!NIL_P(v_truenode))
-	{
-	  trace3("%s::EACH_SUB YIELD -> %s, node.qtparent=%s", TO_CSTR(v_self), TO_CSTR(v_truenode), 
-		 QTCLASS(node->parent()));
-	  rb_yield(v_truenode);
-	  v_node = v_truenode; // otherwise cObject_enqueue_children is always called...
-	}
-      else
-	{
-	  trace1("skipping NILnode %p, enqueue_children on fake node", node);
-	}
+      rb_yield(v_node);
       rb_funcall(v_node, rb_intern("enqueue_children"), 1, v_queue);
     }
   trace1("DONE %s::each_sub", TO_CSTR(v_self));
@@ -804,6 +792,8 @@ init_object()
   rb_define_method(cObject, "each_child_with_root", 
 		   RUBY_METHOD_FUNC(cObject_each_child_with_root), 0);
   rb_define_private_method(cObject, "connect", RUBY_METHOD_FUNC(cObject_connect), 2);
+  rb_define_private_method(cObject, "mark_ownership", 
+			   RUBY_METHOD_FUNC(cObject_mark_ownership), 0);
   rb_define_private_method(cObject, "emit", RUBY_METHOD_FUNC(cObject_emit), -1);
   rb_define_private_method(cObject, "signal_implementation", 
 			   RUBY_METHOD_FUNC(cObject_signal_implementation), 4);
@@ -846,45 +836,10 @@ init_qt()
   cObject = rb_define_class_under(mQt, "Object", rb_cObject);
 }
 
-/** :call-seq:
- *
- *	NoQtControl.new inithash
- *	NoQtControl.new { initcode }
- *
- */
-static VALUE
-cNoQtControl_initialize(int argc, VALUE *argv, VALUE v_self)
-{
-  trace("cNoQtControl_initialize");
-  //trace("scan args and assign parent");
-  VALUE v_hash;
-  rb_scan_args(argc, argv, "01", &v_hash);
-  if (!NIL_P(v_hash))
-    rb_funcall(v_self, rb_intern("setupQuickyhash"), 1, v_hash);
-  else if (rb_block_given_p())
-    rb_obj_instance_eval(0, 0, v_self);
-  else if (argc)
-    rb_raise(rb_eArgError, "%d %s ignored in constructor", argc, argc > 1 ? "arguments" : "argument");
-  trace("cNoQtControl_initialize OK");
-  return Qnil;
-}
-
 static VALUE
 cNoQtControl_enqueue_children(VALUE, VALUE)
 {
   return Qnil;
-}
-
-static VALUE 
-cNoQtControl_objectName_get(VALUE)
-{
-  return Qnil;
-}
-
-static VALUE
-cNoQtControl_objectName_set(VALUE v_self, VALUE)
-{
-  rb_raise(rb_eArgError, "cannot assign objectName to a %s", rb_obj_classname(v_self));
 }
 
 static VALUE
@@ -912,6 +867,12 @@ cNoQtControl_qtchildren_set(VALUE v_self, VALUE)
 }
 
 static VALUE
+cNoQtControl_mark_ownership(VALUE)
+{
+  return Qnil;
+}
+
+static VALUE
 cNoQtControl_qtchildren_get(VALUE)
 {
   return rb_ary_new();
@@ -922,9 +883,8 @@ init_control()
 {
   cControl = rb_define_class_under(mQt, "Control", cObject);
   cNoQtControl = rb_define_class_under(mQt, "NoQtControl", cControl);
-  rb_define_private_method(cNoQtControl, "initialize", RUBY_METHOD_FUNC(cNoQtControl_initialize), -1);
-  rb_define_method(cNoQtControl, "objectName_get", RUBY_METHOD_FUNC(cNoQtControl_objectName_get), 0);
-  rb_define_method(cNoQtControl, "objectName=", RUBY_METHOD_FUNC(cNoQtControl_objectName_set), 1);
+  rb_define_private_method(cNoQtControl, "mark_ownership", 
+			   RUBY_METHOD_FUNC(cNoQtControl_mark_ownership), 0);
   rb_define_method(cNoQtControl, "widget?", RUBY_METHOD_FUNC(cNoQtControl_widget_p), 0);
   rb_define_method(cNoQtControl, "enqueue_children", RUBY_METHOD_FUNC(cNoQtControl_enqueue_children), 1);
   rb_define_method(cNoQtControl, "qtparent_get", RUBY_METHOD_FUNC(cNoQtControl_qtparent_get), 0);
@@ -935,8 +895,6 @@ init_control()
   rb_define_method(cNoQtControl, "qtchildren_get", RUBY_METHOD_FUNC(cNoQtControl_qtchildren_get), 0);
   rb_define_method(cNoQtControl, "qtchildren=", RUBY_METHOD_FUNC(cNoQtControl_qtchildren_set), -1);
   rb_define_alias(cNoQtControl, "qtchildren", "qtchildren_get");
-  rb_define_alias(cNoQtControl, "parent_get", "qtparent_get");
-  rb_define_alias(cNoQtControl, "children_get", "qtchildren_get");
 }
 
 } // namespace R_Qt 

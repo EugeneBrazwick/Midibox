@@ -65,7 +65,10 @@ VALUE item2v(QGraphicsItem *i)
   const RValue &rv = rvalue.value<RValue>();
   trace2("item2v(%p) -> rv %p", i, &rv);
   trace2("item2v(%p) -> VALUE = %p", i, (void *)rv.v());
+  /* THIS IS CALLED BY _mark routines and hence, we may only peek.
+   * INSPECT will try to modify memory though....
   trace2("item2v(%p) -> INSPECT -> %s", i, INSPECT(rv)); 
+  */
   return rv; 
 }
 #endif // DEBUG
@@ -87,39 +90,26 @@ zombify(QGraphicsItem *item)
 
 // NOTICE: do NOT call super here!!
 static VALUE
-cGraphicsItem_initialize(int argc, VALUE *argv, VALUE v_self)
+cGraphicsItem_mark_ownership(VALUE v_self)
 {
 #if defined(DEBUG)
   QGraphicsItem * const self = 
 #endif
-			       v2item(v_self); // First mark ownership
+			       v2item(v_self);
 #if defined(DEBUG)
   const VALUE vdbg = item2v(self);
   assert(vdbg == v_self);
 #endif
-  //trace("scan args and assign parent");
-  VALUE v_0, v_1, v_2;
-  rb_scan_args(argc, argv, "03", &v_0, &v_1, &v_2);
-  if (!NIL_P(v_0))
-    {
-      cObject_initialize_arg(v_self, v_0);
-      if (!NIL_P(v_1))
-	{
-	  cObject_initialize_arg(v_self, v_1);
-	  if (!NIL_P(v_2))
-	    cObject_initialize_arg(v_self, v_2);
-	}
-    }
-  if (rb_block_given_p())
-    rb_obj_instance_eval(0, 0, v_self);
   return Qnil;
 }
 
 static void 
 cGraphicsItem_delete(VALUE v_self)
 {
+  trace1("cGraphicsItem_delete, zombified=%d", IS_ZOMBIFIED(v_self));
   if (IS_ZOMBIFIED(v_self)) return;
   RQTDECLSELF_GI(QGraphicsItem);
+  trace1("DELETE QGraphicsItem %p", self);
   zombify(self);
   traqt1("delete QGraphicsItem(%p)", self);
   delete self;
@@ -128,7 +118,7 @@ cGraphicsItem_delete(VALUE v_self)
 static VALUE 
 cGraphicsItem_parent_set(VALUE v_self, VALUE v_parent)
 {
-  trace("cGraphicsItem_parent_set");
+  track2("%s::parent_set(%s)", v_self, v_parent);
   rb_check_frozen(v_self);
   QGraphicsItem *parent = 0;
   if (!NIL_P(v_parent))
@@ -159,47 +149,15 @@ cGraphicsItem_objectName_get(VALUE v_self)
 }
 
 static VALUE
-cGraphicsItem_parent(int argc, VALUE *argv, VALUE v_self)
+cGraphicsItem_parent_get(VALUE v_self)
 {
-  trace("cObject_parent");
+  trace("cGraphicsItem_parent_get");
+  VALUE v_parent = rb_iv_get(v_self, "@parent");
+  if (!NIL_P(v_parent)) return v_parent;
   RQTDECLSELF_GI(QGraphicsItem);
-  if (argc == 0) 
-    {
-      traqt("QGraphicsItem::parentItem");
-      return item2v(self->parentItem());
-    }
-  VALUE v_new_parent;
-  rb_scan_args(argc, argv, "1", &v_new_parent);
-  return cGraphicsItem_parent_set(v_self, v_new_parent);
+  traqt("QGraphicsItem::parentItem");
+  return item2v(self->parentItem());
 }
-
-static VALUE
-cGraphicsItem_each_sub(VALUE v_self)
-{
-  trace1("%s::each_sub", TO_CSTR(v_self));
-  RETURN_ENUMERATOR(v_self, 0, 0);
-  RQTDECLSELF_GI(QGraphicsItem);
-  VALUE v_queue = rb_ary_new();
-  trace("calling enqueue_children");
-  // do NOT pass block. We use the 'fillqueue' variant
-  rb_funcall(v_self, rb_intern("enqueue_children"), 1, v_queue);
-  while (RARRAY_LEN(v_queue))
-    {
-      VALUE v_node = rb_ary_shift(v_queue);
-      track2("%s::each_sub, dequeued %s", v_self, v_node);
-      QGraphicsItem *node;
-      Data_Get_Struct(v_node, QGraphicsItem, node);
-      const VALUE v_truenode = item2v(node);
-      if (!NIL_P(v_truenode))
-	{
-	  rb_yield(v_truenode);
-	  v_node = v_truenode; // otherwise cObject_enqueue_children is always called...
-	}
-      rb_funcall(v_node, rb_intern("enqueue_children"), 1, v_queue);
-    }
-  trace1("DONE %s::each_sub", TO_CSTR(v_self));
-  return Qnil;
-} // cGraphicsItem_each_sub
 
 static VALUE 
 cGraphicsItem_enqueue_children(VALUE v_self, VALUE v_queue)
@@ -208,6 +166,8 @@ cGraphicsItem_enqueue_children(VALUE v_self, VALUE v_queue)
   track2("%s::enqueue_children(%s)", v_self, v_queue);
   RQTDECLSELF_GI(QGraphicsItem);
   traqt("childItems");
+  trace1("self = %p", self);
+  trace2("self = %p, parentItem = %p, calling childItems()", self, self->parentItem());
   const QList<QGraphicsItem*> &children = self->childItems();
   trace1("#children = %d", children.count());
   const bool yield = NIL_P(v_queue);
@@ -251,10 +211,11 @@ cGraphicsItem_emit(int argc, VALUE *argv, VALUE /*v_self*/)
 static VALUE
 cAbstractGraphicsShapeItem_brush_set(VALUE v_self, VALUE v_brush)
 {
+  rb_iv_set(v_self, "@brush", v_brush);
   RQTDECLSELF_GI(QAbstractGraphicsShapeItem);
   RQTDECLARE_BRUSH(brush);
-  track2("%s.setBrush(%s)", v_self, v_brush);
-  traqt("setBrush");
+  track2("%s.brush_set(%s)", v_self, v_brush);
+  traqt1("::setBrush", QTCLASS(self));
   self->setBrush(*brush);
   return v_brush;
 }
@@ -262,9 +223,40 @@ cAbstractGraphicsShapeItem_brush_set(VALUE v_self, VALUE v_brush)
 static VALUE
 cAbstractGraphicsShapeItem_brush_get(VALUE v_self)
 {
-  RQTDECLSELF_GI(QAbstractGraphicsShapeItem);
-  traqt("brush");
-  return cBrushWrap(new QBrush(self->brush()));
+  return rb_iv_get(v_self, "@brush");
+}
+
+static VALUE
+cAbstractGraphicsShapeItem_enqueue_children(VALUE v_self, VALUE v_queue)
+{
+  rb_call_super(1, &v_queue);
+  const bool yield = NIL_P(v_queue);
+  VALUE v_brush = rb_iv_get(v_self, "@brush");
+  if (!NIL_P(v_brush))
+    {
+      if (yield) 
+	  rb_yield(v_brush);
+      else
+	{
+	  Check_Type(v_queue, T_ARRAY);
+	  rb_ary_push(v_queue, v_brush);
+	}
+    }
+  return Qnil;
+}
+
+static void
+init_abstractgraphicsshapeitem(VALUE mQt)
+{
+  cAbstractGraphicsShapeItem = rb_define_class_under(mQt, "AbstractGraphicsShapeItem", cGraphicsItem);
+  rb_define_method(cAbstractGraphicsShapeItem, "brush=", 
+		   RUBY_METHOD_FUNC(cAbstractGraphicsShapeItem_brush_set), 1);
+  rb_define_method(cAbstractGraphicsShapeItem, "brush_get", 
+		   RUBY_METHOD_FUNC(cAbstractGraphicsShapeItem_brush_get), 0);
+  rb_define_method(cAbstractGraphicsShapeItem, "enqueue_children", 
+		   RUBY_METHOD_FUNC(cAbstractGraphicsShapeItem_enqueue_children), 1);
+  /* STUPID IDEA rb_define_attr(cAbstractGraphicsShapeItem, "brush", true/r/, false/w/); 
+   * */
 }
 
 VALUE
@@ -274,20 +266,19 @@ init_graphicsitem(VALUE mQt, VALUE /*cControl*/)
   init_brush(mQt);
   init_color(mQt);
   cGraphicsItem = rb_define_class_under(mQt, "GraphicsItem", cNoQtControl);
-  rb_define_private_method(cGraphicsItem, "initialize", RUBY_METHOD_FUNC(cGraphicsItem_initialize), -1);
+  rb_define_private_method(cGraphicsItem, "mark_ownership", 
+			   RUBY_METHOD_FUNC(cGraphicsItem_mark_ownership), 0);
   rb_define_method(cGraphicsItem, "delete", RUBY_METHOD_FUNC(cGraphicsItem_delete), 0);
-  rb_define_method(cGraphicsItem, "parent", RUBY_METHOD_FUNC(cGraphicsItem_parent), -1);
+  rb_define_method(cGraphicsItem, "parent_get", RUBY_METHOD_FUNC(cGraphicsItem_parent_get), 0);
   rb_define_method(cGraphicsItem, "parent=", RUBY_METHOD_FUNC(cGraphicsItem_parent_set), 1);
-  rb_define_method(cGraphicsItem, "enqueue_children", RUBY_METHOD_FUNC(cGraphicsItem_enqueue_children), 1);
+  rb_define_method(cGraphicsItem, "enqueue_children", 
+		   RUBY_METHOD_FUNC(cGraphicsItem_enqueue_children), 1);
   rb_define_method(cGraphicsItem, "objectName_get", RUBY_METHOD_FUNC(cGraphicsItem_objectName_get), 0);
   rb_define_method(cGraphicsItem, "objectName=", RUBY_METHOD_FUNC(cGraphicsItem_objectName_set), 1);
   rb_define_method(cGraphicsItem, "delete", RUBY_METHOD_FUNC(cGraphicsItem_delete), 0);
-  rb_define_method(cGraphicsItem, "each_sub", RUBY_METHOD_FUNC(cGraphicsItem_each_sub), 0);
   rb_define_private_method(cGraphicsItem, "connect", RUBY_METHOD_FUNC(cGraphicsItem_connect), 2);
   rb_define_private_method(cGraphicsItem, "emit", RUBY_METHOD_FUNC(cGraphicsItem_emit), -1);
-  cAbstractGraphicsShapeItem = rb_define_class_under(mQt, "AbstractGraphicsShapeItem", cGraphicsItem);
-  rb_define_method(cAbstractGraphicsShapeItem, "brush=", RUBY_METHOD_FUNC(cAbstractGraphicsShapeItem_brush_set), 1);
-  rb_define_method(cAbstractGraphicsShapeItem, "brush_get", RUBY_METHOD_FUNC(cAbstractGraphicsShapeItem_brush_get), 0);
+  init_abstractgraphicsshapeitem(mQt);
   return cGraphicsItem;
 };
 

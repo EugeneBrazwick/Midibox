@@ -3,7 +3,7 @@
 // Copyright (c) 2012-2013 Eugene Brazwick
 
 // Comment the following out to remove the DEBUG tags:
-//#define TRACE
+#define TRACE
 
 /** :rdoc:
 
@@ -151,7 +151,7 @@ cApplication_exit(VALUE v_self, VALUE v_exitcode)
 static VALUE 
 cApplication_enqueue_children(VALUE v_self, VALUE v_queue)
 {
-  trace("cApplication_enqueue_children");
+  track2("%s::enqueue_children(%s)", v_self, v_queue);
   rb_call_super(1, &v_queue);
   VALUE v_widgets = rb_iv_get(v_self, "@toplevel_widgets");
   v_widgets = to_ary(v_widgets);
@@ -160,7 +160,7 @@ cApplication_enqueue_children(VALUE v_self, VALUE v_queue)
   const bool yield = NIL_P(v_queue);
   if (!yield)
     v_queue = to_ary(v_queue);
-  trace2("N=%ld, yield=%d", N, yield);
+  trace2("in addition the @toplevel_widgets: N=%ld, yield=%d", N, yield);
   for (VALUE *v_wdgt = RARRAY_PTR(v_widgets); i < N; i++, v_wdgt++)
     {
       if (yield)

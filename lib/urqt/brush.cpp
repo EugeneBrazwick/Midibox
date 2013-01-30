@@ -6,7 +6,7 @@
 
 #pragma implementation
 #include "brush.h"
-#include "object.h"
+#include "graphicsitem.h"
 #include <assert.h>
 #include <QtGui/QBrush>
 
@@ -22,18 +22,49 @@ cBrush_free(QBrush *brush)
   delete brush;
 }
 
+static void
+anything_else(QBrush *self, VALUE v_args)
+{
+  track1("Anything else: %s", v_args);
+  VALUE v_color = rb_class_new_instance(1, &v_args, cColor);
+  RQTDECLARE_COLOR(color);
+  traqt("QBrush()");
+  *self = QBrush(*color);
+}
+
 static VALUE
 cBrush_initialize(int argc, VALUE *argv, VALUE v_self)
 {
   trace1("cBrush_initialize, argc = %d", argc);
   RQTDECLARE_BRUSH(self);
-  VALUE v_args;
+  VALUE v_args, v_parent = Qnil;
   if (argc == 0)
-    v_args = Qnil;
+      v_args = Qnil;
   if (argc == 1)
-    v_args = argv[0];  // this can be a T_ARRAY...
-  else
-    v_args = rb_ary_new4(argc, argv);
+    {
+      v_args = argv[0];  // this can be a T_ARRAY...
+      if (rb_obj_is_kind_of(v_args, cGraphicsItem))
+	{
+	  trace("located parent as argv0");
+	  v_parent = v_args;
+	  v_args = Qnil;
+	}
+    }
+  else // argc > 1
+    {
+      if (rb_obj_is_kind_of(argv[0], cGraphicsItem))
+	{
+	  trace("located parent as argv0, shift");
+	  v_parent = argv[0];
+	  argc--, argv++;
+	} 
+      if (argc == 1)
+	v_args = argv[0];
+      else
+	v_args = rb_ary_new4(argc, argv);
+    }
+  if (!NIL_P(v_parent))
+    rb_funcall(v_self, rb_intern("parent="), 1, v_parent);
   switch (TYPE(v_args))
     {
     case T_DATA:
@@ -42,20 +73,22 @@ cBrush_initialize(int argc, VALUE *argv, VALUE v_self)
 	    track1("Brush %s", v_args);
 	    RQTDECLARE_BRUSH(args);
 	    *self = *args;
-	    return Qnil;
 	  }
 	else if (rb_obj_is_kind_of(v_args, cColor))
 	  {
 	    track1("Color %s", v_args);
 	    RQTDECLARE_COLOR(args);
+	    traqt("QBrush()");
 	    *self = QBrush(*args);
-	    return Qnil;
 	  }
+	else
+	    anything_else(self, v_args);
 	break;
     case T_FALSE:
 	trace("false");
+	traqt("QBrush(NoBrush)");
 	*self = QBrush(Qt::NoBrush);
-	return Qnil;
+	break;
     case T_SYMBOL:
       {
 	const ID id = SYM2ID(v_args);
@@ -64,21 +97,26 @@ cBrush_initialize(int argc, VALUE *argv, VALUE v_self)
 	    || id == rb_intern("no_brush"))
 	  {
 	    trace(":none, :nobrush, :no_brush");
+	    traqt("QBrush(NoBrush)");
 	    *self = QBrush(Qt::NoBrush);
-	    return Qnil;
 	  }
+	else
+	    anything_else(self, v_args);
 	break;
       }
     case T_NIL:
 	if (rb_block_given_p())
 	  {
 	    trace("&block");
-	    return rb_obj_instance_eval(0, 0, v_self);
+	    rb_obj_instance_eval(0, 0, v_self);
 	  }
+	else
+	    anything_else(self, v_args);
 	break;
     case T_HASH:
 	track1("Hash %s", v_args);
-	return rb_funcall(v_self, rb_intern("setupQuickyhash"), 1, v_args); 
+	rb_funcall(v_self, rb_intern("setupQuickyhash"), 1, v_args); 
+	break;
     case T_STRING:
       {
 	const char * const s = StringValueCStr(v_args);
@@ -89,36 +127,105 @@ cBrush_initialize(int argc, VALUE *argv, VALUE v_self)
 	RQTDECLARE_COLOR(color);
 	trace3("v_color=%d,%d,%d", color->red(), color->green(), color->blue());
 	trace1("QColorptr = %p", color);
+	traqt("QBrush(QColor)");
 	*self = QBrush(*color);
 	trace3("self.color=%d,%d,%d", self->color().red(), self->color().green(),
 	       self->color().blue());
-	return Qnil;
+	trace1("self.style=%d", self->style());
+	break;
       }
     case T_ARRAY:
       {
 	track1("Array %s", v_args);
 	VALUE v_color = rb_class_new_instance(RARRAY_LEN(v_args), RARRAY_PTR(v_args), cColor);
 	RQTDECLARE_COLOR(color);
+	traqt("QBrush(QColor)");
 	*self = QBrush(*color);
-	return Qnil;
+	break;
       }
+    default:
+	anything_else(self, v_args);
+	break;
     } // switch TYPE
-  track1("Anything else: %s", v_args);
-  VALUE v_color = rb_class_new_instance(1, &v_args, cColor);
-  RQTDECLARE_COLOR(color);
-  *self = QBrush(*color);
+  // Late assignment, because model_init_path may have changed the color.
+  // Even though it should already have called setBrush in that case.
+  if (!NIL_P(v_parent))
+    {
+      RQTDECLARE_GI(QAbstractGraphicsShapeItem, parent);
+      trace3("cBrush_initialize, Qt-code %s::setBrush(%s, QBrush: %p)", 
+	     TO_CSTR(v_parent), TO_CSTR(v_self), self);
+      traqt2("%p::setBrush(%p)", parent, self);
+      trace5("self type=%d, rgba=%d,%d,%d,%d", self->style(), self->color().red(),
+	     self->color().green(), self->color().blue(), self->color().alpha());
+      /* NICE
+      *self = QBrush("blue");
+      trace5("self type=%d, rgba=%d,%d,%d,%d", self->style(), self->color().red(),
+	     self->color().green(), self->color().blue(), self->color().alpha());
+       */
+      parent->setBrush(*self);
+    }
   return Qnil;
 } // cBrush_initialize
 
 R_QT_DEF_ALLOCATOR_BASE1(Brush)
 
+static VALUE
+cBrush_parent_set(VALUE v_self, VALUE v_parent)
+{
+  rb_check_frozen(v_self);
+  VALUE v_old_parent = rb_iv_get(v_self, "@parent");
+  if (!NIL_P(v_old_parent))
+    rb_funcall(v_old_parent, rb_intern("brush="), 1, Qnil);
+  rb_iv_set(v_self, "@parent", v_parent);
+  if (!NIL_P(v_parent))
+    rb_funcall(v_parent, rb_intern("brush="), 1, v_self);
+  return v_parent;
+}
+
+static VALUE
+cBrush_apply_model(VALUE v_self, VALUE v_data)
+{
+  return rb_funcall(v_self, rb_intern("apply_dynamic_setter"), 2, CSTR2SYM("color"), v_data);
+}
+
+static VALUE
+cBrush_color_set(VALUE v_self, VALUE v_data)
+{
+  track2("%s::color_set(%s)", v_self, v_data);
+  rb_check_frozen(v_self);
+  RQTDECLARE_BRUSH(self);
+  VALUE v_color = rb_class_new_instance(1, &v_data, cColor);
+  RQTDECLARE_COLOR(color);
+  traqt1("%p::setColor", self);
+  trace4("color_set: v_self=%s, color=(%d,%d,%d)", INSPECT(v_self), color->red(), color->green(), color->blue());
+  // INCORRECT self->setColor(*color);
+  *self = QBrush(*color);
+  trace5("self=%p, brush.color=(%d,%d,%d,%d)", self,
+         self->color().red(), self->color().green(), self->color().blue(), self->color().alpha());
+  // But now we must reattach the brush!!
+  const VALUE v_parent = rb_iv_get(v_self, "@parent");
+  RQTDECLARE_GI(QAbstractGraphicsShapeItem, parent);
+  trace2("parent.class=%s, parent=%p", rb_obj_classname(v_parent), parent);
+  trace3("color_set, call setBrush %s (QBrush:%p) on parent %s", TO_CSTR(v_self), self, 
+	 TO_CSTR(v_parent));
+  trace2("parent.class=%s, parent=%p", rb_obj_classname(v_parent), parent);
+  traqt1("%p::setBrush", parent);
+  parent->setBrush(*self);
+  //parent->update();	CHANGE STILL INVISIBLE 
+  return v_data;
+}
+
 void 
 init_brush(VALUE mQt)
 {
+  trace("init_brush");
   cBrush = rb_define_class_under(mQt, "Brush", cNoQtControl);
   rb_define_alloc_func(cBrush, cBrush_alloc);
   rb_define_const(cBrush, "NoBrush", Qt::NoBrush);
   rb_define_private_method(cBrush, "initialize", RUBY_METHOD_FUNC(cBrush_initialize), -1);
+  rb_define_method(cBrush, "parent=", RUBY_METHOD_FUNC(cBrush_parent_set), 1);
+  rb_define_method(cBrush, "apply_model", RUBY_METHOD_FUNC(cBrush_apply_model), 1);
+  rb_define_method(cBrush, "color=", RUBY_METHOD_FUNC(cBrush_color_set), 1);
 }
 
 static void
@@ -137,12 +244,14 @@ cColorWrap(QColor *color)
 
 R_QT_DEF_ALLOCATOR_BASE1(Color)
 
-static VALUE
+static Qt::GlobalColor
 cColor_sym2color(VALUE v_self, VALUE v_sym)
 {
+  track2("%s::sym2color(%s)", v_self, v_sym);
   VALUE v_colors = rb_iv_get(v_self, "@color");
   if (NIL_P(v_colors))
     {
+      trace("setup @color hash");
       v_colors = rb_hash_new();
       rb_iv_set(v_self, "@color", v_colors);
 #define QTCOLOR_DO(sym) \
@@ -166,8 +275,9 @@ cColor_sym2color(VALUE v_self, VALUE v_sym)
       QTCOLOR_DO(lightGray);
       QTCOLOR_DO(transparent);
     }
-  Check_Type(T_HASH, v_colors);
-  return rb_hash_aref(v_colors, v_sym);
+  track1("Check_Type(%s, T_HASH)", v_colors);
+  Check_Type(v_colors, T_HASH);
+  return Qt::GlobalColor(NUM2INT(rb_hash_aref(v_colors, v_sym)));
 }
 
 // where hex is in range '0'..'9' or 'A'..'F'
@@ -330,9 +440,8 @@ cColor_initialize(int argc, VALUE *argv, VALUE v_self)
     case T_SYMBOL:
       {
 	trace("when Symbol");
-	VALUE v_color = cColor_sym2color(cColor, v_colorsym);
-	RQTDECLARE_COLOR(color);
-	*self = *color;
+	const Qt::GlobalColor gc = cColor_sym2color(cColor, v_colorsym);
+	*self = QColor(gc);
 	return Qnil;
       }
     } // switch TYPE v_colorsym
@@ -346,7 +455,7 @@ init_color(VALUE mQt)
   trace("init_color");
   cColor = rb_define_class_under(mQt, "Color", cNoQtControl);
   rb_define_alloc_func(cColor, cColor_alloc);
-  rb_define_module_function(cColor, "sym2color", RUBY_METHOD_FUNC(cColor_sym2color), 1);
+  //  rb_define_module_function(cColor, "sym2color", RUBY_METHOD_FUNC(cColor_sym2color), 1);
   rb_define_private_method(cColor, "initialize", RUBY_METHOD_FUNC(cColor_initialize), -1);
   trace("DONE init_color");
 }

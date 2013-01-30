@@ -2,13 +2,15 @@
 // This document adheres to the GNU coding standard
 // Copyright (c) 2013 Eugene Brazwick
 
+#define TRACE
+
 #include <QtWidgets/QGraphicsEllipseItem>
 #include "application.h"
 #include "graphicsitem.h"
 
 namespace R_Qt {
 
-/* This may be more dreadful than Scenes, since Items are NOT even QObjects.
+/* This may be more dreadful than Scenes, since Items are not even QObjects.
  */
 R_QT_DEF_GRALLOCATOR(GraphicsEllipseItem)
 
@@ -20,6 +22,7 @@ R_QT_DEF_GRALLOCATOR(GraphicsEllipseItem)
 static VALUE
 cGraphicsEllipseItem_rect_set(int argc, VALUE *argv, VALUE v_self)
 {
+  trace("cGraphicsEllipseItem_rect_set");
   rb_check_frozen(v_self);
   RQTDECLSELF_GI(QGraphicsEllipseItem);
   VALUE v_x, v_y, v_w, v_h;
@@ -44,6 +47,7 @@ cGraphicsEllipseItem_rect_set(int argc, VALUE *argv, VALUE v_self)
 static VALUE
 cGraphicsEllipseItem_rect_get(VALUE v_self)
 {
+  trace("cGraphicsEllipseItem_rect_get");
   RQTDECLSELF_GI(QGraphicsEllipseItem);
   const QRectF &rect = self->rect();
   return cRectFWrap(new QRectF(rect));

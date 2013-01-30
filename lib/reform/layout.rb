@@ -13,11 +13,6 @@ module R::Qt
 	parent.addLayout self
       end # parent=
 
-      # override
-      def children
-	each_child.to_a # .tap{|c| tag "children->#{c.inspect}"}
-      end # children
-
   end # class Layout
 
 end # module R::Qt

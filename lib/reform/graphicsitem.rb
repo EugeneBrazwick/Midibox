@@ -46,12 +46,20 @@ module R::Qt
       def brush *args, &block
 	arg0 = args[0]
 	return brush_get unless arg0 || block
-	tag "calling Brush.new with parent #{self}"
-	Brush.new(self, *args, &block)
+	#tag "calling Brush.new with parent #{self}"
+	Brush.new self, *args, &block
       end # brush
+
+      def pen *args, &block
+	arg0 = args[0]
+	return pen_get unless arg0 || block
+	#tag "calling Brush.new with parent #{self}"
+	Pen.new self, *args, &block
+      end # pen
 
       alias :fill :brush
       alias :fillcolor :brush
+      alias :stroke :pen
 
   end # class GraphicsItem
 

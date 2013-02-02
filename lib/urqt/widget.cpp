@@ -3,7 +3,7 @@
 // Copyright (c) 2013 Eugene Brazwick
 
 // Comment the following out to remove the DEBUG tags:
-#define TRACE
+//#define TRACE
 
 /** :rdoc:
 
@@ -16,14 +16,16 @@ This file contains the QWidget wrapper.
 #include <QtWidgets/QWidget>
 #include <QtWidgets/QLayout>
 #include <QtGui/QResizeEvent>
-#include <ruby.h>
-#include "application.h"
 #include "widget.h"
+#include "layout.h" // cLayout
 #include "object.h" // cObjectWrap
 
 namespace R_Qt {
 
 R_QT_DEF_ALLOCATOR(Widget)
+
+static VALUE
+cSynthWidget = Qnil;
 
 static VALUE
 cWidget_show(VALUE v_self)
@@ -237,18 +239,6 @@ cWidget_shown(int argc, VALUE *argv, VALUE v_self)
   return Qnil;
 } // Widget#shown
 
-static bool
-locate_layout_child(QLayout *layout, QObject *child)
-{
-  const int N = layout->count();
-  for (int i = 0; i < N; i++)
-    {
-      if (layout->itemAt(i)->widget() == child)
-	return true;
-    }
-  return false;
-}
-
 static VALUE
 cWidget_enqueue_children(VALUE v_self, VALUE v_queue)
 {
@@ -270,14 +260,27 @@ cWidget_enqueue_children(VALUE v_self, VALUE v_queue)
       /* We must not add widgets WITHIN a layout, since they are virtually
         parented to that layout.
 	However that is not the same as widgets WITH a layout!
+
+
+COMPLICATION: widgets may be nested multiple times:
+	      widget1 { vbox { hbox { vbox { widget2 }}}}
+    widget2 now has qtparent widget1
+
       */
       trace("check for isWidgetType and layout");
-      if (layout && child->isWidgetType() && locate_layout_child(layout, child))
-	{
-	  trace2("located child %s '%s' in layout: SKIP!!", QTCLASS(child), qString2cstr(child->objectName()));
-	  continue;
-	}
       const VALUE v_child = qt2v(child);
+      if (layout && child->isWidgetType())
+	{
+	  if (!NIL_P(v_child)) 
+	    {
+	      const VALUE v_parent = rb_funcall(v_child, rb_intern("parent"), 0);
+	      if (rb_obj_is_kind_of(v_parent, cLayout))
+		{
+		  track1("located child %s in layout: SKIP!!", v_child);
+		  continue;
+		}
+	    }
+	}
       if (yield)
 	{
 	  if (!NIL_P(v_child)) 
@@ -291,7 +294,9 @@ cWidget_enqueue_children(VALUE v_self, VALUE v_queue)
 	  trace("add child to v_queue");
 	  Check_Type(v_queue, T_ARRAY);
 	  if (NIL_P(v_child)) 
-	    rb_ary_push(v_queue, Data_Wrap_Struct(cObject, 0, 0, child));
+	    rb_ary_push(v_queue, 
+		        Data_Wrap_Struct(child->isWidgetType() ? cSynthWidget : cSynthObject, 
+					 0, 0, child));
 	  else
 	    rb_ary_push(v_queue, v_child);
 	}
@@ -316,6 +321,19 @@ cWidget_layout_set(VALUE v_self, VALUE v_layout)
   return v_self;
 } 
 
+static VALUE
+cSynthWidget_synththesized_p(VALUE)
+{
+  return Qtrue;
+}
+
+static inline void
+init_synthwidget(VALUE mQt, VALUE cWidget)
+{
+  cSynthWidget = rb_define_class_under(mQt, "SynthWidget", cWidget);
+  rb_define_method(cSynthWidget, "synthesized?", RUBY_METHOD_FUNC(cSynthWidget_synththesized_p), 0);
+}
+
 VALUE
 init_widget(VALUE mQt, VALUE cControl)
 {
@@ -338,6 +356,7 @@ init_widget(VALUE mQt, VALUE cControl)
   rb_define_method(cWidget, "layout=", RUBY_METHOD_FUNC(cWidget_layout_set), 1);
   rb_define_protected_method(cWidget, "enqueue_children", 
 			     RUBY_METHOD_FUNC(cWidget_enqueue_children), 1);
+  init_synthwidget(mQt, cWidget);
   return cWidget;
 }
 

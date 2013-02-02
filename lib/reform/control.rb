@@ -74,12 +74,12 @@ module R::Qt
 	end
       end
 
+    public #methods of Control
+
       def trace_propagation v = nil
 	return @trace_propagation if v.nil? 
 	@trace_propagation = v
       end
-
-    public #methods of Control
 
       def connector value = nil, &block
 	if z = value || block
@@ -111,7 +111,7 @@ module R::Qt
 	super
 	#tag "#{self}::collect_names = #@collect_names"
 	if @collect_names
-	  tag "COLLECTING NAMES, each_sub=>#{each_sub.to_a.inspect}"
+	  #tag "COLLECTING NAMES, each_sub=>#{each_sub.to_a.inspect}"
 	  each_sub do |child|
 	    if name = child.objectName 
 	      #tag "define_method #{self}::#{name}"
@@ -140,7 +140,7 @@ module R::Qt
     public # methods of NoQtControl
 
       def parent_get
-	tag "#{self}::parent_get @parent = #@parent"
+	#tag "#{self}::parent_get @parent = #@parent"
         @parent
       end
 

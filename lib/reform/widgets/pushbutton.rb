@@ -39,9 +39,9 @@ end
 if __FILE__ == $0
   require 'reform/app'
   Reform.app {
-    fail_on_instantiation_errors true
-    collect_names true
+    #fail_on_instantiation_errors true
     data 'blue'
+    collect_names true
     widget {
       title 'Red and Blue'
       size 240, 200

@@ -8,16 +8,121 @@
 #include "graphicsitem.h"
 #include "brush.h"
 #include "object.h"
+#include "pen.h"
 #include <assert.h>
 #include <QtGui/QBrush>
 
 namespace R_Qt {
 
 VALUE 
-cRectF = Qnil, cPen = Qnil;
+cRectF = Qnil,
+cPointF = Qnil,
+cSizeF = Qnil; 
 
 VALUE
-cGraphicsItem = Qnil, cAbstractGraphicsShapeItem = Qnil;
+cGraphicsItem = Qnil, 
+cAbstractGraphicsShapeItem = Qnil,
+cSynthItem = Qnil;
+
+void
+cPointF_free(QPointF *pt)
+{
+  trace1("cPointF_free(%p)", pt);
+  traqt1("delete QRectF %p", pt);
+  delete pt;
+}
+
+R_QT_DEF_ALLOCATOR_BASE1(PointF)
+
+QPointF
+args2QPointF(int argc, VALUE *argv)
+{
+  trace1("args2QPointF, argc=%d", argc);
+  VALUE v_x, v_y;
+  rb_scan_args(argc, argv, "11", &v_x, &v_y);
+  if (NIL_P(v_y) && TYPE(v_x) == T_ARRAY)
+    {
+      if (RARRAY_LEN(v_x) != 2)
+	rb_raise(rb_eTypeError, "invalid arraylength for a point");
+      v_y = RARRAY_PTR(v_x)[1];
+      v_x = RARRAY_PTR(v_x)[0];
+    }
+  if (NIL_P(v_y))
+    {
+      track1("v_x = %s", v_x);
+      if (TYPE(v_x) == T_DATA)
+	{
+	  // v_x should be a PointF 
+	  return v2pt(v_x);
+	}
+      rb_raise(rb_eTypeError, "invalid value %s to construct a point", INSPECT(v_x));
+    }
+  return QPointF(NUM2DBL(v_x), NUM2DBL(v_y));
+}
+
+static void 
+init_point()
+{
+  cPointF = rb_define_class_under(mQt, "Point", rb_cObject);
+  rb_define_alloc_func(cPointF, cPointF_alloc);
+}
+
+void
+cSizeF_free(QSizeF *pt)
+{
+  trace1("cPointF_free(%p)", pt);
+  traqt1("delete QRectF %p", pt);
+  delete pt;
+}
+
+R_QT_DEF_ALLOCATOR_BASE1(SizeF)
+
+QSizeF
+args2QSizeF(int argc, VALUE *argv)
+{
+  trace1("args2QSizeF, argc=%d", argc);
+  VALUE v_w, v_h;
+  rb_scan_args(argc, argv, "11", &v_w, &v_h);
+  if (NIL_P(v_h) && TYPE(v_w) == T_ARRAY)
+    {
+      switch (RARRAY_LEN(v_w))
+	{
+	case 2:
+	  v_h = RARRAY_PTR(v_w)[1];
+	  // fall through
+	case 1:
+	  v_w = RARRAY_PTR(v_w)[0];
+	  break;
+	default:
+	  rb_raise(rb_eTypeError, "invalid arrahlength for a size");
+	}
+    }
+  if (NIL_P(v_h))
+    {
+      track1("v_w = %s", v_w);
+      switch (TYPE(v_w))
+	{
+	case T_DATA:
+	    // v_w should be a SizeF 
+	    return v2sz(v_w);
+	case T_FIXNUM:
+	case T_FLOAT:
+	  {
+	    const double w = NUM2DBL(v_w);
+	    return QSizeF(w, w);
+	  }
+	}
+      rb_raise(rb_eTypeError, "invalid value %s to construct a size", INSPECT(v_w));
+    }
+  return QSizeF(NUM2DBL(v_w), NUM2DBL(v_h));
+}
+
+static void 
+init_size()
+{
+  cSizeF = rb_define_class_under(mQt, "Size", rb_cObject);
+  rb_define_alloc_func(cSizeF, cSizeF_alloc);
+}
 
 void
 cRectF_free(QRectF *rect)
@@ -29,8 +134,66 @@ cRectF_free(QRectF *rect)
 
 R_QT_DEF_ALLOCATOR_BASE1(RectF)
 
+QRectF
+args2QRectF(int argc, VALUE *argv)
+{
+  trace1("args2QRectF, argc=%d", argc);
+  VALUE v_x, v_y, v_w, v_h;
+  rb_scan_args(argc, argv, "13", &v_x, &v_y, &v_w, &v_h);
+  if (NIL_P(v_y) && TYPE(v_x) == T_ARRAY)
+    {
+      switch (RARRAY_LEN(v_x))
+	{
+	case 4:
+	  v_h = RARRAY_PTR(v_x)[3];
+	  v_w = RARRAY_PTR(v_x)[2];
+	  // fall through
+	case 2:
+	  v_y = RARRAY_PTR(v_x)[1];
+	  // fall through
+	case 1:
+	  v_x = RARRAY_PTR(v_x)[0];
+	  break;
+	default:
+	  rb_raise(rb_eTypeError, "invalid arraylength for a rectangle");
+	}
+    }
+  if (NIL_P(v_y))
+    {
+      switch (TYPE(v_x))
+	{
+	case T_DATA:
+	    // v_x should be a RectF 
+	    track1("v_x = %s", v_x);
+	    return v2rect(v_x);
+	case T_FIXNUM:
+	case T_FLOAT:
+	  {
+	    const double sz = NUM2DBL(v_x);
+	    return QRectF(0.0, 0.0, sz, sz);
+	  }
+	default:
+	  rb_raise(rb_eTypeError, "invalid value %s to construct a rectangle", INSPECT(v_x));
+	}
+    }
+  if (NIL_P(v_w))
+    {
+      switch (TYPE(v_x))
+	{
+	case T_FIXNUM:
+	case T_FLOAT:
+	  return QRectF(0.0, 0.0, NUM2DBL(v_x), NUM2DBL(v_y));
+	}
+      const VALUE v_pos = to_ary(v_x);
+      const VALUE v_sz = to_ary(v_y);
+      return QRectF(NUM2DBL(rb_ary_entry(v_pos, 0)), NUM2DBL(rb_ary_entry(v_pos, 1)),
+		    NUM2DBL(rb_ary_entry(v_sz, 0)), NUM2DBL(rb_ary_entry(v_sz, 1)));
+    }
+  return QRectF(NUM2DBL(v_x), NUM2DBL(v_y), NUM2DBL(v_w), NUM2DBL(v_h));
+}
+
 static void 
-init_rect(VALUE mQt)
+init_rect()
 {
   cRectF = rb_define_class_under(mQt, "Rectangle", rb_cObject);
   rb_define_alloc_func(cRectF, cRectF_alloc);
@@ -183,7 +346,7 @@ cGraphicsItem_enqueue_children(VALUE v_self, VALUE v_queue)
 	{
 	  Check_Type(v_queue, T_ARRAY);
 	  if (NIL_P(v_child)) 
-	    rb_ary_push(v_queue, Data_Wrap_Struct(cGraphicsItem, 0, 0, child));
+	    rb_ary_push(v_queue, Data_Wrap_Struct(cSynthItem, 0, 0, child));
 	  else
 	    rb_ary_push(v_queue, v_child);
 	}
@@ -209,6 +372,21 @@ cGraphicsItem_emit(int argc, VALUE *argv, VALUE /*v_self*/)
 }
 
 static VALUE
+cGraphicsItem_pos_set(int argc, VALUE *argv, VALUE v_self)
+{
+  RQTDECLSELF_GI(QGraphicsItem);
+  self->setPos(args2QPointF(argc, argv));
+  return Qnil;
+}
+
+static VALUE
+cGraphicsItem_pos_get(VALUE v_self)
+{
+  RQTDECLSELF_GI(QGraphicsItem);
+  return cPointFWrap(self->pos());
+}
+
+static VALUE
 cAbstractGraphicsShapeItem_brush_set(VALUE v_self, VALUE v_brush)
 {
   rb_iv_set(v_self, "@brush", v_brush);
@@ -224,6 +402,23 @@ static VALUE
 cAbstractGraphicsShapeItem_brush_get(VALUE v_self)
 {
   return rb_iv_get(v_self, "@brush");
+}
+
+static VALUE
+cAbstractGraphicsShapeItem_pen_set(VALUE v_self, VALUE v_pen)
+{
+  rb_iv_set(v_self, "@pen", v_pen);
+  RQTDECLSELF_GI(QAbstractGraphicsShapeItem);
+  RQTDECLARE_PEN(pen);
+  track2("%s.pen_set(%s)", v_self, v_pen);
+  self->setPen(*pen);
+  return v_pen;
+}
+
+static VALUE
+cAbstractGraphicsShapeItem_pen_get(VALUE v_self)
+{
+  return rb_iv_get(v_self, "@pen");
 }
 
 static VALUE
@@ -253,17 +448,37 @@ init_abstractgraphicsshapeitem(VALUE mQt)
 		   RUBY_METHOD_FUNC(cAbstractGraphicsShapeItem_brush_set), 1);
   rb_define_method(cAbstractGraphicsShapeItem, "brush_get", 
 		   RUBY_METHOD_FUNC(cAbstractGraphicsShapeItem_brush_get), 0);
+  rb_define_method(cAbstractGraphicsShapeItem, "pen=", 
+		   RUBY_METHOD_FUNC(cAbstractGraphicsShapeItem_pen_set), 1);
+  rb_define_method(cAbstractGraphicsShapeItem, "pen_get", 
+		   RUBY_METHOD_FUNC(cAbstractGraphicsShapeItem_pen_get), 0);
   rb_define_method(cAbstractGraphicsShapeItem, "enqueue_children", 
 		   RUBY_METHOD_FUNC(cAbstractGraphicsShapeItem_enqueue_children), 1);
   /* STUPID IDEA rb_define_attr(cAbstractGraphicsShapeItem, "brush", true/r/, false/w/); 
    * */
 }
 
+static VALUE
+cSynthItem_synthesized_p(VALUE)
+{
+  return Qtrue;
+}
+
+static inline void
+init_synthitem(VALUE mQt)
+{
+  cSynthItem = rb_define_class_under(mQt, "SynthGraphicsItem", cGraphicsItem);
+  rb_define_method(cSynthItem, "synthesized?", RUBY_METHOD_FUNC(cSynthItem_synthesized_p), 0);
+}
+
 VALUE
 init_graphicsitem(VALUE mQt, VALUE /*cControl*/)
 {
-  init_rect(mQt);
+  init_point();
+  init_size();
+  init_rect();
   init_brush(mQt);
+  init_pen(mQt);
   init_color(mQt);
   cGraphicsItem = rb_define_class_under(mQt, "GraphicsItem", cNoQtControl);
   rb_define_private_method(cGraphicsItem, "mark_ownership", 
@@ -276,9 +491,13 @@ init_graphicsitem(VALUE mQt, VALUE /*cControl*/)
   rb_define_method(cGraphicsItem, "objectName_get", RUBY_METHOD_FUNC(cGraphicsItem_objectName_get), 0);
   rb_define_method(cGraphicsItem, "objectName=", RUBY_METHOD_FUNC(cGraphicsItem_objectName_set), 1);
   rb_define_method(cGraphicsItem, "delete", RUBY_METHOD_FUNC(cGraphicsItem_delete), 0);
+  rb_define_method(cGraphicsItem, "pos=", RUBY_METHOD_FUNC(cGraphicsItem_pos_set), -1);
+  rb_define_method(cGraphicsItem, "pos_get", RUBY_METHOD_FUNC(cGraphicsItem_pos_get), 0);
   rb_define_private_method(cGraphicsItem, "connect", RUBY_METHOD_FUNC(cGraphicsItem_connect), 2);
   rb_define_private_method(cGraphicsItem, "emit", RUBY_METHOD_FUNC(cGraphicsItem_emit), -1);
+  rb_funcall(cGraphicsItem, rb_intern("attr_dynamic"), 2, cPointF, CSTR2SYM("pos"));
   init_abstractgraphicsshapeitem(mQt);
+  init_synthitem(mQt);
   return cGraphicsItem;
 };
 

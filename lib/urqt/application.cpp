@@ -3,7 +3,7 @@
 // Copyright (c) 2012-2013 Eugene Brazwick
 
 // Comment the following out to remove the DEBUG tags:
-#define TRACE
+//#define TRACE
 
 /** :rdoc:
 

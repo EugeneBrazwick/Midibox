@@ -14,7 +14,11 @@
 
 namespace R_Qt {
 
-VALUE mR = Qnil, mQt = Qnil;
+VALUE 
+mR = Qnil, 
+mQt = Qnil,
+cSynthObject = Qnil
+;
 
 //typedef RPP::DataObject<QObject> RPP_QObject;
 
@@ -124,7 +128,7 @@ zombify(QObject *object)
   const QObjectList &children = object->children();
   foreach (QObject *child, children) 
     {
-      trace1("ITER: cObject.child %s", child->metaObject()->className());
+      trace1("ITER: cObject.child %s", QTCLASS(child));
       // If the object is OWNED by ruby, do NOT let Qt free it (at least here)
       zombify(child);
     }
@@ -378,14 +382,14 @@ cObject_objectName(int argc, VALUE *argv, VALUE v_self)
 static VALUE
 cObject_to_s(VALUE v_self)
 {
-  trace("cObject_to_s");
+  //trace("cObject_to_s");
   // since to_s is used for debugging it is convenient if it accept zombies:
   if (IS_ZOMBIFIED(v_self)) return rb_str_new_cstr("zombie");
   // traqt1("%s::objectName", QTCLASS(self));
   VALUE v_objectName = rb_funcall(v_self, rb_intern("objectName"), 0);
-  track1("objectName->%s", v_objectName);
+  //track1("objectName->%s", v_objectName);
   v_objectName = RQT_TO_S(v_objectName);
-  track1("RQT_TO_S->%s", v_objectName);
+  //track1("RQT_TO_S->%s", v_objectName);
   const char * const objectName = StringValueCStr(v_objectName);
   if (*objectName)
     {
@@ -529,7 +533,7 @@ cObject_enqueue_children(VALUE v_self, VALUE v_queue)
 	{
 	  Check_Type(v_queue, T_ARRAY);
 	  if (NIL_P(v_child)) 
-	    rb_ary_push(v_queue, Data_Wrap_Struct(cObject, 0, 0, child));
+	    rb_ary_push(v_queue, Data_Wrap_Struct(cSynthObject, 0, 0, child));
 	  else
 	    rb_ary_push(v_queue, v_child);
 	}
@@ -583,7 +587,8 @@ cObject_each_sub(VALUE v_self)
     {
       VALUE v_node = rb_ary_shift(v_queue);
       track2("%s::each_sub, dequeued %s", v_self, v_node);
-      rb_yield(v_node);
+      if (!RTEST(rb_funcall(v_node, rb_intern("synthesized?"), 0)))
+	rb_yield(v_node);
       rb_funcall(v_node, rb_intern("enqueue_children"), 1, v_queue);
     }
   trace1("DONE %s::each_sub", TO_CSTR(v_self));
@@ -762,6 +767,12 @@ cObject_widget_p(VALUE v_self)
 }
 
 static VALUE
+cObject_synththesized_p(VALUE)
+{
+  return Qfalse;
+}
+
+static VALUE
 init_object()
 {
   trace("init_object");
@@ -800,6 +811,7 @@ init_object()
   rb_define_protected_method(cObject, "enqueue_children", 
 			     RUBY_METHOD_FUNC(cObject_enqueue_children), 1);
   rb_define_method(cObject, "to_s", RUBY_METHOD_FUNC(cObject_to_s), 0);
+  rb_define_method(cObject, "synthesized?", RUBY_METHOD_FUNC(cObject_synththesized_p), 0);
   trace("init_object OK");
   return cObject;
 }
@@ -882,6 +894,11 @@ static inline void
 init_control()
 {
   cControl = rb_define_class_under(mQt, "Control", cObject);
+}
+
+static void
+init_noqtcontrol()
+{
   cNoQtControl = rb_define_class_under(mQt, "NoQtControl", cControl);
   rb_define_private_method(cNoQtControl, "mark_ownership", 
 			   RUBY_METHOD_FUNC(cNoQtControl_mark_ownership), 0);
@@ -895,6 +912,19 @@ init_control()
   rb_define_method(cNoQtControl, "qtchildren_get", RUBY_METHOD_FUNC(cNoQtControl_qtchildren_get), 0);
   rb_define_method(cNoQtControl, "qtchildren=", RUBY_METHOD_FUNC(cNoQtControl_qtchildren_set), -1);
   rb_define_alias(cNoQtControl, "qtchildren", "qtchildren_get");
+}
+
+static VALUE
+cSynthObject_synththesized_p(VALUE)
+{
+  return Qtrue;
+}
+
+static inline void
+init_synthobject()
+{
+  cSynthObject = rb_define_class_under(mQt, "SynthObject", cObject);
+  rb_define_method(cSynthObject, "synthesized?", RUBY_METHOD_FUNC(cSynthObject_synththesized_p), 0);
 }
 
 } // namespace R_Qt 
@@ -913,6 +943,8 @@ Init_liburqtCore()
   init_rvalue(); // assigns RVALUE_ID
   init_object();
   init_control();
+  init_noqtcontrol();
+  init_synthobject();
   loaded = true;
   trace("Init_liburqtCore OK");
 }

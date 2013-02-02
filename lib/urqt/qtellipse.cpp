@@ -2,7 +2,7 @@
 // This document adheres to the GNU coding standard
 // Copyright (c) 2013 Eugene Brazwick
 
-#define TRACE
+//#define TRACE
 
 #include <QtWidgets/QGraphicsEllipseItem>
 #include "application.h"
@@ -25,22 +25,7 @@ cGraphicsEllipseItem_rect_set(int argc, VALUE *argv, VALUE v_self)
   trace("cGraphicsEllipseItem_rect_set");
   rb_check_frozen(v_self);
   RQTDECLSELF_GI(QGraphicsEllipseItem);
-  VALUE v_x, v_y, v_w, v_h;
-  rb_scan_args(argc, argv, "13", &v_x, &v_y, &v_w, &v_h);
-  if (NIL_P(v_y))
-    {
-      // v_x is a RectF (or an array[4]?)
-      self->setRect(v2rect(v_x));
-    }
-  else if (NIL_P(v_w))
-    { 
-      const VALUE v_pos = to_ary(v_x);
-      const VALUE v_sz = to_ary(v_y);
-      self->setRect(NUM2DBL(rb_ary_entry(v_pos, 0)), NUM2DBL(rb_ary_entry(v_pos, 1)),
-		    NUM2DBL(rb_ary_entry(v_sz, 0)), NUM2DBL(rb_ary_entry(v_sz, 1)));
-    }
-  else
-      self->setRect(NUM2DBL(v_x), NUM2DBL(v_y), NUM2DBL(v_w), NUM2DBL(v_h));
+  self->setRect(args2QRectF(argc, argv));
   return Qnil;
 }
 

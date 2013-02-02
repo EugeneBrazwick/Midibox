@@ -102,7 +102,7 @@ cGraphicsScene_enqueue_children(VALUE v_self, VALUE v_queue)
 	{
 	  Check_Type(v_queue, T_ARRAY);
 	  if (NIL_P(v_child)) 
-	      rb_ary_push(v_queue, Data_Wrap_Struct(cGraphicsItem, 0, 0, child));
+	      rb_ary_push(v_queue, Data_Wrap_Struct(cSynthItem, 0, 0, child));
 	  else
 	    {
 	      trace("add child to v_queue");
@@ -114,6 +114,35 @@ cGraphicsScene_enqueue_children(VALUE v_self, VALUE v_queue)
   return Qnil;
 }
 
+/** :call-seq:
+ *    area w
+ *    area w, h
+ *    area size
+ *    area x, y, w, h
+ *    area rect
+ * 
+ * x and y default to 0.
+ * height defaults to width.
+ */
+static VALUE
+cGraphicsScene_sceneRect_set(int argc, VALUE *argv, VALUE v_self)
+{
+  RQTDECLSELF(QGraphicsScene);
+  trace("calling args2QRectF");
+  const QRectF &rect = args2QRectF(argc, argv);
+  traqt1("setSceneRect(%s)", rect);
+  self->setSceneRect(rect);
+  return Qnil;
+}
+
+static VALUE
+cGraphicsScene_sceneRect_get(VALUE v_self)
+{
+  RQTDECLSELF(QGraphicsScene);
+  // We cannot Wrap just &self->sceneRect() as it is a temporary...
+  return cRectFWrap(new QRectF(self->sceneRect()));
+}
+
 void
 init_graphicsscene(VALUE mQt, VALUE cControl)
 {
@@ -123,10 +152,14 @@ init_graphicsscene(VALUE mQt, VALUE cControl)
   rb_define_method(cGraphicsScene, "addItem", RUBY_METHOD_FUNC(cGraphicsScene_addItem), 1);
   rb_define_method(cGraphicsScene, "addObject", RUBY_METHOD_FUNC(cGraphicsScene_addObject), 1);
   rb_define_method(cGraphicsScene, "parent=", RUBY_METHOD_FUNC(cGraphicsScene_parent_set), 1);
+  rb_define_method(cGraphicsScene, "sceneRect=", RUBY_METHOD_FUNC(cGraphicsScene_sceneRect_set), -1);
+  rb_define_method(cGraphicsScene, "sceneRect_get", RUBY_METHOD_FUNC(cGraphicsScene_sceneRect_get), 0);
   rb_define_method(cGraphicsScene, "children", RUBY_METHOD_FUNC(cGraphicsScene_children), 0);
   rb_define_method(cGraphicsScene, "enqueue_children", 
 		   RUBY_METHOD_FUNC(cGraphicsScene_enqueue_children), 1);
   rb_define_alias(cGraphicsScene, "addGraphicsItem", "addItem");
+  rb_funcall(cGraphicsScene, rb_intern("attr_dynamic"), 2, cRectF, CSTR2SYM("sceneRect"));
+  rb_define_alias(cGraphicsScene, "area", "sceneRect");
 }
 
 } // namespace R_Qt 

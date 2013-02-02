@@ -226,14 +226,14 @@ module R::Qt
 	controlpath[0...-1].each do |control|
 	  v &&= Model::model_apply_connector v, control, cidpath
 	end
-	tag "lastcontrol=#{lastcontrol}, cid=#{(lastcontrol && lastcontrol.connector).inspect}"
-	tag "v = #{v.inspect}"
+	#tag "lastcontrol=#{lastcontrol}, cid=#{(lastcontrol && lastcontrol.connector).inspect}"
+	#tag "v = #{v.inspect}"
 	if v && lastcontrol && cid = lastcontrol.connector
 	  cidpath << cid
-	  tag "cidpath=#{cidpath.inspect}"
-	  tag "lastcontrol=#{lastcontrol}, cid=#{cid}"
+	  #tag "cidpath=#{cidpath.inspect}"
+	  #tag "lastcontrol=#{lastcontrol}, cid=#{cid}"
 	  if Model::model_apply_setter v, cid, value, sender 
-	    tag "setter was applied, now propagate change"
+	    #tag "setter was applied, now propagate change"
 	    model_propagate cidpath, value, sender
 	  end
 	end

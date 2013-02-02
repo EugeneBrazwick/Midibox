@@ -22,6 +22,8 @@ extern void init_##t(VALUE mQt, VALUE cGraphicsItem)
   RQT_APP_SETUP_CONTROL0(application); \
   RQT_APP_SETUP_CONTROL0(layout); \
   RQT_APP_SETUP_GRAPHICSITEM(qtellipse); \
+  RQT_APP_SETUP_GRAPHICSITEM(rectangle); \
+  RQT_APP_SETUP_GRAPHICSITEM(lineitem); \
   RQT_APP_SETUP_WIDGET(label); \
   RQT_APP_SETUP_WIDGET(button); \
   RQT_APP_SETUP_WIDGET(lineedit); \

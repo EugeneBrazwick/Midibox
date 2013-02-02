@@ -4,7 +4,8 @@
 
 //#define TRACE
 
-#include <ruby/ruby.h>
+#pragma implementation
+#include "layout.h"
 #include <QtWidgets/QHBoxLayout>
 #include <QtWidgets/QVBoxLayout>
 #include <QtWidgets/QWidget>
@@ -12,6 +13,9 @@
 #include "widget.h"
 
 namespace R_Qt {
+
+VALUE
+cLayout = Qnil;
 
 R_QT_DEF_ALLOCATOR(HBoxLayout)
 R_QT_DEF_ALLOCATOR(VBoxLayout)
@@ -76,7 +80,7 @@ cLayout_enqueue_children(VALUE v_self, VALUE v_queue)
 	{
 	  Check_Type(v_queue, T_ARRAY);
 	  if (NIL_P(v_child)) 
-	    rb_ary_push(v_queue, Data_Wrap_Struct(cWidget, 0, 0, w));
+	    rb_ary_push(v_queue, Data_Wrap_Struct(cSynthObject, 0, 0, w));
 	  else
 	    rb_ary_push(v_queue, v_child);
 	}
@@ -88,7 +92,7 @@ void
 init_layout(VALUE mQt, VALUE cControl)
 {
   trace("init_layout");
-  const VALUE cLayout = rb_define_class_under(mQt, "Layout", cControl);
+  cLayout = rb_define_class_under(mQt, "Layout", cControl);
   rb_define_method(cLayout, "addWidget", RUBY_METHOD_FUNC(cLayout_addWidget), 1);
   rb_define_protected_method(cLayout, "enqueue_children", 
 			     RUBY_METHOD_FUNC(cLayout_enqueue_children), 1);

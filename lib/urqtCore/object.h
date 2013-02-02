@@ -7,7 +7,7 @@
 #pragma interface
 
 namespace R_Qt {
-extern VALUE mQt, mR;
+extern VALUE mQt, mR, cSynthObject;
 
 extern void cObject_mark(QObject *object);
 extern VALUE cObject_signal_implementation(VALUE v_self, VALUE v_method, VALUE v_signal,

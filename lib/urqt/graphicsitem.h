@@ -63,7 +63,7 @@ GetQGraphicsItem_noDecl(VALUE v_o, T *&q)
   if (!q) rb_raise(rb_eTypeError, "Bad cast to some kind of QGraphicsItem");
 }
 
-extern VALUE cRectF, cPen;
+extern VALUE cRectF, cPointF, cSynthItem, cSizeF;
 
 #define RQTDECLARE_GI(T, var) T *var; GetQGraphicsItem_noDecl<T>(v_##var, var)
 
@@ -77,7 +77,7 @@ static inline QRectF&
 v2rect(VALUE v)
 {
 #if defined(DEBUG)
-  if (!rb_obj_is_kind_of(v, cRectF))
+  if (!rb_obj_is_instance_of(v, cRectF))
     rb_raise(rb_eTypeError, "SERIOUS PROGRAMMING ERROR: very bad cast to QRectF");
 #endif // DEBUG
   QRectF *r;
@@ -94,6 +94,66 @@ cRectFWrap(QRectF *rect)
 {
   return Data_Wrap_Struct(cRectF, 0, cRectF_free, rect);
 }
+
+extern QRectF args2QRectF(int argc, VALUE *argv);
+extern QPointF args2QPointF(int argc, VALUE *argv);
+
+extern void cSizeF_free(QSizeF *pt);
+extern void cPointF_free(QPointF *pt);
+
+static inline VALUE
+cSizeFWrap(QSizeF *pt)
+{
+  return Data_Wrap_Struct(cSizeF, 0, cSizeF_free, pt);
+}
+
+static inline VALUE
+cSizeFWrap(const QSizeF &sz)
+{
+  return Data_Wrap_Struct(cSizeF, 0, cSizeF_free, new QSizeF(sz));
+}
+
+static inline VALUE
+cPointFWrap(QPointF *pt)
+{
+  return Data_Wrap_Struct(cPointF, 0, cPointF_free, pt);
+}
+
+static inline VALUE
+cPointFWrap(const QPointF &pt)
+{
+  return Data_Wrap_Struct(cPointF, 0, cPointF_free, new QPointF(pt));
+}
+
+static inline QPointF&
+v2pt(VALUE v)
+{
+#if defined(DEBUG)
+  if (!rb_obj_is_instance_of(v, cPointF))
+    rb_raise(rb_eTypeError, "SERIOUS PROGRAMMING ERROR: very bad cast to QPointF");
+#endif // DEBUG
+  QPointF *r;
+  Data_Get_Struct(v, QPointF, r);
+  if (!r)
+    rb_raise(rb_eTypeError, "Bad cast to QPointF");
+  return *r;
+};
+
+static inline QSizeF&
+v2sz(VALUE v)
+{
+#if defined(DEBUG)
+  if (!rb_obj_is_instance_of(v, cSizeF))
+    rb_raise(rb_eTypeError, "SERIOUS PROGRAMMING ERROR: very bad cast to QSizeF");
+#endif // DEBUG
+  QSizeF *r;
+  Data_Get_Struct(v, QSizeF, r);
+  if (!r)
+    rb_raise(rb_eTypeError, "Bad cast to QSizeF");
+  return *r;
+};
+
+extern QSizeF args2QSizeF(int argc, VALUE *argv);
 
 } // namespace R_Qt 
 #endif // _URQT_GRAPHICSITEM_H_

@@ -113,6 +113,7 @@ module R::Ake
     dep = src2dep unit
     depcmd = [CXX, *CXXFLAGS, '-MM', unit].shelljoin
     r = execute(depcmd, 'CPP -> dependencies')
+    raise "Creating dep for '#{unit}' failed" if r.strip.empty?
     #STDERR.puts "Now writing to #{dep}"
     File.open(dep, 'w') { |f| f.write r }
     r # !
@@ -183,7 +184,26 @@ BECAUSE THE CURRENT METHOD ALWAYS calcs the d's.
   And the second file should build the correct reqs for the first.
 
   Example: rm *.d
-  The rules then become:    X.o => X.d => X.cpp
+  The rules then become:    X.o => X.d =    r
+  ret
+};
+
+stati
+v2sz(
+{
+#if d
+  if 
+    r
+#endi
+  QSi
+  Dat
+  if 
+    r
+  ret
+};
+
+exter
+> X.cpp
   so it regenerates .d and should then alter the X.o reqlist.
 
   If we change the .cpp file it is regenerated and so is the .o

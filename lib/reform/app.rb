@@ -1,6 +1,7 @@
 
 #  Copyright (c) 2013 Eugene Brazwick
 
+require_relative 'control'    # for attr_dynamic
 require_relative 'context'
 
 module R
@@ -65,7 +66,7 @@ module Reform
       for dir in dirs
 #         tag "Calling internalize #{dir}"
 	internalize dir, widgets: R::Qt::Widget, graphics: R::Qt::GraphicsItem,
-			 models: R::Qt::Model
+			 models: R::Qt::Model, any: R::Qt::Control
       end
     end # internalize_dir
 

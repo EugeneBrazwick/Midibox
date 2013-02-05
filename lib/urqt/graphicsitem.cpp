@@ -22,7 +22,8 @@ cSizeF = Qnil;
 VALUE
 cGraphicsItem = Qnil, 
 cAbstractGraphicsShapeItem = Qnil,
-cSynthItem = Qnil;
+cSynthItem = Qnil,
+cGraphicsLineItem = Qnil;
 
 void
 cPointF_free(QPointF *pt)
@@ -213,8 +214,9 @@ cGraphicsItem_mark(QGraphicsItem *item)
     {
       traqt1("QGraphicsItem::data(%d)", i);
       const QVariant &var = item->data(i);
-      assert(var.canConvert<RValue>());
-      rb_gc_mark(var.value<RValue>());
+      trace2("i=%d (0:VALUE, 1:objectName), var=%s", i, qString2cstr(var.toString()));
+      if (var.canConvert<RValue>()) // might be corrupted??
+	rb_gc_mark(var.value<RValue>());
     }
 } // cGraphicsItem_mark
 

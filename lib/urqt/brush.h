@@ -45,6 +45,21 @@ cBrushWrap(QBrush *brush)
   return Data_Wrap_Struct(cBrush, 0, cBrush_free, brush);
 }
 
+extern void cColor_free(QColor *color);
+
+static inline VALUE
+cColorWrap(QColor *color)
+{
+  trace1("cColorWrap(%p)", color);
+  return Data_Wrap_Struct(cColor, 0, cColor_free, color);
+} // cColorWrap
+
+static inline VALUE
+cColorWrap(const QColor &color)
+{
+  return Data_Wrap_Struct(cColor, 0, cColor_free, new QColor(color));
+} // cColorWrap
+
 extern void init_color(VALUE mQt);
 extern void init_brush(VALUE mQt);
 

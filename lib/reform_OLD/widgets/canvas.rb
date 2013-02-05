@@ -110,7 +110,7 @@ If items fall from the screen the canvas does not become bigger.
         if controlklass <= GraphicsItem then nil else super end
       end
 
-        # NOTE: this methods must be public!!
+        # NOTE: these methods must be public!!
       def_delegators :infused_scene!, :addGraphicsItem, :registeredBrush,
                     :registeredPen, :area, :addAnimation, :addState, :background
 

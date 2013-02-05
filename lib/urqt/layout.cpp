@@ -9,6 +9,7 @@
 #include <QtWidgets/QHBoxLayout>
 #include <QtWidgets/QVBoxLayout>
 #include <QtWidgets/QWidget>
+#include <QtWidgets/QGridLayout>
 #include "application.h"
 #include "widget.h"
 
@@ -16,9 +17,6 @@ namespace R_Qt {
 
 VALUE
 cLayout = Qnil;
-
-R_QT_DEF_ALLOCATOR(HBoxLayout)
-R_QT_DEF_ALLOCATOR(VBoxLayout)
 
 static VALUE
 cBoxLayout_addLayout(VALUE v_self, VALUE v_layout)
@@ -29,6 +27,9 @@ cBoxLayout_addLayout(VALUE v_self, VALUE v_layout)
   return v_self;
 }
 
+R_QT_DEF_ALLOCATOR(HBoxLayout)
+R_QT_DEF_ALLOCATOR(VBoxLayout)
+
 static void
 init_boxlayout(VALUE mQt, VALUE cLayout)
 {
@@ -38,6 +39,74 @@ init_boxlayout(VALUE mQt, VALUE cLayout)
   rb_define_alloc_func(cVBox, cVBoxLayout_alloc);
   const VALUE cHBox = rb_define_class_under(mQt, "HBoxLayout", cBoxLayout);
   rb_define_alloc_func(cHBox, cHBoxLayout_alloc);
+}
+
+R_QT_DEF_ALLOCATOR(GridLayout)
+
+static VALUE
+cGridLayout_columnCount(int argc, VALUE *argv, VALUE v_self)
+{
+  if (argc == 0)
+    {
+      const VALUE r = rb_iv_get(v_self, "@columnCount");
+      if (RTEST(r)) return r;
+      RQTDECLSELF(QGridLayout);
+      return INT2NUM(self->columnCount());
+    }
+  VALUE v_columnCount;
+  rb_scan_args(argc, argv, "1", &v_columnCount);
+  rb_iv_set(v_self, "@columnCount", v_columnCount); 
+  return v_columnCount;
+}
+
+static VALUE
+cGridLayout_initialize(int argc, VALUE *argv, VALUE v_self)
+{
+  rb_call_super(argc, argv);
+  rb_iv_set(v_self, "currow", INT2NUM(0));
+  rb_iv_set(v_self, "curcol", INT2NUM(0));
+  return Qnil;
+}
+
+#define GRIDLAYOUT_ADD(X) \
+static VALUE \
+cGridLayout_add##X(VALUE v_self, VALUE v_x) \
+{ \
+  RQTDECLSELF(QGridLayout); \
+  RQTDECLARE(Q##X, x); \
+  int currow = NUM2INT(rb_iv_get(v_self, "currow")); \
+  const int currow_org = currow; \
+  int curcol = NUM2INT(rb_iv_get(v_self, "curcol")); \
+  const int columnCount = NUM2INT(rb_funcall(v_self, rb_intern("columnCount"), 0)); \
+  self->add##X(x, currow, curcol); \
+  if (++curcol == columnCount) \
+    { \
+      currow++; \
+      curcol = 0; \
+    } \
+  rb_iv_set(v_self, "curcol", INT2NUM(curcol)); \
+  if (currow_org != currow) \
+    rb_iv_set(v_self, "currow", INT2NUM(currow)); \
+  rb_iv_set(v_x, "@parent", v_self); /* see cLayout_addWidget */ \
+  return v_self; \
+}
+
+GRIDLAYOUT_ADD(Widget)
+GRIDLAYOUT_ADD(Layout)
+
+static void
+init_gridlayout(VALUE mQt, VALUE cLayout)
+{
+  const VALUE cGridLayout = rb_define_class_under(mQt, "GridLayout", cLayout);
+  rb_define_alloc_func(cGridLayout, cGridLayout_alloc);
+  rb_define_method(cGridLayout, "columnCount", RUBY_METHOD_FUNC(cGridLayout_columnCount), -1);
+  rb_define_alias(cGridLayout, "columncount", "columnCount");
+  rb_define_alias(cGridLayout, "colcount", "columnCount");
+  rb_define_alias(cGridLayout, "colums", "columnCount");
+  rb_define_private_method(cGridLayout, "initialize", 
+			   RUBY_METHOD_FUNC(cGridLayout_initialize), -1);
+  rb_define_method(cGridLayout, "addWidget", RUBY_METHOD_FUNC(cGridLayout_addWidget), 1);
+  rb_define_method(cGridLayout, "addLayout", RUBY_METHOD_FUNC(cGridLayout_addLayout), 1);
 }
 
 static VALUE
@@ -97,6 +166,7 @@ init_layout(VALUE mQt, VALUE cControl)
   rb_define_protected_method(cLayout, "enqueue_children", 
 			     RUBY_METHOD_FUNC(cLayout_enqueue_children), 1);
   init_boxlayout(mQt, cLayout);
+  init_gridlayout(mQt, cLayout);
 }
 
 } // namespace R_Qt

@@ -2,6 +2,8 @@
 // This document adheres to the GNU coding standard
 // Copyright (c) 2013 Eugene Brazwick
 
+//#define TRACE
+
 #pragma implementation
 #include "pen.h"
 #include "graphicsitem.h"
@@ -38,6 +40,29 @@ anything_else(QPen *self, VALUE v_args)
   *self = QPen(*color);
 }
 
+static void
+reattach(VALUE v_self, QPen *self)
+{
+  track1("%s::reattach", v_self);
+  const VALUE v_parent = rb_iv_get(v_self, "@parent");
+  if (NIL_P(v_parent)) return;
+  if (rb_obj_is_kind_of(v_parent, cGraphicsLineItem))
+    {
+      RQTDECLARE_GI(QGraphicsLineItem, parent);
+      parent->setPen(*self);
+    }
+  else
+    {
+      RQTDECLARE_GI(QAbstractGraphicsShapeItem, parent);
+      trace2("parent.class=%s, parent=%p", rb_obj_classname(v_parent), parent);
+      trace3("color_set, call setPen %s (QPen:%p) on parent %s", TO_CSTR(v_self), self, 
+	     TO_CSTR(v_parent));
+      trace2("parent.class=%s, parent=%p", rb_obj_classname(v_parent), parent);
+      traqt1("%p::setPen", parent);
+      parent->setPen(*self);
+    }
+}
+
 // This is in fact almost identical to cBrush_initialize
 static VALUE
 cPen_initialize(int argc, VALUE *argv, VALUE v_self)
@@ -61,7 +86,7 @@ cPen_initialize(int argc, VALUE *argv, VALUE v_self)
     {
       if (rb_obj_is_kind_of(argv[0], cGraphicsItem))
 	{
-	  trace("located parent as argv0, shift");
+	  track1("located parent '%s' as argv0, shift", argv[0]);
 	  v_parent = argv[0];
 	  argc--, argv++;
 	} 
@@ -153,21 +178,7 @@ cPen_initialize(int argc, VALUE *argv, VALUE v_self)
     } // switch TYPE
   // Late assignment, because model_init_path may have changed the color.
   // Even though it should already have called setPen in that case.
-  if (!NIL_P(v_parent))
-    {
-      RQTDECLARE_GI(QAbstractGraphicsShapeItem, parent);
-      trace3("cPen_initialize, Qt-code %s::setPen(%s, QPen: %p)", 
-	     TO_CSTR(v_parent), TO_CSTR(v_self), self);
-      traqt2("%p::setPen(%p)", parent, self);
-      trace5("self type=%d, rgba=%d,%d,%d,%d", self->style(), self->color().red(),
-	     self->color().green(), self->color().blue(), self->color().alpha());
-      /* NICE
-      *self = QPen("blue");
-      trace5("self type=%d, rgba=%d,%d,%d,%d", self->style(), self->color().red(),
-	     self->color().green(), self->color().blue(), self->color().alpha());
-       */
-      parent->setPen(*self);
-    }
+  reattach(v_self, self);
   return Qnil;
 } // cPen_initialize
 
@@ -206,17 +217,37 @@ cPen_color_set(VALUE v_self, VALUE v_data)
   trace5("self=%p, pen.color=(%d,%d,%d,%d)", self,
          self->color().red(), self->color().green(), self->color().blue(), 
 	 self->color().alpha());
-  // But now we must reattach the pen!!
-  const VALUE v_parent = rb_iv_get(v_self, "@parent");
-  RQTDECLARE_GI(QAbstractGraphicsShapeItem, parent);
-  trace2("parent.class=%s, parent=%p", rb_obj_classname(v_parent), parent);
-  trace3("color_set, call setPen %s (QPen:%p) on parent %s", TO_CSTR(v_self), self, 
-	 TO_CSTR(v_parent));
-  trace2("parent.class=%s, parent=%p", rb_obj_classname(v_parent), parent);
-  traqt1("%p::setPen", parent);
-  parent->setPen(*self);
+  reattach(v_self, self);
   //parent->update();	CHANGE STILL INVISIBLE 
   return v_data;
+}
+
+static VALUE
+cPen_color_get(VALUE v_self)
+{
+  track1("%s::color_get()", v_self);
+  RQTDECLARE_PEN(self);
+  return cColorWrap(self->color());
+} // cPen_color_get
+
+static VALUE
+cPen_widthF_set(VALUE v_self, VALUE v_widthF)
+{
+  track2("%s::widthF_set(%s)", v_self, v_widthF);
+  RQTDECLARE_PEN(self);
+  if (TYPE(v_widthF) == T_SYMBOL && v_widthF == CSTR2SYM("cosmetic"))
+    self->setWidthF(0);
+  else
+    self->setWidthF(NUM2DBL(v_widthF));
+  reattach(v_self, self);
+  return v_widthF;
+}
+
+static VALUE
+cPen_widthF_get(VALUE v_self)
+{
+  RQTDECLARE_PEN(self);
+  return DBL2NUM(self->widthF());
 }
 
 void 
@@ -231,6 +262,14 @@ init_pen(VALUE mQt)
   rb_define_method(cPen, "parent=", RUBY_METHOD_FUNC(cPen_parent_set), 1);
   rb_define_method(cPen, "apply_model", RUBY_METHOD_FUNC(cPen_apply_model), 1);
   rb_define_method(cPen, "color=", RUBY_METHOD_FUNC(cPen_color_set), 1);
+  rb_define_method(cPen, "color_get", RUBY_METHOD_FUNC(cPen_color_get), 0);
+  rb_funcall(cPen, rb_intern("attr_dynamic"), 2, cColor, CSTR2SYM("color"));
+  rb_define_method(cPen, "widthF=", RUBY_METHOD_FUNC(cPen_widthF_set), 1);
+  rb_define_method(cPen, "widthF_get", RUBY_METHOD_FUNC(cPen_widthF_get), 0);
+  rb_funcall(cPen, rb_intern("attr_dynamic"), 2, rb_cFloat, CSTR2SYM("widthF"));
+  rb_define_alias(cPen, "width", "widthF");
+  rb_define_alias(cPen, "size", "widthF");
+  rb_define_alias(cPen, "weight", "widthF");
 }
 
 } // namespace R_Qt 

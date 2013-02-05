@@ -2,11 +2,13 @@
 #  Copyright (c) 2013 Eugene Brazwick
 
 require_relative '../context'
+require_relative '../layoutable'
 
 module R::Qt
   class Widget < Control
       # you can include any widget inside any other:
       include Reform::WidgetContext
+      include Layout::Able
 
     public # methods of Widget
 

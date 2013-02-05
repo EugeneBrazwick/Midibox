@@ -24,6 +24,14 @@ cGraphicsView_scene_set(VALUE v_self, VALUE v_scene)
 }
 
 static VALUE
+cGraphicsView_scene_get(VALUE v_self)
+{
+  track1("%s::scene_get", v_self);
+  RQTDECLSELF(QGraphicsView);
+  return qt2v(self->scene());
+}
+
+static VALUE
 cGraphicsView_initialize(int argc, VALUE *argv, VALUE v_self)
 {
   rb_call_super(argc, argv); 
@@ -83,6 +91,7 @@ init_graphicsview(VALUE mQt, VALUE cWidget)
   rb_define_private_method(cGraphicsView, "initialize", 
 			   RUBY_METHOD_FUNC(cGraphicsView_initialize), -1);
   rb_define_method(cGraphicsView, "scene=", RUBY_METHOD_FUNC(cGraphicsView_scene_set), 1);
+  rb_define_method(cGraphicsView, "scene_get", RUBY_METHOD_FUNC(cGraphicsView_scene_get), 0);
   rb_define_method(cGraphicsView, "scale=", RUBY_METHOD_FUNC(cGraphicsView_scale_set), -1);
   rb_define_method(cGraphicsView, "scale_get", RUBY_METHOD_FUNC(cGraphicsView_scale_get), 0);
   rb_funcall(cGraphicsView, rb_intern("attr_dynamic"), 2, cSizeF, CSTR2SYM("scale"));

@@ -68,8 +68,7 @@ cGraphicsLineItem_to_get(VALUE v_self)
 void
 init_lineitem(VALUE mQt, VALUE cGraphicsItem)
 {
-  const VALUE cGraphicsLineItem = rb_define_class_under(mQt, "GraphicsLineItem", 
-						 	cGraphicsItem);
+  cGraphicsLineItem = rb_define_class_under(mQt, "GraphicsLineItem", cGraphicsItem);
   rb_define_alloc_func(cGraphicsLineItem, cGraphicsLineItem_alloc);
   rb_define_method(cGraphicsLineItem, "to=", RUBY_METHOD_FUNC(cGraphicsLineItem_to_set), -1);
   rb_define_method(cGraphicsLineItem, "to_get", RUBY_METHOD_FUNC(cGraphicsLineItem_to_get), 0);

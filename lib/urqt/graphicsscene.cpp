@@ -7,10 +7,11 @@
 #include <QtWidgets/QGraphicsView>
 #include "application.h"
 #include "graphicsitem.h"
+#include "brush.h"
 
 namespace R_Qt {
 
-static VALUE 
+VALUE 
 cGraphicsScene = Qnil;
 
 /* NOTE: _mark methods may NOT allocate or free ruby values.
@@ -143,6 +144,35 @@ cGraphicsScene_sceneRect_get(VALUE v_self)
   return cRectFWrap(new QRectF(self->sceneRect()));
 }
 
+static VALUE
+cGraphicsScene_backgroundBrush_set(VALUE v_self, VALUE v_brush)
+{
+  rb_iv_set(v_self, "@brush", v_brush);
+  RQTDECLSELF(QGraphicsScene);
+  RQTDECLARE_BRUSH(brush);
+  track2("%s.brush_set(%s)", v_self, v_brush);
+  traqt1("::setBackgroundBrush", QTCLASS(self));
+  self->setBackgroundBrush(*brush);
+  return v_brush;
+}
+
+static VALUE
+cGraphicsScene_backgroundBrush_get(VALUE v_self)
+{
+  return rb_iv_get(v_self, "@brush");
+}
+
+static VALUE
+cGraphicsScene_backgroundBrush(int argc, VALUE *argv, VALUE v_self)
+{
+  if (argc == 0)
+    return cGraphicsScene_backgroundBrush_get(v_self);
+  VALUE argv_ex[argc + 1];
+  argv_ex[0] = v_self;
+  memcpy(argv_ex + 1, argv, argc * sizeof(VALUE));
+  return rb_funcall_passing_block(cBrush, rb_intern("new"), argc + 1, argv_ex);
+}
+
 void
 init_graphicsscene(VALUE mQt, VALUE cControl)
 {
@@ -160,6 +190,15 @@ init_graphicsscene(VALUE mQt, VALUE cControl)
   rb_define_alias(cGraphicsScene, "addGraphicsItem", "addItem");
   rb_funcall(cGraphicsScene, rb_intern("attr_dynamic"), 2, cRectF, CSTR2SYM("sceneRect"));
   rb_define_alias(cGraphicsScene, "area", "sceneRect");
+  rb_define_method(cGraphicsScene, "backgroundBrush=", 
+		   RUBY_METHOD_FUNC(cGraphicsScene_backgroundBrush_set), 1);
+  rb_define_method(cGraphicsScene, "backgroundBrush_get", 
+		   RUBY_METHOD_FUNC(cGraphicsScene_backgroundBrush_get), 0);
+  rb_define_method(cGraphicsScene, "backgroundBrush", 
+		   RUBY_METHOD_FUNC(cGraphicsScene_backgroundBrush), -1);
+  rb_define_alias(cGraphicsScene, "background", "backgroundBrush");
+  // the next one makes life easier for brush.cpp
+  rb_define_alias(cGraphicsScene, "brush=", "backgroundBrush=");
 }
 
 } // namespace R_Qt 

@@ -49,10 +49,11 @@ v2item(VALUE v_q)
   return q;
 }
 
-extern VALUE cGraphicsItem, cAbstractGraphicsShapeItem;
+extern VALUE cGraphicsItem, cAbstractGraphicsShapeItem, cGraphicsScene,
+	     cGraphicsLineItem;
 
 template <typename T> static inline void
-GetQGraphicsItem_noDecl(VALUE v_o, T *&q)
+GetQGraphicsItem_noDecl(VALUE v_o, T *&q, const char *type)
 {
 #if defined(DEBUG)
   if (!rb_obj_is_kind_of(v_o, cGraphicsItem))
@@ -60,12 +61,12 @@ GetQGraphicsItem_noDecl(VALUE v_o, T *&q)
 #endif // DEBUG
   GET_STRUCT(QGraphicsItem, o);
   q = dynamic_cast<T *>(o);
-  if (!q) rb_raise(rb_eTypeError, "Bad cast to some kind of QGraphicsItem");
+  if (!q) rb_raise(rb_eTypeError, "Bad cast from %s (qtptr: %p) to %s", INSPECT(v_o), o, type);
 }
 
 extern VALUE cRectF, cPointF, cSynthItem, cSizeF;
 
-#define RQTDECLARE_GI(T, var) T *var; GetQGraphicsItem_noDecl<T>(v_##var, var)
+#define RQTDECLARE_GI(T, var) T *var; GetQGraphicsItem_noDecl<T>(v_##var, var, #T)
 
 #if defined(DEBUG)
 #define RQTDECLSELF_GI(T) RQTDECLARE_GI(T, self)

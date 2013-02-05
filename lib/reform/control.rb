@@ -5,10 +5,6 @@ module R::Qt
 
   class Control < Object  # ie Qt::Object!
     private  # methods of Control
-      # callback
-      def parent2use4 child
-	self
-      end
 
       # handle_dynamics must move to C++ since it is required for many Qt 
       # classes as well!
@@ -42,7 +38,24 @@ module R::Qt
 	@collect_names = v
       end
 
+      def use macro_id
+	if macro = collector!.send(macro_id)
+	  block = macro.block and instance_eval(&block)
+	  quicky = macro.quicky and setupQuickyhash quicky
+	end
+      end
+
+      def collector!
+	collector or 
+	  raise Reform::Error, "no collector found, please use 'collect_names true'"
+      end
+
     protected #methods of Control
+
+      # the closest parent (or self) which has collect_names true.
+      def collector
+	collect_names && self || (p = parent) && p.collector
+      end
 
       def apply_dynamic_setter method, *args
 	send method.to_s + '=', *args
@@ -74,6 +87,16 @@ module R::Qt
 	end
       end
 
+	# context: Control#objectName=
+      def registerName name, child
+	#tag "registerName(#{name})"
+	m = method(name) rescue nil
+	raise NameError, "the name '#{name}' is already in use" if m
+	define_singleton_method name do
+	  child
+	end
+      end # registerName
+
     public #methods of Control
 
       def trace_propagation v = nil
@@ -101,26 +124,6 @@ module R::Qt
 	for method in methods
 	  define_method method do |*args, &block|
 	    handle_dynamics klass, method, options, *args, &block
-	  end
-	end
-      end
-
-      # override
-      def setup hash = nil, &block
-	#tag "#{self}::setup"
-	super
-	#tag "#{self}::collect_names = #@collect_names"
-	if @collect_names
-	  #tag "COLLECTING NAMES, each_sub=>#{each_sub.to_a.inspect}"
-	  each_sub do |child|
-	    if name = child.objectName 
-	      #tag "define_method #{self}::#{name}"
-	      m = method(name) rescue nil
-	      raise NameError, "the name '#{name}' is already in use" if m
-	      define_singleton_method name do
-		child
-	      end
-	    end
 	  end
 	end
       end

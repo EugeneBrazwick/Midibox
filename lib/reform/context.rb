@@ -66,9 +66,7 @@ module Reform  # aka R::EForm
 		raise ArgumentError, "Bad param #{quicky.inspect} passed to instantiator '#{name}'" 
 	      end
 #             tag "quicky hash = #{quicky.inspect}"
-	      # It's important to use parent_qtc_to_use, since it must be a true widget.
-	      parent = quicky && quicky[:parent] || parent2use4(klass)
-	      child = instantiate_child klass, parent
+	      child = instantiate_child klass, self
 	      child.setup quicky, &block
 	    end # R::escue
 	  end  # define_method
@@ -183,7 +181,10 @@ module Reform  # aka R::EForm
 		 R::Qt::Animation=>[AnimationContext], # , MacroContext],
 		 R::Qt::AbstractState=>[StateContext], # , MacroContext],
 		 R::Qt::Menu=>[MenuContext],
-		 R::Qt::AbstractAction=>[ActionContext]
+		 R::Qt::AbstractAction=>[ActionContext],
+		 R::Qt::Control=>[WidgetContext, ModelContext, GraphicContext,
+				  AnimationContext, StateContext, MenuContext,
+				  ActionContext] # aka 'any'
 		}
 
     def self.context4 klass

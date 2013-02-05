@@ -890,10 +890,27 @@ cNoQtControl_qtchildren_get(VALUE)
   return rb_ary_new();
 }
 
+// override
+static VALUE
+cControl_objectName_set(VALUE v_self, VALUE v_newname)
+{
+  track2("%s::objectName = %s", v_self, v_newname);
+  rb_call_super(1, &v_newname);
+  if (RTEST(v_newname))
+    {
+      VALUE v_collector = rb_funcall(v_self, rb_intern("collector"), 0);
+      track1("collector=%s", v_collector);
+      if (RTEST(v_collector))
+	rb_funcall(v_collector, rb_intern("registerName"), 2, v_newname, v_self);
+    }
+  return v_newname;
+}
+
 static inline void
 init_control()
 {
   cControl = rb_define_class_under(mQt, "Control", cObject);
+  rb_define_method(cControl, "objectName=", RUBY_METHOD_FUNC(cControl_objectName_set), 1);
 }
 
 static void

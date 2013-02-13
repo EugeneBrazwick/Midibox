@@ -7,6 +7,7 @@ describe "R::Qt::Data" do
 
   it "connects to data stored elsewhere" do
     Reform::app {
+      fail_on_errors true
       data TITLE
       widget {
 	name 'bert'
@@ -20,10 +21,11 @@ describe "R::Qt::Data" do
   it "connects to data stored elsewhere, but not out of order" do
     $example = self
     Reform::app {
+      fail_on_errors true
       widget {
 	name 'bert'
 	title {
-	  $example.expect { connector :self }.to $example.raise_error Reform::Error
+	  $example.expect { connector :self }.to $example.raise_error NoMethodError
 	}
 	shown { $app.quit }
       } # widget
@@ -35,7 +37,7 @@ describe "R::Qt::Data" do
   it "you cannot create more than 1 model in any control" do
     expect {
       Reform::app {
-	fail_on_instantiation_errors true
+	fail_on_errors true
 	data TITLE
 	data TITLE
       }

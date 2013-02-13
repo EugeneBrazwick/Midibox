@@ -1,6 +1,6 @@
 
 #STDERR.puts "loading liburqt.so"
-require_relative '../urqt/liburqt'
+require_relative 'liburqt'
 require_relative 'control'
 
 module R
@@ -18,28 +18,7 @@ end # module R
 
 module Reform  # aka R::EForm
 
-=begin :rdoc:
-    basemodule for WidgetContext, GraphicContext etc.
-    As such it has a big impact on all Frame and Scene derivates, 
-    which are most container classes.
-
-    For example: including GraphicContext means that you get access to methods like
-    'circle', 'rect' etc.  But these are ALL plugins from the corresponding directory.
-    In this case reform/graphics. By storing the methods inside the contect
-    we automatically
-    make them available precisely (pinpoint accuracy!) to the classes of our choice.
-    A class can easily support more than one context.
-
-    First we have instantiators for each file/class in the controls or graphics directory.
-    For example, since canvas.rb is in controls/ we have an instantiator 'canvas' in all
-    frames (widgetcontainers) and its subclasses.
-    This instantiator accepts an optional string and a setup block.
-    When called we decide to what parent to add the control, associated with the class involved,
-    in this case a 'Canvas', which is a Qt::GraphicsView wrapper (see canvas.rb).
-    At that point first the Qt implementor is instatiated, and then the Reform wrapper.
-    We then call Canvas.addControl(graphicsview, setupblock).
-    This should execute the setupblock, and finally call postSetup on the canvas.
-=end
+    ## basemodule for WidgetContext, GraphicContext etc.
     module Instantiator
 
 	# hash Symbol=>class
@@ -174,12 +153,14 @@ module Reform  # aka R::EForm
 	extend Instantiator
     end # module ActionContext
 
-    Contexts = { R::Qt::Widget=>[WidgetContext], # , MacroContext],
+    # this tells us which controls are added where.
+    # But a class can then 'include' the contexts to use.
+    Contexts = { R::Qt::Widget=>[WidgetContext], 
 		 R::Qt::Model=>[ModelContext],
 		 R::Qt::Object=>[ModelContext],
-		 R::Qt::GraphicsItem=>[GraphicContext], # , MacroContext],
-		 R::Qt::Animation=>[AnimationContext], # , MacroContext],
-		 R::Qt::AbstractState=>[StateContext], # , MacroContext],
+		 R::Qt::GraphicsItem=>[GraphicContext],
+		 R::Qt::Animation=>[AnimationContext],
+		 R::Qt::AbstractState=>[StateContext],
 		 R::Qt::Menu=>[MenuContext],
 		 R::Qt::AbstractAction=>[ActionContext],
 		 R::Qt::Control=>[WidgetContext, ModelContext, GraphicContext,

@@ -1,8 +1,8 @@
 
-LIBRARY = 'liburqt.so'
+LIBRARY = '../reform/liburqt.so'
 LIBS = %w[ -lQt5Widgets -lurqtCore ]
 INCDIRS = %w[ ../urqtCore ]
-LINKDIRS = %w[ ../urqtCore ]
+LINKDIRS = []
 require_relative '../urqtCore/rake_ruby_so'
 
 task default: :buildlib

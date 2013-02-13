@@ -6,6 +6,8 @@ module R
   module Ake; end
 end
 
+# NOTE: apparently: rake -m is required to multithread all tasks.
+# However, the current rakefile seems to fail on this
 module R::Ake
   DEBUG = true # add some PARANOIA checks, but not a bad idea.
   TRACE = 1 # 0 is none, 2 is full command dumps of the build itself. Works for rake only.
@@ -17,7 +19,9 @@ module R::Ake
   TMPDIR = '.tmp'
   CLEAN.include TMPDIR
   CLOBBER.include LIBRARY
-  @linkdirs = {}
+  # mapping dirname=>true, so the paths are auto-unique. Use the keys only
+  @linkdirs = { '../reform'=>true }
+  # mapping dirname=>true
   @incdirs = {} 
   qt_paths = FileList['/usr/local/Qt5', '/usr/Qt5', '/opt/Qt5']
   ruby_paths = FileList['/usr/local', '/usr', '/opt/ruby']
@@ -89,7 +93,7 @@ module R::Ake
 
   # parent directory
   PWD_UP = File.dirname(`pwd`.chomp)
-  RPATH = %w[urqtCore].map{|path| PWD_UP + '/' + path}.join(':')
+  RPATH = PWD_UP + '/reform'
 
   LDFLAGS = %w[-fPIC -Wl,-Bsymbolic-functions,-export-dynamic] +
 	    ['-Wl,-rpath,' + RPATH] +

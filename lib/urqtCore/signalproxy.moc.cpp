@@ -5,6 +5,7 @@
 
 #include "signalproxy.moc.h"
 #include "object.h"
+#include "ruby++/proc.h"
 #include <QtCore/QMetaMethod>
 
 namespace R_Qt {
@@ -34,7 +35,9 @@ Block(v_block)
   traqt("QMetaObject::indexOfSlot");
   const int i_slot = meta.indexOfSlot(qslot);
   if (i_slot == -1)
-    rb_raise(rb_eRuntimeError, "no broker available for signal %s", signal);
+    rb_raise(rb_eRuntimeError, "no broker available for signal %s\n"
+			       "Please fix urqtCore/signalproxy.moc.cpp", 
+	     signal);
   traqt("QMetaObject::method");
   QMetaMethod method_parent = meta_parent.method(i_parent_signal);
   traqt("QMetaObject::method");
@@ -50,48 +53,47 @@ static VALUE
 sp_handle_callback(VALUE /*v_yielded*/, VALUE v_arg)
 {
   track2("sp_handle_callback(yielded: %s, %s)", v_yielded, v_arg);
-  // v_arg is always an Array
-  VALUE block = rb_ary_entry(v_arg, 0);
-  VALUE v_ary = rb_ary_entry(v_arg, 1);
-  track2("rb_proc_call(%s, %s)", block, v_ary);
-  return rb_proc_call(block, v_ary);
+  // v_arg is ALWAYS an Array
+  const RPP::Array arg(v_arg, RPP::Array::Unsafe);
+  const RPP::Proc block = arg[0];
+  const RPP::Array arg1 = arg[1];
+  track2("rb_proc_call(%s, %s)", block, arg1);
+  return block.callback(arg1);
 }
 
 void 
-QSignalProxy::handle_i(VALUE v_ary) const
+QSignalProxy::handle_i(RPP::Array v_ary) const
 {
   track2("handle_i(%s) on block %s", v_ary, block());
-  if (!rb_obj_is_proc(block())
-      || TYPE(v_ary) != T_ARRAY)
-    rb_raise(rb_eTypeError, "QSignalProxy CORRUPTION DETECTED");
-  //rb_proc_call(Block, v_ary);	  works as good as below, ie  both SEGV!!! when tried twice.
-  //
-  //	R::escue do
-  //	  Block[v_ary]
-  //	end
-  //
-  VALUE val = rb_ary_new3(2, block(), v_ary);
-  rb_block_call(mR, rb_intern("escue"), 0, 0, RUBY_METHOD_FUNC(sp_handle_callback), val);
-  //BROKEN rb_iterate(sp_handle_rescue, mR, RUBY_METHOD_FUNC(sp_handle_callback), val);
+  mR.call_with_block("escue", sp_handle_callback, block(), v_ary);
 }
 
 void 
 QSignalProxy::handle() const
 {
-  handle_i(rb_ary_new());
+  handle_i(RPP::Array());
 }
 
 void 
 QSignalProxy::handle(QObject *object) const
 {
-  VALUE v_object = qt2v(object);
-  handle_i(rb_ary_new3(1, v_object));
+  //  VERY BAD IDEA.  since VALUE -> array tries to convert it. handle_i(qt2v(object));
+  handle_i(RPP::Array(qt2v(object), RPP::Array::CreateSingleton)); 
 }
 
 void 
 QSignalProxy::handle(bool value) const
 {
-  handle_i(rb_ary_new3(1, p(value)));
+  handle_i(value);
+}
+
+void 
+QSignalProxy::handle(int value) const
+{
+  // This might go:	int -> VALUE -> Array(VALUE)
+  // But it should do:	int -> Array(int)
+  // Fortunately VALUE is not a macro but a typedef
+  handle_i(value);
 }
 
 } // namespace R_Qt

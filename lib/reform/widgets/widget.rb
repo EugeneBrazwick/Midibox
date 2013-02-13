@@ -7,7 +7,7 @@ require_relative '../layoutable'
 module R::Qt
   class Widget < Control
       # you can include any widget inside any other:
-      include Reform::WidgetContext
+      include Reform::WidgetContext, Reform::ModelContext
       include Layout::Able
 
     public # methods of Widget
@@ -35,12 +35,20 @@ module R::Qt
 	parent.addWidget self
       end # parent=
 
-      attr_dynamic String, :title, :caption, :windowTitle
+      attr_dynamic String, :title
       attr_dynamic Reform::Size, :size
+
+      alias caption title
+      alias windowTitle title
 
       #override
       def connect_attribute methodname, dynattr
-	if methodname != :windowTitle
+	case methodname
+	  # this is just the list of attr_dynamics?
+	  # No there may be aliases too.
+	when :title, :caption, :windowTitle, 
+	     :size
+	else
 	  super
 	end
       end

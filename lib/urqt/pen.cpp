@@ -234,6 +234,7 @@ static VALUE
 cPen_widthF_set(VALUE v_self, VALUE v_widthF)
 {
   track2("%s::widthF_set(%s)", v_self, v_widthF);
+  rb_check_frozen(v_self);
   RQTDECLARE_PEN(self);
   if (TYPE(v_widthF) == T_SYMBOL && v_widthF == CSTR2SYM("cosmetic"))
     self->setWidthF(0);
@@ -250,6 +251,85 @@ cPen_widthF_get(VALUE v_self)
   return DBL2NUM(self->widthF());
 }
 
+static VALUE
+cPen_capStyle_set(VALUE v_self, VALUE v_style)
+{
+  track2("%s::capStyle= %s", v_self, v_style);
+  rb_check_frozen(v_self);
+  RQTDECLARE_PEN(self);
+  VALUE v_capstyles = rb_cv_get(cPen, "@@capstyles");
+  if (TYPE(v_capstyles) != T_HASH)
+    {
+      v_capstyles = rb_hash_new();
+      rb_cv_set(cPen, "@@capstyles", v_capstyles);
+#define QTCAPSTYLE_DO(sym, qtstyle) \
+      rb_hash_aset(v_capstyles, CSTR2SYM(#sym), INT2NUM(Qt::qtstyle##Cap))
+      QTCAPSTYLE_DO(default, Square);
+      QTCAPSTYLE_DO(square, Square);
+      QTCAPSTYLE_DO(squarecap, Square);
+      QTCAPSTYLE_DO(project, Square);
+      QTCAPSTYLE_DO(flat, Flat);
+      QTCAPSTYLE_DO(flatcap, Flat);
+      QTCAPSTYLE_DO(round, Round);
+      QTCAPSTYLE_DO(roundcap, Round);
+    }
+  self->setCapStyle(Qt::PenCapStyle(NUM2INT(rb_hash_aref(v_capstyles, v_style))));
+  return v_style;
+}
+
+static VALUE
+cPen_capStyle_get(VALUE v_self)
+{
+  RQTDECLARE_PEN(self);
+  switch (self->capStyle())
+    {
+      case Qt::SquareCap: return CSTR2SYM("square");
+      case Qt::FlatCap: return CSTR2SYM("flat");
+      case Qt::RoundCap: return CSTR2SYM("round");
+      default: break;
+    }
+  rb_raise(rb_eRuntimeError, "Unhandled capstyle %d", self->capStyle());
+}
+
+static VALUE
+cPen_joinStyle_set(VALUE v_self, VALUE v_style)
+{
+  track2("%s::joinStyle= %s", v_self, v_style);
+  rb_check_frozen(v_self);
+  RQTDECLARE_PEN(self);
+  VALUE v_joinstyles = rb_cv_get(cPen, "@@joinstyles");
+  if (TYPE(v_joinstyles) != T_HASH)
+    {
+      v_joinstyles = rb_hash_new();
+      rb_cv_set(cPen, "@@joinstyles", v_joinstyles);
+#define QTJOINSTYLE_DO(sym, qtstyle) \
+      rb_hash_aset(v_joinstyles, CSTR2SYM(#sym), INT2NUM(Qt::qtstyle##Join))
+      QTJOINSTYLE_DO(default, Bevel);
+      QTJOINSTYLE_DO(miter, Miter);
+      QTJOINSTYLE_DO(miterjoin, Miter);
+      QTJOINSTYLE_DO(bevel, Bevel);
+      QTJOINSTYLE_DO(beveljoin, Bevel);
+      QTJOINSTYLE_DO(round, Round);
+      QTJOINSTYLE_DO(roundjoin, Round);
+    }
+  self->setJoinStyle(Qt::PenJoinStyle(NUM2INT(rb_hash_aref(v_joinstyles, v_style))));
+  return v_style;
+}
+
+static VALUE
+cPen_joinStyle_get(VALUE v_self)
+{
+  RQTDECLARE_PEN(self);
+  switch (self->joinStyle())
+    {
+      case Qt::MiterJoin: return CSTR2SYM("miter");
+      case Qt::BevelJoin: return CSTR2SYM("bevel");
+      case Qt::RoundJoin: return CSTR2SYM("round");
+      default: break;
+    }
+  rb_raise(rb_eRuntimeError, "Unhandled joinstyle %d", self->joinStyle());
+}
+
 void 
 init_pen(VALUE mQt)
 {
@@ -263,13 +343,27 @@ init_pen(VALUE mQt)
   rb_define_method(cPen, "apply_model", RUBY_METHOD_FUNC(cPen_apply_model), 1);
   rb_define_method(cPen, "color=", RUBY_METHOD_FUNC(cPen_color_set), 1);
   rb_define_method(cPen, "color_get", RUBY_METHOD_FUNC(cPen_color_get), 0);
-  rb_funcall(cPen, rb_intern("attr_dynamic"), 2, cColor, CSTR2SYM("color"));
+  VALUE v_hash = rb_hash_new();
+  rb_hash_aset(v_hash, CSTR2SYM("klass"), cDynamicColor);
+  rb_hash_aset(v_hash, CSTR2SYM("require"), rb_str_new_cstr("dynamic_color"));
+  trace("create color attribute with dynattrclass = DynamicColor");
+  rb_funcall(cPen, rb_intern("attr_dynamic"), 3, cColor, CSTR2SYM("color"), v_hash);
   rb_define_method(cPen, "widthF=", RUBY_METHOD_FUNC(cPen_widthF_set), 1);
   rb_define_method(cPen, "widthF_get", RUBY_METHOD_FUNC(cPen_widthF_get), 0);
   rb_funcall(cPen, rb_intern("attr_dynamic"), 2, rb_cFloat, CSTR2SYM("widthF"));
   rb_define_alias(cPen, "width", "widthF");
   rb_define_alias(cPen, "size", "widthF");
   rb_define_alias(cPen, "weight", "widthF");
+  rb_define_method(cPen, "capStyle=", RUBY_METHOD_FUNC(cPen_capStyle_set), 1);
+  rb_define_method(cPen, "capStyle_get", RUBY_METHOD_FUNC(cPen_capStyle_get), 0);
+  rb_funcall(cPen, rb_intern("attr_dynamic"), 2, rb_cSymbol, CSTR2SYM("capStyle"));
+  rb_define_alias(cPen, "cap", "capStyle");
+  rb_define_class_variable(cPen, "@@capstyles", Qnil);
+  rb_define_method(cPen, "joinStyle=", RUBY_METHOD_FUNC(cPen_joinStyle_set), 1);
+  rb_define_method(cPen, "joinStyle_get", RUBY_METHOD_FUNC(cPen_joinStyle_get), 0);
+  rb_funcall(cPen, rb_intern("attr_dynamic"), 2, rb_cSymbol, CSTR2SYM("joinStyle"));
+  rb_define_alias(cPen, "join", "joinStyle");
+  rb_define_class_variable(cPen, "@@joinstyles", Qnil);
 }
 
 } // namespace R_Qt 

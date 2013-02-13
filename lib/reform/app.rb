@@ -7,18 +7,19 @@ require_relative 'context'
 module R
 
   public # methods of R
-    # use this to wrap a rescue clause around any block.
-    # transforms the exception (RuntimeError+IOError+StandardError) to a warning on stderr.
+  ## use this to wrap a rescue clause around any block.
+  # transforms the exception (RuntimeError+IOError+StandardError) to a warning on stderr.
+  # Reform::Error is also a RuntimeError.
+  #
+  # UNLESS: 'fail_on_errors true' is specified in Application.
     def self.escue
       begin
         return yield
       rescue IOError => exception
+	raise if $app.fail_on_errors?
         msg = "#{exception.message}\n"
-      rescue Reform::Error => exception
-	raise if $app.fail_on_instantiation_errors?
-        msg = "#{exception.class}: #{exception}\n" + exception.backtrace.join("\n")
       rescue StandardError, RuntimeError => exception
-	raise if $app.fail_on_instantiation_errors?
+	raise if $app.fail_on_errors?
 	#tag "got exception"
 	#tag "exception class: #{exception.class}"
 	#tag "exception msg: #{exception}"
@@ -119,8 +120,8 @@ module R::Qt
 	  top
 	end # setupForms
  
-	def fail_on_instantiation_errors value
-	  @fail_on_instantiation_errors = value
+	def fail_on_errors value
+	  @fail_on_errors = value
 	end
 
 	signal :created
@@ -129,9 +130,8 @@ module R::Qt
 
       public # methods of Application
 
-	def fail_on_instantiation_errors?
-	  @fail_on_instantiation_errors
-	end
+	# you cannot say:    attr :fail_on_errors?
+	def fail_on_errors?; @fail_on_errors; end
 
 	# override, kind of
 	def addWidget widget

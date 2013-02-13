@@ -6,7 +6,7 @@ describe "Reform::Layout" do
   it "should parent as shown, not as done by Qt internally" do
     $shown = false
     Reform.app {
-      fail_on_instantiation_errors true
+      fail_on_errors true
       rubydata data: 'Hallo World', name: 'rdata'
       widget {
 	name 'wdgt'
@@ -37,7 +37,7 @@ describe "Reform::Layout" do
 
   it "should end up in each_sub of application" do
     Reform.app {
-      fail_on_instantiation_errors true
+      fail_on_errors true
       widget {
 	name 'wdgt'
 	size 320, 240
@@ -60,7 +60,7 @@ describe "Reform::Layout" do
 
   it "with collect_names all items become more readily available" do
     Reform.app {
-      fail_on_instantiation_errors true
+      fail_on_errors true
       collect_names true
       rubydata data: 'Hallo World', name: 'rdata'
       widget {

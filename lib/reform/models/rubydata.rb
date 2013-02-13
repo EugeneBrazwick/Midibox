@@ -68,8 +68,15 @@ module R::Qt
   end # class RubyDataNode
 
   ## this class wraps around any ruby data (with some limitations)
+  # It can be used using the 'rubydata' instantiator (as all controls)
+  # or the shortcut: 'data' can be used instead:
+  #	data X  
+  # is the same as:
+  #     rubydata { data X }
+  #
   class RubyData < Model
 
+      # so RubyDataNode == RubyData::Node
       Node = RubyDataNode
 
     private # methods of RubyData

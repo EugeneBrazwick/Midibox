@@ -7,6 +7,8 @@
 #include <QtWidgets/QGraphicsView>
 #include "application.h"
 #include "graphicsitem.h"
+#include "size.h"
+#include "point.h"
 
 namespace R_Qt {
 

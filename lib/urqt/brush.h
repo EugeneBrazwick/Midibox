@@ -7,19 +7,21 @@
 #include <QtWidgets/QGraphicsItem>
 #include <ruby/ruby.h>
 #include "api_utils.h"
+#include "ruby++/ruby++.h"
 
 #pragma interface
 
 namespace R_Qt {
 
-extern VALUE cBrush, cColor;
+extern RPP::Class cBrush, cColor, cDynamicColor;
 
 static inline void
 GetQBrush_noDecl(VALUE v_q, QBrush *&q)
 {
 #if defined(DEBUG)
   if (!rb_obj_is_kind_of(v_q, cBrush))
-    rb_raise(rb_eTypeError, "SERIOUS PROGRAMMING ERROR: very bad cast to QBrush");
+    rb_raise(rb_eTypeError, "SERIOUS PROGRAMMING ERROR: very bad cast from %s to QBrush",
+	     INSPECT(v_q));
 #endif // DEBUG
   GET_STRUCT_NODECL(QBrush, q);
 }

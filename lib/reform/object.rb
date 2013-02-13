@@ -1,7 +1,7 @@
 
 #  Copyright (c) 2013 Eugene Brazwick
 
-require_relative '../urqtCore/liburqtCore' 
+require_relative 'liburqtCore' 
 
 module Kernel
   private # methods of Kernel
@@ -100,7 +100,7 @@ module R::Qt
 
       protected # methods of Object
 
-	# the default assigns the parent
+	# the default assigns the QT(!) parent
 	def addObject child
 	  child.qtparent = self
 	end # addObject
@@ -121,7 +121,12 @@ module R::Qt
 	  each_child.to_a
 	end
 
-	alias :parent_get :qtparent_get
+	# It is possible that a Qt::Object's parent is not a Qt::Object.
+	# This is coded by setting @parent. This overrides any other parent.
+	def parent_get 
+	  @parent || qtparent_get
+	end
+
 	alias :children_get :children
 
 	# you can 'mount' a model into any object.

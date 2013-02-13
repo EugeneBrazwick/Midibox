@@ -7,14 +7,67 @@
 #pragma implementation
 #include "brush.h"
 #include "graphicsitem.h"
+#include "object.h"
+#include "ruby++/dataobject.h"
+#include "ruby++/array.h"
+#include "ruby++/hash.h"
 #include <assert.h>
 #include <QtGui/QBrush>
 #include <QtWidgets/QGraphicsScene>
 
+namespace RPP {
+class QBrush: public DataObject< ::QBrush >
+{
+private:
+  typedef DataObject< ::QBrush > inherited;
+public:
+  QBrush(VALUE v_o): inherited(v_o)
+    {
+#if defined(DEBUG)
+      if (!rb_obj_is_kind_of(v_o, R_Qt::cBrush))
+	rb_raise(rb_eTypeError, "SERIOUS PROGRAMMING ERROR: very bad cast to QBrush");
+#endif // DEBUG
+      GET_STRUCT(::QBrush, o);
+      this->setWrapped(o);
+    }
+  QBrush(::QBrush *brush): inherited(Data_Wrap_Struct(R_Qt::cBrush, 0, R_Qt::cBrush_free, brush)) {}
+  QBrush(const ::QBrush &brush): 
+    inherited(Data_Wrap_Struct(R_Qt::cBrush, 0, R_Qt::cBrush_free, new ::QBrush(brush)))
+    {
+    }
+  void operator=(VALUE v) { V = v; }
+  // CRAZY  void operator=(const RPP::QBrush &other) { V = other.value(); }
+}; // class RPP::QBrush
+
+class QColor: public DataObject< ::QColor >
+{
+private:
+  typedef DataObject< ::QColor > inherited;
+public:
+  QColor(VALUE v_o): inherited(v_o)
+    {
+#if defined(DEBUG)
+      if (!rb_obj_is_kind_of(v_o, R_Qt::cColor))
+	rb_raise(rb_eTypeError, "SERIOUS PROGRAMMING ERROR: very bad cast to QColor");
+#endif // DEBUG
+      GET_STRUCT(::QColor, o);
+      this->setWrapped(o);
+    }
+  QColor(::QColor *color): inherited(Data_Wrap_Struct(R_Qt::cColor, 0, R_Qt::cColor_free, color)) {}
+  QColor(const ::QColor &color): 
+    inherited(Data_Wrap_Struct(R_Qt::cColor, 0, R_Qt::cColor_free, new ::QColor(color)))
+    {
+    }
+}; // class RPP::QColor
+
+} // namespace RPP
+
 namespace R_Qt {
 
-VALUE 
-cBrush = Qnil, cColor = Qnil;
+RPP::Class 
+cBrush,
+cColor, 
+cDynamicColor;
 
 void
 cBrush_free(QBrush *brush)
@@ -24,16 +77,16 @@ cBrush_free(QBrush *brush)
 }
 
 static void
-reattach_brush(VALUE v_self, QBrush *self)
+reattach_brush(RPP::QBrush self)
 {
   trace("reattach_brush");
-  const VALUE v_parent = rb_iv_get(v_self, "@parent");
+  const RPP::Object v_parent = self.iv("@parent");
   track1("parent = %s", v_parent);
-  if (rb_obj_is_kind_of(v_parent, cGraphicsScene))
+  if (v_parent.is_kind_of(cGraphicsScene))
     {
       trace("setBackgroundBrush");
-      RQTDECLARE(QGraphicsScene, parent);
-      parent->setBackgroundBrush(*self);
+      const RPP::QObject<QGraphicsScene> parent(v_parent);
+      parent->setBackgroundBrush(self);
     }
   else
     {
@@ -52,8 +105,7 @@ static void
 anything_else(QBrush *self, VALUE v_args)
 {
   track1("Anything else: %s", v_args);
-  VALUE v_color = rb_class_new_instance(1, &v_args, cColor);
-  RQTDECLARE_COLOR(color);
+  RPP::QColor color = cColor.new_instance(v_args);
   traqt("QBrush()");
   *self = QBrush(*color);
 } // anything_else
@@ -62,55 +114,53 @@ static VALUE
 cBrush_initialize(int argc, VALUE *argv, VALUE v_self)
 {
   trace1("cBrush_initialize, argc = %d", argc);
-  RQTDECLARE_BRUSH(self);
-  VALUE v_args, v_parent = Qnil;
-  if (argc == 0)
-      v_args = Qnil;
+  RPP::QBrush self = v_self;
+  RPP::Object args, parent;
   if (argc == 1)
     {
-      v_args = argv[0];  // this can be a T_ARRAY...
-      if (rb_obj_is_kind_of(v_args, cGraphicsItem)
-	  || rb_obj_is_kind_of(v_args, cGraphicsScene))
+      args = argv[0];  // this can be a T_ARRAY...
+      if (args.is_kind_of(cGraphicsItem) || args.is_kind_of(cGraphicsScene))
 	{
 	  trace("located parent as argv0");
-	  v_parent = v_args;
-	  v_args = Qnil;
+	  parent = args;
+	  args = Qnil;
 	}
     }
   else // argc > 1
     {
-      if (rb_obj_is_kind_of(argv[0], cGraphicsItem)
-	  || rb_obj_is_kind_of(argv[0], cGraphicsScene))
+      const RPP::Object arg0 = argv[0];
+      if (arg0.is_kind_of(cGraphicsItem) || arg0.is_kind_of(cGraphicsScene))
 	{
 	  trace("located parent as argv0, shift");
-	  v_parent = argv[0];
+	  parent = argv[0];
 	  argc--, argv++;
 	} 
       if (argc == 1)
-	v_args = argv[0];
+	args = argv[0];
       else
-	v_args = rb_ary_new4(argc, argv);
+	args = RPP::Array(argc, argv);
     }
-  if (!NIL_P(v_parent))
-    rb_funcall(v_self, rb_intern("parent="), 1, v_parent);
-  switch (TYPE(v_args))
+  if (!parent.isNil())
+    {
+      track2("%s created with parent %s", self, parent);
+      self.call("parent=", parent);
+    }
+  switch (args.type())
     {
     case T_DATA:
-	if (rb_obj_is_kind_of(v_args, cBrush))
+	if (args.is_kind_of(cBrush))
 	  {
-	    track1("Brush %s", v_args);
-	    RQTDECLARE_BRUSH(args);
-	    *self = *args;
+	    track1("Brush %s", args);
+	    *self = RPP::QBrush(args);
 	  }
-	else if (rb_obj_is_kind_of(v_args, cColor))
+	else if (args.is_kind_of(cColor))
 	  {
-	    track1("Color %s", v_args);
-	    RQTDECLARE_COLOR(args);
+	    track1("Color %s", args);
 	    traqt("QBrush()");
-	    *self = QBrush(*args);
+	    *self = QBrush(*RPP::QColor(args));
 	  }
 	else
-	    anything_else(self, v_args);
+	    anything_else(self, args);
 	break;
     case T_FALSE:
 	trace("false");
@@ -119,7 +169,7 @@ cBrush_initialize(int argc, VALUE *argv, VALUE v_self)
 	break;
     case T_SYMBOL:
       {
-	const ID id = SYM2ID(v_args);
+	const ID id = RPP::Symbol(args, RPP::Symbol::Unsafe).to_id();	// FIXME. Need Id class I guess
 	if (id == rb_intern("none")
 	    || id == rb_intern("nobrush")
 	    || id == rb_intern("no_brush"))
@@ -129,30 +179,29 @@ cBrush_initialize(int argc, VALUE *argv, VALUE v_self)
 	    *self = QBrush(Qt::NoBrush);
 	  }
 	else
-	    anything_else(self, v_args);
+	    anything_else(self, args);
 	break;
       }
     case T_NIL:
-	if (rb_block_given_p())
+	if (rb_block_given_p())	// hm....
 	  {
 	    trace("&block");
-	    rb_obj_instance_eval(0, 0, v_self);
+	    self.instance_eval();
 	  }
 	else
-	    anything_else(self, v_args);
+	    anything_else(self, args);
 	break;
     case T_HASH:
-	track1("Hash %s", v_args);
-	rb_funcall(v_self, rb_intern("setupQuickyhash"), 1, v_args); 
+	track1("Hash %s", args);
+	self.call("setupQuickyhash", args); 
 	break;
     case T_STRING:
       {
-	const char * const s = StringValueCStr(v_args);
+	const char * const s = RPP::String(args);
 	if (strncmp(s, "file://", 7) == 0)
 	  rb_raise(rb_eNotImpError, "loading pixmaps for brushes");
-	track1("String %s", v_args);
-	VALUE v_color = rb_class_new_instance(1, &v_args, cColor);
-	RQTDECLARE_COLOR(color);
+	track1("String %s", args);
+	const RPP::QColor color = cColor.new_instance(args);
 	trace3("v_color=%d,%d,%d", color->red(), color->green(), color->blue());
 	trace1("QColorptr = %p", color);
 	traqt("QBrush(QColor)");
@@ -164,21 +213,19 @@ cBrush_initialize(int argc, VALUE *argv, VALUE v_self)
       }
     case T_ARRAY:
       {
-	track1("Array %s", v_args);
-	VALUE v_color = rb_class_new_instance(RARRAY_LEN(v_args), RARRAY_PTR(v_args), cColor);
-	RQTDECLARE_COLOR(color);
+	track1("Array %s", args);
 	traqt("QBrush(QColor)");
-	*self = QBrush(*color);
+	*self = QBrush(*RPP::QColor(cColor.new_instance(RPP::Array(args, RPP::Array::Unsafe))));
 	break;
       }
     default:
-	anything_else(self, v_args);
+	anything_else(self, args);
 	break;
     } // switch TYPE
   // Late assignment, because model_init_path may have changed the color.
   // Even though it should already have called setBrush in that case.
-  if (!NIL_P(v_parent))
-    reattach_brush(v_self, self);
+  if (!parent.isNil())
+    reattach_brush(self);
   trace("cBrush_initialize OK");
   return Qnil;
 } // cBrush_initialize
@@ -188,37 +235,46 @@ R_QT_DEF_ALLOCATOR_BASE1(Brush)
 static VALUE
 cBrush_parent_set(VALUE v_self, VALUE v_parent)
 {
-  rb_check_frozen(v_self);
-  VALUE v_old_parent = rb_iv_get(v_self, "@parent");
-  if (!NIL_P(v_old_parent))
-    rb_funcall(v_old_parent, rb_intern("brush="), 1, Qnil);
-  rb_iv_set(v_self, "@parent", v_parent);
-  if (!NIL_P(v_parent))
-    rb_funcall(v_parent, rb_intern("brush="), 1, v_self);
+  track2("%s::parent_set(%s)", v_self, v_parent);
+  const RPP::Object self = v_self;
+  const RPP::Object parent = v_parent;
+  self.check_frozen();
+  const RPP::Object old_parent = self.iv("@parent");
+  if (!old_parent.isNil())
+    {
+      track1("Removing old parent %s", old_parent);
+      old_parent.call("brush=", Qnil);
+    }
+  self.iv_set("@parent", parent);
+  if (!parent.isNil())
+    {
+      track2("calling %s.brush= %s", parent, self);
+      parent.call("brush=", self);
+    }
   return v_parent;
 } // cBrush_parent_set
 
 static VALUE
 cBrush_apply_model(VALUE v_self, VALUE v_data)
 {
-  return rb_funcall(v_self, rb_intern("apply_dynamic_setter"), 2, CSTR2SYM("color"), v_data);
+  const RPP::Object self = v_self;
+  return self.call("apply_dynamic_setter", RPP::Symbol("color"), v_data);
 } // cBrush_apply_model
 
 static VALUE
 cBrush_color_set(VALUE v_self, VALUE v_data)
 {
   track2("%s::color_set(%s)", v_self, v_data);
-  rb_check_frozen(v_self);
-  RQTDECLARE_BRUSH(self);
-  VALUE v_color = rb_class_new_instance(1, &v_data, cColor);
-  RQTDECLARE_COLOR(color);
+  RPP::QBrush self = v_self;
+  self.check_frozen();
+  const RPP::QColor color = cColor.new_instance(v_data);
   traqt1("%p::setColor", self);
   trace4("color_set: v_self=%s, color=(%d,%d,%d)", INSPECT(v_self), color->red(), color->green(), color->blue());
   // INCORRECT self->setColor(*color);
   *self = QBrush(*color);
   trace5("self=%p, brush.color=(%d,%d,%d,%d)", self,
          self->color().red(), self->color().green(), self->color().blue(), self->color().alpha());
-  reattach_brush(v_self, self);
+  reattach_brush(self);
   return v_data;
 } // cBrush_color_set
 
@@ -226,23 +282,25 @@ static VALUE
 cBrush_color_get(VALUE v_self)
 {
   track1("%s::color_get()", v_self);
-  RQTDECLARE_BRUSH(self);
-  return cColorWrap(self->color());
+  return RPP::QColor(RPP::QBrush(v_self)->color());
 } // cBrush_color_get
 
 void 
-init_brush(VALUE mQt)
+init_brush(VALUE /*bogo*/)
 {
   trace("init_brush");
-  cBrush = rb_define_class_under(mQt, "Brush", cNoQtControl);
-  rb_define_alloc_func(cBrush, cBrush_alloc);
-  rb_define_const(cBrush, "NoBrush", Qt::NoBrush);
-  rb_define_private_method(cBrush, "initialize", RUBY_METHOD_FUNC(cBrush_initialize), -1);
-  rb_define_method(cBrush, "parent=", RUBY_METHOD_FUNC(cBrush_parent_set), 1);
-  rb_define_method(cBrush, "apply_model", RUBY_METHOD_FUNC(cBrush_apply_model), 1);
-  rb_define_method(cBrush, "color=", RUBY_METHOD_FUNC(cBrush_color_set), 1);
-  rb_define_method(cBrush, "color_get", RUBY_METHOD_FUNC(cBrush_color_get), 0);
-  rb_funcall(cBrush, rb_intern("attr_dynamic"), 2, cColor, CSTR2SYM("color"));
+  cBrush = mQt.define_class("Brush", cNoQtControl);
+  cBrush.define_alloc_func(cBrush_alloc)
+	.define_private_method("initialize", cBrush_initialize)
+	.define_method("parent=", cBrush_parent_set)
+	.define_method("apply_model", cBrush_apply_model)
+	.define_method("color=", cBrush_color_set)
+	.define_method("color_get", cBrush_color_get)
+	;
+  RPP::Dictionary hash;
+  hash["klass"] = cDynamicColor;
+  hash["require"] = "dynamic_color";
+  cBrush.call("attr_dynamic", cColor, RPP::Symbol("color"), hash);
 } // init_brush
 
 R_QT_DEF_ALLOCATOR_BASE1(Color)
@@ -251,14 +309,15 @@ static Qt::GlobalColor
 cColor_sym2color(VALUE v_self, VALUE v_sym)
 {
   track2("%s::sym2color(%s)", v_self, v_sym);
-  VALUE v_colors = rb_iv_get(v_self, "@color");
-  if (NIL_P(v_colors))
+  const RPP::Object self = v_self;
+  RPP::Dictionary colors(self.iv("@color"), RPP::Dictionary::Unsafe);
+  if (!colors.isHash())
     {
       trace("setup @color hash");
-      v_colors = rb_hash_new();
-      rb_iv_set(v_self, "@color", v_colors);
+      colors = RPP::Dictionary();
+      self.iv_set("@color", colors);
 #define QTCOLOR_DO(sym) \
-      rb_hash_aset(v_colors, CSTR2SYM(#sym), INT2NUM(Qt::sym))
+      colors[#sym] = (int)Qt::sym
       QTCOLOR_DO(white);
       QTCOLOR_DO(black);
       QTCOLOR_DO(yellow);
@@ -278,9 +337,8 @@ cColor_sym2color(VALUE v_self, VALUE v_sym)
       QTCOLOR_DO(lightGray);
       QTCOLOR_DO(transparent);
     }
-  track1("Check_Type(%s, T_HASH)", v_colors);
-  Check_Type(v_colors, T_HASH);
-  return Qt::GlobalColor(NUM2INT(rb_hash_aref(v_colors, v_sym)));
+  track1("Check_Type(%s, T_HASH)", colors);
+  return Qt::GlobalColor(RPP::Fixnum(colors[v_sym]).to_i());
 } // cColor_sym2color
 
 // where hex is in range '0'..'9' or 'A'..'F'
@@ -291,6 +349,7 @@ hex2int(int hex)
 } // hex2int
 
 /** :call-seq:
+    Color.new						   # The default color. Let's say: black
     Color.new :white					   # or any other QGlobalColor. These are cached.
     Color.new Color
     Color.new Color, alpha
@@ -314,85 +373,84 @@ static VALUE
 cColor_initialize(int argc, VALUE *argv, VALUE v_self)
 {
   trace("cColor_initialize");
-  RQTDECLARE_COLOR(self);
+  RPP::QColor self = v_self;
   VALUE v_colorsym, v_g, v_b, v_a;
-  rb_scan_args(argc, argv, "13", &v_colorsym, &v_g, &v_b, &v_a);
+  rb_scan_args(argc, argv, "04", &v_colorsym, &v_g, &v_b, &v_a);
   track4("cColor_initialize(%s, %s, %s, %s)", v_colorsym, v_g, v_b, v_a);
-  switch (TYPE(v_colorsym))
+  const RPP::Object colorsym = v_colorsym;
+  const RPP::Object g = v_g, b = v_b, a = v_a;
+  switch (colorsym.type())
     {
     case T_HASH:
-	return rb_funcall(v_self, rb_intern("setupQuickyhash"), 1, v_colorsym);
+	return self.call("setupQuickyhash", colorsym);
     case T_NIL:
 	if (rb_block_given_p())
-	  return rb_obj_instance_eval(0, 0, v_self);
-	break;
+	  return self.instance_eval();
+	*self = QColor();
+	return Qnil;
     case T_DATA:
-	if (rb_obj_is_kind_of(v_colorsym, cColor)) 
+	if (colorsym.is_kind_of(cColor)) 
 	  {
 	    trace("when Color");
-	    if (!NIL_P(v_g))
-	      rb_funcall(v_colorsym, rb_intern("alpha="), 1, v_g);
-	    RQTDECLARE_COLOR(colorsym);
-	    *self = *colorsym;
+	    if (!g.isNil()) colorsym.call("alpha=", g);
+	    *self = *RPP::QColor(colorsym);
 	    return Qnil;
 	  }
-	if (rb_obj_is_kind_of(v_colorsym, cBrush))
+	if (colorsym.is_kind_of(cBrush))
 	  {
 	    trace("when Brush");
-	    VALUE v_color = rb_funcall(v_colorsym, rb_intern("color"), 0);
-	    RQTDECLARE_COLOR(color);
-	    *self = *color;
+	    *self = *RPP::QColor(colorsym.call("color"));
 	    return Qnil;
 	  }
 	break;
     case T_STRING:
       {
 	trace("when String");
-	char *s = StringValueCStr(v_colorsym);
+	const char *s = RPP::String(colorsym);
 	if (*s == '#')
 	  {
 	    const size_t l = strlen(s);
 	    char t[l + 1];
 	    strcpy(t, s);
 	    s = t;
-	    for (char *t = s; *t; t++)
-	      *t = toupper(*t);
+	    for (char *u = t; *u; u++)
+	      *u = toupper(*u);
 	    switch (l)
 	      {
 	      case 5:
 		{
 		  // 17 * 0xf = 17 * 15 = 255. How nice.
-		  const int alpha = hex2int(s[4]) * 17;
-		  s[4] = 0;
-		  QColor * const r = new QColor(s);
+		  const int alpha = hex2int(t[4]) * 17;
+		  t[4] = 0;
+		  QColor * const r = new QColor(t);
 		  r->setAlpha(alpha);
 		  *self = *r;
 		  return Qnil;
 		}
 	      case 9:
 		{
-		  const int alpha = hex2int(s[7]) * 16 + hex2int(s[8]);
-		  s[7] = 0;
-		  QColor * const r = new QColor(s);
+		  const int alpha = hex2int(t[7]) * 16 + hex2int(t[8]);
+		  t[7] = 0;
+		  QColor * const r = new QColor(t);
 		  r->setAlpha(alpha);
 		  *self = *r;
 		  return Qnil;
 		}
 	      case 13:
 		{
-		  const int alpha = hex2int(s[10]) * 256 + hex2int(s[11]) * 16 + hex2int(s[12]);
-		  s[10] = 0;
-		  QColor * const r = new QColor(s);
+		  const int alpha = hex2int(t[10]) * 256 + hex2int(t[11]) * 16 + hex2int(t[12]);
+		  t[10] = 0;
+		  QColor * const r = new QColor(t);
 		  r->setAlphaF(alpha / 4096.0);
 		  *self = *r;
 		  return Qnil;
 		}
 	      case 17:
 		{
-		  const int alpha = hex2int(s[13]) * 65536 + hex2int(s[14]) * 256 
-				    + hex2int(s[15]) * 16 + hex2int(s[16]);
-		  s[13] = 0;
-		  QColor * const r = new QColor(s);
+		  const int alpha = hex2int(t[13]) * 65536 + hex2int(t[14]) * 256 
+				    + hex2int(t[15]) * 16 + hex2int(t[16]);
+		  t[13] = 0;
+		  QColor * const r = new QColor(t);
 		  r->setAlphaF(alpha / 65536.0);
 		  *self = *r;
 		  return Qnil;
@@ -410,46 +468,49 @@ cColor_initialize(int argc, VALUE *argv, VALUE v_self)
 	return Qnil;
       }
     case T_ARRAY:
+      {
 	trace("when Array");
-	return cColor_initialize(RARRAY_LEN(v_colorsym), RARRAY_PTR(v_colorsym), v_self);
+	const RPP::Array ary(colorsym, RPP::Array::Unsafe);
+	return cColor_initialize(ary.length(), ary.ptr(), self);
+      }
     case T_FIXNUM:
       {
 	trace("when Fixnum");
-	if (NIL_P(v_b))
+	if (b.isNil())
 	  {
-	    const int gray = NUM2INT(v_colorsym);
-	    const int alpha = NIL_P(v_g) ? 255 : NUM2INT(v_g);
+	    const int gray = colorsym.to_i();
+	    const int alpha = g.isNil() ? 255 : g.to_i();
 	    *self = QColor(gray, gray, gray, alpha);
 	    return Qnil;
 	  }
-	const int alpha = NIL_P(v_a) ? 255 : NUM2INT(v_a);
-	*self = QColor(NUM2INT(v_colorsym), NUM2INT(v_g), NUM2INT(v_b), alpha);
+	const int alpha = a.isNil() ? 255 : a.to_i();
+	*self = QColor(colorsym.to_i(), g.to_i(), b.to_i(), alpha);
 	return Qnil;
       }
     case T_FLOAT:
       {
 	trace("when Float");
-	if (NIL_P(v_b))
+	if (b.isNil())
 	  {
-	    const double gray = NUM2DBL(v_colorsym);
-	    const double alpha = NIL_P(v_g) ? 1.0 : NUM2DBL(v_g);
+	    const double gray = colorsym.to_f();
+	    const double alpha = g.isNil() ? 1.0 : g.to_i();
 	    *self = QColor(gray, gray, gray, alpha);
 	    return Qnil;
 	  }
-	const double alpha = NIL_P(v_a) ? 1.0 : NUM2DBL(v_a);
-	*self = QColor(NUM2DBL(v_colorsym), NUM2DBL(v_g), NUM2DBL(v_b), alpha);
+	const double alpha = a.isNil() ? 1.0 : a.to_i();
+	*self = QColor(colorsym.to_f(), g.to_f(), b.to_f(), alpha);
 	return Qnil;
       }
     case T_SYMBOL:
       {
 	trace("when Symbol");
-	const Qt::GlobalColor gc = cColor_sym2color(cColor, v_colorsym);
+	const Qt::GlobalColor gc = cColor_sym2color(cColor, colorsym);
 	*self = QColor(gc);
 	return Qnil;
       }
-    } // switch TYPE v_colorsym
-  rb_raise(rb_eArgError, "invalid color %s, %s, %s, %s", INSPECT(v_colorsym), INSPECT(v_g),
-	   INSPECT(v_b), INSPECT(v_a));
+    } // switch TYPE colorsym
+  rb_raise(rb_eArgError, "invalid color %s, %s, %s, %s", colorsym.inspect(), g.inspect(),
+	   b.inspect(), a.inspect());
 } // cColor_initialize
 
 void 
@@ -459,14 +520,172 @@ cColor_free(QColor *color)
   delete color;
 } // cColor_free
 
+#define COMP(comp, Comp) INT_COMP(comp, Comp) FLOAT_COMP(comp, Comp)
+#define COMP_RO(comp, Comp) INT_COMP_RO(comp, Comp) FLOAT_COMP_RO(comp, Comp)
+#define COMPS \
+	COMP(alpha, Alpha) \
+	COMP(blue, Blue) \
+	COMP(green, Green) \
+	COMP(red, Red) \
+	COMP_RO(black, Black) \
+	COMP_RO(cyan, Cyan) \
+	COMP_RO(hslHue, HslHue) \
+	COMP_RO(hslSaturation, HslSaturation) \
+	COMP_RO(hsvHue, HsvHue) \
+	COMP_RO(hsvSaturation, HsvSaturation) \
+	COMP_RO(lightness, Lightness) \
+	COMP_RO(magenta, Magenta) \
+	COMP_RO(yellow, Yellow) \
+	COMP_RO(value, Value) \
+
+#define TYPE_COMP_RO(tp, comp, Comp) \
+static VALUE \
+cColor_##comp##_get(VALUE v_self) \
+{ \
+  return RPP::tp(RPP::QColor(v_self)->comp()); \
+} 
+
+#define TYPE_COMP(tp, comp, Comp) \
+TYPE_COMP_RO(tp, comp, Comp) \
+\
+static VALUE \
+cColor_##comp##_set(VALUE v_self, VALUE v_comp) \
+{ \
+  RPP::QColor(v_self)->set##Comp(RPP::tp(v_comp)); \
+  return v_comp; \
+}
+
+#define INT_COMP_RO(comp, Comp) TYPE_COMP_RO(Fixnum, comp, Comp)
+#define INT_COMP(comp, Comp) TYPE_COMP(Fixnum, comp, Comp)
+#define FLOAT_COMP_RO(comp, Comp) TYPE_COMP_RO(Float, comp##F, Comp##F)
+#define FLOAT_COMP(comp, Comp) TYPE_COMP(Float, comp##F, Comp##F)
+
+COMPS
+
+/* Now we need some handmade stuff
+ */
+#define TP_CMYK_SETTER(ctp, rpptp, comp, suffix) \
+static VALUE \
+cColor_##comp##suffix##_set(VALUE v_self, VALUE v_comp) \
+{ \
+  const RPP::QColor self = v_self; \
+  ctp cyan##suffix, magenta##suffix, yellow##suffix, black##suffix, alpha; \
+  self->getCmyk##suffix(&cyan##suffix, &magenta##suffix, &yellow##suffix, \
+			&black##suffix, &alpha); \
+  comp##suffix = RPP::rpptp(v_comp); \
+  self->setCmyk##suffix(cyan##suffix, magenta##suffix, yellow##suffix, \
+			black##suffix, alpha); \
+  return v_comp; \
+}
+
+#define INT_CMYK_SETTER(comp) TP_CMYK_SETTER(int, Fixnum, comp, )
+#define FLOAT_CMYK_SETTER(comp) TP_CMYK_SETTER(double, Float, comp, F)
+#define CMYK_SETTER(comp) INT_CMYK_SETTER(comp) FLOAT_CMYK_SETTER(comp)
+
+CMYK_SETTER(black)
+CMYK_SETTER(cyan)
+CMYK_SETTER(magenta)
+CMYK_SETTER(yellow)
+
+#define TP_HSL_SETTER(hsl, ctp, rpptp, comp, Comp, suffix) \
+static VALUE \
+cColor_##hsl##Comp##suffix##_set(VALUE v_self, VALUE v_comp) \
+{ \
+  const RPP::QColor self = v_self; \
+  ctp hue##suffix, saturation##suffix, lightness##suffix, alpha; \
+  self->getHsl##suffix(&hue##suffix, &saturation##suffix, &lightness##suffix, \
+		       &alpha); \
+  comp##suffix = RPP::rpptp(v_comp); \
+  self->setHsl##suffix(hue##suffix, saturation##suffix, lightness##suffix, alpha); \
+  return v_comp; \
+}
+
+#define INT_HSL_SETTER(comp, Comp, hsl) TP_HSL_SETTER(hsl, int, Fixnum, comp, Comp, )
+#define FLOAT_HSL_SETTER(comp, Comp, hsl) TP_HSL_SETTER(hsl, double, Float, comp, Comp, F)
+#define HSL_SETTER(comp, Comp, hsl) INT_HSL_SETTER(comp, Comp, hsl) FLOAT_HSL_SETTER(comp, Comp, hsl)
+
+HSL_SETTER(hue, Hue, hsl)
+HSL_SETTER(saturation, Saturation, hsl)
+HSL_SETTER(lightness, lightness, )
+
+#define TP_HSV_SETTER(hsv, ctp, rpptp, comp, Comp, suffix) \
+static VALUE \
+cColor_##hsv##Comp##suffix##_set(VALUE v_self, VALUE v_comp) \
+{ \
+  const RPP::QColor self = v_self; \
+  ctp hue##suffix, saturation##suffix, value##suffix, alpha; \
+  self->getHsv##suffix(&hue##suffix, &saturation##suffix, &value##suffix, \
+		       &alpha); \
+  comp##suffix = RPP::rpptp(v_comp); \
+  self->setHsv##suffix(hue##suffix, saturation##suffix, value##suffix, alpha); \
+  return v_comp; \
+}
+
+#define INT_HSV_SETTER(comp, Comp, hsv) TP_HSV_SETTER(hsv, int, Fixnum, comp, Comp, )
+#define FLOAT_HSV_SETTER(comp, Comp, hsv) TP_HSV_SETTER(hsv, double, Float, comp, Comp, F)
+#define HSV_SETTER(comp, Comp, hsv) INT_HSV_SETTER(comp, Comp, hsv) FLOAT_HSV_SETTER(comp, Comp, hsv)
+
+HSV_SETTER(hue, Hue, hsv)
+HSV_SETTER(saturation, Saturation, hsv)
+HSV_SETTER(value, value, )
+
+#undef INT_COMP
+#undef INT_COMP_RO
+#undef FLOAT_COMP
+#undef FLOAT_COMP_RO
+
+#define INT_COMP(comp, Comp) \
+    .define_method(#comp "_get", cColor_##comp##_get) \
+    .define_method(#comp "=", cColor_##comp##_set) \
+
+#define FLOAT_COMP(comp, Comp) \
+    .define_method(#comp "F_get", cColor_##comp##F_get) \
+    .define_method(#comp "F=", cColor_##comp##F_set) \
+
+#define INT_COMP_RO INT_COMP
+#define FLOAT_COMP_RO FLOAT_COMP
+
 void 
-init_color(VALUE mQt)
+init_color(VALUE /*bogo*/)
 {
   trace("init_color");
-  cColor = rb_define_class_under(mQt, "Color", cNoQtControl);
-  rb_define_alloc_func(cColor, cColor_alloc);
-  //  rb_define_module_function(cColor, "sym2color", RUBY_METHOD_FUNC(cColor_sym2color), 1);
-  rb_define_private_method(cColor, "initialize", RUBY_METHOD_FUNC(cColor_initialize), -1);
+  cColor = mQt.define_class("Color", cNoQtControl);
+  cColor.define_alloc_func(cColor_alloc)
+        .define_private_method("initialize", cColor_initialize)
+	COMPS
+	/* MAYBE LATER
+	.define_method("convertTo", cColor_convertTo)
+	.define_method("darker", cColor_darker)
+	.define_method("lighter", cColor_lighter)
+	.define_method("cmyk_get", cColor_cmyk_get)
+	.define_method("cmykF_get", cColor_cmykF_get)
+	.define_method("hsl_get", cColor_hsl_get)
+	.define_method("hslF_get", cColor_hslF_get)
+	.define_method("hsv_get", cColor_hsv_get)
+	.define_method("hsvF_get", cColor_hsvF_get)
+	*/
+	.define_alias("hue=", "hsvHue=")
+	.define_alias("saturation=", "hsvSaturation=")
+	.define_alias("hue_get", "hsvHue_get")
+	;
+// According to Qt manual     hsvHue does not convert color, but hue() does, even if it is a getter.
+// Or maybe they both do.
+
+#undef INT_COMP
+#undef INT_COMP_RO
+#undef FLOAT_COMP
+#undef FLOAT_COMP_RO
+
+#define INT_COMP(comp, Comp) cColor.call("attr_dynamic", rb_cFixnum, RPP::Symbol(#comp));
+#define INT_COMP_RO INT_COMP
+#define FLOAT_COMP(comp, Comp) cColor.call("attr_dynamic", rb_cFloat, RPP::Symbol(#comp "F"));
+#define FLOAT_COMP_RO FLOAT_COMP
+  COMPS
+  cColor.define_alias("saturation_get", "hsvSaturation_get")
+	.define_alias("hue", "hsvHue")
+	.define_alias("saturation", "hsvSaturation")
+	;
+  cDynamicColor = mQt.define_class("DynamicColor", cDynamicAttribute);
   trace("DONE init_color");
 }
 

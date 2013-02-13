@@ -102,7 +102,7 @@ init_gridlayout(VALUE mQt, VALUE cLayout)
   rb_define_method(cGridLayout, "columnCount", RUBY_METHOD_FUNC(cGridLayout_columnCount), -1);
   rb_define_alias(cGridLayout, "columncount", "columnCount");
   rb_define_alias(cGridLayout, "colcount", "columnCount");
-  rb_define_alias(cGridLayout, "colums", "columnCount");
+  rb_define_alias(cGridLayout, "columns", "columnCount");
   rb_define_private_method(cGridLayout, "initialize", 
 			   RUBY_METHOD_FUNC(cGridLayout_initialize), -1);
   rb_define_method(cGridLayout, "addWidget", RUBY_METHOD_FUNC(cGridLayout_addWidget), 1);

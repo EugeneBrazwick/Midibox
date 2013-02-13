@@ -14,10 +14,13 @@
 
 namespace R_Qt {
 
+RPP::Module 
+mQt,
+mR;
+
 VALUE 
-mR = Qnil, 
-mQt = Qnil,
-cSynthObject = Qnil
+cSynthObject = Qnil,
+cDynamicAttribute = Qnil
 ;
 
 //typedef RPP::DataObject<QObject> RPP_QObject;
@@ -142,7 +145,7 @@ cObject_delete(VALUE v_self)
 {
   if (IS_ZOMBIFIED(v_self)) return;
   RQTDECLSELF(QObject);
-  trace4("cObject_free(qptr=%p, class=%s, name='%s', #children=%d)", self, 
+  trace4("cObject_delete(qptr=%p, class=%s, name='%s', #children=%d)", self, 
 	 self->metaObject()->className(), qString2cstr(self->objectName()),
 	 self->children().count());
   track1("Freeing ruby VALUE %s", v_self);
@@ -211,6 +214,22 @@ cObject_alloc(VALUE cObject)
   traqt1("new QObject -> %p", object);
   trace1("cApplication_alloc -> qptr %p", object);
   return cObjectWrap(cObject, object);
+}
+
+static void 
+cObject_free(QObject *object)
+{
+  delete object;
+}
+
+static VALUE
+cObject_takeOwnership(VALUE v_self)
+{
+#if defined(DEBUG)
+  RQTDECLSELF(QObject);
+#endif
+  RDATA(v_self)->dfree = (void (*)(void*))cObject_free;
+  return Qnil;
 }
 
 /** :call-seq:
@@ -767,9 +786,30 @@ cObject_widget_p(VALUE v_self)
 }
 
 static VALUE
+cObject_qtobject_p(VALUE)
+{
+  return Qtrue;
+}
+
+static VALUE
 cObject_synththesized_p(VALUE)
 {
   return Qfalse;
+}
+
+static VALUE
+cObject_setProperty(VALUE v_self, VALUE v_name, VALUE v_value)
+{
+  RQTDECLSELF(QObject);
+  self->setProperty(StringValueCStr(v_name), QVariant::fromValue(RValue(v_value))); 
+  return v_value;
+}
+
+static VALUE
+cObject_property(VALUE v_self, VALUE v_name)
+{
+  RQTDECLSELF(QObject);
+  return prop2v(self, StringValueCStr(v_name));
 }
 
 static VALUE
@@ -794,6 +834,7 @@ init_object()
   rb_define_method(cObject, "delete", RUBY_METHOD_FUNC(cObject_delete), 0);
   rb_define_method(cObject, "zombified?", RUBY_METHOD_FUNC(cObject_zombified_p), 0);
   rb_define_method(cObject, "widget?", RUBY_METHOD_FUNC(cObject_widget_p), 0);
+  rb_define_method(cObject, "qtobject?", RUBY_METHOD_FUNC(cObject_qtobject_p), 0);
 //  rb_define_method(cObject, "findChild", RUBY_METHOD_FUNC(cObject_findChild), -1);
   rb_define_method(cObject, "each_child", RUBY_METHOD_FUNC(cObject_each_child), 0);
   rb_define_method(cObject, "each", RUBY_METHOD_FUNC(cObject_each_child), 0);
@@ -812,6 +853,9 @@ init_object()
 			     RUBY_METHOD_FUNC(cObject_enqueue_children), 1);
   rb_define_method(cObject, "to_s", RUBY_METHOD_FUNC(cObject_to_s), 0);
   rb_define_method(cObject, "synthesized?", RUBY_METHOD_FUNC(cObject_synththesized_p), 0);
+  rb_define_method(cObject, "takeOwnership", RUBY_METHOD_FUNC(cObject_takeOwnership), 0);	
+  rb_define_method(cObject, "setProperty", RUBY_METHOD_FUNC(cObject_setProperty), 2);
+  rb_define_method(cObject, "property", RUBY_METHOD_FUNC(cObject_property), 1);
   trace("init_object OK");
   return cObject;
 }
@@ -856,6 +900,12 @@ cNoQtControl_enqueue_children(VALUE, VALUE)
 
 static VALUE
 cNoQtControl_widget_p(VALUE)
+{
+  return Qfalse;
+}
+
+static VALUE
+cNoQtControl_qtobject_p(VALUE)
 {
   return Qfalse;
 }
@@ -911,6 +961,14 @@ init_control()
 {
   cControl = rb_define_class_under(mQt, "Control", cObject);
   rb_define_method(cControl, "objectName=", RUBY_METHOD_FUNC(cControl_objectName_set), 1);
+  rb_define_const(cControl, "DynValProp", rb_str_new_cstr(R_QT_DYNVALUE_PROPERTYID));
+  cDynamicAttribute = rb_define_class_under(mQt, "DynamicAttribute", cControl);
+}
+
+static VALUE
+cNoQtControl_takeOwnership(VALUE /*v_self*/)
+{
+  return Qnil;
 }
 
 static void
@@ -919,16 +977,17 @@ init_noqtcontrol()
   cNoQtControl = rb_define_class_under(mQt, "NoQtControl", cControl);
   rb_define_private_method(cNoQtControl, "mark_ownership", 
 			   RUBY_METHOD_FUNC(cNoQtControl_mark_ownership), 0);
+  rb_define_method(cNoQtControl, "qtobject?", RUBY_METHOD_FUNC(cNoQtControl_qtobject_p), 0);
   rb_define_method(cNoQtControl, "widget?", RUBY_METHOD_FUNC(cNoQtControl_widget_p), 0);
   rb_define_method(cNoQtControl, "enqueue_children", RUBY_METHOD_FUNC(cNoQtControl_enqueue_children), 1);
   rb_define_method(cNoQtControl, "qtparent_get", RUBY_METHOD_FUNC(cNoQtControl_qtparent_get), 0);
   rb_define_method(cNoQtControl, "qtparent", RUBY_METHOD_FUNC(cNoQtControl_qtparent_get), 0);
   rb_define_method(cNoQtControl, "qtparent=", RUBY_METHOD_FUNC(cNoQtControl_qtparent_set), 1);	
   // qtparent is used through parent sometimes as in	  'Object.new parent: bart'
-  //  rb_define_method(cNoQtControl, "qtparent", RUBY_METHOD_FUNC(cNoQtControl_qtparent), -1);
   rb_define_method(cNoQtControl, "qtchildren_get", RUBY_METHOD_FUNC(cNoQtControl_qtchildren_get), 0);
   rb_define_method(cNoQtControl, "qtchildren=", RUBY_METHOD_FUNC(cNoQtControl_qtchildren_set), -1);
   rb_define_alias(cNoQtControl, "qtchildren", "qtchildren_get");
+  rb_define_method(cNoQtControl, "takeOwnership", RUBY_METHOD_FUNC(cNoQtControl_takeOwnership), 0);	
 }
 
 static VALUE
@@ -954,14 +1013,14 @@ Init_liburqtCore()
   static bool loaded = false;
   trace1("Init_liburqtCore, loaded=%d", loaded);
   if (loaded) return;
-  init_qt();
+  init_qt(); // mR + mQt + cObject
   const VALUE mReform = rb_define_module_under(mR, "EForm");
   rb_define_module_function(mReform, "tr", RUBY_METHOD_FUNC(mReform_tr), -1);
   init_rvalue(); // assigns RVALUE_ID
   init_object();
-  init_control();
-  init_noqtcontrol();
-  init_synthobject();
+  init_control(); // cControl + cDynamicAttribute
+  init_noqtcontrol(); // cNoQtControl
+  init_synthobject(); // cSynthObject
   loaded = true;
   trace("Init_liburqtCore OK");
 }

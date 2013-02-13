@@ -1,13 +1,16 @@
 #if !defined (_URQT_OBJECT_H_)
 #define _URQT_OBJECT_H_
 
-// #include "ruby++/ruby++.h"
-#include <ruby/ruby.h> /* rather unavoidable anyway */
-#include "api_utils.h" /* "" */
+// This document adheres to the GNU coding standard
+// Copyright (c) 2013 Eugene Brazwick
+
+#include "ruby++/ruby++.h" 
+#include "api_utils.h" /* "rather unavoidable" */
 #pragma interface
 
 namespace R_Qt {
-extern VALUE mQt, mR, cSynthObject;
+extern RPP::Module mQt, mR; 
+extern VALUE cSynthObject, cDynamicAttribute;
 
 extern void cObject_mark(QObject *object);
 extern VALUE cObject_signal_implementation(VALUE v_self, VALUE v_method, VALUE v_signal,

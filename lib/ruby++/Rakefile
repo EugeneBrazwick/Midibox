@@ -1,6 +1,6 @@
 
 DEBUG = true
-LIBRARY = 'libruby++.so'
+LIBRARY = '../reform/libruby++.so'
 LIBS = [] # %w[ -lQt5Widgets -lurqtCore ]
 INCDIRS = [] # %w[ ../urqtCore ]
 LINKDIRS = [] # %w[ ../urqtCore ]

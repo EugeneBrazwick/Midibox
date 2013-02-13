@@ -17,6 +17,7 @@ This file contains the QWidget wrapper.
 #include <QtWidgets/QLayout>
 #include <QtGui/QResizeEvent>
 #include "widget.h"
+#include "size.h" // cSizeWrap	  
 #include "layout.h" // cLayout
 #include "object.h" // cObjectWrap
 
@@ -48,11 +49,8 @@ cWidget_resize(int argc, VALUE *argv, VALUE v_self)
   rb_check_frozen(v_self);
   RQTDECLSELF(QWidget);
   trace("cWidget_resize");
-  VALUE v_x, v_y;
-  rb_scan_args(argc, argv, "02", &v_x, &v_y);
-  const int x = NUM2INT(v_x);
   traqt1("%s::resize", QTCLASS(self));
-  self->resize(x, NIL_P(v_y) ? x : NUM2INT(v_y));
+  self->resize(args2QSize(argc, argv));
   return v_self;
 }
 
@@ -65,8 +63,41 @@ cWidget_size_get(VALUE v_self)
 {
   RQTDECLSELF(QWidget);
   traqt1("%s::size", QTCLASS(self));
-  const QSize r = self->size();
-  return rb_ary_new3(2, INT2NUM(r.width()), INT2NUM(r.height())); 
+  return cSizeWrap(self->size());
+}
+
+static VALUE
+cWidget_minimumSize_set(int argc, VALUE *argv, VALUE v_self)
+{
+  rb_check_frozen(v_self);
+  RQTDECLSELF(QWidget);
+  trace("cWidget_resize");
+  self->setMinimumSize(args2QSize(argc, argv));
+  return Qnil;
+}
+
+static VALUE
+cWidget_minimumSize_get(VALUE v_self)
+{
+  RQTDECLSELF(QWidget);
+  return cSizeWrap(self->minimumSize());
+}
+
+static VALUE
+cWidget_maximumSize_set(int argc, VALUE *argv, VALUE v_self)
+{
+  rb_check_frozen(v_self);
+  RQTDECLSELF(QWidget);
+  trace("cWidget_resize");
+  self->setMinimumSize(args2QSize(argc, argv));
+  return Qnil;
+}
+
+static VALUE
+cWidget_maximumSize_get(VALUE v_self)
+{
+  RQTDECLSELF(QWidget);
+  return cSizeWrap(self->maximumSize());
 }
 
 VALUE 
@@ -321,6 +352,27 @@ cWidget_layout_set(VALUE v_self, VALUE v_layout)
   return v_self;
 } 
 
+/*
+static VALUE
+cWidget_sizeHint_set(int argc, VALUE *argv, VALUE v_self)
+{
+  RQTDECLSELF(QWidget);
+  const QSizeF sz = args2QSizeF(argc, argv);
+  // FAILS:  sizeHint() is READONLY!!!!
+  self->setProperty("sizeHint", sz);
+  // DOES THIS WORK??? ie ,  will self->sizeHint now return the size??
+  if (self->sizeHint() != sz) rb_fatal("Er.....");
+  return Qnil;
+}
+
+static VALUE
+cWidget_sizeHint_get(VALUE v_self)
+{
+  RQTDECLSELF(QWidget);
+  return cSizeWrap(self->sizeHint());
+}
+*/
+
 static VALUE
 cSynthWidget_synththesized_p(VALUE)
 {
@@ -345,6 +397,21 @@ init_widget(VALUE mQt, VALUE cControl)
   rb_define_method(cWidget, "resize", RUBY_METHOD_FUNC(cWidget_resize), -1);
   rb_define_method(cWidget, "size=", RUBY_METHOD_FUNC(cWidget_resize), -1);
   rb_define_method(cWidget, "size_get", RUBY_METHOD_FUNC(cWidget_size_get), 0);
+  rb_define_method(cWidget, "minimumSize=", RUBY_METHOD_FUNC(cWidget_minimumSize_set), -1);
+  rb_define_method(cWidget, "minimumSize_get", RUBY_METHOD_FUNC(cWidget_minimumSize_get), 0);
+  rb_funcall(cWidget, rb_intern("attr_dynamic"), 2, cSize, CSTR2SYM("minimumSize"));
+  rb_define_method(cWidget, "maximumSize=", RUBY_METHOD_FUNC(cWidget_maximumSize_set), -1);
+  rb_define_method(cWidget, "maximumSize_get", RUBY_METHOD_FUNC(cWidget_maximumSize_get), 0);
+  rb_funcall(cWidget, rb_intern("attr_dynamic"), 2, cSize, CSTR2SYM("maximumSize"));
+  /*	QWidget.sizeHint is virtual but readonly...
+   *	And static properties do not merge with dynamic ones
+   *
+   *	The only solution is to subclass ALL widget subclasses with their own
+   *	sizeHint() crap.
+  rb_define_method(cWidget, "sizeHint=", RUBY_METHOD_FUNC(cWidget_sizeHint_set), -1);
+  rb_define_method(cWidget, "sizeHint_get", RUBY_METHOD_FUNC(cWidget_sizeHint_get), 0);
+  rb_funcall(cWidget, rb_intern("attr_dynamic"), 2, cSize, CSTR2SYM("sizeHint"));
+  */
   rb_define_method(cWidget, "title=", RUBY_METHOD_FUNC(cWidget_title_set), -1);
   rb_define_method(cWidget, "caption=", RUBY_METHOD_FUNC(cWidget_title_set), -1);
   rb_define_method(cWidget, "windowTitle=", RUBY_METHOD_FUNC(cWidget_title_set), -1);

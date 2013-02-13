@@ -28,7 +28,7 @@ init_rvalue()
 
 std::ostream &operator<<(std::ostream &o, const T_RVALUE &v)
 {
-  return o << v.v();
+  return o << *v;
 }
 
 std::istream &operator>>(std::istream &i, T_RVALUE &v)
@@ -38,7 +38,7 @@ std::istream &operator>>(std::istream &i, T_RVALUE &v)
 
 std::ostream &operator<<(std::ostream &o, const T_RGCGUARDEDVALUE &v)
 {
-  return o << v.v();
+  return o << *v;
 }
 
 std::istream &operator>>(std::istream &i, T_RGCGUARDEDVALUE &v)

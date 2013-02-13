@@ -39,7 +39,7 @@ end
 if __FILE__ == $0
   require 'reform/app'
   Reform.app {
-    #fail_on_instantiation_errors true
+    #fail_on_errors true
     data 'blue'
     collect_names true
     widget {

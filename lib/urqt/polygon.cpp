@@ -4,6 +4,7 @@
 
 #include <QtWidgets/QGraphicsPolygonItem>
 #include "graphicsitem.h"
+#include "point.h"
 
 namespace R_Qt {
 
@@ -92,11 +93,13 @@ args2QPolygonF(int argc, VALUE *argv, QPolygonF &dst)
   return dst;
 } // args2QPolygonF
 
+#define ARGS2QPOLYGONF(poly) args2QPolygonF(argc, argv, poly)
+
 static VALUE
 cGraphicsTriangleItem_points_set(int argc, VALUE *argv, VALUE v_self)
 {
   QPolygonF poly;
-  args2QPolygonF(argc, argv, poly);
+  ARGS2QPOLYGONF(poly);
   if (poly.size() != 3) rb_raise(rb_eArgError, "a triangle must have exactly 3 vertices");
   RQTDECLSELF_GI(QGraphicsPolygonItem);
   self->setPolygon(poly);
@@ -119,7 +122,7 @@ static VALUE
 cGraphicsQuadItem_points_set(int argc, VALUE *argv, VALUE v_self)
 {
   QPolygonF poly;
-  args2QPolygonF(argc, argv, poly);
+  ARGS2QPOLYGONF(poly);
   if (poly.size() != 4) rb_raise(rb_eArgError, "a quad must have exactly 4 vertices");
   RQTDECLSELF_GI(QGraphicsPolygonItem);
   self->setPolygon(poly);
@@ -141,7 +144,7 @@ cGraphicsPolygonItem_points_set(int argc, VALUE *argv, VALUE v_self)
 {
   RQTDECLSELF_GI(QGraphicsPolygonItem);
   QPolygonF poly;
-  self->setPolygon(args2QPolygonF(argc, argv, poly));
+  self->setPolygon(ARGS2QPOLYGONF(poly));
   return Qnil;
 }
 

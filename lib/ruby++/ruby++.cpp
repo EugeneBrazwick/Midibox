@@ -2,14 +2,16 @@
 #pragma implementation
 
 #include "ruby++.h"
+// not required, but errors in templates are then reveiled
+#include "hash.h"
+#include "numeric.h"
+#include "dataobject.h"
+#include "range.h"
+#include "array.h"
+#include "proc.h"
+#include "bool.h"
 
 namespace RPP {
-
-void experiment2()
-{
-  Module m = "Experiment";
-  m.define_function("f", experiment);
-}
 
 const Object Object::NIL = Qnil;
 const Class Class::Object = rb_cObject;

@@ -7,123 +7,24 @@
 #pragma implementation
 #include "graphicsitem.h"
 #include "brush.h"
+#include "size.h"
 #include "object.h"
 #include "pen.h"
+#include "painterpath.h"
+#include "point.h"
 #include <assert.h>
 #include <QtGui/QBrush>
 
 namespace R_Qt {
 
 VALUE 
-cRectF = Qnil,
-cPointF = Qnil,
-cSizeF = Qnil; 
+cRectF = Qnil;
 
 VALUE
 cGraphicsItem = Qnil, 
 cAbstractGraphicsShapeItem = Qnil,
 cSynthItem = Qnil,
 cGraphicsLineItem = Qnil;
-
-void
-cPointF_free(QPointF *pt)
-{
-  trace1("cPointF_free(%p)", pt);
-  traqt1("delete QRectF %p", pt);
-  delete pt;
-}
-
-R_QT_DEF_ALLOCATOR_BASE1(PointF)
-
-QPointF
-args2QPointF(int argc, VALUE *argv)
-{
-  trace1("args2QPointF, argc=%d", argc);
-  VALUE v_x, v_y;
-  rb_scan_args(argc, argv, "11", &v_x, &v_y);
-  if (NIL_P(v_y) && TYPE(v_x) == T_ARRAY)
-    {
-      if (RARRAY_LEN(v_x) != 2)
-	rb_raise(rb_eTypeError, "invalid arraylength for a point");
-      v_y = RARRAY_PTR(v_x)[1];
-      v_x = RARRAY_PTR(v_x)[0];
-    }
-  if (NIL_P(v_y))
-    {
-      track1("v_x = %s", v_x);
-      if (TYPE(v_x) == T_DATA)
-	{
-	  // v_x should be a PointF 
-	  return v2pt(v_x);
-	}
-      rb_raise(rb_eTypeError, "invalid value %s to construct a point", INSPECT(v_x));
-    }
-  return QPointF(NUM2DBL(v_x), NUM2DBL(v_y));
-}
-
-static void 
-init_point()
-{
-  cPointF = rb_define_class_under(mQt, "Point", rb_cObject);
-  rb_define_alloc_func(cPointF, cPointF_alloc);
-}
-
-void
-cSizeF_free(QSizeF *pt)
-{
-  trace1("cPointF_free(%p)", pt);
-  traqt1("delete QRectF %p", pt);
-  delete pt;
-}
-
-R_QT_DEF_ALLOCATOR_BASE1(SizeF)
-
-QSizeF
-args2QSizeF(int argc, VALUE *argv)
-{
-  trace1("args2QSizeF, argc=%d", argc);
-  VALUE v_w, v_h;
-  rb_scan_args(argc, argv, "11", &v_w, &v_h);
-  if (NIL_P(v_h) && TYPE(v_w) == T_ARRAY)
-    {
-      switch (RARRAY_LEN(v_w))
-	{
-	case 2:
-	  v_h = RARRAY_PTR(v_w)[1];
-	  // fall through
-	case 1:
-	  v_w = RARRAY_PTR(v_w)[0];
-	  break;
-	default:
-	  rb_raise(rb_eTypeError, "invalid arrahlength for a size");
-	}
-    }
-  if (NIL_P(v_h))
-    {
-      track1("v_w = %s", v_w);
-      switch (TYPE(v_w))
-	{
-	case T_DATA:
-	    // v_w should be a SizeF 
-	    return v2sz(v_w);
-	case T_FIXNUM:
-	case T_FLOAT:
-	  {
-	    const double w = NUM2DBL(v_w);
-	    return QSizeF(w, w);
-	  }
-	}
-      rb_raise(rb_eTypeError, "invalid value %s to construct a size", INSPECT(v_w));
-    }
-  return QSizeF(NUM2DBL(v_w), NUM2DBL(v_h));
-}
-
-static void 
-init_size()
-{
-  cSizeF = rb_define_class_under(mQt, "Size", rb_cObject);
-  rb_define_alloc_func(cSizeF, cSizeF_alloc);
-}
 
 void
 cRectF_free(QRectF *rect)
@@ -377,7 +278,7 @@ static VALUE
 cGraphicsItem_pos_set(int argc, VALUE *argv, VALUE v_self)
 {
   RQTDECLSELF_GI(QGraphicsItem);
-  self->setPos(args2QPointF(argc, argv));
+  self->setPos(ARGS2QPOINTF());
   return Qnil;
 }
 
@@ -393,10 +294,17 @@ cAbstractGraphicsShapeItem_brush_set(VALUE v_self, VALUE v_brush)
 {
   rb_iv_set(v_self, "@brush", v_brush);
   RQTDECLSELF_GI(QAbstractGraphicsShapeItem);
-  RQTDECLARE_BRUSH(brush);
-  track2("%s.brush_set(%s)", v_self, v_brush);
-  traqt1("::setBrush", QTCLASS(self));
-  self->setBrush(*brush);
+  if (NIL_P(v_brush))
+    {
+      self->setBrush(QBrush()); // default, I hope
+    }
+  else
+    {
+      RQTDECLARE_BRUSH(brush);
+      track2("%s.brush_set(%s)", v_self, v_brush);
+      traqt1("::setBrush", QTCLASS(self));
+      self->setBrush(*brush);
+    }
   return v_brush;
 }
 
@@ -406,14 +314,20 @@ cAbstractGraphicsShapeItem_brush_get(VALUE v_self)
   return rb_iv_get(v_self, "@brush");
 }
 
+// Context: Pen.parent=
 static VALUE
 cAbstractGraphicsShapeItem_pen_set(VALUE v_self, VALUE v_pen)
 {
   rb_iv_set(v_self, "@pen", v_pen);
   RQTDECLSELF_GI(QAbstractGraphicsShapeItem);
-  RQTDECLARE_PEN(pen);
-  track2("%s.pen_set(%s)", v_self, v_pen);
-  self->setPen(*pen);
+  if (NIL_P(v_pen))
+      self->setPen(QPen());
+  else
+    {
+      RQTDECLARE_PEN(pen);
+      track2("%s.pen_set(%s)", v_self, v_pen);
+      self->setPen(*pen);
+    }
   return v_pen;
 }
 
@@ -476,12 +390,13 @@ init_synthitem(VALUE mQt)
 VALUE
 init_graphicsitem(VALUE mQt, VALUE /*cControl*/)
 {
-  init_point();
-  init_size();
-  init_rect();
-  init_brush(mQt);
-  init_pen(mQt);
-  init_color(mQt);
+  init_point(mQt); // cPointF/cPoint
+  init_size(mQt); // cSizeF/cSize
+  init_painterpath(mQt); // cPainterPath
+  init_rect(); // cRectF
+  init_color(mQt); // cColor, cDynamicColor
+  init_brush(mQt); // cBrush
+  init_pen(mQt); // cPen
   cGraphicsItem = rb_define_class_under(mQt, "GraphicsItem", cNoQtControl);
   rb_define_private_method(cGraphicsItem, "mark_ownership", 
 			   RUBY_METHOD_FUNC(cGraphicsItem_mark_ownership), 0);

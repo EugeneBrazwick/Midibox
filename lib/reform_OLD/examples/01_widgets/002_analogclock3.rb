@@ -62,7 +62,7 @@ Reform::app {
 	  # So 'brush' is set on each item passed, and we use hue to
 	  # make the colors rotate 360 degrees as well.
 	  # The hsv method is available in all graphicals and creates a
-	  # color out of hue, satarution and value (strength).
+	  # color out of hue, saturation and value (strength).
 	  # Note that h is in degrees while s and v must be in the range
 	  # 0..255.
           brush color: hsv(n * 6, 255, 255)

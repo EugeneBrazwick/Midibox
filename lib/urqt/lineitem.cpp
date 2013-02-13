@@ -8,11 +8,13 @@
 #include "application.h"
 #include "graphicsitem.h"
 #include "pen.h"
+#include "point.h"
 
 namespace R_Qt {
 
 R_QT_DEF_GRALLOCATOR(GraphicsLineItem)
 
+// Context: Pen.parent=
 static VALUE
 cGraphicsLineItem_pen_set(VALUE v_self, VALUE v_pen)
 {
@@ -33,7 +35,7 @@ static VALUE
 cGraphicsLineItem_from_set(int argc, VALUE *argv, VALUE v_self)
 {
   RQTDECLSELF_GI(QGraphicsLineItem);
-  const QPointF &pt = args2QPointF(argc, argv);
+  const QPointF &pt = ARGS2QPOINTF();
   QLineF ln = self->line();
   ln.setP1(pt);
   self->setLine(ln);
@@ -51,7 +53,7 @@ static VALUE
 cGraphicsLineItem_to_set(int argc, VALUE *argv, VALUE v_self)
 {
   RQTDECLSELF_GI(QGraphicsLineItem);
-  const QPointF &pt = args2QPointF(argc, argv);
+  const QPointF &pt = ARGS2QPOINTF();
   QLineF ln = self->line();
   ln.setP2(pt);
   self->setLine(ln);

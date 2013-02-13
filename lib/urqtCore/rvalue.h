@@ -1,6 +1,6 @@
 #if !defined(_R_QT_RVALUE_H_)
 #define _R_QT_RVALUE_H_
-#include <ruby.h>
+#include "ruby++/ruby++.h"
 #include <iostream>
 #include <QtCore/QMetaType>
 
@@ -11,19 +11,17 @@
 #define T_RVALUE RValue
 #define T_RGCGUARDEDVALUE RGCGuardedValue
 
-class RValue 
+class RValue: public RPP::BasicObject 
 {
 private:
-  VALUE V;
+  typedef RPP::BasicObject inherited;
 public:
-  RValue(VALUE v): V(v) {}
-  RValue(): V(Qnil) {}
-  RValue(const RValue &other): V(other.V) {}
+  RValue(VALUE v): inherited(v) {}
+  RValue(): inherited() {}
+  RValue(const RValue &other): inherited(other) {}
   ~RValue() {}
-  VALUE v() const { return V; }
+  //  VALUE v() const { return V; }   use '*'
   std::istream &read_from(std::istream &i) { return i >> V; }
-  operator VALUE() const { return V; }
-  VALUE operator*() const { return V; }
 };
 
 class RGCGuardedValue 
@@ -38,7 +36,7 @@ public:
   RGCGuardedValue(): V(Qnil) {}
   RGCGuardedValue(const RGCGuardedValue &other): V(other.V) { lock(); }
   ~RGCGuardedValue() { release(); }
-  VALUE v() const { return V; }
+  //VALUE v() const { return V; }     use '*'
   std::istream &read_from(std::istream &i) { release(); i >> V; lock(); return i; }
   operator VALUE() const { return V; }
   VALUE operator*() const { return V; }

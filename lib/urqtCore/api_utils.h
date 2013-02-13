@@ -6,7 +6,7 @@
 
 #include <QtCore/QObject>
 #include <QtCore/QVariant>
-// #include "ruby++/ruby++.h"
+#include "ruby++/dataobject.h"
 #include "rvalue.h"
 
 #if defined(TRACE)
@@ -48,9 +48,6 @@
 #define traqt4(arg, a, b, c, d)
 #endif
 
-#define INSPECT(x) RSTRING_PTR(rb_inspect(x))
-#define RQT_TO_S(x) rb_funcall(x, rb_intern("to_s"), 0)
-#define TO_CSTR(x) RSTRING_PTR(RQT_TO_S(x))
 #define STRINGIFY_INTERNAL(t) #t
 #define STRINGIFY(t) STRINGIFY_INTERNAL(t)
       /* Check_Type(v, T_DATA);  seems not required in My_Data_Get_Struct */
@@ -67,6 +64,9 @@
 #define GET_STRUCT(Type, var) Type *var; GET_STRUCT_NODECL(Type, var)
 #define GET_STRUCT_PTR(Type, var) Type *var; My_Data_Get_Struct(*v_##var, Type, var)
 
+namespace R_Qt {
+
+// handy for debugging:
 static inline const char *
 QTCLASS(const QObject *o)
 {
@@ -78,8 +78,6 @@ QTCLASS(const QObject &o)
 {
   return o.metaObject()->className();
 }
-
-namespace R_Qt {
 
 extern VALUE cObject, cControl, cNoQtControl;
 
@@ -115,10 +113,15 @@ An example would be the GraphicsItem classes.
 #endif // !DEBUG
 
 #define R_QT_INTERNAL_PROPERTY_PREFIX "R_Qt::"
-#define R_QT_RVALUE_PROPERTYID R_QT_INTERNAL_PROPERTY_PREFIX "rvalue"
 
-// Stores v inside its own q object and returns that object
-// Just use GET_STRUCT to simply go from v_x to x
+// the ruby VALUE is stored in the following property of all wrapped QObjects:
+#define R_QT_RVALUE_PROPERTYID R_QT_INTERNAL_PROPERTY_PREFIX "rvalue"
+// the next name is used for dynamic values
+#define R_QT_DYNVALUE_PROPERTYID R_QT_INTERNAL_PROPERTY_PREFIX "dynvalue"
+
+// Stores v inside its own q object and returns that object. 
+// AVOID!
+// Just use GET_STRUCT/RQTDECL-macros to simply go from v_x to x
 static inline QObject *
 v2qt(VALUE v_q)
 {
@@ -199,6 +202,26 @@ cstr2sym(const char *s)
 #define RQT2SYM(s) cstr2sym(#s)
 
 } // namespace R_Qt 
+
+namespace RPP {
+template <class T> class QObject: public DataObject<T>
+{
+private:
+  typedef DataObject<T> inherited;
+public:
+  QObject<T>(VALUE v_o): inherited(v_o)
+    {
+#if defined(DEBUG)
+      if (!rb_obj_is_kind_of(v_o, R_Qt::cObject))
+	rb_raise(rb_eTypeError, "SERIOUS PROGRAMMING ERROR: very bad cast to QObject");
+#endif // DEBUG
+      GET_STRUCT(::QObject, o);
+      if (!this->setWrapped(dynamic_cast<T *>(o)))  // this????
+	rb_raise(rb_eTypeError, "Bad cast to %s", R_Qt::QTCLASS(o));
+    }
+}; // class RPP::QObject
+
+} // namespace RPP 
 
 #define override virtual
 

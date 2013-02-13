@@ -18,8 +18,9 @@ Or better, we must generate it.
 	title 'Top-level widget'
 	shown do
 	  #tag "SHOWN CALLED!!!!!!!!!!, ok=#{ok}, size = #{size.inspect}" 
-	  size.should == [320, 240]	# SPURIOUS SEGV at end...
-	  title.should == 'Top-level widget' # IDEM
+	  size.w.should == 320
+	  size.h.should == 240
+	  title.should == 'Top-level widget' 
 	  ok = true 
 	  # now break from the eventloop, so rspec gets control back
 	  $app.quit

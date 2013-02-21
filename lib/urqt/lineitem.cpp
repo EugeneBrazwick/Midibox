@@ -18,23 +18,17 @@ R_QT_DEF_GRALLOCATOR(GraphicsLineItem)
 static VALUE
 cGraphicsLineItem_pen_set(VALUE v_self, VALUE v_pen)
 {
-  rb_iv_set(v_self, "@pen", v_pen);
-  RQTDECLSELF_GI(QGraphicsLineItem);
-  RQTDECLARE_PEN(pen);
+  const RPP::QGraphicsItem<QGraphicsLineItem> self = v_self;
+  const RPP::QPen pen = v_pen;
+  self.iv_set("@pen", pen);
   self->setPen(*pen);
   return v_pen;
 }
 
 static VALUE
-cGraphicsLineItem_pen_get(VALUE v_self)
-{
-  return rb_iv_get(v_self, "@pen");
-}
-
-static VALUE
 cGraphicsLineItem_from_set(int argc, VALUE *argv, VALUE v_self)
 {
-  RQTDECLSELF_GI(QGraphicsLineItem);
+  const RPP::QGraphicsItem<QGraphicsLineItem> self = v_self;
   const QPointF &pt = ARGS2QPOINTF();
   QLineF ln = self->line();
   ln.setP1(pt);
@@ -45,14 +39,14 @@ cGraphicsLineItem_from_set(int argc, VALUE *argv, VALUE v_self)
 static VALUE
 cGraphicsLineItem_from_get(VALUE v_self)
 {
-  RQTDECLSELF_GI(QGraphicsLineItem);
+  const RPP::QGraphicsItem<QGraphicsLineItem> self = v_self;
   return cPointFWrap(self->line().p1());
 }
 
 static VALUE
 cGraphicsLineItem_to_set(int argc, VALUE *argv, VALUE v_self)
 {
-  RQTDECLSELF_GI(QGraphicsLineItem);
+  const RPP::QGraphicsItem<QGraphicsLineItem> self = v_self;
   const QPointF &pt = ARGS2QPOINTF();
   QLineF ln = self->line();
   ln.setP2(pt);
@@ -63,23 +57,21 @@ cGraphicsLineItem_to_set(int argc, VALUE *argv, VALUE v_self)
 static VALUE
 cGraphicsLineItem_to_get(VALUE v_self)
 {
-  RQTDECLSELF_GI(QGraphicsLineItem);
+  const RPP::QGraphicsItem<QGraphicsLineItem> self = v_self;
   return cPointFWrap(self->line().p2());
 }
 
 void
-init_lineitem(VALUE mQt, VALUE cGraphicsItem)
+init_lineitem(RPP::Module mQt, RPP::Class cGraphicsItem)
 {
-  cGraphicsLineItem = rb_define_class_under(mQt, "GraphicsLineItem", cGraphicsItem);
-  rb_define_alloc_func(cGraphicsLineItem, cGraphicsLineItem_alloc);
-  rb_define_method(cGraphicsLineItem, "to=", RUBY_METHOD_FUNC(cGraphicsLineItem_to_set), -1);
-  rb_define_method(cGraphicsLineItem, "to_get", RUBY_METHOD_FUNC(cGraphicsLineItem_to_get), 0);
-  rb_define_method(cGraphicsLineItem, "from=", RUBY_METHOD_FUNC(cGraphicsLineItem_from_set), -1);
-  rb_define_method(cGraphicsLineItem, "from_get", RUBY_METHOD_FUNC(cGraphicsLineItem_from_get), 0);
-  rb_define_method(cGraphicsLineItem, "pen=", RUBY_METHOD_FUNC(cGraphicsLineItem_pen_set), 1);
-  rb_define_method(cGraphicsLineItem, "pen_get", RUBY_METHOD_FUNC(cGraphicsLineItem_pen_get), 0);
-  rb_funcall(cGraphicsLineItem, rb_intern("attr_dynamic"), 2, cPointF, CSTR2SYM("from"));
-  rb_funcall(cGraphicsLineItem, rb_intern("attr_dynamic"), 2, cPointF, CSTR2SYM("to"));
+  cGraphicsLineItem = mQt.define_class("GraphicsLineItem", cGraphicsItem);
+  cGraphicsLineItem.define_alloc_func(cGraphicsLineItem_alloc)
+		   .define_method("to=", cGraphicsLineItem_to_set)
+		   .define_method("to_get", cGraphicsLineItem_to_get)
+		   .define_method("from=", cGraphicsLineItem_from_set)
+		   .define_method("from_get", cGraphicsLineItem_from_get)
+		   .define_method("pen=", cGraphicsLineItem_pen_set)
+		   ;
 }
 
 } // namespace R_Qt

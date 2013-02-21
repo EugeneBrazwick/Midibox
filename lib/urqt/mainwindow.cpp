@@ -22,12 +22,10 @@ namespace R_Qt {
 R_QT_DEF_ALLOCATOR(MainWindow)
 
 void 
-init_mainwindow(VALUE mQt, VALUE cWidget)
+init_mainwindow(RPP::Module mQt, RPP::Class cWidget)
 {
-  trace2("init_mainwindow, mQt=%p, cWidget=%p", (void *)mQt, (void *)cWidget);
-  const VALUE cMainWindow = rb_define_class_under(mQt, "MainWindow", cWidget);
-  trace("HERE");
-  rb_define_alloc_func(cMainWindow, cMainWindow_alloc);
+  const RPP::Class cMainWindow = mQt.define_class("MainWindow", cWidget);
+  cMainWindow.define_alloc_func(cMainWindow_alloc);
   trace("init_mainwindow OK");
 }
 

@@ -6,33 +6,8 @@
 
 #include <QtCore/QObject>
 #include <QtCore/QVariant>
-#include "ruby++/dataobject.h"
 #include "rvalue.h"
-
-#if defined(TRACE)
-#define trace(arg) fprintf(stderr, __FILE__ ":%d:" arg "\n", __LINE__);
-#define trace1(arg, a) fprintf(stderr, __FILE__ ":%d:" arg "\n", __LINE__, a);
-#define trace2(arg, a, b) fprintf(stderr, __FILE__ ":%d:" arg "\n", __LINE__, a, b);
-#define trace3(arg, a, b, c) fprintf(stderr, __FILE__ ":%d:" arg "\n", __LINE__, a, b, c);
-#define trace4(arg, a, b, c, d) fprintf(stderr, __FILE__ ":%d:" arg "\n", __LINE__, a, b, c, d);
-#define trace5(arg, a, b, c, d, e) fprintf(stderr, __FILE__ ":%d:" arg "\n", __LINE__, a, b, c, d, e);
-#define track1(arg, a) fprintf(stderr, __FILE__ ":%d:" arg "\n", __LINE__, INSPECT(a));
-#define track2(arg, a, b) fprintf(stderr, __FILE__ ":%d:" arg "\n", __LINE__, INSPECT(a), INSPECT(b));
-#define track3(arg, a, b, c) fprintf(stderr, __FILE__ ":%d:" arg "\n", __LINE__, INSPECT(a), INSPECT(b), INSPECT(c));
-#define track4(arg, a, b, c, d) fprintf(stderr, __FILE__ ":%d:" arg "\n", __LINE__, INSPECT(a), INSPECT(b), \
-					INSPECT(c), INSPECT(d));
-#else
-#define trace(arg)
-#define trace1(arg, a)
-#define trace2(arg, a, b)
-#define trace3(arg, a, b, c)
-#define trace4(arg, a, b, c, d)
-#define trace5(arg, a, b, c, d, e)
-#define track1(arg, a)
-#define track2(arg, a, b)
-#define track3(arg, a, b, c)
-#define track4(arg, a, b, c, d)
-#endif
+#include "ruby++/dataobject.h"
 
 #if defined(TRACE_QT_API)
 #define traqt(arg) fprintf(stderr, "TRAQT: " arg "\n");
@@ -79,7 +54,7 @@ QTCLASS(const QObject &o)
   return o.metaObject()->className();
 }
 
-extern VALUE cObject, cControl, cNoQtControl;
+extern RPP::Class cObject, cControl, cNoQtControl;
 
 template <typename T> static inline void
 GetQObject_noDecl(VALUE v_o, T *&q)
@@ -134,7 +109,6 @@ v2qt(VALUE v_q)
 // Returns ruby instance for q. If invalid returns Qnil
 
 #if defined(DEBUG)
-extern VALUE qt2v(QObject *);
 extern VALUE prop2v(QObject *q, const char *id);
 #else // !DEBUG
 static inline VALUE
@@ -143,15 +117,17 @@ prop2v(QObject *q, const char *id)
   const QVariant &rvalue = q->property(id);
   return rvalue.isValid() ? rvalue.value<RValue>().v() : Qnil;
 }
+#endif // !DEBUG
 
+// INTERNAL, use RPP::QObject<QClass>(q)
 static inline VALUE
 qt2v(QObject *q)
 {
+  //trace2("qt2v(%s %p)", q ? QTCLASS(q) : "NULL", q);
   return q ? prop2v(q, R_QT_RVALUE_PROPERTYID) : Qnil;
 } // qt2v
 
-#endif // !DEBUG
-
+// INTERNAL or DEPRECATED. Just use RPP::Array constructor.
 static inline VALUE 
 to_ary(VALUE any)
 {
@@ -202,26 +178,6 @@ cstr2sym(const char *s)
 #define RQT2SYM(s) cstr2sym(#s)
 
 } // namespace R_Qt 
-
-namespace RPP {
-template <class T> class QObject: public DataObject<T>
-{
-private:
-  typedef DataObject<T> inherited;
-public:
-  QObject<T>(VALUE v_o): inherited(v_o)
-    {
-#if defined(DEBUG)
-      if (!rb_obj_is_kind_of(v_o, R_Qt::cObject))
-	rb_raise(rb_eTypeError, "SERIOUS PROGRAMMING ERROR: very bad cast to QObject");
-#endif // DEBUG
-      GET_STRUCT(::QObject, o);
-      if (!this->setWrapped(dynamic_cast<T *>(o)))  // this????
-	rb_raise(rb_eTypeError, "Bad cast to %s", R_Qt::QTCLASS(o));
-    }
-}; // class RPP::QObject
-
-} // namespace RPP 
 
 #define override virtual
 

@@ -1,7 +1,9 @@
 
+// This document adheres to the GNU coding standard
+// Copyright (c) 2013 Eugene Brazwick
+
 #include <QtCore/QObject>
 #include <QtCore/QVariant>
-#include <ruby/ruby.h>
 #include "rvalue.h"
 #include "ruby++/array.h"
 #include "object.h"
@@ -16,6 +18,8 @@ class QSignalProxy: public QObject
 private:
   typedef QObject inherited;
   GCSafeValue Block;
+  const QByteArray QSig;
+  const char * const Signal; // same as QSig.data
 private:
   void handle_i(RPP::Array v_ary) const;
   VALUE block() const { return Block; }

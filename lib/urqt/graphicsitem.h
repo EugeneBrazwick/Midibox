@@ -5,7 +5,7 @@
 // Copyright (c) 2013 Eugene Brazwick
 
 #include <QtWidgets/QGraphicsItem>
-#include <ruby/ruby.h>
+#include <typeinfo>
 #include "api_utils.h"
 
 #pragma interface
@@ -49,8 +49,8 @@ v2item(VALUE v_q)
   return q;
 }
 
-extern VALUE cGraphicsItem, cAbstractGraphicsShapeItem, cGraphicsScene,
-	     cGraphicsLineItem;
+extern RPP::Class cGraphicsItem, cAbstractGraphicsShapeItem, cGraphicsScene,
+		  cGraphicsLineItem;
 
 template <typename T> static inline void
 GetQGraphicsItem_noDecl(VALUE v_o, T *&q, const char *type)
@@ -64,7 +64,7 @@ GetQGraphicsItem_noDecl(VALUE v_o, T *&q, const char *type)
   if (!q) rb_raise(rb_eTypeError, "Bad cast from %s (qtptr: %p) to %s", INSPECT(v_o), o, type);
 }
 
-extern VALUE cRectF, cSynthItem;
+extern RPP::Class cRectF, cSynthItem;
 
 #define RQTDECLARE_GI(T, var) T *var; GetQGraphicsItem_noDecl<T>(v_##var, var, #T)
 
@@ -107,4 +107,22 @@ extern QRectF args2QRectF(int argc, VALUE *argv);
 #define ARGS2QRECTF() args2QRectF(argc, argv)
 
 } // namespace R_Qt 
+
+namespace RPP {
+// T must be a ::QGraphicsItem (sub)class
+template <class T>class QGraphicsItem: public DataObject<T>
+{
+private:
+  typedef DataObject<T> inherited;
+public:
+  QGraphicsItem<T>(VALUE v_o): inherited(v_o, R_Qt::cGraphicsItem)
+    {
+      ::QGraphicsItem * const o = this->wrapped();
+      if (!dynamic_cast<T *>(o))
+	rb_raise(rb_eTypeError, "Bad cast from %s (qtptr: %p) to %s", INSPECT(v_o), o, typeid(T).name());
+    }
+  QGraphicsItem<T>(T *gi, E_SAFETY /*VERYUNSAFE*/): inherited(R_Qt::item2v(gi), gi) {}
+}; // class RPP::QGraphicsItem
+
+} // namespace RPP 
 #endif // _URQT_GRAPHICSITEM_H_

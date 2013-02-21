@@ -1,4 +1,5 @@
 
+// This document adheres to the GNU coding standard
 //#define TRACE
 
 #pragma implementation
@@ -10,22 +11,42 @@
 
 namespace R_Qt {
 
-QSignalProxy::QSignalProxy(QObject *parent, const char *signal, VALUE v_block):
+/* the idea is as follows:
+ *
+ * We delegate to
+ *    connect(parent, method_parent, signalproxy, method);
+ *
+ * where
+ *    'method_parent' is the method 'signal' in 'parent'
+ * and
+ *    'method' is the 'handle' method in signalproxy itself
+ *
+ * So if parent.signal is 'emitted' we call signalproxy.handle() with the same signature 
+ * as the original signal.
+ * And we then arrive in QSignalProxy.handle_i which calls v_block with the arguments
+ * from the signal.
+ *
+ * QSignalProxy is a QObject and it becomes a child of 'parent'.
+ *
+ * Context:   Qt::Object.connect(signalstring, rubyproc)
+ *
+ */
+QSignalProxy::QSignalProxy(QObject *parent, const char *signalname, VALUE v_block):
 inherited(parent),
-Block(v_block)
+Block(v_block),
+QSig(QMetaObject::normalizedSignature(signalname)),
+Signal(QSig.data())
 {
   if (!parent) rb_raise(rb_eTypeError, "Bad parent");
   traqt("QMetaObject::normalizedSignature");
-  QByteArray qsig = QMetaObject::normalizedSignature(signal);
   traqt1("%s::metaObject", QTCLASS(parent));
   const QMetaObject &meta_parent = *parent->metaObject();
-  signal = qsig.data();
-  const char * const brop = strchr(signal, '(');
-  if (!brop) rb_raise(rb_eTypeError, "Bad signal '%s'", signal);
-  const int i_parent_signal = meta_parent.indexOfSignal(signal);
+  const char * const brop = strchr(Signal, '(');
+  if (!brop) rb_raise(rb_eTypeError, "Bad signal '%s'", Signal);
+  const int i_parent_signal = meta_parent.indexOfSignal(Signal);
   if (i_parent_signal == -1)
-    rb_raise(rb_eRuntimeError, "Signal '%s' not found in parent", signal);
-  trace1("call QObject::connect signal '%s' creating QMetaObject::Connection", signal);
+    rb_raise(rb_eRuntimeError, "Signal '%s' not found in parent", Signal);
+  trace1("call QObject::connect signal '%s' creating QMetaObject::Connection", Signal);
   // locate the correct 'handle' 
   QByteArray qslot;
   qslot.append("handle");
@@ -37,24 +58,23 @@ Block(v_block)
   if (i_slot == -1)
     rb_raise(rb_eRuntimeError, "no broker available for signal %s\n"
 			       "Please fix urqtCore/signalproxy.moc.cpp", 
-	     signal);
-  traqt("QMetaObject::method");
+	     Signal);
   QMetaMethod method_parent = meta_parent.method(i_parent_signal);
   traqt("QMetaObject::method");
   QMetaMethod method = meta.method(i_slot);
-  trace("slot located");
+  trace1("slot for signal %s located", Signal);
   traqt1("%s::connect", QTCLASS(this));
   const QMetaObject::Connection c = connect(parent, method_parent, this, method);
   if (!c)
-    rb_raise(rb_eRuntimeError, "invalid connection on signal %s", signal);
+    rb_raise(rb_eRuntimeError, "invalid connection on signal %s", Signal);
 }
 
 static VALUE 
 sp_handle_callback(VALUE /*v_yielded*/, VALUE v_arg)
 {
-  track2("sp_handle_callback(yielded: %s, %s)", v_yielded, v_arg);
+  track1("sp_handle_callback() arg=%s", v_arg);
   // v_arg is ALWAYS an Array
-  const RPP::Array arg(v_arg, RPP::Array::Unsafe);
+  const RPP::Array arg(v_arg, RPP::VERYUNSAFE);
   const RPP::Proc block = arg[0];
   const RPP::Array arg1 = arg[1];
   track2("rb_proc_call(%s, %s)", block, arg1);
@@ -64,7 +84,7 @@ sp_handle_callback(VALUE /*v_yielded*/, VALUE v_arg)
 void 
 QSignalProxy::handle_i(RPP::Array v_ary) const
 {
-  track2("handle_i(%s) on block %s", v_ary, block());
+  trace3("SIGNAL[%s].handle_i(%s) on block %s", Signal, v_ary.inspect(), INSPECT(block()));
   mR.call_with_block("escue", sp_handle_callback, block(), v_ary);
 }
 
@@ -90,10 +110,8 @@ QSignalProxy::handle(bool value) const
 void 
 QSignalProxy::handle(int value) const
 {
-  // This might go:	int -> VALUE -> Array(VALUE)
-  // But it should do:	int -> Array(int)
-  // Fortunately VALUE is not a macro but a typedef
-  handle_i(value);
+  trace2("SIGNAL[%s].handle(int: %d)", Signal, value);
+  handle_i(RPP::Array(value, RPP::Array::CreateSingleton));
 }
 
 } // namespace R_Qt

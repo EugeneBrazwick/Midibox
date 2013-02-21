@@ -17,25 +17,31 @@ module R::Qt
 	@model_listeners = [] 
       end # initialize
 
-      # every node in the controlpath can have a connector set
+      # controlpath is the list of controls, starting with the control that has the model, and ending
+      # with the original sender.
+      # Every node in the controlpath can have a connector set.
       def model_init_path controlpath
-	$stderr.puts "model_init_path(#{controlpath.inspect})" if controlpath[-1].trace_propagation
+	sender = controlpath[-1]
+	$stderr.puts "model_init_path(#{controlpath.inspect})" if sender.trace_propagation
 	v = self
-	lastcontrol = nil
 	controlpath.each do |control|
 	  v &&= Model::model_apply_connector v, control
-	  lastcontrol = control
 	end
-	#tag "lastcontrol=#{lastcontrol}, v =#{v}"
-	lastcontrol.apply_model(v) if v && lastcontrol
+	#tag "sender=#{sender}, v =#{v}"
+	v and sender.apply_model v
       end # model_init_path
 
-      def model_propagate cidpath, value, sender
-	Model::model_propagate_i cidpath, value, sender, self, @model_listeners
+      # context: model_push_data, delegates to model_propagate_i
+      # cidpath can be an array, but normally it's just the initiating method.
+      def model_propagate cidpath, sender
+	cidpath = [cidpath] unless Array === cidpath
+	Model::model_propagate_i cidpath, sender, self, @model_listeners
       end
 
+      # context: model_init_path and model_push_data.
+      # Delegates to model_apply_cid
       def self.model_apply_connector v, control, cidpath = nil
-	model_apply_cid( v, control && control.connector, cidpath)
+	model_apply_cid v, control && control.connector, cidpath
       end # model_apply_connector
 
       def self.model_apply_cid v, cid, cidpath
@@ -45,11 +51,12 @@ module R::Qt
 	  #tag "nil"
 	  v
 	when Proc
+	  #tag "Passing #{v.class} #{v} to proc #{cid}"
 	  cid[v]
 	when Array
 	  #tag "Array, apply them in order"
 	  cid.inject(v) do |w, nm|
-	    w && model_apply_cid(w, nm, cidpath) 
+	    w and model_apply_cid w, nm, cidpath
 	  end
 	else
 	  #tag "should be symbol, delegate to model_apply_getter"
@@ -65,7 +72,16 @@ module R::Qt
 	self
       end
 
-      def self.model_propagate_cid cidpath, control, cid, value, sender, v, subs
+      # context: model_propagate_i <- model_propagate
+      # delegates to control.apply_model unless control == sender
+      # cidpath: an array of cids that indicates the altered value within the model. It is how 
+      #		 sender connects to us.
+      # control: subject of the propagation algo
+      # cid: normally control.connector
+      # sender: original sender (some control) of datachange
+      # v: starts out as the model, but we keep applying the cid on it as we go deeper
+      # subs: model_listeners
+      def self.model_propagate_cid cidpath, control, cid, sender, v, subs
 	if sender.trace_propagation
 	  $stderr.puts "PROPAGATE_CID(#{cidpath.inspect}, #{cid.inspect}, on #{v}, subs = #{subs})"
 	end
@@ -76,7 +92,7 @@ module R::Qt
 	  v = cid[v]
 	when Array
 	  cid.each do |el|
-	    v &&= model_propagate_cid cidpath, control, el, value, sender, v, subs
+	    v &&= model_propagate_cid cidpath, control, el, sender, v, subs
 	  end
 	  return v
 	else
@@ -92,11 +108,11 @@ module R::Qt
 	end
 	if subs
 	  #tag "propagate to subs #{subs.inspect}"
-	  model_propagate_i cidpath, value, sender, v, subs
+	  model_propagate_i cidpath, sender, v, subs
 	else
 	  unless control.equal? sender
 	    #tag "ARRIVAL at accepting endpoint #{control}, v = #{v}"
-	    control.apply_model(v) if v
+	    v and control.apply_model v
 	  end
 	end
 	v
@@ -117,9 +133,12 @@ module R::Qt
     # Note we must not change the model, that's already been done.
     # We must inform all controls that connect to cidpath and reattach
     # by calling control.apply_model
-      def self.model_propagate_i cidpath, value, sender, v, listeners
+    #
+    # Context: model_propagate
+    # Delegates to model_propagate_cid
+      def self.model_propagate_i cidpath, sender, v, listeners
 	if sender.trace_propagation
-	  $stderr.puts "PROPAGATE(#{cidpath.inspect}, #{value}, on #{v}, listeners = #{listeners})"
+	  $stderr.puts "PROPAGATE(#{cidpath.inspect}, on #{v}, listeners = #{listeners})"
 	end
 	listeners.each do |listener|
 	  if Array === listener 
@@ -128,7 +147,7 @@ module R::Qt
 	    control, subs = listener, nil
 	  end
 	  #tag "control = #{control}"
-	  model_propagate_cid cidpath, control, control.connector, value, sender, v, subs
+	  model_propagate_cid cidpath, control, control.connector, sender, v, subs
 	end # each
       end # model_propagate_i
 
@@ -177,7 +196,7 @@ module R::Qt
 	  nil
 	when Array
 	  # apply them in order
-	  if sub = model_apply_cid(v, cid[0...-1]) 
+	  if sub = model_apply_cid(v, cid[0...-1])
 	    model_apply_setter sub, cid[-1], value, sender
 	  else
 	    nil
@@ -218,26 +237,29 @@ module R::Qt
 	model_init_path path
       end # model_add_listener
 
-      def model_push_data value, sender, controlpath
+      # Context: Control.push_data
+      # controlpath is the list of controls starting with the one owning the model, and ending with
+      # the original sender.
+      def model_push_data value, controlpath
+	sender = controlpath[-1]
 	$stderr.puts "model_push_data(#{value}, #{sender}, #{controlpath})" if sender.trace_propagation
 	v = self
 	cidpath = []
-	lastcontrol = controlpath[-1]
 	controlpath[0...-1].each do |control|
 	  v &&= Model::model_apply_connector v, control, cidpath
 	end
-	#tag "lastcontrol=#{lastcontrol}, cid=#{(lastcontrol && lastcontrol.connector).inspect}"
+	#tag "sender=#{sender}, cid=#{(sender && sender.connector).inspect}"
 	#tag "v = #{v.inspect}"
-	if v && lastcontrol && cid = lastcontrol.connector
+	if v && sender && cid = sender.connector
 	  cidpath << cid
 	  #tag "cidpath=#{cidpath.inspect}"
-	  #tag "lastcontrol=#{lastcontrol}, cid=#{cid}"
+	  #tag "sender=#{sender}, cid=#{cid}"
 	  if Model::model_apply_setter v, cid, value, sender 
 	    #tag "setter was applied, now propagate change"
-	    model_propagate cidpath, value, sender
+	    model_propagate cidpath, sender
 	  end
 	end
-      end
+      end # model_push_data
 
       def model_apply_setter methodname, value, sender
 	if sender.trace_propagation

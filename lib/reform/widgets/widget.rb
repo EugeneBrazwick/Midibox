@@ -2,10 +2,13 @@
 #  Copyright (c) 2013 Eugene Brazwick
 
 require_relative '../context'
-require_relative '../layoutable'
+require_relative '_layoutable'
 
 module R::Qt
   class Widget < Control
+
+    # tag "Scanning class Widget, caller = #{caller.inspect}"
+
       # you can include any widget inside any other:
       include Reform::WidgetContext, Reform::ModelContext
       include Layout::Able
@@ -35,13 +38,19 @@ module R::Qt
 	parent.addWidget self
       end # parent=
 
+      #tag "setting up 'title' attr_dynamic"
       attr_dynamic String, :title
-      attr_dynamic Reform::Size, :size
+      attr_dynamic Size, :size, :minimumSize, :maximumSize
 
       alias caption title
       alias windowTitle title
 
+    #tag "Scanned class Widget OK"
   end # class Widget
+
+  class SynthWidget < Widget
+    def synthesized?; true; end
+  end
 
   # req. for a plugin:
   Reform.createInstantiator __FILE__, Widget

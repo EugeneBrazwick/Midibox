@@ -10,6 +10,8 @@
 #include "size.h"
 #include "point.h"
 #include "graphicsitem.h"
+#include "ruby++/numeric.h"
+#include "ruby++/symbol.h"
 
 namespace R_Qt {
 
@@ -38,11 +40,11 @@ inherited(-Radius, -Radius, 2 * Radius, 2 * Radius)
 R_QT_DEF_GRALLOCATOR(GraphicsPointItem)
 
 static void
-init_pointitem()
+init_pointitem(RPP::Module mQt)
 {
-  const VALUE cGraphicsPointItem = rb_define_class_under(mQt, "GraphicsPointItem", 
+  const RPP::Class cGraphicsPointItem = mQt.define_class("GraphicsPointItem", 
 						 	 cAbstractGraphicsShapeItem);
-  rb_define_alloc_func(cGraphicsPointItem, cGraphicsPointItem_alloc);
+  cGraphicsPointItem.define_alloc_func(cGraphicsPointItem_alloc);
 }
 
 R_QT_DEF_GRALLOCATOR(GraphicsRectItem)
@@ -56,8 +58,8 @@ static VALUE
 cGraphicsRectItem_rect_set(int argc, VALUE *argv, VALUE v_self)
 {
   trace("cGraphicsRectItem_rect_set");
-  rb_check_frozen(v_self);
-  RQTDECLSELF_GI(QGraphicsRectItem);
+  const RPP::QGraphicsItem<QGraphicsRectItem> self = v_self;
+  self.check_frozen();
   self->setRect(ARGS2QRECTF());
   return Qnil;
 }
@@ -66,7 +68,7 @@ static VALUE
 cGraphicsRectItem_rect_get(VALUE v_self)
 {
   trace("cGraphicsRectItem_rect_get");
-  RQTDECLSELF_GI(QGraphicsRectItem);
+  const RPP::QGraphicsItem<QGraphicsRectItem> self = v_self;
   return cRectFWrap(self->rect());
 }
 
@@ -74,8 +76,8 @@ static VALUE
 cGraphicsRectItem_size_set(int argc, VALUE *argv, VALUE v_self)
 {
   trace("cGraphicsRectItem_size_set");
-  rb_check_frozen(v_self);
-  RQTDECLSELF_GI(QGraphicsRectItem);
+  const RPP::QGraphicsItem<QGraphicsRectItem> self = v_self;
+  self.check_frozen();
   QRectF r = self->rect();
   r.setSize(ARGS2QSIZEF());
   self->setRect(r);
@@ -86,7 +88,7 @@ static VALUE
 cGraphicsRectItem_size_get(VALUE v_self)
 {
   trace("cGraphicsRectItem_size_get");
-  RQTDECLSELF_GI(QGraphicsRectItem);
+  const RPP::QGraphicsItem<QGraphicsRectItem> self = v_self;
   return cSizeFWrap(self->rect().size());
 }
 
@@ -95,8 +97,8 @@ static VALUE \
 cGraphicsRectItem_##corner##_set(int argc, VALUE *argv, VALUE v_self) \
 { \
   trace("cGraphicsRectItem_" #corner "_set"); \
-  rb_check_frozen(v_self); \
-  RQTDECLSELF_GI(QGraphicsRectItem); \
+  const RPP::QGraphicsItem<QGraphicsRectItem> self = v_self; \
+  self.check_frozen(); \
   QRectF r = self->rect(); \
   r.set##Corner(ARGS2QPOINTF()); \
   self->setRect(r); \
@@ -107,7 +109,7 @@ static VALUE \
 cGraphicsRectItem_##corner##_get(VALUE v_self) \
 { \
   trace("cGraphicsRectItem_" #corner "_get"); \
-  RQTDECLSELF_GI(QGraphicsRectItem); \
+  const RPP::QGraphicsItem<QGraphicsRectItem> self = v_self; \
   return cPointFWrap(self->rect().corner()); \
 }
 
@@ -126,8 +128,8 @@ static VALUE \
 cGraphicsRectItem_##side##_set(VALUE v_self, VALUE v_sz) \
 { \
   trace("cGraphicsRectItem_" #side "_set"); \
-  rb_check_frozen(v_self); \
-  RQTDECLSELF_GI(QGraphicsRectItem); \
+  const RPP::QGraphicsItem<QGraphicsRectItem> self = v_self; \
+  self.check_frozen(); \
   QRectF r = self->rect(); \
   r.set##Side(NUM2DBL(v_sz)); \
   self->setRect(r); \
@@ -138,8 +140,8 @@ static VALUE \
 cGraphicsRectItem_##side##_get(VALUE v_self) \
 { \
   trace("cGraphicsRectItem_" #side "_get"); \
-  RQTDECLSELF_GI(QGraphicsRectItem); \
-  return DBL2NUM(self->rect().side()); \
+  const RPP::QGraphicsItem<QGraphicsRectItem> self = v_self; \
+  return RPP::Float(self->rect().side()); \
 }
 
 #define QT_GRI_SIDES \
@@ -155,38 +157,31 @@ QT_GRI_SIDES
 #undef QT_GRI_SIDEMETHODS
 
 void 
-init_rectangle(VALUE mQt, VALUE /*cGraphicsItem*/)
+init_rectangle(RPP::Module mQt, RPP::Class /*cGraphicsItem*/)
 {
-  const VALUE cGraphicsRectItem = rb_define_class_under(mQt, "GraphicsRectItem", 
+  const RPP::Class cGraphicsRectItem = mQt.define_class("GraphicsRectItem", 
 							cAbstractGraphicsShapeItem);
-  rb_define_alloc_func(cGraphicsRectItem, cGraphicsRectItem_alloc);
-  rb_define_method(cGraphicsRectItem, "rect=", 
-		   RUBY_METHOD_FUNC(cGraphicsRectItem_rect_set), -1);
-  rb_define_method(cGraphicsRectItem, "rect_get", 
-		   RUBY_METHOD_FUNC(cGraphicsRectItem_rect_get), 0);
-  rb_funcall(cGraphicsRectItem, rb_intern("attr_dynamic"), 2, cRectF, CSTR2SYM("rect"));
-  rb_define_method(cGraphicsRectItem, "size=", 
-		   RUBY_METHOD_FUNC(cGraphicsRectItem_size_set), -1);
-  rb_define_method(cGraphicsRectItem, "size_get", 
-		   RUBY_METHOD_FUNC(cGraphicsRectItem_size_get), 0);
-  rb_funcall(cGraphicsRectItem, rb_intern("attr_dynamic"), 2, cSizeF, CSTR2SYM("size"));
+  cGraphicsRectItem.define_alloc_func(cGraphicsRectItem_alloc)
+		   .define_method("rect=", cGraphicsRectItem_rect_set)
+		   .define_method("rect_get", cGraphicsRectItem_rect_get)
+		   .define_method("size=", cGraphicsRectItem_size_set)
+		   .define_method("size_get", cGraphicsRectItem_size_get)
+		   ;
+  cGraphicsRectItem.call("attr_dynamic", cSizeF, RPP::Symbol("size"));
 #define QT_GRI_CORNERMETHODS(Corner, corner, alias) \
-  rb_define_method(cGraphicsRectItem, #corner "=", \
-		   RUBY_METHOD_FUNC(cGraphicsRectItem_##corner##_set), -1); \
-  rb_define_method(cGraphicsRectItem, #corner "_get", \
-		   RUBY_METHOD_FUNC(cGraphicsRectItem_##corner##_get), 0); \
-  rb_funcall(cGraphicsRectItem, rb_intern("attr_dynamic"), 2, cPointF, \
-	     CSTR2SYM(#corner)); \
-  rb_define_alias(cGraphicsRectItem, #alias, #corner);
-  QT_GRI_CORNERS
+  cGraphicsRectItem.define_method(#corner "=", cGraphicsRectItem_##corner##_set) \
+		   .define_method(#corner "_get", cGraphicsRectItem_##corner##_get); \
+  cGraphicsRectItem.call("attr_dynamic", cPointF, RPP::Symbol(#corner)); \
+  cGraphicsRectItem.define_alias(#alias, #corner);
+		  QT_GRI_CORNERS
 #define QT_GRI_SIDEMETHODS(Side, side) \
-  rb_define_method(cGraphicsRectItem, #side "=", \
-		   RUBY_METHOD_FUNC(cGraphicsRectItem_##side##_set), 1); \
-  rb_define_method(cGraphicsRectItem, #side "_get", \
-		   RUBY_METHOD_FUNC(cGraphicsRectItem_##side##_get), 0); \
-  rb_funcall(cGraphicsRectItem, rb_intern("attr_dynamic"), 2, rb_cFloat, CSTR2SYM(#side));
-  QT_GRI_SIDES
-  init_pointitem();
+  cGraphicsRectItem.define_method(#side "=", cGraphicsRectItem_##side##_set) \
+		   .define_method(#side "_get", cGraphicsRectItem_##side##_get); \
+  cGraphicsRectItem.call("attr_dynamic", rb_cFloat, RPP::Symbol(#side));
+		  QT_GRI_SIDES
+		  ;
+  cGraphicsRectItem.call("attr_dynamic", cRectF, RPP::Symbol("rect"));
+  init_pointitem(mQt);
 }
 
 } // namespace R_Qt

@@ -22,40 +22,60 @@ module Reform  # aka R::EForm
     module Instantiator
 
 	# hash Symbol=>class
-	@@instantiator = {}
+	@instantiator = {}
+
+	class << self
+
+	  # returns class to use
+	  def [] name; @instantiator[name]; end
+
+	  def []= name, klass 
+	    @instantiator[name.to_sym] = klass
+	  end
+
+	end # eigenclass Instantiator
 
       private # methods of Instantiator
-	# It may return nil on exceptions... This is by design
-	def define_proxy_method name, thePath
-	  #tag "define_proxy_method(#{name}, #{thePath})"
+      # It may return nil on exceptions... This is by design
+      # Context: registerControlClassProxy(_i) <- Reform#internalize
+      # The caller must test whether the method already exists.
+	def define_proxy_method name, path
+	  #tag "self=#{self}, name=#{name}, path=#{path}"
 	  define_method name do |quicky = nil, &block|
 	    R::escue do
 	      # are we registered at this point?
 	      # this is done by the require which executes createInstantiator.
-	      unless @@instantiator[name]
+	      unless Instantiator[name]
                 #tag "arrived in #{self}##{name}, first time, loading file, just in time style"
-		require_relative thePath
+		#tag "REQUIRE(#{path})"
+		if path[0] == '/'
+		  require path
+		else
+		  require_relative path
+		end
 		# the loaded module should call createInstantiator (and so registerControlClass) which alters
 		# @@instantiator
-		raise "'#{name}' did not register an instantiator!!!" unless @@instantiator[name]
+		raise "'#{name}' did not register an instantiator!!!" unless Instantiator[name]
 	      end
               #tag "HERE, name = #{name}"
-	      klass = @@instantiator[name]
+	      klass = Instantiator[name]
 	      unless quicky == nil || Hash === quicky
-		raise ArgumentError, "Bad param #{quicky.inspect} passed to instantiator '#{name}'" 
+		ArgumentError.raise "Bad param #{quicky.inspect} passed to instantiator '#{name}'" 
 	      end
 #             tag "quicky hash = #{quicky.inspect}"
 	      child = instantiate_child klass, self
 	      child.setup quicky, &block
 	    end # R::escue
 	  end  # define_method
+	  private name
 	end # define_proxy_method
 
       public # methods of Instantiator
 
-	# add a record to @@instantiator
-	def createInstantiator name, klass
-	  @@instantiator[name.to_sym] = klass
+	# add a record to Instantiator.instantiator
+	# context: Reform::createInstantiator
+	def createInstantiator path, klass
+	  Instantiator[path] = klass
 	end # createInstantiator
 
 	# Example:
@@ -70,36 +90,31 @@ module Reform  # aka R::EForm
 	# When called it performs 'require' and
 	# the unit loaded should call registerControlClass and so createInstantiator above.
 	# 
-	# if 'thePath' is a symbol we create an alias for name. This is done when
+	# if 'path' is a symbol we create an alias for name. This is done when
 	# a softlink is read by internalize_dir
-	def registerControlClassProxy name, thePath
+	#
+	# Context: Reform::registerClassProxy
+	def registerControlClassProxy name, path
 	  name = name.to_sym
-#          tag "#{self}::registerControlClassProxy_i(#{name}, #{thePath})"
-	  case thePath
-	  when Symbol
-#            tag "Create alias :#{name} :#{thePath}"
-	    return module_eval("alias :#{name} :#{thePath}")
-	  end
+#          tag "#{self}::registerControlClassProxy_i(#{name}, #{realpath})"
 	  # to avoid endless loops we must consider that by loading some classes it is possible
 	  # that we already loaded the file:
-	  return if private_method_defined?(name)
+	  return if private_method_defined? name
+	  if method_defined? name
+	    NameError.raise "the plugin #{self}.#{name} is already defined as " +
+			    "#{instance_method(name).owner}.#{name}"
+	  end
+	  if Symbol === path
+	    alias_method name, path
+	    private name
+	  else
+	    define_proxy_method name, path
+	  end
     # failing components do not stop the setup process.
 	  #tag "Defining proxy_method #{self}.#{name}"  
-	  define_proxy_method name, thePath
 	  # make it private to complete it:
-	  private name
 	end # registerControlClassProxy_i
 
-	# return hash
-	def self.instantiator
-    #       tag "instantiator -> #{@@instantiator}"
-	  @@instantiator
-	end
-
-	# returns class to use
-	def self.[] name
-	  @@instantiator[name]
-	end
     end # module Instantiator
 
     # including this context makes all 'widgets' available as 'constructor' shortcuts.
@@ -120,24 +135,6 @@ module Reform  # aka R::EForm
     module AnimationContext
 	extend Instantiator
     end # module AnimationContext
-
-=begin ????
-    # include this to make it possible canning commands into named 'macros'.
-    module MacroContext
-	extend Instantiator
-
-      private # methods of MacroContext
-
-	#override
-	def self.define_proxy_method name, thePath
-	  define_method name do |quicky = nil, &block|
-	    #tag "#{self.class}::#{name} called, creating Macro!"
-	    Macro.new self, name, quicky, block
-	  end # define_method
-	end # define_proxy_method
-
-    end # module MacroContext
-=end
 
     module StateContext
 	extend Instantiator

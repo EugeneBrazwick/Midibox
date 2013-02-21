@@ -20,6 +20,7 @@ Also it contains the libraries initialization method that defines all other clas
 #include "application.h"
 #include "api_utils.h"
 #include "object.h"
+#include "ruby++/numeric.h"
 
 namespace R_Qt {
 
@@ -88,91 +89,43 @@ cApplication_alloc(VALUE cApplication)
   return Data_Wrap_Struct(cApplication, cObject_mark, cApplication_free, app);
 }
 
-/** call-seq: new()
- */
-static VALUE
-cApplication_initialize(VALUE v_self)
-{
-  trace("cApplication_initialize");
-  rb_call_super(0, 0);
-  rb_iv_set(v_self, "@toplevel_widgets", rb_ary_new());
-  rb_iv_set(v_self, "@quit", Qfalse);
-  rb_gv_set("$app", v_self);
-  return Qnil;
-}
-
 static VALUE
 cApplication_exec(VALUE v_self)
 {
   // Qt ignores quit if called before 'exec()' is started.
   // That is stupid
-  const VALUE v_quit = rb_iv_get(v_self, "@quit");
+  const RPP::QObject<QApplication> self = v_self;
+  const RPP::Object quit = self.iv("@quit");
   //  const int quit = RTEST(v_quit) ? NUM2INT(v_quit) : 0;
-  if (RTEST(v_quit))
-    return v_quit; 
-  rb_iv_set(v_self, "@quit", Qnil);
+  if (quit.test()) return quit; 
+  self.iv_set("@quit", Qnil);
   // should be == qApp anyway
-  RQTDECLSELF(QApplication);
   trace("QApplication::exec()");
-  traqt1("%s::exec", QTCLASS(self));
-  return INT2NUM(self->exec());
+  return RPP::Fixnum(self->exec());
 }
 
 static VALUE
 cApplication_quit(VALUE v_self)
 {
-  RQTDECLSELF(QApplication);
+  const RPP::QObject<QApplication> self = v_self;
   trace("QApplication::quit()");
-  rb_iv_set(v_self, "@quit", INT2NUM(0));
-  traqt1("%s::quit", QTCLASS(self));
+  self.iv_set("@quit", 0);
   self->quit();
-  return v_self;
-}
-
-static VALUE
-cApplication_quit_p(VALUE v_self)
-{
-  RQTDECLSELF(QApplication);
-  return rb_iv_get(v_self, "@quit");
+  return self;
 }
 
 static VALUE
 cApplication_exit(VALUE v_self, VALUE v_exitcode)
 {
-  RQTDECLSELF(QApplication);
+  const RPP::QObject<QApplication> self = v_self;
   track1("QApplication::exit(%s)", v_exitcode);
-  rb_iv_set(v_self, "@quit", v_exitcode);
-  traqt1("%s::exit", QTCLASS(self));
-  self->exit(NUM2INT(v_exitcode));
-  return v_self;
-}
-
-// override
-static VALUE 
-cApplication_enqueue_children(VALUE v_self, VALUE v_queue)
-{
-  track2("%s::enqueue_children(%s)", v_self, v_queue);
-  rb_call_super(1, &v_queue);
-  VALUE v_widgets = rb_iv_get(v_self, "@toplevel_widgets");
-  v_widgets = to_ary(v_widgets);
-  const long N = RARRAY_LEN(v_widgets);
-  long i = 0;
-  const bool yield = NIL_P(v_queue);
-  if (!yield)
-    v_queue = to_ary(v_queue);
-  trace2("in addition the @toplevel_widgets: N=%ld, yield=%d", N, yield);
-  for (VALUE *v_wdgt = RARRAY_PTR(v_widgets); i < N; i++, v_wdgt++)
-    {
-      if (yield)
-	rb_yield(*v_wdgt);
-      else
-	rb_ary_push(v_queue, *v_wdgt);
-    }
-  return Qnil;
+  self.iv_set("@quit", v_exitcode);
+  self->exit(RPP::Fixnum(v_exitcode));
+  return self;
 }
 
 void
-init_application(VALUE mQt, VALUE cControl)
+init_application(RPP::Module mQt, RPP::Class cControl)
 {
   trace("init_application");
   /** :rdoc:
@@ -181,25 +134,19 @@ init_application(VALUE mQt, VALUE cControl)
    * Stub around QApplication.
    * Frees the application when going out of scope
    */
-  const VALUE cApplication = rb_define_class_under(mQt, "Application", cControl);
-  rb_define_alloc_func(cApplication, cApplication_alloc);
-  rb_define_method(cApplication, "initialize", 
-		   RUBY_METHOD_FUNC(cApplication_initialize), 0);
-  // actually in core(!):
-  rb_define_method(cApplication, "exec", RUBY_METHOD_FUNC(cApplication_exec), 0);
-  // actually in core(!):
-  rb_define_method(cApplication, "quit", RUBY_METHOD_FUNC(cApplication_quit), 0);
-  rb_define_method(cApplication, "exit", RUBY_METHOD_FUNC(cApplication_exit), 1);
-  rb_define_method(cApplication, "quit?", RUBY_METHOD_FUNC(cApplication_quit_p), 0);
-  rb_define_protected_method(cApplication, "enqueue_children", RUBY_METHOD_FUNC(cApplication_enqueue_children), 1);
+  const RPP::Class cApplication = mQt.define_class("Application", cControl);
+  cApplication.define_alloc_func(cApplication_alloc)
+	      .define_method("exec", cApplication_exec)	 // actually part of QtCore !
+	      .define_method("quit", cApplication_quit) // ""
+	      .define_method("exit", cApplication_exit)
+	      ;
 }
 
-static VALUE
-init_control(VALUE mQt, VALUE cObject)
+static RPP::Class
+init_control(RPP::Module mQt, RPP::Class cObject)
 {
   trace("init_control");
-  const VALUE cControl = rb_define_class_under(mQt, "Control", cObject);
-  return cControl;
+  return mQt.define_class("Control", cObject);
 }
 
 } // namespace R_Qt 
@@ -216,7 +163,7 @@ Init_liburqt()
 {
   trace("Init_liburqt");
   Init_liburqtCore();
-  const VALUE cControl = init_control(mQt, cObject);
+  const RPP::Class cControl = init_control(mQt, cObject);
   RQT_APP_SETUP_ALL
   //  rb_define_method(cApplication, "initialize", RUBY_METHOD_FUNC(cApplication_initialize), 0);
 }

@@ -56,7 +56,7 @@ describe "Qt::Object" do
   it "you can set a parent and it kills the child with it" do
     fifi = nil
     Qt::Object.new { objectName 'froome' }.scope do |froome|
-      fifi = Qt::Object.new(froome, 'fifi')
+      fifi = Qt::Object.new froome, 'fifi'
       fifi.objectName.should == 'fifi'
       fifi.parent.should == froome
     end

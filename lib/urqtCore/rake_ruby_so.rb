@@ -84,7 +84,7 @@ module R::Ake
 
   # This uses the attributes collected above
   # -fPIC is required for Qt
-  CXXFLAGS = %w[-Wall -Wextra -fPIC ] +
+  CXXFLAGS = %w[-Wall -Wextra -Wno-parentheses -fPIC -std=c++11 ] +
 	     @incdirs.keys.map { |i| '-I' + i} + 
 	     (DEBUG ? %w[-O0 -g -DDEBUG] : %w[-O3]) +
 	     (TRACE_QT_API ? ['-DTRACE_QT_API'] : []) +

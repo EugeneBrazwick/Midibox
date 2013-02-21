@@ -1,7 +1,7 @@
 #if !defined(_RUBYPP_DATA_H_)
 #define _RUBYPP_DATA_H_
 
-#include "ruby++.h"
+#include "ruby++/class.h"
 
 namespace RPP {
 
@@ -17,11 +17,31 @@ protected:
   // Use this->wrapped() and this->setWrapped() in subclasses!! (C++ quirck)
   T *wrapped() const { return Wrapped; }
   T *setWrapped(T *w) { return Wrapped = w; } // sic
+  DataObject<T>(VALUE v, T *wrapped): inherited(v), Wrapped(wrapped) {}
 public:
-  DataObject<T>(VALUE v): inherited(v)
+  /* Note: if Unsafe is passed the result can be nil 
+     In that case the guarded pointer will be 0 as well.
+     But the constructor will raise if anything but nil or T* is present.
+   */
+  DataObject<T>(VALUE v, Class target, E_SAFETY safe = SAFE): 
+    Wrapped(0)
     {
-      Data_Get_Struct(v, T, Wrapped);
-      if (!Wrapped) rb_raise(rb_eTypeError, "attempt to access a zombie");
+      assign(v, safe);
+      if (safe == SAFE || safe == UNSAFE && !this->isNil())
+	{
+	  if (!is_kind_of(target))
+	    rb_raise(rb_eTypeError, "very bad cast to %s", target.to_s());
+	}
+    }
+  override void assign(VALUE v, E_SAFETY safe)
+    {
+      inherited::assign(v, safe);
+      if (safe == SAFE || safe == UNSAFE && !this->isNil())
+	{
+	  Data_Get_Struct(V, T, Wrapped);
+	  if (!Wrapped)	  // THIS IS ALWAYS WRONG, otherwise it becomes a mess.
+	    rb_raise(rb_eTypeError, "attempt to access a zombie");
+	}
     }
   // Note that VALUE can no longer be accessed. But VALUE() will still work
   // Use value() and value_ref() if required

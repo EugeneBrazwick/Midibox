@@ -1,64 +1,53 @@
 
 #  Copyright (c) 2013 Eugene Brazwick
 
+require_relative 'r'
 require_relative 'control'    # for attr_dynamic
 require_relative 'context'
-
-module R
-
-  public # methods of R
-  ## use this to wrap a rescue clause around any block.
-  # transforms the exception (RuntimeError+IOError+StandardError) to a warning on stderr.
-  # Reform::Error is also a RuntimeError.
-  #
-  # UNLESS: 'fail_on_errors true' is specified in Application.
-    def self.escue
-      begin
-        return yield
-      rescue IOError => exception
-	raise if $app.fail_on_errors?
-        msg = "#{exception.message}\n"
-      rescue StandardError, RuntimeError => exception
-	raise if $app.fail_on_errors?
-	#tag "got exception"
-	#tag "exception class: #{exception.class}"
-	#tag "exception msg: #{exception}"
-	#tag "exception backtrace: #{exception.backtrace.join "\n"}"
-        msg = "#{exception.class}: #{exception}\n" + exception.backtrace.join("\n")
-      end
-      $stderr << msg
-      nil
-    end # escue
-
-end # module R
 
 module Reform
 
   private # methods of EForm
 
-    # scan given dir for fixed set of subdirectories. Each maps to a context by hash
+  # scan given dir for fixed set of subdirectories. Each maps to a context by hash.
+  # each file not starting with '_' is supposed to be a pluging and it
+  # added as a method to the proper context.
+  # symlinks will cause 'alias' to be used.
+  #
+  # known problem: 
+  # the plugin-method (like 'widget') will first do a require_relative.
+  #
     def self.internalize dirprefix, hash
 #       tag "internalize"
-      dirprefix = File.dirname(__FILE__) + '/' + dirprefix unless dirprefix[0] == '/'
       # note that dirs need not exist. But at least one should!
-      located = false
+      located_any_plugins = false
       for dir, klass in hash
-	fulldir = dirprefix + '/' + dir.to_s
+	fulldir = if dirprefix.empty? then dir.to_s else "#{dirprefix}/#{dir}" end
+	unless fulldir[0] == '/'
+	  fulldir = File.dirname(__FILE__) + '/' + fulldir
+	end
 	symlinks = {}
-#         tag "GLOBBING #{dirprefix}/#{dir}/*.rb"
+        #tag "GLOBBING #{fulldir}/*.rb"
 	for file in Dir["#{fulldir}/*.rb"]
+	  #tag "file = '#{file}'"
 	  basename = File.basename(file, '.rb')
+	  next if basename[0] == '_'
 #          tag "INTERNALIZE #{basename} from #{file}"
 	  if File.symlink?(file)
-	    symlinks[basename.to_sym] = File.basename(File.readlink(file), '.rb').to_sym
+	    link_basename = File.basename(File.readlink(file), '.rb')
+	    next if link_basename[0] == '_'
+	    symlinks[basename.to_sym] = link_basename.to_sym
 	  else
+	   # tag "registerClassProxy(#{klass}, #{basename})"
 	    registerClassProxy klass, basename, "#{dirprefix}/#{dir}/#{basename}"
 	  end
-	  located = true
+	  located_any_plugins = true
 	end # for
 	symlinks.each { |key, value| registerClassProxy klass, key, value }
       end # for
-      raise Reform::Error, tr("incorrect plugin directory '#{dirprefix}'") unless located
+      unless located_any_plugins
+	Reform::Error.raise "incorrect plugin directory '#{dirprefix}'"
+      end
     end
 
     # scan given dirs for fixed set of subdirectories. Each maps to a context
@@ -79,6 +68,7 @@ module Reform
       R::Qt::Application.new.scope do |app|
 	begin
 	  # note that app is identical to $app
+	  #tag "__FILE__ = #{__FILE__}"
 	  internalize_dir '.', 'contrib'
 	  #tag "calling #{app}.setup" 
 	  app.setup quickyhash, &block 
@@ -93,12 +83,14 @@ module Reform
     # delegator. see Instantiator::registerControlClassProxy
     #  we add the X classProxy to those contexts in which we want the plugins
     # to become available.
-    def self.registerClassProxy klass, id, path = nil
+    #
+    # Context: internalize
+    def self.registerClassProxy klass, id, path
       contexts = Contexts[klass] and
 	contexts.each { |ctxt| ctxt::registerControlClassProxy id, path }
     end # self.registerClassProxy
 
-end # module R::EForm
+end # module Reform
 
 module R::Qt
 
@@ -107,6 +99,13 @@ module R::Qt
 	      Reform::GraphicContext
 
       private # methods of Application
+
+	def initialize 
+	  super
+	  @toplevel_widgets = []
+	  @quit = false
+	  $app = self
+	end
 
 	# run (show) first widget defined.
         # if a model is set, propagate it
@@ -126,9 +125,15 @@ module R::Qt
 
 	signal :created
 
-      protected # methods of Application
-
       public # methods of Application
+
+	# override
+	def enqueue_children queue = nil
+	  super
+	  @toplevel_widgets.each { |wdgt| queue and queue.push wdgt or yield wdgt }
+	end
+
+	def quit?; @quit; end
 
 	# you cannot say:    attr :fail_on_errors?
 	def fail_on_errors?; @fail_on_errors; end
@@ -151,7 +156,7 @@ module R::Qt
 	## delete the toplevel widgets and the global $app variable
 	def cleanup
 	  # tag "Application::cleanup, #toplevel_widgets = #{@toplevel_widgets.length}"
-	  @toplevel_widgets.each &:delete 
+	  @toplevel_widgets.each(&:delete)
 	  $app = nil
 	end
     end # class Application

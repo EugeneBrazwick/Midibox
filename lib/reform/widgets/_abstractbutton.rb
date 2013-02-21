@@ -1,7 +1,7 @@
 
 #  Copyright (c) 2013 Eugene Brazwick
 
-require_relative 'widgets/widget'
+require_relative 'widget'
 
 module R::Qt
   class AbstractButton < Widget 

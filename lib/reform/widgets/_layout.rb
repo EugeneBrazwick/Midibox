@@ -1,6 +1,6 @@
 
-require_relative 'context'
-require_relative 'layoutable'
+require_relative '../context'
+require_relative '_layoutable'
 
 module R::Qt
 

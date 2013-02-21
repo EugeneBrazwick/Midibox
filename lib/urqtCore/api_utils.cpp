@@ -5,8 +5,10 @@
 
 namespace R_Qt {
 
-VALUE
-cObject = Qnil, cControl = Qnil, cNoQtControl = Qnil;
+RPP::Class
+cObject, 
+cControl, 
+cNoQtControl;
 
 #if defined(DEBUG)
 
@@ -22,13 +24,6 @@ VALUE prop2v(QObject *q, const char *id)
   trace2("qt2v(%p) -> VALUE = %p", q, (void *)rv.v());
   trace2("qt2v(%p) -> INSPECT -> %s", q, INSPECT(rv)); 
   return rv; 
-}
-
-VALUE qt2v(QObject *q)
-{
-  if (!q) return Qnil;
-  trace1("qt2v(%p)", q);
-  return prop2v(q, R_QT_RVALUE_PROPERTYID);
 }
 
 #endif // DEBUG

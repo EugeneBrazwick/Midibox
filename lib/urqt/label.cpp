@@ -4,6 +4,8 @@
 
 #include <QtWidgets/QLabel>
 #include "application.h"
+#include "frame.h"
+#include "ruby++/rppstring.h"
 
 namespace R_Qt {
 
@@ -12,12 +14,10 @@ R_QT_DEF_ALLOCATOR(Label)
 static inline VALUE 
 set(VALUE v_self, VALUE v_text, Qt::TextFormat format)
 {
-  RQTDECLSELF(QLabel);
-  rb_check_frozen(v_self);
-  traqt1("%s::setTextFormat", QTCLASS(self));
+  const RPP::QObject<QLabel> self = v_self;
+  self.check_frozen();
   self->setTextFormat(format);
-  traqt1("%s::setText", QTCLASS(self));
-  self->setText(StringValueCStr(v_text));
+  self->setText(RPP::String(v_text).to_s());
   return v_text;
 }
 
@@ -40,27 +40,26 @@ cLabel_html_set(VALUE v_self, VALUE v_text)
   return set(v_self, v_text, Qt::RichText);
 }
 
-
 static VALUE
 cLabel_text_get(VALUE v_self)
 {
-  RQTDECLSELF(QLabel);
-  traqt1("%s::text", QTCLASS(self));
+  const RPP::QObject<QLabel> self = v_self;
   return qString2v(self->text());
 }
 
 void
-init_label(VALUE mQt, VALUE cWidget)
+init_label(RPP::Module qt, RPP::Class)
 {
-  trace1("init_label, define R::Qt::Widget, mQt=%p", (void *)mQt);
-  const VALUE cLabel = rb_define_class_under(mQt, "Label", cWidget);
-  rb_define_alloc_func(cLabel, cLabel_alloc);
-  rb_define_method(cLabel, "text=", RUBY_METHOD_FUNC(cLabel_text_set), 1);
-  rb_define_method(cLabel, "rawtext=", RUBY_METHOD_FUNC(cLabel_rawtext_set), 1);
-  rb_define_method(cLabel, "html=", RUBY_METHOD_FUNC(cLabel_html_set), 1);
-  rb_define_method(cLabel, "text_get", RUBY_METHOD_FUNC(cLabel_text_get), 0);
-  rb_define_method(cLabel, "rawtext_get", RUBY_METHOD_FUNC(cLabel_text_get), 0);
-  rb_define_method(cLabel, "html_get", RUBY_METHOD_FUNC(cLabel_text_get), 0);
+  trace1("init_label, define R::Qt::Widget, mQt=%p", &qt);
+  const RPP::Class cLabel = qt.define_class("Label", cFrame);
+  cLabel.define_alloc_func(cLabel_alloc)
+	.define_method("text=", cLabel_text_set)
+	.define_method("rawtext=", cLabel_rawtext_set)
+	.define_method("html=", cLabel_html_set)
+	.define_method("text_get", cLabel_text_get)
+	.define_method("rawtext_get", cLabel_text_get)
+	.define_method("html_get", cLabel_text_get)
+	;
 } // init_label
 
 } // namespace R_Qt

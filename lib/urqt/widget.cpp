@@ -19,22 +19,24 @@ This file contains the QWidget wrapper.
 #include "widget.h"
 #include "size.h" // cSizeWrap	  
 #include "layout.h" // cLayout
-#include "object.h" // cObjectWrap
+#include "ruby++/rppstring.h"
+#include "ruby++/array.h"
 
 namespace R_Qt {
 
-R_QT_DEF_ALLOCATOR(Widget)
-
 static VALUE
-cSynthWidget = Qnil;
+cWidget_alloc(VALUE cWidget)
+{
+  return RPP::QObject<QWidget>(cWidget, new QWidget);
+}
+
+static RPP::Class
+cSynthWidget;
 
 static VALUE
 cWidget_show(VALUE v_self)
 {
-  trace("cWidget_show");
-  RQTDECLSELF(QWidget);
-  traqt1("%s::show", QTCLASS(self));
-  self->show();
+  RPP::QObject<QWidget>(v_self)->show();
   return v_self;
 }
 
@@ -46,10 +48,9 @@ cWidget_show(VALUE v_self)
 static VALUE
 cWidget_resize(int argc, VALUE *argv, VALUE v_self)
 {
-  rb_check_frozen(v_self);
-  RQTDECLSELF(QWidget);
-  trace("cWidget_resize");
-  traqt1("%s::resize", QTCLASS(self));
+  const RPP::QObject<QWidget> self = v_self;
+  self.check_frozen();
+  //trace("cWidget_resize");
   self->resize(args2QSize(argc, argv));
   return v_self;
 }
@@ -61,16 +62,15 @@ cWidget_resize(int argc, VALUE *argv, VALUE v_self)
 static VALUE
 cWidget_size_get(VALUE v_self)
 {
-  RQTDECLSELF(QWidget);
-  traqt1("%s::size", QTCLASS(self));
+  const RPP::QObject<QWidget> self = v_self;
   return cSizeWrap(self->size());
 }
 
 static VALUE
 cWidget_minimumSize_set(int argc, VALUE *argv, VALUE v_self)
 {
-  rb_check_frozen(v_self);
-  RQTDECLSELF(QWidget);
+  const RPP::QObject<QWidget> self = v_self;
+  self.check_frozen();
   trace("cWidget_resize");
   self->setMinimumSize(args2QSize(argc, argv));
   return Qnil;
@@ -79,15 +79,15 @@ cWidget_minimumSize_set(int argc, VALUE *argv, VALUE v_self)
 static VALUE
 cWidget_minimumSize_get(VALUE v_self)
 {
-  RQTDECLSELF(QWidget);
+  const RPP::QObject<QWidget> self = v_self;
   return cSizeWrap(self->minimumSize());
 }
 
 static VALUE
 cWidget_maximumSize_set(int argc, VALUE *argv, VALUE v_self)
 {
-  rb_check_frozen(v_self);
-  RQTDECLSELF(QWidget);
+  const RPP::QObject<QWidget> self = v_self;
+  self.check_frozen();
   trace("cWidget_resize");
   self->setMinimumSize(args2QSize(argc, argv));
   return Qnil;
@@ -96,50 +96,39 @@ cWidget_maximumSize_set(int argc, VALUE *argv, VALUE v_self)
 static VALUE
 cWidget_maximumSize_get(VALUE v_self)
 {
-  RQTDECLSELF(QWidget);
+  const RPP::QObject<QWidget> self = v_self;
   return cSizeWrap(self->maximumSize());
 }
 
-VALUE 
-cWidget = Qnil;
+RPP::Class 
+cWidget;
 
 static VALUE 
 cWidget_qtparent_set(VALUE v_self, VALUE v_parent)
 {
   track2("cObject_parent_set(%s, %s)", v_self, v_parent);
-  rb_check_frozen(v_self);
-  QWidget *parent = 0;
-  if (!NIL_P(v_parent))
-    {
-      const VALUE v_p = v_parent;
-      RQTDECLARE(QWidget, p);
-      parent = p;
-    }
-  RQTDECLSELF(QWidget);
+  const RPP::QObject<QWidget> self = v_self;
+  self.check_frozen();
+  const RPP::QObject<QWidget> parent(v_parent, RPP::UNSAFE);
   trace("Calling setParent");
-  traqt2("%s::setParent(%s)", QTCLASS(self), QTCLASS(parent));
   self->setParent(parent);
-  return v_parent;
+  return parent;
 }
 
 static VALUE
 cWidget_title_get(VALUE v_self)
 {
-  RQTDECLSELF(QWidget);
-  traqt1("%s::windowTitle", QTCLASS(self));
+  const RPP::QObject<QWidget> self = v_self;
   return qString2v(self->windowTitle());
 } // Widget#title
 
 static VALUE
-cWidget_title_set(int argc, VALUE *argv, VALUE v_self)
+cWidget_title_set(VALUE v_self, VALUE v_title)
 {
-  RQTDECLSELF(QWidget);
-  rb_check_frozen(v_self);
-  VALUE v_title;
-  rb_scan_args(argc, argv, "1", &v_title);
-  traqt2("%s::setWindowTitle(%s)", QTCLASS(self), TO_S(v_title));
-  self->setWindowTitle(StringValueCStr(v_title));
-  return v_self;
+  const RPP::QObject<QWidget> self = v_self;
+  self.check_frozen();
+  self->setWindowTitle(RPP::String(v_title).to_s());
+  return v_title;
 } // Widget#title
 
 class EventSignalBroker: public QObject
@@ -168,7 +157,7 @@ void
 EventSignalBroker::registerEvent(QEvent::Type tp, const char *method)
 {
   if (Events.contains(tp)) return;
-  trace1("registerEvent %s", method);
+  // trace1("registerEvent %s", method);
   switch (tp)
     {
     case QEvent::Resize:
@@ -192,32 +181,34 @@ EventSignalBroker::registerEvent(QEvent::Type tp, const char *method)
 bool 
 EventSignalBroker::eventFilter(QObject *object, QEvent *event)
 {
-  traqt("QEvent::type");
   const QEvent::Type tp = event->type();
-  trace1("eventFilter, received type '%d' <<<<<EVENT!!!!>>>>>", tp);
-  const VALUE v_object = qt2v(object);
-  if (!NIL_P(v_object))
+  //trace1("eventFilter, received type '%d' <<<<<EVENT!!!!>>>>>", tp);
+  const RPP::QObject<QObject> v_object(object, RPP::UNSAFE);
+  if (v_object.test())
     {
       const char * const method = Events.value(tp);
       if (method)
 	{
-	  trace1("emit %s()", method);
-	  const VALUE v_method = CSTR2SYM(method);
+	  const RPP::Symbol v_method = method;
+	  // if inspected or to_s then it works.
+	  // Otherwise it calls emit with a Proc with address 0x00000000000
+	  // using plain VALUE has the same result.
+	  //track2("call %s::emit(%s)", v_object, v_method);
 	  // unfortunately:
 	  switch (tp)
 	    {
 	    case QEvent::Resize:
 	      {
 		const QResizeEvent &ev_resize = *static_cast<QResizeEvent *>(event);
-		traqt("QResizeEvent::size");
 		const QSize &sz = ev_resize.size();
-		rb_funcall(v_object, rb_intern("emit"), 3, v_method,
-			   INT2NUM(sz.width()), INT2NUM(sz.height()));
+		v_object.call("emit", v_method, RPP::Fixnum(sz.width()), 
+			      RPP::Fixnum(sz.height()));
 		break;
 	      }
 	    case QEvent::Show:
-		track2("%s::emit(%s)", v_object, v_method);
-		rb_funcall(v_object, rb_intern("emit"), 1, v_method);
+		trace1("calling rb_funcall(:emit), v_method = %p", &v_method);
+		// using call or rb_funcall has SAME weird result
+		v_object.call("emit", v_method);
 		break;
 	    default:
 		rb_raise(rb_eNotImpError, "events of type %s cannot be brokered yet", method);
@@ -240,52 +231,44 @@ EventSignalBroker::eventFilter(QObject *object, QEvent *event)
 static VALUE
 cWidget_shown(int argc, VALUE *argv, VALUE v_self)
 {
-  trace1("cWidget_shown, argc=%d", argc);
   // FIXME macro req.  EVENT_TRIGGERED_SIGNAL...
-  RQTDECLSELF(QWidget);
+  const RPP::QObject<QWidget> self = v_self;
   EventSignalBroker *esb = 0;
-  traqt2("%s::property(%s)", QTCLASS(self), ESB_PropertyId);
   QVariant v = self->property(ESB_PropertyId);
-  traqt("QVariant::isValid");
   if (!v.isValid())
     {
-      trace("create the broker and cache it");
+      //trace("create the broker and cache it");
       esb = new EventSignalBroker(self);
-      // WTF QVariant cannot store QObject* ????
-      traqt1("%s::setProperty", QTCLASS(self));
       self->setProperty(ESB_PropertyId, QVariant(QMetaType::QObjectStar, esb));
-      traqt2("%s::installEventFilter(%s)", QTCLASS(self), QTCLASS(esb));
       self->installEventFilter(esb); // Eugene assumes Qt does not own it.
     }
   else
-    {
-      traqt("QVariant::value<QObject>");
       esb = static_cast<EventSignalBroker *>(v.value<QObject*>());
-    }
   const char *const method = "shown";
   esb->registerEvent(QEvent::Show, method);
   VALUE v_args, v_block;
   rb_scan_args(argc, argv, "*&", &v_args, &v_block);
+  //track4("Object.signal_impl(%s, %s, %s, %s)", v_self, RPP::Symbol(method), v_args, v_block);
   cObject_signal_impl(v_self, method, v_args, v_block);
   return Qnil;
 } // Widget#shown
 
 static VALUE
-cWidget_enqueue_children(VALUE v_self, VALUE v_queue)
+cWidget_enqueue_children(int argc, VALUE *argv, VALUE v_self)
 {
+  const RPP::QObject<QWidget> self = v_self;
+  VALUE v_queue;
+  rb_scan_args(argc, argv, "01", &v_queue);
   const bool yield = NIL_P(v_queue);
-  trace2("%s::enqueue_children, yieldmode=%d", TO_CSTR(v_self), yield);
-  // do not call super here
-  RQTDECLSELF(QWidget);
+  //trace2("%s::enqueue_children, yieldmode=%d", TO_CSTR(v_self), yield);
   QLayout * const layout = self->layout(); // can be null
   if (!layout)
     {
-      trace("no layout, revert to cObject_enqueue_children");
-      return rb_call_super(1, &v_queue);
+      //trace("no layout, revert to cObject_enqueue_children");
+      return self.super(v_queue);
     }
-  traqt1("%s::children", QTCLASS(self));
   const QObjectList &children = self->children();
-  trace1("#children = %d", children.count());
+  //trace1("#children = %d", children.count());
   foreach (QObject *child, children)
     {
       /* We must not add widgets WITHIN a layout, since they are virtually
@@ -298,38 +281,37 @@ COMPLICATION: widgets may be nested multiple times:
     widget2 now has qtparent widget1
 
       */
-      trace("check for isWidgetType and layout");
-      const VALUE v_child = qt2v(child);
+      //trace("check for isWidgetType and layout");
+      const RPP::Object v_child = qt2v(child);
       if (layout && child->isWidgetType())
 	{
-	  if (!NIL_P(v_child)) 
+	  if (!v_child.isNil())
 	    {
-	      const VALUE v_parent = rb_funcall(v_child, rb_intern("parent"), 0);
-	      if (rb_obj_is_kind_of(v_parent, cLayout))
+	      const RPP::Object parent = v_child.call("parent");
+	      if (parent.is_kind_of(cLayout))
 		{
-		  track1("located child %s in layout: SKIP!!", v_child);
+		  //track1("located child %s in layout: SKIP!!", v_child);
 		  continue;
 		}
 	    }
 	}
       if (yield)
 	{
-	  if (!NIL_P(v_child)) 
+	  if (!v_child.isNil())
 	    {
-	      track1("YIELD child=%s", v_child);
-	      rb_yield(v_child);
+	      //track1("YIELD child=%s", v_child);
+	      v_child.yield();
 	    }
 	}
       else
 	{
 	  trace("add child to v_queue");
-	  Check_Type(v_queue, T_ARRAY);
-	  if (NIL_P(v_child)) 
-	    rb_ary_push(v_queue, 
-		        Data_Wrap_Struct(child->isWidgetType() ? cSynthWidget : cSynthObject, 
-					 0, 0, child));
+	  const RPP::Array queue = v_queue;
+	  if (v_child.isNil())
+	    queue.push(Data_Wrap_Struct(child->isWidgetType() ? cSynthWidget : cSynthObject, 
+					0, 0, child));
 	  else
-	    rb_ary_push(v_queue, v_child);
+	    queue.push(v_child);
 	}
     }
   return Qnil;
@@ -338,7 +320,7 @@ COMPLICATION: widgets may be nested multiple times:
 static VALUE
 cWidget_layout(VALUE v_self)
 {
-  RQTDECLSELF(QWidget);
+  const RPP::QObject<QWidget> self = v_self;
   QLayout * const layout = self->layout();
   return layout ? qt2v(layout) : Qnil;
 }
@@ -346,83 +328,49 @@ cWidget_layout(VALUE v_self)
 static VALUE
 cWidget_layout_set(VALUE v_self, VALUE v_layout)
 {
-  RQTDECLSELF(QWidget);
-  RQTDECLARE(QLayout, layout);
+  const RPP::QObject<QWidget> self = v_self;
+  const RPP::QObject<QLayout> layout = v_layout;
   self->setLayout(layout);
   return v_self;
 } 
 
-/*
-static VALUE
-cWidget_sizeHint_set(int argc, VALUE *argv, VALUE v_self)
-{
-  RQTDECLSELF(QWidget);
-  const QSizeF sz = args2QSizeF(argc, argv);
-  // FAILS:  sizeHint() is READONLY!!!!
-  self->setProperty("sizeHint", sz);
-  // DOES THIS WORK??? ie ,  will self->sizeHint now return the size??
-  if (self->sizeHint() != sz) rb_fatal("Er.....");
-  return Qnil;
-}
-
-static VALUE
-cWidget_sizeHint_get(VALUE v_self)
-{
-  RQTDECLSELF(QWidget);
-  return cSizeWrap(self->sizeHint());
-}
-*/
-
-static VALUE
-cSynthWidget_synththesized_p(VALUE)
-{
-  return Qtrue;
-}
-
 static inline void
-init_synthwidget(VALUE mQt, VALUE cWidget)
+init_synthwidget(RPP::Module mQt, RPP::Class cWidget)
 {
-  cSynthWidget = rb_define_class_under(mQt, "SynthWidget", cWidget);
-  rb_define_method(cSynthWidget, "synthesized?", RUBY_METHOD_FUNC(cSynthWidget_synththesized_p), 0);
+  cSynthWidget = mQt.define_class("SynthWidget", cWidget);
 }
 
 VALUE
-init_widget(VALUE mQt, VALUE cControl)
+init_widget(RPP::Module mQt, RPP::Class cControl)
 {
-  trace1("init_widget, define R::Qt::Widget, mQt=%p", (void *)mQt);
-  cWidget = rb_define_class_under(mQt, "Widget", cControl);
-  rb_define_alloc_func(cWidget, cWidget_alloc);
-  rb_define_method(cWidget, "show", RUBY_METHOD_FUNC(cWidget_show), 0);
-  rb_define_method(cWidget, "qtparent=", RUBY_METHOD_FUNC(cWidget_qtparent_set), 1);
-  rb_define_method(cWidget, "resize", RUBY_METHOD_FUNC(cWidget_resize), -1);
-  rb_define_method(cWidget, "size=", RUBY_METHOD_FUNC(cWidget_resize), -1);
-  rb_define_method(cWidget, "size_get", RUBY_METHOD_FUNC(cWidget_size_get), 0);
-  rb_define_method(cWidget, "minimumSize=", RUBY_METHOD_FUNC(cWidget_minimumSize_set), -1);
-  rb_define_method(cWidget, "minimumSize_get", RUBY_METHOD_FUNC(cWidget_minimumSize_get), 0);
-  rb_funcall(cWidget, rb_intern("attr_dynamic"), 2, cSize, CSTR2SYM("minimumSize"));
-  rb_define_method(cWidget, "maximumSize=", RUBY_METHOD_FUNC(cWidget_maximumSize_set), -1);
-  rb_define_method(cWidget, "maximumSize_get", RUBY_METHOD_FUNC(cWidget_maximumSize_get), 0);
-  rb_funcall(cWidget, rb_intern("attr_dynamic"), 2, cSize, CSTR2SYM("maximumSize"));
-  /*	QWidget.sizeHint is virtual but readonly...
-   *	And static properties do not merge with dynamic ones
-   *
-   *	The only solution is to subclass ALL widget subclasses with their own
-   *	sizeHint() crap.
-  rb_define_method(cWidget, "sizeHint=", RUBY_METHOD_FUNC(cWidget_sizeHint_set), -1);
-  rb_define_method(cWidget, "sizeHint_get", RUBY_METHOD_FUNC(cWidget_sizeHint_get), 0);
-  rb_funcall(cWidget, rb_intern("attr_dynamic"), 2, cSize, CSTR2SYM("sizeHint"));
-  */
-  rb_define_method(cWidget, "title=", RUBY_METHOD_FUNC(cWidget_title_set), -1);
-  rb_define_method(cWidget, "caption=", RUBY_METHOD_FUNC(cWidget_title_set), -1);
-  rb_define_method(cWidget, "windowTitle=", RUBY_METHOD_FUNC(cWidget_title_set), -1);
-  rb_define_method(cWidget, "title_get", RUBY_METHOD_FUNC(cWidget_title_get), 0);
-  rb_define_method(cWidget, "caption_get", RUBY_METHOD_FUNC(cWidget_title_get), 0);
-  rb_define_method(cWidget, "windowTitle_get", RUBY_METHOD_FUNC(cWidget_title_get), 0);
-  rb_define_method(cWidget, "shown", RUBY_METHOD_FUNC(cWidget_shown), -1);
-  rb_define_method(cWidget, "layout", RUBY_METHOD_FUNC(cWidget_layout), 0);
-  rb_define_method(cWidget, "layout=", RUBY_METHOD_FUNC(cWidget_layout_set), 1);
-  rb_define_protected_method(cWidget, "enqueue_children", 
-			     RUBY_METHOD_FUNC(cWidget_enqueue_children), 1);
+  //trace1("init_widget, define R::Qt::Widget, mQt=%p", &mQt);
+  cWidget = mQt.define_class("Widget", cControl);
+  cWidget.define_alloc_func(cWidget_alloc)
+	 .define_method("show", cWidget_show)
+	 .define_method("qtparent=", cWidget_qtparent_set)
+	 .define_method("resize", cWidget_resize)
+	 .define_method("size=", cWidget_resize)
+	 .define_method("size_get", cWidget_size_get)
+	 .define_method("minimumSize=", cWidget_minimumSize_set)
+	 .define_method("minimumSize_get", cWidget_minimumSize_get)
+	 .define_method("maximumSize=", cWidget_maximumSize_set)
+	 .define_method("maximumSize_get", cWidget_maximumSize_get)
+	/*	QWidget.sizeHint is virtual but readonly...
+	 *	And static properties do not merge with dynamic ones
+	 *
+	 *	The only solution is to subclass ALL widget subclasses with their own
+	 *	sizeHint() crap.
+	 .define_method("sizeHint=", cWidget_sizeHint_set), -1);
+	 .define_method("sizeHint_get", cWidget_sizeHint_get), 0);
+	 .funcall(rb_intern("attr_dynamic"), 2, cSize, CSTR2SYM("sizeHint"));
+	*/
+	 .define_method("title=", cWidget_title_set)
+	 .define_method("title_get", cWidget_title_get)
+	 .define_method("shown", cWidget_shown)
+	 .define_method("layout", cWidget_layout)
+	 .define_method("layout=", cWidget_layout_set)
+	 .define_method("enqueue_children", cWidget_enqueue_children)
+	 ;
   init_synthwidget(mQt, cWidget);
   return cWidget;
 }

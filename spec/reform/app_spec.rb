@@ -1,10 +1,11 @@
 
 require_relative '../../lib/reform/app'
 
-describe "Reform::Application" do
+describe 'Qt::Application' do
   it "should not hang on an empty app (no eventloop)" do
     expect {
       Reform.app {
+	fail_on_errors true
       } # app
     }.to_not raise_error
   end # it
@@ -12,6 +13,7 @@ describe "Reform::Application" do
   it "should emit the 'created' signal" do
     $created = false
     Reform.app {
+      fail_on_errors true
       widget shown: -> { $app.quit }
       created { $created = true }
     } # app

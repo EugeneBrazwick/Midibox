@@ -1,7 +1,25 @@
 
-require_relative '../graphicsitem'    # required to get the GraphicsItem class complete!
+require_relative '../graphicsitem'    
 
-Reform.createInstantiator __FILE__, R::Qt::GraphicsLineItem
+module R::Qt
+  class GraphicsLineItem < GraphicsItem
+
+    public # methods of GraphicsLineItem
+
+      # override
+      def enqueue_children queue = nil
+	super
+	if @pen
+	  queue and queue.push @pen or yield @pen
+	end
+      end
+
+      def pen_get; @pen; end
+
+      attr_dynamic PointF, :from, :to
+  end
+  Reform.createInstantiator __FILE__, GraphicsLineItem
+end # module R::Qt
 
 if __FILE__ == $0
   require 'reform/app'

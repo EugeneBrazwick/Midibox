@@ -1,0 +1,8 @@
+
+LIBRARY = '../rpp/librpprpp.so'
+LIBS = %w[-lruby++]
+INCDIRS = []
+LINKDIRS = []
+require_relative '../urqtCore/rake_ruby_so'
+
+task default: :buildlib

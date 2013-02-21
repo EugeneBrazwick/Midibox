@@ -1,5 +1,6 @@
 #if !defined(_R_QT_RVALUE_H_)
 #define _R_QT_RVALUE_H_
+
 #include "ruby++/ruby++.h"
 #include <iostream>
 #include <QtCore/QMetaType>

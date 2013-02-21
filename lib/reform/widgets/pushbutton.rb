@@ -1,7 +1,7 @@
 
 #  Copyright (c) 2013 Eugene Brazwick
 
-require_relative '../abstractbutton'
+require_relative '_abstractbutton'
 
 module R::Qt
   # a PushButton can be connected to data in several ways.

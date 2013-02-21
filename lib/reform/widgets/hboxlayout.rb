@@ -1,7 +1,7 @@
 
 #  Copyright (c) 2013 Eugene Brazwick
 
-require_relative '../layout'
+require_relative '_layout'
 
 # req. for a plugin:
 Reform.createInstantiator __FILE__, R::Qt::HBoxLayout

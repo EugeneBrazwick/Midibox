@@ -409,6 +409,11 @@ module R::Qt
 
   end # class GraphicsPathItem
 
+  class BezierCurve < GraphicsPathItem
+    public # methods of BezierCurve
+      attr_dynamic PointF, :from, :to, :c1, :c2
+  end
+
   Reform.createInstantiator __FILE__, GraphicsPathItem
 end # module R::Qt
 

@@ -26,6 +26,7 @@ public:
     }
   operator const char *() const { volatile VALUE tmp = V; return StringValueCStr(tmp); }
   operator const char *() { return StringValueCStr(V); }
+  bool isEmpty() const { return RTEST(call("empty?")); }
 };
 
 class Symbol: public Object
@@ -33,14 +34,22 @@ class Symbol: public Object
 private:
   typedef Object inherited;
 public:
-  Symbol(VALUE v, ESafety safe = Safe): inherited(v)
+  Symbol(VALUE v, E_SAFETY safe = SAFE): inherited(v)
     {
-      if (safe && TYPE(V) != T_SYMBOL)
+      if ((safe == SAFE || safe == UNSAFE && !isNil()) && !SYMBOL_P(V))
 	rb_raise(rb_eTypeError, "attempt to cast %s to a Symbol", inspect());
     }
   Symbol(const char *cstr): inherited(ID2SYM(rb_intern(cstr))) {}
   ID to_id() const { return SYM2ID(V); }
+  bool operator==(const char *other) const { return to_id() == rb_intern(other); } 
+  bool operator!=(const char *other) const { return to_id() != rb_intern(other); } 
 };
+
+inline RPP::String 
+BasicObject::check_string_type() const 
+{ 
+  return rb_check_string_type(V); 
+}
 
 } // namespace RPP 
 #endif // _RUBYPP_STRING_H_

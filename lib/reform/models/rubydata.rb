@@ -87,6 +87,7 @@ module R::Qt
       end
 
       def overwrite_with init_value
+	#tag "overwrite_with(#{init_value.inspect})"
 	@rubydata_node = Node::rubydata_inter init_value, self
       end
 
@@ -97,7 +98,12 @@ module R::Qt
     protected # methods of RubyData
 
     public # methods of RubyData
-      alias :self= :overwrite_with
+
+      alias self= overwrite_with
+
+      def inspect
+	super + "[#{@rubydata_node.inspect}]"
+      end
 
       # override
       def model_apply_getter methodname
@@ -111,6 +117,8 @@ module R::Qt
 	  Node::Basic.new(@rubydata_node).model_apply_getter methodname
 	end
       end
+
+      attr :rubydata_node
 
   end # class RubyData
 

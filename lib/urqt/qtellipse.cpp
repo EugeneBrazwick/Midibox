@@ -23,8 +23,8 @@ static VALUE
 cGraphicsEllipseItem_rect_set(int argc, VALUE *argv, VALUE v_self)
 {
   trace("cGraphicsEllipseItem_rect_set");
-  rb_check_frozen(v_self);
-  RQTDECLSELF_GI(QGraphicsEllipseItem);
+  const RPP::QGraphicsItem<QGraphicsEllipseItem> self = v_self;
+  self.check_frozen();
   self->setRect(args2QRectF(argc, argv));
   return Qnil;
 }
@@ -33,18 +33,19 @@ static VALUE
 cGraphicsEllipseItem_rect_get(VALUE v_self)
 {
   trace("cGraphicsEllipseItem_rect_get");
-  RQTDECLSELF_GI(QGraphicsEllipseItem);
+  const RPP::QGraphicsItem<QGraphicsEllipseItem> self = v_self;
   const QRectF &rect = self->rect();
   return cRectFWrap(new QRectF(rect));
 }
 
 void 
-init_qtellipse(VALUE mQt, VALUE /*cGraphicsItem*/)
+init_qtellipse(RPP::Module mQt, RPP::Class/*cGraphicsItem*/)
 {
-  const VALUE cGraphicsEllipseItem = rb_define_class_under(mQt, "GraphicsEllipseItem", cAbstractGraphicsShapeItem);
-  rb_define_alloc_func(cGraphicsEllipseItem, cGraphicsEllipseItem_alloc);
-  rb_define_method(cGraphicsEllipseItem, "rect=", RUBY_METHOD_FUNC(cGraphicsEllipseItem_rect_set), -1);
-  rb_define_method(cGraphicsEllipseItem, "rect_get", RUBY_METHOD_FUNC(cGraphicsEllipseItem_rect_get), 0);
+  const RPP::Class cGraphicsEllipseItem = mQt.define_class("GraphicsEllipseItem", cAbstractGraphicsShapeItem);
+  cGraphicsEllipseItem.define_alloc_func(cGraphicsEllipseItem_alloc)
+		      .define_method("rect=", cGraphicsEllipseItem_rect_set)
+		      .define_method("rect_get", cGraphicsEllipseItem_rect_get)
+		      ;
 }
 
 } // namespace R_Qt

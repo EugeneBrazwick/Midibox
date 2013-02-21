@@ -8,11 +8,13 @@
 #include "application.h"
 #include "graphicsitem.h"
 #include "brush.h"
+#include "ruby++/rppstring.h"
+#include "ruby++/array.h"
 
 namespace R_Qt {
 
-VALUE 
-cGraphicsScene = Qnil;
+RPP::Class 
+cGraphicsScene;
 
 /* NOTE: _mark methods may NOT allocate or free ruby values.
  * This includes TO_CSTR debug statements.
@@ -42,73 +44,48 @@ static VALUE
 cGraphicsScene_addItem(VALUE v_self, VALUE v_item)
 {
   track2("cGraphicsScene_addItem(%s, %s)", v_self, v_item);
-  RQTDECLSELF(QGraphicsScene);
-  RQTDECLARE_GI(QGraphicsItem, item);
-  trace2("item(%p).childItems.count= %d", item, item->childItems().count());
-  traqt1("%s::addItem", QTCLASS(self));
+  const RPP::QObject<QGraphicsScene> self = v_self;
+  const RPP::QGraphicsItem<QGraphicsItem> item = v_item;
+  trace2("item(%p).childItems.count= %d", &item, item->childItems().count());
+  traqt1("%s::addItem", self.qtclass());
   self->addItem(item);
   // Technically v_item could be toplevel in another scene, or it could be not 
   // a toplevel at all.
-  VALUE v_old_parent = rb_iv_get(v_item, "@parent");
-  if (!NIL_P(v_old_parent))
-    {
-      RQTDECLARE(QGraphicsScene, old_parent);
-      traqt1("%s::addItem", QTCLASS(old_parent));
-      old_parent->removeItem(item);
-    }
+  const RPP::QObject<QGraphicsScene> old_parent(item.iv("@parent"), RPP::UNSAFE);
+  if (old_parent.test())
+    old_parent->removeItem(item);
   trace("assign @parent in item");
-  rb_iv_set(v_item, "@parent", v_self); // otherwise they lack this
-  return v_self;
+  item.iv_set("@parent", self); // otherwise they lack this
+  return self;
 }
 
 static VALUE
-cGraphicsScene_parent_set(VALUE v_self, VALUE v_parent)
+cGraphicsScene_enqueue_children(int argc, VALUE *argv, VALUE v_self)
 {
-  trace("cGraphicsScene_parent_set");
-  return rb_funcall(v_parent, rb_intern("addScene"), 1, v_self);
-}
-
-static VALUE
-cGraphicsScene_addObject(VALUE /*v_self*/, VALUE /*v_child*/)
-{
-  trace("cGraphicsScene_addObject");
-  rb_raise(rb_eTypeError, "can only add GraphicsItems to a GraphicsScene");
-}
-
-static VALUE
-cGraphicsScene_children(VALUE v_self)
-{
-  trace("cGraphicsScene_children");
-  return rb_funcall(rb_funcall(v_self, rb_intern("each_child"), 0),
-		    rb_intern("to_a"), 0);
-}
-
-static VALUE
-cGraphicsScene_enqueue_children(VALUE v_self, VALUE v_queue)
-{
+  VALUE v_queue;
+  rb_scan_args(argc, argv, "01", &v_queue);
   trace("cGraphicsScene_enqueue_children");
-  RQTDECLSELF(QGraphicsScene);
-  rb_call_super(1, &v_queue);
+  const RPP::QObject<QGraphicsScene> self = v_self;
+  self.super(v_queue);
   const bool yield = NIL_P(v_queue);
   foreach (QGraphicsItem *child, self->items())
     {
       trace3("yield=%d, item(%p).childItems.count= %d", yield, child, child->childItems().count());
-      const VALUE v_child = item2v(child);
+      const RPP::Object v_child = item2v(child);
       if (yield)
 	{
-	  if (!NIL_P(v_child)) 
-	    rb_yield(v_child);
+	  if (!v_child.isNil()) v_child.yield();
 	}
       else
 	{
-	  Check_Type(v_queue, T_ARRAY);
-	  if (NIL_P(v_child)) 
-	      rb_ary_push(v_queue, Data_Wrap_Struct(cSynthItem, 0, 0, child));
+	  const RPP::Array queue = v_queue;
+	  if (v_child.isNil())
+	      queue.push(Data_Wrap_Struct(cSynthItem, 0, 0, child));
 	  else
 	    {
 	      trace("add child to v_queue");
 	      trace3("yield=%d, item(%p).childItems.count= %d", yield, child, child->childItems().count());
-	      rb_ary_push(v_queue, v_child);
+	      queue.push(v_child);
 	    }
 	}
     }
@@ -128,18 +105,16 @@ cGraphicsScene_enqueue_children(VALUE v_self, VALUE v_queue)
 static VALUE
 cGraphicsScene_sceneRect_set(int argc, VALUE *argv, VALUE v_self)
 {
-  RQTDECLSELF(QGraphicsScene);
-  trace("calling args2QRectF");
-  const QRectF &rect = args2QRectF(argc, argv);
-  traqt1("setSceneRect(%s)", rect);
-  self->setSceneRect(rect);
+  const RPP::QObject<QGraphicsScene> self = v_self;
+  self.check_frozen();
+  self->setSceneRect(args2QRectF(argc, argv));
   return Qnil;
 }
 
 static VALUE
 cGraphicsScene_sceneRect_get(VALUE v_self)
 {
-  RQTDECLSELF(QGraphicsScene);
+  const RPP::QObject<QGraphicsScene> self = v_self;
   // We cannot Wrap just &self->sceneRect() as it is a temporary...
   return cRectFWrap(new QRectF(self->sceneRect()));
 }
@@ -147,58 +122,25 @@ cGraphicsScene_sceneRect_get(VALUE v_self)
 static VALUE
 cGraphicsScene_backgroundBrush_set(VALUE v_self, VALUE v_brush)
 {
-  rb_iv_set(v_self, "@brush", v_brush);
-  RQTDECLSELF(QGraphicsScene);
-  RQTDECLARE_BRUSH(brush);
-  track2("%s.brush_set(%s)", v_self, v_brush);
-  traqt1("::setBackgroundBrush", QTCLASS(self));
+  const RPP::QObject<QGraphicsScene> self = v_self;
+  const RPP::QBrush brush = v_brush;
+  self.iv_set("@brush", brush);
   self->setBackgroundBrush(*brush);
-  return v_brush;
-}
-
-static VALUE
-cGraphicsScene_backgroundBrush_get(VALUE v_self)
-{
-  return rb_iv_get(v_self, "@brush");
-}
-
-static VALUE
-cGraphicsScene_backgroundBrush(int argc, VALUE *argv, VALUE v_self)
-{
-  if (argc == 0)
-    return cGraphicsScene_backgroundBrush_get(v_self);
-  VALUE argv_ex[argc + 1];
-  argv_ex[0] = v_self;
-  memcpy(argv_ex + 1, argv, argc * sizeof(VALUE));
-  return rb_funcall_passing_block(cBrush, rb_intern("new"), argc + 1, argv_ex);
+  return brush;
 }
 
 void
-init_graphicsscene(VALUE mQt, VALUE cControl)
+init_graphicsscene(RPP::Module qt, RPP::Class control)
 {
-  trace1("init_graphicsscene, define R::Qt::GraphicsScene, mQt=%p", (void *)mQt);
-  cGraphicsScene = rb_define_class_under(mQt, "GraphicsScene", cControl);
-  rb_define_alloc_func(cGraphicsScene, cGraphicsScene_alloc);
-  rb_define_method(cGraphicsScene, "addItem", RUBY_METHOD_FUNC(cGraphicsScene_addItem), 1);
-  rb_define_method(cGraphicsScene, "addObject", RUBY_METHOD_FUNC(cGraphicsScene_addObject), 1);
-  rb_define_method(cGraphicsScene, "parent=", RUBY_METHOD_FUNC(cGraphicsScene_parent_set), 1);
-  rb_define_method(cGraphicsScene, "sceneRect=", RUBY_METHOD_FUNC(cGraphicsScene_sceneRect_set), -1);
-  rb_define_method(cGraphicsScene, "sceneRect_get", RUBY_METHOD_FUNC(cGraphicsScene_sceneRect_get), 0);
-  rb_define_method(cGraphicsScene, "children", RUBY_METHOD_FUNC(cGraphicsScene_children), 0);
-  rb_define_method(cGraphicsScene, "enqueue_children", 
-		   RUBY_METHOD_FUNC(cGraphicsScene_enqueue_children), 1);
-  rb_define_alias(cGraphicsScene, "addGraphicsItem", "addItem");
-  rb_funcall(cGraphicsScene, rb_intern("attr_dynamic"), 2, cRectF, CSTR2SYM("sceneRect"));
-  rb_define_alias(cGraphicsScene, "area", "sceneRect");
-  rb_define_method(cGraphicsScene, "backgroundBrush=", 
-		   RUBY_METHOD_FUNC(cGraphicsScene_backgroundBrush_set), 1);
-  rb_define_method(cGraphicsScene, "backgroundBrush_get", 
-		   RUBY_METHOD_FUNC(cGraphicsScene_backgroundBrush_get), 0);
-  rb_define_method(cGraphicsScene, "backgroundBrush", 
-		   RUBY_METHOD_FUNC(cGraphicsScene_backgroundBrush), -1);
-  rb_define_alias(cGraphicsScene, "background", "backgroundBrush");
-  // the next one makes life easier for brush.cpp
-  rb_define_alias(cGraphicsScene, "brush=", "backgroundBrush=");
+  trace("init_graphicsscene()");
+  cGraphicsScene = qt.define_class("GraphicsScene", control);
+  cGraphicsScene.define_alloc_func(cGraphicsScene_alloc)
+		.define_method("addItem", cGraphicsScene_addItem)
+		.define_method("sceneRect=", cGraphicsScene_sceneRect_set)
+		.define_method("sceneRect_get", cGraphicsScene_sceneRect_get)
+		.define_method("enqueue_children", cGraphicsScene_enqueue_children)
+		.define_method("backgroundBrush=", cGraphicsScene_backgroundBrush_set)
+		;
 }
 
 } // namespace R_Qt 

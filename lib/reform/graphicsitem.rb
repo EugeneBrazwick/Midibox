@@ -61,7 +61,72 @@ module R::Qt
       alias :fillcolor :brush
       alias :stroke :pen
 
+      # override
+      def connect signal, proc
+	TypeError.raise 'GraphicsItems only support ruby signals' unless Symbol === signal
+	super
+      end
+
+      # override
+      def emit signal, *args
+	TypeError.raise 'GraphicsItems only support ruby signals' unless Symbol === signal
+	super
+      end
   end # class GraphicsItem
+
+  class Brush < NoQtControl
+    public # methods of Bruhs
+      # override
+      def parent= parent
+	old_parent = @parent and old_parent.brush = nil
+	@parent = parent and parent.brush = self
+      end
+
+      # override
+      def apply_model data
+	apply_dynamic_setter :color, data
+      end
+  end # class GraphicsItem
+
+  class AbstractGraphicsShapeItem < GraphicsItem
+     
+    public # methods of AbstractGraphicsShapeItem
+
+      # override
+      def enqueue_children queue = nil
+	super
+	if @brush
+	  queue and queue.push @brush or yield @brush
+	end
+	if @pen
+	  queue and queue.push @pen or yield @pen
+	end
+      end
+
+      def brush_get; @brush; end
+      def pen_get; @pen; end
+  end # class AbstractGraphicsShapeItem
+
+  class SynthItem < GraphicsItem
+    public # methods of SynthItem
+      #override
+      def synthesized?; true; end
+  end # class SynthItem
+
+  class Pen < NoQtControl
+    public # methods of Pen
+      attr_dynamic Color, :color, klass: DynamicColor, require: 'dynamic_color'
+      attr_dynamic Float, :widthF
+      attr_dynamic Symbol, :capStyle, :joinStyle
+
+      alias width widthF 
+      alias size widthF
+      alias weight widthF 
+      alias cap capStyle
+      alias join joinStyle 
+
+      @@capstyles = @@joinstyles = nil
+  end
 
   Reform.createInstantiator __FILE__, GraphicsItem
 end

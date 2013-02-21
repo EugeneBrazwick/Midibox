@@ -10,6 +10,7 @@
 #include "array.h"
 #include "proc.h"
 #include "bool.h"
+#include "scan.h"
 
 namespace RPP {
 

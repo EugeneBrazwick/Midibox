@@ -25,7 +25,7 @@ describe "R::Qt::Data" do
       widget {
 	name 'bert'
 	title {
-	  $example.expect { connector :self }.to $example.raise_error NoMethodError
+	  $example.expect { connector :self }.to $example.raise_error Reform::Error
 	}
 	shown { $app.quit }
       } # widget

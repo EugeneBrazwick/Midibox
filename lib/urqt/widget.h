@@ -1,7 +1,7 @@
 
-#include <ruby/ruby.h>
+#include "object.h"
 #pragma interface
 
 namespace R_Qt {
-extern VALUE cWidget;
+extern RPP::Class cWidget;
 } // namespace R_Qt 

@@ -8,8 +8,8 @@
 
 namespace R_Qt {
 
-static VALUE
-cPolygonF = Qnil;
+static RPP::Class
+cPolygonF;
 
 static void
 cPolygonF_free(QPolygonF *poly)
@@ -40,10 +40,10 @@ v2poly(VALUE v)
 };
 
 static void
-init_poly(VALUE mQt)
+init_poly(RPP::Module mQt)
 {
-  cPolygonF = rb_define_class_under(mQt, "Polygon", rb_cObject);
-  rb_define_alloc_func(cPolygonF, cPolygonF_alloc);
+  cPolygonF = mQt.define_class("Polygon", rb_cObject);
+  cPolygonF.define_alloc_func(cPolygonF_alloc);
 }
 
 static QPolygonF &
@@ -109,13 +109,13 @@ cGraphicsTriangleItem_points_set(int argc, VALUE *argv, VALUE v_self)
 R_QT_DEF_GRALLOCATOR(GraphicsPolygonItem)
 
 static void
-init_triangle(VALUE mQt, VALUE cGraphicsPolygonItem)
+init_triangle(RPP::Module mQt, RPP::Class cGraphicsPolygonItem)
 {
-  const VALUE cGraphicsTriangleItem = rb_define_class_under(mQt, "GraphicsTriangleItem",
+  const RPP::Class cGraphicsTriangleItem = mQt.define_class("GraphicsTriangleItem",
 							    cGraphicsPolygonItem);
-  rb_define_alloc_func(cGraphicsTriangleItem, cGraphicsPolygonItem_alloc);
-  rb_define_method(cGraphicsTriangleItem, "points=", 
-		   RUBY_METHOD_FUNC(cGraphicsTriangleItem_points_set), -1);
+  cGraphicsPolygonItem.define_alloc_func(cGraphicsPolygonItem_alloc)
+		      .define_method("points=", cGraphicsTriangleItem_points_set)
+		      ;
 }
 
 static VALUE
@@ -142,7 +142,7 @@ init_quad(VALUE mQt, VALUE cGraphicsPolygonItem)
 static VALUE
 cGraphicsPolygonItem_points_set(int argc, VALUE *argv, VALUE v_self)
 {
-  RQTDECLSELF_GI(QGraphicsPolygonItem);
+  const RPP::QGraphicsItem<QGraphicsPolygonItem> self = v_self;
   QPolygonF poly;
   self->setPolygon(ARGS2QPOLYGONF(poly));
   return Qnil;
@@ -160,7 +160,7 @@ cGraphicsPolygonItem_points_set(int argc, VALUE *argv, VALUE v_self)
 static VALUE
 cGraphicsPolygonItem_points_get(VALUE v_self)
 {
-  RQTDECLSELF_GI(QGraphicsPolygonItem);
+  const RPP::QGraphicsItem<QGraphicsPolygonItem> self = v_self;
   // we must make a copy since polygon() returns a temporary
   return cPolygonFWrap(new QPolygonF(self->polygon()));
 }
@@ -174,18 +174,16 @@ cGraphicsPolygonItem_points(int argc, VALUE *argv, VALUE v_self)
 }
 
 void 
-init_polygon(VALUE mQt, VALUE /*cGraphicsItem*/)
+init_polygon(RPP::Module mQt, RPP::Class /*cGraphicsItem*/)
 {
   init_poly(mQt);
-  const VALUE cGraphicsPolygonItem = rb_define_class_under(mQt, "GraphicsPolygonItem", 
+  const RPP::Class cGraphicsPolygonItem = mQt.define_class("GraphicsPolygonItem", 
 							   cAbstractGraphicsShapeItem);
-  rb_define_alloc_func(cGraphicsPolygonItem, cGraphicsPolygonItem_alloc);
-  rb_define_method(cGraphicsPolygonItem, "points=", 
-		   RUBY_METHOD_FUNC(cGraphicsPolygonItem_points_set), -1);
-  rb_define_method(cGraphicsPolygonItem, "points_get", 
-		   RUBY_METHOD_FUNC(cGraphicsPolygonItem_points_get), 0);
-  rb_define_method(cGraphicsPolygonItem, "points", 
-		   RUBY_METHOD_FUNC(cGraphicsPolygonItem_points), -1);
+  cGraphicsPolygonItem.define_alloc_func(cGraphicsPolygonItem_alloc)
+		      .define_method("points=", cGraphicsPolygonItem_points_set)
+		      .define_method("points_get", cGraphicsPolygonItem_points_get)
+		      .define_method("points", cGraphicsPolygonItem_points)
+		      ;
   init_triangle(mQt, cGraphicsPolygonItem);
   init_quad(mQt, cGraphicsPolygonItem);
 }

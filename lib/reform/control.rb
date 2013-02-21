@@ -91,30 +91,36 @@ module R::Qt
       end # want_data
 
 	# note that propagation can be dumped by specifying 'trace_propagation true' in the sender cq widget
-      def push_data value, sender = nil, path = []
+      def push_data value, path = []
 	#tag "#{self}::push_data(#{value})"
-	sender ||= self
 	path.unshift self
 	if @model
 	  #tag "delegate #{value}  to @model #@model"
-	  @model.model_push_data value, sender, path 
+	  @model.model_push_data value, path 
 	elsif par = parent
 	  #tag "delegate to parent"
-	  par.push_data value, sender, path
+	  par.push_data value, path
 	end
       end # push_data
 
 	# context: Control#objectName=
       def registerName name, child
 	#tag "registerName(#{name})"
-	m = method(name) rescue nil
-	raise NameError, "the name '#{name}' is already in use" if m
+	if respond_to? name
+	  raise NameError, "the name '#{name}' is already in use"
+	end
 	define_singleton_method name do
 	  child
 	end
       end # registerName
 
     public #methods of Control
+
+      # override
+      def objectName= newname
+	super newname
+	newname && (c = collector) and c.registerName newname, self
+      end
 
       def addDynamicAttribute attr
 	addObject attr
@@ -135,29 +141,36 @@ module R::Qt
       end # connector
 
       ## :call-seq:   attr_dynamic type, :meth1 [,:meth2...] [, optionhash]
+      # 'type' refers to the attribute, so String if it is a string.
+      # This typing is required for Qt and also to create a proper default value.
       def self.attr_dynamic klass, *methods
 	#tag "#{self}.attr_dynamic #{klass} #{methods.inspect}"	  # INTERESTING
 	options = Hash === methods[-1] ? methods.pop : nil
 	with_acceptors = options && options[:with_acceptors]
-	methods.each do |method|      # NOT 'for' GODDAMNED!
+	methods.each do |meth|      # NOT 'for' GODDAMNED!
 	  #tag "creating method :#{method}"
-	  define_method method do |*args, &block|
-	    handle_dynamics klass, method, options, *args, &block
+	  if method_defined? meth
+	    NameError.raise "the dynamic attribute #{self}.#{meth} is already defined as " +
+			    "#{instance_method(meth).owner}.#{meth}"
+	  end
+	  define_method meth do |*args, &block|
+	    handle_dynamics klass, meth, options, *args, &block
 	  end
 	  if with_acceptors
-	    assigner = (method.to_s + '=').to_sym
+	    assigner = (meth.to_s + '=').to_sym
 	    #tag "creating acceptor :#{assigner}"
 	    define_method assigner do |value|
 	      #tag "executing acceptor :#{assigner}(#{value})"
-	      apply_dynamic_setter method, value
+	      apply_dynamic_setter meth, value
 	    end
 	  end # with_acceptors
 	end # each
 	#tag "OK"
       end # attr_dynamic
 
-      attr_dynamic String, :objectName
+      # attr_dynamic String, :objectName
 
+      alias collectnames collect_names
   end # class Control
 
 
@@ -166,6 +179,26 @@ module R::Qt
   class NoQtControl < Control
 
     public # methods of NoQtControl
+
+      # overrides:
+      def enqueue_children *args; end
+      def qtobject?; end
+      def widget?; end
+      def qtparent_get; end
+      def mark_ownership; end
+      def qtchildren_get; []; end
+
+      alias qtchildren qtchildren_get
+
+      # override
+      def qtparent= parent
+	ArgError.raise "cannot assign a qtparent to a #{self.class}"
+      end
+
+      # override
+      def qtchildren= arg
+	ArgError.raise "cannot assign qtchildren to a #{self.class}"
+      end
 
       # override. Because they are not QObjects in the first place
       def addObject child
@@ -191,7 +224,18 @@ module R::Qt
       # overrides
       attr_writer :objectName, :parent 
 
+      # override
+      def takeOwnership 
+	NotImplementedError.raise 'takeOwnership on non-QObjects'
+      end
+
   end  # class NoQtControl
+
+  class SynthObject < R::Qt::Object
+    # override
+    def synthesized?; true; end
+  end
+
 end # module R::Qt
 
 if __FILE__ == $0

@@ -43,6 +43,26 @@ cAbstractSlider_value_set(VALUE v_self, VALUE v_val)
 }
 
 static VALUE
+cAbstractSlider_valueF_set(VALUE v_self, VALUE v_val)
+{
+  track2("%s::valueF=(%s)", v_self, v_val);
+  RPP::QObject<QAbstractSlider> self = v_self;
+  self.check_frozen();
+  const RPP::Float val = v_val;
+  trace("calling setValue, should emit valueChanged");
+  self->setValue(val * FloatModeFactor + 0.5);
+  return v_val;
+}
+
+static VALUE
+cAbstractSlider_valueF_get(VALUE v_self)
+{
+  track1("%s::valueF_get()", v_self);
+  RPP::QObject<QAbstractSlider> self = v_self;
+  return RPP::Float(self->value() / FloatModeFactor);
+}
+
+static VALUE
 cAbstractSlider_value_get(VALUE v_self)
 {
   track1("%s::value_get()", v_self);
@@ -55,7 +75,7 @@ cAbstractSlider_orientation_set(VALUE v_self, VALUE v_or)
 {
   RPP::QObject<QAbstractSlider> self = v_self;
   self.check_frozen();
-  RPP::Dictionary syms(cAbstractSlider.cv("@@orientations"), RPP::Hash::Unsafe);
+  RPP::Dictionary syms(cAbstractSlider.cv("@@orientations"), RPP::VERYUNSAFE);
   if (!syms.isHash())
     {
       syms = RPP::Dictionary();
@@ -108,7 +128,7 @@ cAbstractSlider_range_set(int argc, VALUE *argv, VALUE v_self)
   if (NIL_P(v_to))
     {
       trace("No 'to', expect arg1 to be Range or Array");
-      RPP::Range range(v_from, RPP::Range::Unsafe);
+      RPP::Range range(v_from, RPP::VERYUNSAFE);
       if (range.isRange())
 	{
 	  trace("isRange");
@@ -194,14 +214,15 @@ MINMAXERF(min)
 MINMAXERF(max)
 
 static void
-init_abstractSlider(RPP::Class cWidget)
+init_abstractSlider(RPP::Module mQt, RPP::Class cWidget)
 {
   cAbstractSlider = mQt.define_class("AbstractSlider", cWidget);
   cAbstractSlider.define_method("value=", cAbstractSlider_value_set)
-		 .define_method("value_get", cAbstractSlider_value_get);
-  cAbstractSlider.call("attr_dynamic", rb_cFixnum, RPP::Symbol("value"));
-  cAbstractSlider.define_method("range=", cAbstractSlider_range_set)
-		 .define_alias("range", "range=")
+		 .define_method("value_get", cAbstractSlider_value_get)
+		 .define_method("valueF=", cAbstractSlider_valueF_set)
+		 .define_method("valueF_get", cAbstractSlider_valueF_get)
+		 .define_method("range=", cAbstractSlider_range_set)
+		 .define_alias("range", "range=")    // This is stupid...
 		 .define_private_method("initialize", cAbstractSlider_initialize)
 		 .define_method("minimum=", cAbstractSlider_minimum_set)
 		 .define_method("minimum_get", cAbstractSlider_minimum_get)
@@ -212,14 +233,9 @@ init_abstractSlider(RPP::Class cWidget)
 		 .define_method("maximumF=", cAbstractSlider_maximumF_set)
 		 .define_method("maximumF_get", cAbstractSlider_maximumF_get)
 		 .define_method("orientation=", cAbstractSlider_orientation_set)
-		 .define_method("orientation_get", cAbstractSlider_orientation_get);
-  cAbstractSlider.call("attr_dynamic", rb_cSymbol, RPP::Symbol("orientation"));
-  cAbstractSlider.call("attr_dynamic", rb_cSymbol, RPP::Symbol("orientation"));
-  cAbstractSlider.call("attr_dynamic", rb_cSymbol, RPP::Symbol("orientation"));
-  cAbstractSlider.call("attr_dynamic", rb_cInteger, RPP::Symbol("minimum"));
-  cAbstractSlider.call("attr_dynamic", rb_cInteger, RPP::Symbol("maximum"));
-  cAbstractSlider.call("attr_dynamic", rb_cFloat, RPP::Symbol("minimumF"));
-  cAbstractSlider.call("attr_dynamic", rb_cFloat, RPP::Symbol("maximumF"));
+		 .define_method("orientation_get", cAbstractSlider_orientation_get)
+		 .define_const("FloatModeFactor", FloatModeFactor)
+		 ;
 }
 
 static VALUE
@@ -227,7 +243,7 @@ cSlider_tickPosition_set(VALUE v_self, VALUE v_tickpos)
 {
   RPP::QObject<QSlider> self = v_self;
   self.check_frozen();
-  RPP::Dictionary syms(cSlider.cv("@@tickpositions"), RPP::Hash::Unsafe);
+  RPP::Dictionary syms(cSlider.cv("@@tickpositions"), RPP::VERYUNSAFE);
   if (!syms.isHash())
     {
       syms = RPP::Dictionary();
@@ -288,10 +304,10 @@ cSlider_tickInterval_get(VALUE v_self)
 }
 
 void
-init_slider(VALUE, VALUE cWidget)
+init_slider(RPP::Module mQt, RPP::Class cWidget)
 {
   trace("init_slider");
-  init_abstractSlider(cWidget);
+  init_abstractSlider(mQt, cWidget);
   /* Sliders provide a value that has some range.
    By default the range is 0.0 .. 1.0.
    
@@ -302,9 +318,8 @@ init_slider(VALUE, VALUE cWidget)
 	 .define_method("tickPosition=", cSlider_tickPosition_set)
          .define_method("tickPosition_get", cSlider_tickPosition_get)
 	 .define_method("tickInterval=", cSlider_tickInterval_set)
-	 .define_method("tickInterval_get", cSlider_tickInterval_get);
-  cSlider.call("attr_dynamic", rb_cSymbol, RPP::Symbol("tickPosition"));
-  cSlider.call("attr_dynamic", rb_cFixnum, RPP::Symbol("tickInterval"));
+	 .define_method("tickInterval_get", cSlider_tickInterval_get)
+	 ;
 } // init_slider
 
 } // namespace R_Qt {

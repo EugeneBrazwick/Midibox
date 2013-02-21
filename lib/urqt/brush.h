@@ -5,7 +5,7 @@
 // Copyright (c) 2013 Eugene Brazwick
 
 #include <QtWidgets/QGraphicsItem>
-#include <ruby/ruby.h>
+#include <QtGui/QBrush>
 #include "api_utils.h"
 #include "ruby++/ruby++.h"
 
@@ -13,7 +13,7 @@
 
 namespace R_Qt {
 
-extern RPP::Class cBrush, cColor, cDynamicColor;
+extern RPP::Class cBrush;
 
 static inline void
 GetQBrush_noDecl(VALUE v_q, QBrush *&q)
@@ -26,18 +26,7 @@ GetQBrush_noDecl(VALUE v_q, QBrush *&q)
   GET_STRUCT_NODECL(QBrush, q);
 }
 
-static inline void
-GetQColor_noDecl(VALUE v_q, QColor *&q)
-{
-#if defined(DEBUG)
-  if (!rb_obj_is_kind_of(v_q, cColor))
-    rb_raise(rb_eTypeError, "SERIOUS PROGRAMMING ERROR: very bad cast to QColor");
-#endif // DEBUG
-  GET_STRUCT_NODECL(QColor, q);
-}
-
 #define RQTDECLARE_BRUSH(var) QBrush *var; GetQBrush_noDecl(v_##var, var)
-#define RQTDECLARE_COLOR(var) QColor *var; GetQColor_noDecl(v_##var, var)
 
 extern void cBrush_free(QBrush *brush);
 
@@ -47,23 +36,26 @@ cBrushWrap(QBrush *brush)
   return Data_Wrap_Struct(cBrush, 0, cBrush_free, brush);
 }
 
-extern void cColor_free(QColor *color);
-
-static inline VALUE
-cColorWrap(QColor *color)
-{
-  trace1("cColorWrap(%p)", color);
-  return Data_Wrap_Struct(cColor, 0, cColor_free, color);
-} // cColorWrap
-
-static inline VALUE
-cColorWrap(const QColor &color)
-{
-  return Data_Wrap_Struct(cColor, 0, cColor_free, new QColor(color));
-} // cColorWrap
-
-extern void init_color(VALUE mQt);
 extern void init_brush(VALUE mQt);
 
 } // namespace R_Qt 
+
+namespace RPP {
+class QBrush: public DataObject< ::QBrush >
+{
+private:
+  typedef DataObject< ::QBrush > inherited;
+public:
+  /* If Unsafe is passed then the result can be nil as well as a QBrush.
+     But exceptions are raised if it is neither.
+     The caller MUST test for isNil()!
+   */
+  QBrush(VALUE v_o, E_SAFETY safe = SAFE): inherited(v_o, R_Qt::cBrush, safe) {}
+  QBrush(::QBrush *brush): inherited(Data_Wrap_Struct(R_Qt::cBrush, 0, R_Qt::cBrush_free, brush), brush) {}
+  QBrush(const ::QBrush &brush): QBrush(new ::QBrush(brush)) {}
+  void operator=(VALUE v) { V = v; }
+  // CRAZY  void operator=(const RPP::QBrush &other) { V = other.value(); }
+}; // class RPP::QBrush
+
+} // namespace RPP 
 #endif // _URQT_BRUSH_H_

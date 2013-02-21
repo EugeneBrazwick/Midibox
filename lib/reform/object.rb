@@ -132,10 +132,11 @@ module R::Qt
 	# you can 'mount' a model into any object.
 	attr :model
 
-	# callback, if DynamicAttribute is given a 'connector'
-	def connect_attribute attrname, dynattr
-	  raise Reform::Error, "No support for connecting attribute #{self}::#{attrname}"
-	end
+	## callback, called when a DynamicAttribute is given a 'connector'
+	# Semantics: a RW-widget can decide to add a push-channel for data.
+	# Erm...  See widgets/lineedit.rb to get the idea.
+	def connect_attribute attrname, dynattr; end
+	  # INCONVENIENT raise Reform::Error, "No support for connecting attribute #{self}::#{attrname}"
 
 	# callback, called after the instance is parented
 	def setup hash = nil, &initblock

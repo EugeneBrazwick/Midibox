@@ -41,17 +41,6 @@ module R::Qt
       alias caption title
       alias windowTitle title
 
-      #override
-      def connect_attribute methodname, dynattr
-	case methodname
-	  # this is just the list of attr_dynamics?
-	  # No there may be aliases too.
-	when :title, :caption, :windowTitle, 
-	     :size
-	else
-	  super
-	end
-      end
   end # class Widget
 
   # req. for a plugin:

@@ -13,6 +13,7 @@ Or better, we must generate it.
   it "should show the widget" do
     ok = false
     Reform.app {
+      fail_on_errors true
       widget {
 	size 320, 240
 	title 'Top-level widget'

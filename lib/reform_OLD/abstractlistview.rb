@@ -136,7 +136,6 @@ Not supported yet
 =end
       def activated model, cid, idx, data_idx = nil
         #tag "YES, 'activated'!!!, idx = #{idx}, cid=#{cid}, model=#{model},
-        data_to_transmit=#{@localmodel.model_index2value(idx, self).inspect}, debug_track = #@debug_track"
         model.model_apply_setter cid, @localmodel.model_index2value(idx, col0), self #, debug_track: true
       end
 
@@ -183,4 +182,5 @@ Not supported yet
     public # methods of AbstractListView
 
   end # class AbstractListView
+
 end

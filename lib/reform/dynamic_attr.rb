@@ -103,7 +103,8 @@ module R::Qt
       end # parent=
 
       def apply_model data
-	#tag "#{self}::apply_model"
+	#tag "#{self}::apply_model -> delegate to #{parent.class}::apply_dynamic_setter(#@methodname)"
+	#tag "data = #{data}"
 	parent.apply_dynamic_setter @methodname, data
       end # apply_model
 

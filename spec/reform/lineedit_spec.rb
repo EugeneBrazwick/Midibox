@@ -9,13 +9,16 @@ describe "Reform::LineEdit" do
     $quit = false
     Reform.app {
       data TEXT
+      fail_on_errors true
+      collect_names true
       widget {
 	name :w
 	size 320, 240
 	title 'Top-level widget'
-	shown do 
-	  $app.w.e1.text.should == TEXT
-	  $app.w.e2.text.should == TEXT
+	shown do
+	  # note that $app.w.e1 fails due to the implict 'vbox'!
+	  $app.e1.text.should == TEXT
+	  $app.e2.text.should == TEXT
 	  $quit = true
 	  $app.quit
 	end 

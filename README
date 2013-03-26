@@ -9,12 +9,23 @@ Building debug version qt-5 from open source:
   make module-qtbase module-qtsvg module-qtimageformats \
        module-qtgraphicaleffects module-qtdoc \
        install
-Building debug version ruby-1.9.3: 
+Building debug version ruby-1.9.3:
   apt-get install libyaml-dev libreadline6-dev
   optflags=-O0 debugflags='-DDEBUG -g' ./configure --prefix=/usr --sysconfdir=/etc \
   --localstatedir=/var --program-suffix=1.9.1 \
   --enable-shared --enable-debug-env --with-out-ext=sdbm,syck
   # sdbm and syck do not compile
+  make -j4 all install
+Building debug version ruby-2.0.0:
+  # Note it needs gdbm1.9 current Ubuntu version is 1.8. So fails.
+  # sdbm still fails
+  apt-get install libyaml-dev libreadline6-dev libgdbm-dev libffi-dev \
+		  libncurses5-dev libtokyocabinet-dev libqdbm-dev
+  optflags=-O0 debugflags='-DDEBUG -g' \
+  ./configure --prefix=/usr --sysconfdir=/etc \
+	      --localstatedir=/var --program-suffix=2.0.0 \
+	      --enable-shared --enable-debug-env \
+	      --with-out-ext=sdbm
   make -j4 all install
 
 -----------------------------------------------------------------------------------------

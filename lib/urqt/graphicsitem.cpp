@@ -343,7 +343,6 @@ init_graphicsitem(RPP::Module qt, RPP::Class /*cControl*/)
 	       .define_method("pos=", cGraphicsItem_pos_set)
 	       .define_method("pos_get", cGraphicsItem_pos_get)
 	       ;
-  cGraphicsItem.call("attr_dynamic", cPointF, RPP::Symbol("pos"));
   init_abstractgraphicsshapeitem(qt);
   init_synthitem(qt);
   return cGraphicsItem;

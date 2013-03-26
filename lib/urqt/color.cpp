@@ -8,9 +8,11 @@
 #include "color.h"
 #include "brush.h"
 #include "object.h"
+#include "urqtCore/stringlist.h"
 #include "ruby++/dataobject.h"
 #include "ruby++/array.h"
 #include "ruby++/hash.h"
+#include "ruby++/bool.h"
 
 namespace R_Qt {
 
@@ -360,6 +362,18 @@ HSV_SETTER(value, value, )
 #define INT_COMP_RO INT_COMP
 #define FLOAT_COMP_RO FLOAT_COMP
 
+static VALUE
+cColor_colorNames(VALUE /*cColor*/)
+{
+  return RPP::QStringList(QColor::colorNames());
+}
+
+static VALUE
+cColor_isValidColor(VALUE /*cColor*/)
+{
+  return RPP::Bool(QColor::isValidColor(RPP::String(cColor).to_s()));
+}
+
 void 
 init_color(RPP::Module qt)
 {
@@ -368,6 +382,8 @@ init_color(RPP::Module qt)
   cColor.define_alloc_func(cColor_alloc)
         .define_private_method("initialize", cColor_initialize)
 	COMPS
+	.define_function("colorNames", cColor_colorNames)
+	.define_function("validColor?", cColor_isValidColor)
 	/* MAYBE LATER
 	.define_method("convertTo", cColor_convertTo)
 	.define_method("darker", cColor_darker)
@@ -379,27 +395,10 @@ init_color(RPP::Module qt)
 	.define_method("hsv_get", cColor_hsv_get)
 	.define_method("hsvF_get", cColor_hsvF_get)
 	*/
-	.define_alias("hue=", "hsvHue=")
-	.define_alias("saturation=", "hsvSaturation=")
-	.define_alias("hue_get", "hsvHue_get")
 	;
 // According to Qt manual     hsvHue does not convert color, but hue() does, even if it is a getter.
 // Or maybe they both do.
 
-#undef INT_COMP
-#undef INT_COMP_RO
-#undef FLOAT_COMP
-#undef FLOAT_COMP_RO
-
-#define INT_COMP(comp, Comp) cColor.call("attr_dynamic", rb_cFixnum, RPP::Symbol(#comp));
-#define INT_COMP_RO INT_COMP
-#define FLOAT_COMP(comp, Comp) cColor.call("attr_dynamic", rb_cFloat, RPP::Symbol(#comp "F"));
-#define FLOAT_COMP_RO FLOAT_COMP
-  COMPS
-  cColor.define_alias("saturation_get", "hsvSaturation_get")
-	.define_alias("hue", "hsvHue")
-	.define_alias("saturation", "hsvSaturation")
-	;
   cDynamicColor = mQt.define_class("DynamicColor", cDynamicAttribute);
   trace("DONE init_color");
 } // init_color

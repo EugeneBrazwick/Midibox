@@ -1,16 +1,8 @@
 
 #pragma implementation
 
-#include "ruby++.h"
 // not required, but errors in templates are then reveiled
-#include "hash.h"
-#include "numeric.h"
-#include "dataobject.h"
-#include "range.h"
-#include "array.h"
-#include "proc.h"
-#include "bool.h"
-#include "scan.h"
+#include "ruby++all.h"
 
 namespace RPP {
 

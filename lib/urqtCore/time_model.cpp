@@ -12,6 +12,7 @@
 #include "ruby++/symbol.h"
 #include "ruby++/bool.h"
 #include "ruby++/hash.h"
+#include "ruby++/scan.h"
 #include <QtCore/QTimer>
 
 namespace R_Qt {

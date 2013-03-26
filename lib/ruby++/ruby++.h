@@ -7,10 +7,8 @@
 // inline macro lib that is rock solid and crash proof
 // Not to mention 100 % type safe (but this currently fails)
 
-#include <ruby/ruby.h>
-#include <ruby/intern.h>
 #include "ruby++/class.h"
-#include "ruby++/scan.h"
+#include <ruby/intern.h>
 
 #pragma interface
 

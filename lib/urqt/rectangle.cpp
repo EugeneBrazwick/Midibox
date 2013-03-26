@@ -79,7 +79,7 @@ cGraphicsRectItem_size_set(int argc, VALUE *argv, VALUE v_self)
   const RPP::QGraphicsItem<QGraphicsRectItem> self = v_self;
   self.check_frozen();
   QRectF r = self->rect();
-  r.setSize(ARGS2QSIZEF());
+  r.setSize(RPP::QSizeF(argc, argv));
   self->setRect(r);
   return Qnil;
 }
@@ -89,10 +89,10 @@ cGraphicsRectItem_size_get(VALUE v_self)
 {
   trace("cGraphicsRectItem_size_get");
   const RPP::QGraphicsItem<QGraphicsRectItem> self = v_self;
-  return cSizeFWrap(self->rect().size());
+  return RPP::QSizeF(self->rect().size());
 }
 
-#define QT_GRI_CORNERMETHODS(Corner, corner, alias) \
+#define QT_GRI_CORNERMETHODS(Corner, corner) \
 static VALUE \
 cGraphicsRectItem_##corner##_set(int argc, VALUE *argv, VALUE v_self) \
 { \
@@ -114,10 +114,10 @@ cGraphicsRectItem_##corner##_get(VALUE v_self) \
 }
 
 #define QT_GRI_CORNERS \
-  QT_GRI_CORNERMETHODS(TopLeft, topLeft, topleft) \
-  QT_GRI_CORNERMETHODS(TopRight, topRight, topright) \
-  QT_GRI_CORNERMETHODS(BottomLeft, bottomLeft, bottomleft) \
-  QT_GRI_CORNERMETHODS(BottomRight, bottomRight, bottomright)
+  QT_GRI_CORNERMETHODS(TopLeft, topLeft) \
+  QT_GRI_CORNERMETHODS(TopRight, topRight) \
+  QT_GRI_CORNERMETHODS(BottomLeft, bottomLeft) \
+  QT_GRI_CORNERMETHODS(BottomRight, bottomRight)
 
 QT_GRI_CORNERS
 
@@ -167,20 +167,15 @@ init_rectangle(RPP::Module mQt, RPP::Class /*cGraphicsItem*/)
 		   .define_method("size=", cGraphicsRectItem_size_set)
 		   .define_method("size_get", cGraphicsRectItem_size_get)
 		   ;
-  cGraphicsRectItem.call("attr_dynamic", cSizeF, RPP::Symbol("size"));
-#define QT_GRI_CORNERMETHODS(Corner, corner, alias) \
+#define QT_GRI_CORNERMETHODS(Corner, corner) \
   cGraphicsRectItem.define_method(#corner "=", cGraphicsRectItem_##corner##_set) \
-		   .define_method(#corner "_get", cGraphicsRectItem_##corner##_get); \
-  cGraphicsRectItem.call("attr_dynamic", cPointF, RPP::Symbol(#corner)); \
-  cGraphicsRectItem.define_alias(#alias, #corner);
+		   .define_method(#corner "_get", cGraphicsRectItem_##corner##_get);
 		  QT_GRI_CORNERS
 #define QT_GRI_SIDEMETHODS(Side, side) \
   cGraphicsRectItem.define_method(#side "=", cGraphicsRectItem_##side##_set) \
-		   .define_method(#side "_get", cGraphicsRectItem_##side##_get); \
-  cGraphicsRectItem.call("attr_dynamic", rb_cFloat, RPP::Symbol(#side));
+		   .define_method(#side "_get", cGraphicsRectItem_##side##_get); 
 		  QT_GRI_SIDES
 		  ;
-  cGraphicsRectItem.call("attr_dynamic", cRectF, RPP::Symbol("rect"));
   init_pointitem(mQt);
 }
 

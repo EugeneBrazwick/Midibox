@@ -19,6 +19,7 @@ This file contains the QWidget wrapper.
 #include "widget.h"
 #include "size.h" // cSizeWrap	  
 #include "layout.h" // cLayout
+#include "urqtCore/margins.h"
 #include "ruby++/rppstring.h"
 #include "ruby++/array.h"
 
@@ -50,8 +51,10 @@ cWidget_resize(int argc, VALUE *argv, VALUE v_self)
 {
   const RPP::QObject<QWidget> self = v_self;
   self.check_frozen();
-  //trace("cWidget_resize");
-  self->resize(args2QSize(argc, argv));
+  trace1("cWidget_resize, argc=%d", argc);
+  const QSize sz = RPP::QSize(argc, argv);
+  trace2("Calling QWidget::resize(%d, %d)", sz.width(), sz.height());
+  self->resize(sz);
   return v_self;
 }
 
@@ -62,8 +65,7 @@ cWidget_resize(int argc, VALUE *argv, VALUE v_self)
 static VALUE
 cWidget_size_get(VALUE v_self)
 {
-  const RPP::QObject<QWidget> self = v_self;
-  return cSizeWrap(self->size());
+  return RPP::QSize(RPP::QObject<QWidget>(v_self)->size());
 }
 
 static VALUE
@@ -72,15 +74,14 @@ cWidget_minimumSize_set(int argc, VALUE *argv, VALUE v_self)
   const RPP::QObject<QWidget> self = v_self;
   self.check_frozen();
   trace("cWidget_resize");
-  self->setMinimumSize(args2QSize(argc, argv));
+  self->setMinimumSize(RPP::QSize(argc, argv));
   return Qnil;
 }
 
 static VALUE
 cWidget_minimumSize_get(VALUE v_self)
 {
-  const RPP::QObject<QWidget> self = v_self;
-  return cSizeWrap(self->minimumSize());
+  return RPP::QSize(RPP::QObject<QWidget>(v_self)->minimumSize());
 }
 
 static VALUE
@@ -89,15 +90,14 @@ cWidget_maximumSize_set(int argc, VALUE *argv, VALUE v_self)
   const RPP::QObject<QWidget> self = v_self;
   self.check_frozen();
   trace("cWidget_resize");
-  self->setMinimumSize(args2QSize(argc, argv));
+  self->setMinimumSize(RPP::QSize(argc, argv));
   return Qnil;
 }
 
 static VALUE
 cWidget_maximumSize_get(VALUE v_self)
 {
-  const RPP::QObject<QWidget> self = v_self;
-  return cSizeWrap(self->maximumSize());
+  return RPP::QSize(RPP::QObject<QWidget>(v_self)->maximumSize());
 }
 
 RPP::Class 
@@ -340,6 +340,25 @@ init_synthwidget(RPP::Module mQt, RPP::Class cWidget)
   cSynthWidget = mQt.define_class("SynthWidget", cWidget);
 }
 
+static VALUE
+cWidget_contentsMargins_get(VALUE v_self)
+{
+  return RPP::QMargins(RPP::QObject<QWidget>(v_self)->contentsMargins());
+}
+
+static VALUE
+cWidget_contentsMargins_set(int argc, VALUE *argv, VALUE v_self)
+{
+  trace("contentsMargins_set");
+  const RPP::QObject<QWidget> self = v_self;
+  self.check_frozen();
+  trace("calling QMargins argc/argv constructor");
+  const RPP::QMargins m(argc, argv);
+  track1("setContentsMargins(%s)", m);
+  self->setContentsMargins(m);
+  return Qnil;
+}
+
 VALUE
 init_widget(RPP::Module mQt, RPP::Class cControl)
 {
@@ -355,15 +374,8 @@ init_widget(RPP::Module mQt, RPP::Class cControl)
 	 .define_method("minimumSize_get", cWidget_minimumSize_get)
 	 .define_method("maximumSize=", cWidget_maximumSize_set)
 	 .define_method("maximumSize_get", cWidget_maximumSize_get)
-	/*	QWidget.sizeHint is virtual but readonly...
-	 *	And static properties do not merge with dynamic ones
-	 *
-	 *	The only solution is to subclass ALL widget subclasses with their own
-	 *	sizeHint() crap.
-	 .define_method("sizeHint=", cWidget_sizeHint_set), -1);
-	 .define_method("sizeHint_get", cWidget_sizeHint_get), 0);
-	 .funcall(rb_intern("attr_dynamic"), 2, cSize, CSTR2SYM("sizeHint"));
-	*/
+	 .define_method("contentsMargins=", cWidget_contentsMargins_set)
+	 .define_method("contentsMargins_get", cWidget_contentsMargins_get)
 	 .define_method("title=", cWidget_title_set)
 	 .define_method("title_get", cWidget_title_get)
 	 .define_method("shown", cWidget_shown)

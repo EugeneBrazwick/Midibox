@@ -37,7 +37,7 @@ protected:
 public:
   Hash(): inherited(rb_hash_new()) {}
   Hash(VALUE v, E_SAFETY safe = SAFE) { assign(v, safe); }
-  override void assign(VALUE v, E_SAFETY safe)
+  override void assign(VALUE v, E_SAFETY safe = SAFE)
     {
       inherited::assign(v, safe);
       if (safe == SAFE || safe == UNSAFE && !isNil())

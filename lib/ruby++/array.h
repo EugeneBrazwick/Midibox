@@ -1,7 +1,8 @@
 #if !defined(_RUBYPP_ARRAY_H_)
 #define _RUBYPP_ARRAY_H_
 
-#include "numeric.h"
+#include "ruby++/numeric.h"
+#include "ruby++/scan.h"
 
 namespace RPP {
 
@@ -66,7 +67,7 @@ public:
     {
       assign(v, safe);
     }
-  override void assign(VALUE v, E_SAFETY safe)
+  override void assign(VALUE v, E_SAFETY safe = SAFE)
     {
       inherited::assign(v, safe);
       if (safe == SAFE || safe == UNSAFE && !isNil())
@@ -93,7 +94,17 @@ public:
   // arg1 can be a Range or a Fixnum
   VALUE slice(VALUE arg1) const { return rb_ary_aref(1, &arg1, V); } 
   VALUE push(VALUE arg) const { return rb_ary_push(V, arg); }
-  // etc.... ?
+  VALUE push(bool arg) const { return rb_ary_push(V, arg ? Qtrue : Qfalse); }
+  VALUE push(int arg) const { return rb_ary_push(V, INT2NUM(arg)); }
+  VALUE push(Fixnum arg) const { return rb_ary_push(V, VALUE(arg)); }
+  VALUE push(double arg) const { return rb_ary_push(V, DBL2NUM(arg)); }
+  VALUE push(const char *arg) const { return rb_ary_push(V, rb_str_new_cstr(arg)); }
+  const Array &operator<<(VALUE arg) const { push(arg); return *this; }
+  const Array &operator<<(bool arg) const { push(arg); return *this; }
+  const Array &operator<<(int arg) const { push(arg); return *this; }
+  const Array &operator<<(Fixnum arg) const { push(arg); return *this; }
+  const Array &operator<<(double arg) const { push(arg); return *this; }
+  const Array &operator<<(const char *arg) const { push(arg); return *this; }
   VALUE unshift(VALUE arg) const { return rb_ary_unshift(V, arg); }
   // etc.... ?
   VALUE at(VALUE pos) const { return call("at", pos); }
@@ -150,4 +161,5 @@ Scan::splat(Array &v)
 }
 
 } // namespace RPP 
+
 #endif // _RUBYPP_ARRAY_H_

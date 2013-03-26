@@ -41,11 +41,12 @@ public:
     {
       arg(v4);
     }
-  ~Scan() { if (ArgC) rb_raise(rb_eArgError, "too many arguments, expected %d", OrgArgC); }
+  ~Scan() { if (ArgC) rb_raise(rb_eArgError, "Scan: too many arguments (%d) given", OrgArgC); }
   Scan &arg(BasicObject &v1)
     {
+      trace1("arg, ArgC=%d", ArgC);
       if (ArgC <= 0)
-	rb_raise(rb_eArgError, "too few arguments given, expected %d", OrgArgC);
+	rb_raise(rb_eArgError, "Scan: too few arguments (%d) given", OrgArgC);
       v1.assign(*ArgV, SAFE);
       ArgC--, ArgV++;
       return *this;
@@ -67,9 +68,10 @@ public:
     }
   Scan &tail_arg(BasicObject &v1)
     {
-      if (GotOpt) rb_raise(rb_eFatal, "tail_arg[s]() must be given BEFORE opt[s]()");
+      trace1("tail_arg, ArgC=%d", ArgC);
+      if (GotOpt) rb_raise(rb_eFatal, "Scan: tail_arg[s]() must be given BEFORE opt[s]()");
       if (ArgC <= 0)
-	rb_raise(rb_eArgError, "too few arguments given, expected %d", OrgArgC);
+	rb_raise(rb_eArgError, "Scan: too few arguments (%d) given", OrgArgC);
       v1.assign(ArgV[--ArgC], SAFE);
       return *this;
     }
@@ -80,7 +82,8 @@ public:
     }
   Scan &opt(BasicObject &v1)
     {
-      if (GotSplat) rb_raise(rb_eFatal, "options are obviously nil after splat() is called");
+      trace1("arg, ArgC=%d", ArgC);
+      if (GotSplat) rb_raise(rb_eFatal, "Scan: options are obviously nil after splat() is called");
       GotOpt = true;
       if (ArgC <= 0)
 	  v1.assign(Qnil, UNSAFE);
@@ -96,10 +99,27 @@ public:
       opt(v1);
       return opt(v2);
     }
+  Scan &opts(BasicObject &v1, BasicObject &v2, BasicObject &v3)
+    {
+      opts(v1, v2);
+      return opt(v3);
+    }
+  Scan &opts(BasicObject &v1, BasicObject &v2, BasicObject &v3, BasicObject &v4)
+    {
+      opts(v1, v2, v3);
+      return opt(v4);
+    }
   Scan &splat(Array &v); // FORWARDED
   //  Scan &hash(Hash &v);    BOGO, can just use tail_arg(hash).
   Scan &block(Proc &v); // FORWARDED
-};
+
+  // argc may change due to calls!
+  int argc() const { return ArgC; }
+
+  // argv may change due to calls!
+  VALUE *argv() const { return ArgV; }
+
+}; // class Scan
 
 } // namespace RPP
 

@@ -17,7 +17,7 @@ describe "Reform::Slider" do
 	shown do
 	  valueF 0.5
 	  #tag "thedata = #{thedata.inspect}"
-	  thedata.rubydata_node.should == 0.5
+	  thedata.instance_variable_get(:@rubydata_node).should == 0.5
 	  $app.quit
 	end
       } 

@@ -111,7 +111,9 @@ module R::Qt
 	#    rubydata data: 4
 	# you can now say:
 	#    data 4
-	def data arg
+	def data *arg
+	  arg = arg[0] if arg.length == 1
+	  #tag "arg=#{arg.inspect}"
 	  rubydata data: arg
 	end
 
@@ -310,18 +312,15 @@ module R::Qt
 	end
 
 	# Like Enumerable 
-        def find_all *args
-	  return enum_for(:find_all) if args.empty? && !block_given?
-	  name = klass = opts = nil 
+        def find_all *args, recursive: true, include_root: false
+	  return to_enum(:find_all) if args.empty? && !block_given?
+	  name = klass = nil 
 	  args.each do |arg|
 	    case arg
 	    when Class then klass = arg
-	    when Hash then opts = arg
 	    else name = arg.to_str
 	    end
 	  end
-	  recursive = opts ? opts[:recursive] : true
-	  include_root = opts && opts[:include_root]
 	  enum = recursive ? include_root ? each_sub_with_root : each_sub
 			   : include_root ? each_child_with_root : each_child 
 	  r = []
@@ -370,7 +369,6 @@ module R::Qt
 	end
 
 	signal 'destroyed(QObject *)'
-
 
 	# you can 'mount' a model into any object.
 	attr :model

@@ -12,9 +12,14 @@ describe "R::Qt::Data" do
       widget {
 	name 'bert'
 	title connector: :self 
-	shown { $app.quit }
+	shown do 
+	  #STDERR.puts "title=#{title.inspect}"
+	  title.should == TITLE 
+	  $app.quit 
+	end
       }
-      bert.title.should == TITLE 
+      # at this point, the app has not been completely setup yet
+      bert.title.should == '' 
     }
   end # it
 

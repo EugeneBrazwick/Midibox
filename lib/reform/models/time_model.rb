@@ -25,10 +25,8 @@ module R::Qt
 	#tag "tracing prop"; trace_propagation true
 	timeout do
 	  @frame_nr += 1
-	  #tag "And now we propagate the lot"
-	  [:frame_nr, :now, :angle, :hour12_f, :hour_f, :min_f].each do |comp|
-	    model_propagate comp, self
-	  end
+	  #tag "And now we propagate the lot, using broadcast"
+	  model_propagate
 	end
 	interval 100
       end # initialize

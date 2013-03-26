@@ -7,6 +7,35 @@ module R::Qt
   class Rectangle
   end
 
+  class Color < NoQtControl
+    public
+      alias hue= hsvHue=
+      alias hue_get hsvHue_get
+      alias saturation= hsvSaturation=
+      alias saturation_get hsvSaturation_get
+
+      attr_dynamic Fixnum, :alpha, :blue, :green, :red, 
+			   :black, :cyan, :hslHue, :hslSaturation,
+			   :hsvHue, :hsvSaturation, :lightness,
+			   :magenta, :yellow, :value
+      attr_dynamic Float, :alphaF, :blueF, :greenF, :redF, 
+			  :blackF, :cyanF, :hslHueF, :hslSaturationF,
+			  :hsvHueF, :hsvSaturationF, :lightnessF,
+			  :magentaF, :yellowF, :valueF
+
+      alias hue hsvHue
+      alias saturation hsvSaturation
+
+      class << self
+	alias isValidColor validColor?
+      end
+  end # class Color
+
+  class Brush < NoQtControl
+    public
+      attr_dynamic Color, :color, klass: DynamicColor, require: 'dynamic_color'
+  end
+
   ## This diverts from the Qt hierarchy!!!
   # I don't suppose people want to use ruby to load 50000 items in a scene 
   class GraphicsItem < NoQtControl
@@ -56,6 +85,8 @@ module R::Qt
 	#tag "calling Brush.new with parent #{self}"
 	Pen.new self, *args, &block
       end # pen
+
+      attr_dynamic PointF, :pos
 
       alias :fill :brush
       alias :fillcolor :brush

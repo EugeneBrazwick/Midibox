@@ -1,11 +1,9 @@
 
-require_relative 'widget'
-require 'forwardable'
+require_relative 'frame'
 
 module R::Qt
   class GraphicsView < AbstractScrollArea 
       include Reform::GraphicContext
-      extend Forwardable
 
     private #methods of GraphicsView
 

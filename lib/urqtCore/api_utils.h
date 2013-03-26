@@ -94,6 +94,18 @@ An example would be the GraphicsItem classes.
 // the next name is used for dynamic values
 #define R_QT_DYNVALUE_PROPERTYID R_QT_INTERNAL_PROPERTY_PREFIX "dynvalue"
 
+static inline QVariant 
+v2qvar(const VALUE &v)
+{
+  return QVariant::fromValue(RValue(v));
+}
+
+static inline VALUE
+qvar2v(const QVariant &v)
+{
+  return v.isValid() ? VALUE(v.value<RValue>()) : Qnil;
+}
+
 // Stores v inside its own q object and returns that object. 
 // AVOID!
 // Just use GET_STRUCT/RQTDECL-macros to simply go from v_x to x
@@ -102,26 +114,21 @@ v2qt(VALUE v_q)
 {
   track1("v2qt(%s)", v_q);
   GET_STRUCT(QObject, q);
-  q->setProperty(R_QT_RVALUE_PROPERTYID, QVariant::fromValue(RValue(v_q)));
+  q->setProperty(R_QT_RVALUE_PROPERTYID, v2qvar(v_q));
   return q;
 } // v2qt
 
 // Returns ruby instance for q. If invalid returns Qnil
 
-#if defined(DEBUG)
-extern VALUE prop2v(QObject *q, const char *id);
-#else // !DEBUG
 static inline VALUE
-prop2v(QObject *q, const char *id)
+prop2v(const QObject *q, const char *id)
 {
-  const QVariant &rvalue = q->property(id);
-  return rvalue.isValid() ? rvalue.value<RValue>().v() : Qnil;
+  return qvar2v(q->property(id));
 }
-#endif // !DEBUG
 
 // INTERNAL, use RPP::QObject<QClass>(q)
 static inline VALUE
-qt2v(QObject *q)
+qt2v(const QObject *q)
 {
   //trace2("qt2v(%s %p)", q ? QTCLASS(q) : "NULL", q);
   return q ? prop2v(q, R_QT_RVALUE_PROPERTYID) : Qnil;
@@ -159,6 +166,9 @@ static inline const char *qString2cstr(const QString &s)
 extern VALUE qString2v(const QString &s);
 // qString2v_nil is like qString2v but returns nil for ""
 extern VALUE qString2v_nil(const QString &s);
+
+// v2QString converts a ruby String to a QString.
+static inline QString v2QString(VALUE v) { return QString(StringValueCStr(v)); }
 
 /*
 inline RPP::String qString2rpp(const QString &s)

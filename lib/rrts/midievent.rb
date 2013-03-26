@@ -1,4 +1,4 @@
-#!/usr/bin/ruby1.9.1 -w
+#!/usr/bin/ruby -w
 
 require_relative 'driver/alsa_midi.so'
 require 'forwardable'

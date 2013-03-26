@@ -9,6 +9,8 @@
 #include <QtCore/QQueue>
 #include "api_utils.h"
 #include "time_model.h"
+#include "margins.h"
+#include "size.h"
 #include "ruby++/array.h"
 #include "ruby++/hash.h"
 #include "ruby++/proc.h"
@@ -24,7 +26,9 @@ mR;
 
 RPP::Class
 cSynthObject,
-cDynamicAttribute
+cDynamicAttribute,
+cReformError,
+cModel
 ;
 
 RPP::Class
@@ -205,6 +209,7 @@ cObject_mark(QObject *object)
     }
   foreach (const QByteArray &propname, object->dynamicPropertyNames())
     {
+      // does it start with 'R_Qt::' ?
       if (strncmp(propname.data(), R_QT_INTERNAL_PROPERTY_PREFIX, 
 		  strlen(R_QT_INTERNAL_PROPERTY_PREFIX)) != 0) 
 	continue;
@@ -542,8 +547,12 @@ init_qt()
 {
   trace("init_qt");
   mR = RPP::Module("R");
+  const RPP::Module mReform = mR.define_module("EForm");
   mQt = mR.define_module("Qt");
   cObject = mQt.define_class("Object", rb_cObject);
+  cReformError = mReform.define_class("Error", rb_eRuntimeError);
+  init_size(mQt);
+  init_margins(mQt);
 }
 
 static inline void
@@ -594,7 +603,7 @@ Init_liburqtCore()
   init_control(); // cControl + cDynamicAttribute
   init_noqtcontrol(); // cNoQtControl
   init_synthobject(); // cSynthObject
-  const RPP::Class cModel = mQt.define_class("Model", cControl);
+  cModel = mQt.define_class("Model", cControl);
   init_time_model(mQt, cModel);
   loaded = true;
   trace("Init_liburqtCore OK");

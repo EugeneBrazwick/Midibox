@@ -40,6 +40,7 @@ module R::Qt
 
       alias :objectName_Object :objectName
 
+      # Use send(method) to get here. Or just	control.method() obviously
       def apply_dynamic_getter method
 	#tag "apply_dynamic_getter :#{method}"
 	send method.to_s + '_get'
@@ -63,6 +64,14 @@ module R::Qt
 	  raise Reform::Error, "no collector found, please use 'collect_names true'"
       end # collector!
 
+      # context: setup.
+      def start_model_propagation
+	if @model 
+	  #tag "#{self}.setup calls #@model.model_propagate"
+	  @model.model_propagate :broadcast, self
+	end 
+      end
+
     protected #methods of Control
 
       # the closest parent (or self) which has collect_names true.
@@ -71,33 +80,36 @@ module R::Qt
       end # collector
 
       def apply_dynamic_setter method, *args
-	#tag "#{self}::apply_dynamic_setter :#{method}"
+	#tag "#{self}::apply_dynamic_setter :#{method}=, args=#{args.inspect}"
 	send method.to_s + '=', *args
       end # apply_dynamic_setter
 
-      # connect ourselves to the closest model upwards.
-      # This includes self(?)
-      def want_data path = []
-	#tag "#{self}::want_data #{path.inspect}"
-	path.unshift self
-	if @model
-	  @model.model_add_listener path 
-	elsif par = parent
-	  #tag "#{self}::want_data -> recurse into parent #{par}"
-	  par.want_data path
-	else
-	  raise Reform::Error, "no model found to connect to, path collected: #{path.inspect}, at #{self}"
+      # context: want_data
+      def want_data_par path = [] 
+	unless par = parent
+	  Reform::Error.raise "no model found to connect to, path " +
+			      "collected: #{path.inspect}, at #{self}"
 	end
-      end # want_data
+	path.unshift self
+	#tag "#{self}::want_data_par -> recurse into parent #{par}"
+	par.want_data path
+      end
 
 	# note that propagation can be dumped by specifying 'trace_propagation true' in the sender cq widget
       def push_data value, path = []
 	#tag "#{self}::push_data(#{value})"
-	path.unshift self
 	if @model
 	  #tag "delegate #{value}  to @model #@model"
+	  path.unshift self
 	  @model.model_push_data value, path 
-	elsif par = parent
+	else
+	  push_data_par value, path
+	end
+      end
+
+      def push_data_par value, path = []
+	if par = parent
+	  path.unshift self
 	  #tag "delegate to parent"
 	  par.push_data value, path
 	end
@@ -115,6 +127,18 @@ module R::Qt
       end # registerName
 
     public #methods of Control
+
+      # connect ourselves to the closest model upwards.
+      # This includes self(?)
+      def want_data path = []
+	#tag "#{self}::want_data #{path.inspect}"
+	if @model
+	  path.unshift self
+	  @model.model_add_listener path 
+	else
+	  want_data_par path
+	end
+      end # want_data
 
       # override
       def objectName= newname
@@ -143,10 +167,8 @@ module R::Qt
       ## :call-seq:   attr_dynamic type, :meth1 [,:meth2...] [, optionhash]
       # 'type' refers to the attribute, so String if it is a string.
       # This typing is required for Qt and also to create a proper default value.
-      def self.attr_dynamic klass, *methods
+      def self.attr_dynamic klass, *methods, with_acceptors: false, **options 
 	#tag "#{self}.attr_dynamic #{klass} #{methods.inspect}"	  # INTERESTING
-	options = Hash === methods[-1] ? methods.pop : nil
-	with_acceptors = options && options[:with_acceptors]
 	methods.each do |meth|      # NOT 'for' GODDAMNED!
 	  #tag "creating method :#{method}"
 	  if method_defined? meth
@@ -167,6 +189,11 @@ module R::Qt
 	end # each
 	#tag "OK"
       end # attr_dynamic
+
+      def setup hash = nil, &initblock
+	super
+	start_model_propagation
+      end
 
       # attr_dynamic String, :objectName
 

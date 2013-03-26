@@ -1,9 +1,9 @@
 #if !defined(_RPP_BO_H_)
 #define _RPP_BO_H_
 
-namespace RPP {
-
 #include <ruby/ruby.h>
+
+namespace RPP {
 
 #define override virtual
 
@@ -76,7 +76,7 @@ public:
   operator VALUE() const { return V; }
   VALUE operator*() const { return V; }
   VALUE *operator &() { return &V; }
-  virtual void assign(VALUE v, E_SAFETY /*safe*/) { V = v; }
+  virtual void assign(VALUE v, E_SAFETY /*safe*/ = SAFE) { V = v; }
   void operator=(VALUE v) { assign(v, UNSAFE); }
   /* CAUSES ZILLION AMBIGUITIES
   void operator=(BasicObject v) { V = v; }
@@ -86,6 +86,7 @@ public:
   bool isClass() const { return TYPE(V) == T_CLASS; } 
   bool isModule() const { return TYPE(V) == T_MODULE; } 
   bool isArray() const { return TYPE(V) == T_ARRAY; }
+  bool isData() const { return TYPE(V) == T_DATA; }
   bool isHash() const { return TYPE(V) == T_HASH; }
   bool isFixnum() const { return FIXNUM_P(V); }
   bool isSymbol() const { return SYMBOL_P(V); }
@@ -298,11 +299,29 @@ public:
       return rb_call_super(4, args); 
     }
 
-  // This is always safe anyway:      According to irb	'nil.to_i' is 0.
-  // But NUM2INT(Qnil) fails anyway. So:
-  int to_i() const { return call("to_i"); }
-  double to_f() const { return call("to_f"); }
+  /* This is always safe anyway:      According to irb	'nil.to_i' is 0.
+   But NUM2INT(Qnil) fails anyway. So:
+  int to_i() const { return NUM2INT(call("to_i")); }
+  double to_f() const { return NUM2DBL(call("to_f")); }
 
+  TOO EXPENSIVE!
+  */
+
+  int to_i() const 
+    { 
+      switch (type())
+	{
+	case T_NIL: 
+	  return 0;
+	default:
+	  return NUM2INT(*this);
+	}
+    }
+  double to_f() const 
+    { 
+      if (type() == T_NIL) return 0.0;
+      return NUM2DBL(*this);
+    }
   VALUE iv(const char *varname) const { return rb_iv_get(V, varname); }
   RPP_SETTERS(BasicObject, iv);
   bool is_kind_of(VALUE klass) const { return rb_obj_is_kind_of(V, klass); }

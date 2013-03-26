@@ -6,9 +6,6 @@ require_relative 'control'
 module R::Qt
   class Model < Control
 
-      class PropertyChange
-      end # class PropertyChange
-
     private # methods of Model
 
       def initialize *args
@@ -16,27 +13,6 @@ module R::Qt
 	# listener tree, see add_listener
 	@model_listeners = [] 
       end # initialize
-
-      # controlpath is the list of controls, starting with the control that has the model, and ending
-      # with the original sender.
-      # Every node in the controlpath can have a connector set.
-      def model_init_path controlpath
-	sender = controlpath[-1]
-	$stderr.puts "model_init_path(#{controlpath.inspect})" if sender.trace_propagation
-	v = self
-	controlpath.each do |control|
-	  v &&= Model::model_apply_connector v, control
-	end
-	#tag "sender=#{sender}, v =#{v}"
-	v and sender.apply_model v
-      end # model_init_path
-
-      # context: model_push_data, delegates to model_propagate_i
-      # cidpath can be an array, but normally it's just the initiating method.
-      def model_propagate cidpath, sender
-	cidpath = [cidpath] unless Array === cidpath
-	Model::model_propagate_i cidpath, sender, self, @model_listeners
-      end
 
       # context: model_init_path and model_push_data.
       # Delegates to model_apply_cid
@@ -61,7 +37,12 @@ module R::Qt
 	else
 	  #tag "should be symbol, delegate to model_apply_getter"
 	  cidpath << cid if cidpath
-	  v.model_apply_getter cid
+	  if cid == :self
+	    # since v may not even have model_apply_getter
+	    v
+	  else
+	    model_apply_getter v, cid
+	  end
 	end # case
       end # model_apply_cid
 
@@ -76,9 +57,10 @@ module R::Qt
       # delegates to control.apply_model unless control == sender
       # cidpath: an array of cids that indicates the altered value within the model. It is how 
       #		 sender connects to us.
+      #		 Or nil, implying a broadcast to all listeneres no matter what cid.
       # control: subject of the propagation algo
       # cid: normally control.connector
-      # sender: original sender (some control) of datachange
+      # sender: original sender (some control) of datachange. Can be the model itself too.
       # v: starts out as the model, but we keep applying the cid on it as we go deeper
       # subs: model_listeners
       def self.model_propagate_cid cidpath, control, cid, sender, v, subs
@@ -104,15 +86,19 @@ module R::Qt
 	    # BAD IDEA cidpath.shift,  this alters the caller
 	    cidpath = if cidpath.length == 1 then nil else cidpath[1..-1] end
 	  end
-	  v = v.model_apply_getter cid
+	  # special case 'self':    v obviously need not change. THIS IS VERY WRONG!!!
+	  # model_apply_getter may check for :self and return something different.
+	  #tag "#{v}::model_apply_getter #{cid}"
+	  v = model_apply_getter v, cid 
+	  #tag "-> #{v}"
 	end
 	if subs
 	  #tag "propagate to subs #{subs.inspect}"
 	  model_propagate_i cidpath, sender, v, subs
 	else
-	  unless control.equal? sender
+	  if v && !control.equal?(sender)
 	    #tag "ARRIVAL at accepting endpoint #{control}, v = #{v}"
-	    v and control.apply_model v
+	    control.apply_model Model::model_unwrap v
 	  end
 	end
 	v
@@ -124,10 +110,14 @@ module R::Qt
     # into this model. A listener must have this cidpath as a prefix, or
     # it must contain a Proc cid.  For this reason cidpath can be nil and
     # we must then broadcast.
+    #
     # value is the new value. Do not use. This should describe the change
     # better.
+    #
     # sender is the control that instigated the change. We must skip it 
     # when sending a message (but not its children).
+    # This can be the model itself as well.
+    #
     # listeners are the receivers as listenertree. It is always an array. 
     # See model_merge_listener_path.
     # Note we must not change the model, that's already been done.
@@ -202,15 +192,39 @@ module R::Qt
 	    nil
 	  end
 	else
-	  v.model_apply_setter cid, value, sender
+	  if v.respond_to?(:model_apply_setter)
+	    #tag "#{v} responds to 'model_apply_setter' so call it using #{cid}="
+	    v.model_apply_setter cid, value, sender
+	  else
+	    v.send "#{cid}=", value
+	  end
 	  true
 	end
       end # model_apply_setter
 
+      def self.model_unwrap value
+	v = value.model_value
+      rescue NoMethodError
+	value
+      end
     public # methods of Model
+
+    # context: model_push_data, delegates to model_propagate_i
+    # also from Control.setup
+    # cidpath can be an array, but normally it's just the initiating method.
+    # cidpath can be nil or :broadcast to broadcast.
+    # sender is the control that instigated the propagation, which can be the model
+    # itself too (which is also the default).
+      def model_propagate cidpath = nil, sender = nil 
+	#tag "#{self}::model_propagate"
+	cidpath = nil if cidpath == :broadcast
+	cidpath = [cidpath] unless Array === cidpath || cidpath == nil
+	Model::model_propagate_i cidpath, sender || self, self, @model_listeners
+      end
 
       # override
       def parent= parent 
+	#tag "calling #{parent}.addModel(#{self})"
 	parent.addModel self
       end # parent=
 
@@ -234,7 +248,8 @@ module R::Qt
 	#tag "model_add_listener(#{path.inspect})"
 	Model::model_merge_listener_path @model_listeners, path
 	#tag "listeners=(#{@model_listeners.inspect})"
-	model_init_path path
+	# model_init_path path	  STUPID, since a single control can easily have 6 listeners.
+	# AND it requires special API
       end # model_add_listener
 
       # Context: Control.push_data
@@ -270,6 +285,8 @@ module R::Qt
 	send(methodname + '=', value)
       end # model_apply_setter
 
+      # apply 'methodname' as a 'getter'. The default uses 'send' since that likely works.
+      # But some models may delegate it (and 'send' is hard to delegate).
       def model_apply_getter methodname
 	# return self if methodname == :self	
 	# since 'self' cannot be a method,
@@ -278,6 +295,16 @@ module R::Qt
 	send methodname
       end
 
+      def self.model_apply_getter value, methodname
+	if value.respond_to?(:model_apply_getter)
+	  #tag "value #{value} responds to :model_apply_getter so call it"
+	  value.model_apply_getter methodname
+	elsif methodname == :self
+	  value
+	else
+	  value.send methodname
+	end
+      end
   end # class Model
 
 end # module R::Qt

@@ -31,7 +31,7 @@ module R::Ake
   RUBY_INCDIRS = ruby_paths.map { |path| [ path + '/include/ruby*', path + '/include/ruby*/**' ] }.flatten
   RUBY_LINKDIRS = ruby_paths.sub(/$/, '/lib')
 
-  #STDERR.puts "incdirs = #@incdirs, linkdirs=#@linkdirs"
+  #  STDERR.puts "incdirs = #@incdirs, linkdirs=#@linkdirs, RUBY_LINKDIRS=#{RUBY_LINKDIRS}"
   MOCSRC = FileList['*.moc.cpp']
   SRC = FileList['*.cpp'] 
   OBJ = (SRC.ext('.o') + MOCSRC.sub(/\.moc\.cpp$/, '.o')).sub(/^/, TMPDIR + '/')

@@ -50,6 +50,7 @@ module R::Qt
 
       # override
       def apply_model data
+	#tag "apply_model #{data.inspect}"
 	apply_dynamic_setter :text, data
       end
   end

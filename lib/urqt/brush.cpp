@@ -217,10 +217,6 @@ init_brush(VALUE /*bogo*/)
 	.define_method("color=", cBrush_color_set)
 	.define_method("color_get", cBrush_color_get)
 	;
-  RPP::Dictionary hash;
-  hash["klass"] = cDynamicColor;
-  hash["require"] = "dynamic_color";
-  cBrush.call("attr_dynamic", cColor, RPP::Symbol("color"), hash);
 } // init_brush
 
 } // namespace R_Qt 

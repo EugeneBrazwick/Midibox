@@ -27,10 +27,12 @@ extern void init_##t(RPP::Module mQt, RPP::Class cGraphicsItem)
   RQT_APP_SETUP_GRAPHICSITEM(lineitem); \
   RQT_APP_SETUP_GRAPHICSITEM(pathitem); \
   RQT_APP_SETUP_WIDGET(frame); \
+  RQT_APP_SETUP_WIDGET(abstractitemview); /* is a abstractscrollarea! */ \
   RQT_APP_SETUP_WIDGET(label); /* is a frame!*/ \
   RQT_APP_SETUP_WIDGET(lcdnumber); /* is a frame!*/ \
   RQT_APP_SETUP_WIDGET(graphicsview); /* is a frame */\
   RQT_APP_SETUP_WIDGET(button); \
+  RQT_APP_SETUP_WIDGET(combobox); \
   RQT_APP_SETUP_WIDGET(lineedit); \
   RQT_APP_SETUP_WIDGET(slider); \
   RQT_APP_SETUP_WIDGET(mainwindow); \

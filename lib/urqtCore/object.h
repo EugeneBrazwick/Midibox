@@ -13,6 +13,8 @@ namespace R_Qt {
 extern RPP::Module mQt, mR; 
 extern RPP::Class eReform;
 extern RPP::Class cSynthObject, cDynamicAttribute;
+extern RPP::Class cReformError;
+extern RPP::Class cModel;
 
 extern void cObject_mark(QObject *object);
 
@@ -88,9 +90,13 @@ public:
     } 
   // The following is the correct way of using cObjectWrap 
   QObject<T>(VALUE klass, T *object): inherited(R_Qt::cObjectWrap(klass, object), object) {}
-  // The following is the correct way of using qt2v. However the result can be Qnil!!
-  // So this is UNSAFE!! The second arg MUST be RPP::VERYUNSAFE (or RPP::UNSAFE).
-  QObject<T>(T *object, RPP::E_SAFETY /*VERYUNSAFE*/): inherited(R_Qt::qt2v(object), object) {}
+  // The following is the correct way of using qt2v. 
+  QObject<T>(T *object, E_SAFETY safe = SAFE): 
+    inherited(R_Qt::qt2v(object), object)
+    {
+      if (safe == SAFE && this->isNil())
+	rb_raise(R_Qt::cReformError, "attempt to access a zombie");
+    }
   void zombify() const { DATA_PTR(this->V) = 0; }
   bool is_zombified() const { return !DATA_PTR(this->V); }
   bool isZombified() const { return !DATA_PTR(this->V); }

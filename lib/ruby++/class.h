@@ -41,10 +41,12 @@ public:
       VALUE args[4] = { v_1, v_2, v_3, v_4 };
       return rb_class_new_instance(4, args, V); 
     }
+  // next is unsafe, but usefull if argc and argv were passed to us anyway
+  VALUE new_instance(int argc, VALUE *argv) const { return rb_class_new_instance(argc, argv, V); }
 };
 
 inline Class 
-Module::define_class(const char *name, Class super) const 
+Module::define_class(const char *name, Class super = rb_cObject) const 
 { 
   return rb_define_class_under(V, name, super); 
 }

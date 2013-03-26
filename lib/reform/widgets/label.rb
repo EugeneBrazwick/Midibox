@@ -1,10 +1,10 @@
 
 #  Copyright (c) 2013 Eugene Brazwick
 
-require_relative 'widget'
+require_relative 'frame'
 
 module R::Qt
-  class Label < Widget 
+  class Label < Frame 
     public #methods of Label
       attr_dynamic String, :text, :html, :rawtext
   end

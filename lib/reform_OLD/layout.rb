@@ -107,10 +107,8 @@ However it must be in postSetup.
     def stretch v = nil, w = nil
       return (instance_variable_defined?(:@stretch) ? @stretch : nil) unless v
       if w
-#         check_grid_parent 'stretch'
         @stretch = v, w
       else
-#         check_boxparent 'stretch'
         @stretch = v
       end
     end

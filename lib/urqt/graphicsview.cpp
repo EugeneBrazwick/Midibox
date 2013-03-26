@@ -51,12 +51,9 @@ calc_matrix(RPP::QObject<QGraphicsView> self)
   const RPP::Float rotation = self.iv("@rotation");
   if (rotation.test())
     i.rotate(rotation); // ccw 
-  const RPP::Object scale = self.iv("@scale");
+  const RPP::QSizeF scale(self.iv("@scale"), RPP::UNSAFE);
   if (scale.test())
-    {
-      const QSizeF &s = v2sz(scale);
-      i.scale(s.width(), s.height());
-    }
+    i.scale(scale->width(), scale->height());
   const RPP::Object translation = self.iv("@translation");
   if (translation.test())
     {
@@ -70,7 +67,7 @@ static VALUE
 cGraphicsView_scale_set(int argc, VALUE *argv, VALUE v_self)
 {
   const RPP::QObject<QGraphicsView> self = v_self;
-  self.iv_set("@scale", cSizeFWrap(args2QSizeF(argc, argv))); 
+  self.iv_set("@scale", RPP::QSizeF(argc, argv));
   calc_matrix(self);
   return Qnil;
 }
@@ -79,7 +76,6 @@ void
 init_graphicsview(RPP::Module qt, RPP::Class)
 {
   trace1("init_graphicsview, define R::Qt::GraphicsView, mQt=%p", &qt);
-  const RPP::Class cAbstractScrollArea = qt.define_class("AbstractScrollArea", cFrame);
   const RPP::Class cGraphicsView = qt.define_class("GraphicsView", cAbstractScrollArea);
   cGraphicsView.define_alloc_func(cGraphicsView_alloc)
 	       .define_private_method("initialize", cGraphicsView_initialize)

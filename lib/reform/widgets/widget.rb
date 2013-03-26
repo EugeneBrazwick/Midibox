@@ -3,15 +3,26 @@
 
 require_relative '../context'
 require_relative '_layoutable'
+require 'forwardable'
 
 module R::Qt
   class Widget < Control
-
-    # tag "Scanning class Widget, caller = #{caller.inspect}"
-
+      extend Forwardable
       # you can include any widget inside any other:
       include Reform::WidgetContext, Reform::ModelContext
       include Layout::Able
+
+    private #methods of Widget
+
+      def create_infused_layout
+	require_relative 'vboxlayout'
+	vboxlayout
+	layout or Reform::Error.raise 'broken auto-vboxlayout'
+      end
+
+      def infused_layout!
+	layout || create_infused_layout
+      end
 
     public # methods of Widget
 
@@ -22,15 +33,11 @@ module R::Qt
 	@parent || qtparent_get
       end # parent_get
 
-      # override
-      def addWidget widget
-	widget.qtparent = self
-      end # addWidget
+      def_delegators :infused_layout!, :addWidget
 
       # override
-      def addLayout layout
-	raise Reform::Error, "a widget can only have one layout" if self.layout
-	self.layout = layout
+      def addLayout aLayout
+	layout and layout.addLayout aLayout or self.layout = aLayout
       end # addLayout
 
       # override
@@ -41,6 +48,7 @@ module R::Qt
       #tag "setting up 'title' attr_dynamic"
       attr_dynamic String, :title
       attr_dynamic Size, :size, :minimumSize, :maximumSize
+      attr_dynamic Margins, :contentsMargins
 
       alias caption title
       alias windowTitle title

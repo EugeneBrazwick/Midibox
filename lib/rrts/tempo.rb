@@ -1,5 +1,4 @@
 #!/usr/bin/ruby -w
-# encoding: utf-8
 
 require_relative 'driver/alsa_midi.so'
 require 'forwardable'

@@ -30,10 +30,10 @@ public:
       if (safe == SAFE || safe == UNSAFE && !this->isNil())
 	{
 	  if (!is_kind_of(target))
-	    rb_raise(rb_eTypeError, "very bad cast to %s", target.to_s());
+	    rb_raise(rb_eTypeError, "very bad cast of %s to %s", inspect(), target.to_s());
 	}
     }
-  override void assign(VALUE v, E_SAFETY safe)
+  override void assign(VALUE v, E_SAFETY safe = SAFE)
     {
       inherited::assign(v, safe);
       if (safe == SAFE || safe == UNSAFE && !this->isNil())
@@ -54,4 +54,5 @@ public:
 };
 
 } // namespace RPP 
+
 #endif // _RUBYPP_DATA_H_

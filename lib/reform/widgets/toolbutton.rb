@@ -4,20 +4,9 @@
 require_relative '_abstractbutton'
 
 module R::Qt
-  # a PushButton can be connected to data in several ways.
-  # it can be a toggle associated with a boolen, or a bit in a flagset.
-  # it can be a one time trigger, setting a boolean or a bit to 
-  # some fixed value (1 or 0).
-  # This could simply be $app.quit.
-  # Example:
-  #
-  #   Reform.app {
-  #	data false
-  #	button connector: :self, text: 'Push Me', value: true
-  #   }
 
   # req. for a plugin:
-  Reform.createInstantiator __FILE__, PushButton
+  Reform.createInstantiator __FILE__, ToolButton
 end
 
 if __FILE__ == $0

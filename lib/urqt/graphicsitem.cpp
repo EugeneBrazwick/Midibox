@@ -13,6 +13,7 @@
 #include "painterpath.h"
 #include "point.h"
 #include "color.h"
+#include "font.h"
 #include "ruby++/rppstring.h"
 #include "ruby++/array.h"
 #include <assert.h>
@@ -307,12 +308,44 @@ cAbstractGraphicsShapeItem_pen_set(VALUE v_self, VALUE v_pen)
   return pen;
 }
 
+static VALUE
+cAbstractGraphicsShapeItem_pen_get(VALUE v_self)
+{
+  const RPP::QGraphicsItem<QAbstractGraphicsShapeItem> self = v_self;
+  RPP::QPen pen(self.iv("@pen"), RPP::UNSAFE);
+  if (pen.isNil()) 
+    {
+      pen = self->pen(); 
+      pen.iv_set("@parent", v_self);
+      self.iv_set("@pen", pen);
+      return pen;
+    }
+  return pen;
+}
+
+static VALUE
+cAbstractGraphicsShapeItem_brush_get(VALUE v_self)
+{
+  const RPP::QGraphicsItem<QAbstractGraphicsShapeItem> self = v_self;
+  RPP::QBrush brush(self.iv("@brush"), RPP::UNSAFE);
+  if (brush.isNil()) 
+    {
+      brush = self->brush();
+      brush.iv_set("@parent", v_self);
+      self.iv_set("@brush", brush);
+      return brush;
+    }
+  return brush;
+}
+
 static void
 init_abstractgraphicsshapeitem(RPP::Module qt)
 {
   cAbstractGraphicsShapeItem = qt.define_class("AbstractGraphicsShapeItem", cGraphicsItem);
   cAbstractGraphicsShapeItem.define_method("brush=", cAbstractGraphicsShapeItem_brush_set)
+			    .define_method("brush_get", cAbstractGraphicsShapeItem_brush_get)
 			    .define_method("pen=", cAbstractGraphicsShapeItem_pen_set)
+			    .define_method("pen_get", cAbstractGraphicsShapeItem_pen_get)
 			    ;
 }
 
@@ -331,6 +364,7 @@ init_graphicsitem(RPP::Module qt, RPP::Class /*cControl*/)
   init_rect(); // cRectF
   init_color(qt); // cColor, cDynamicColor
   init_brush(qt); // cBrush
+  init_font(qt); // cFont
   init_pen(qt); // cPen
   cGraphicsItem = qt.define_class("GraphicsItem", cNoQtControl);
   cGraphicsItem.define_private_method("mark_ownership", cGraphicsItem_mark_ownership)

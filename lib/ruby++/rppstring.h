@@ -1,14 +1,15 @@
 #if !defined(_RUBYPP_STRING_H_)
 #define _RUBYPP_STRING_H_
 
+// This document adheres to the GNU coding standard
+// Copyright (c) 2013 Eugene Brazwick
+
 #include "ruby++.h"
 #include "numeric.h"
 #include <ruby/encoding.h>
 
 namespace RPP {
 
-// This document adheres to the GNU coding standard
-// Copyright (c) 2013 Eugene Brazwick
 class String: public Object
 {
 private:

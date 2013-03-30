@@ -109,6 +109,15 @@ public:
       opts(v1, v2, v3);
       return opt(v4);
     }
+  /* Scan a 'splat'. Note if only a splat is ever scanned, just
+   * creating the array is faster.
+   *
+   *	static VALUE f(int argc, VALUE *argv, VALUE v_self)
+   *	{
+   *	  const RPP::Array splat(argc, argv);
+   *	  ...
+   *	}    
+   */
   Scan &splat(Array &v); // FORWARDED
   //  Scan &hash(Hash &v);    BOGO, can just use tail_arg(hash).
   Scan &block(Proc &v); // FORWARDED

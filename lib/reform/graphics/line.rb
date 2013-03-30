@@ -14,8 +14,6 @@ module R::Qt
 	end
       end
 
-      def pen_get; @pen; end
-
       attr_dynamic PointF, :from, :to
   end
   Reform.createInstantiator __FILE__, GraphicsLineItem

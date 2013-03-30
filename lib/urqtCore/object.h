@@ -10,7 +10,7 @@
 #pragma interface
 
 namespace R_Qt {
-extern RPP::Module mQt, mR; 
+extern RPP::Module mQt, mR, mReform; 
 extern RPP::Class eReform;
 extern RPP::Class cSynthObject, cDynamicAttribute;
 extern RPP::Class cReformError;
@@ -88,6 +88,7 @@ public:
 	    rb_raise(rb_eTypeError, "Bad cast to %s", typeid(T).name());
 	}
     } 
+  QObject<T>(RPP::E_SAFETY unsafe): QObject<T>(Qnil, unsafe) {}
   // The following is the correct way of using cObjectWrap 
   QObject<T>(VALUE klass, T *object): inherited(R_Qt::cObjectWrap(klass, object), object) {}
   // The following is the correct way of using qt2v. 

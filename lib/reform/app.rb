@@ -28,17 +28,17 @@ module Reform
 	end
 	symlinks = {}
         #tag "GLOBBING #{fulldir}/*.rb"
-	for file in Dir["#{fulldir}/*.rb"]
+	for file in Dir["#{fulldir}/*.rb", "#{fulldir}/*.so"]
 	  #tag "file = '#{file}'"
-	  basename = File.basename(file, '.rb')
+	  basename = File.basename(file).sub(/\.rb$|\.so$/, '')
 	  next if basename[0] == '_'
-#          tag "INTERNALIZE #{basename} from #{file}"
+          #tag "INTERNALIZE #{basename} from #{file}"
 	  if File.symlink?(file)
-	    link_basename = File.basename(File.readlink(file), '.rb')
+	    link_basename = File.basename(File.readlink(file)).sub(/\.rb$|\.so$/, '')
 	    next if link_basename[0] == '_'
 	    symlinks[basename.to_sym] = link_basename.to_sym
 	  else
-	   # tag "registerClassProxy(#{klass}, #{basename})"
+	    #tag "registerClassProxy(#{klass}, #{basename})"
 	    registerClassProxy klass, basename, "#{dirprefix}/#{dir}/#{basename}"
 	  end
 	  located_any_plugins = true
@@ -94,6 +94,8 @@ end # module Reform
 
 module R::Qt
 
+    @@alignmentflags = nil
+
     class Application < Control
       include Reform::ModelContext, Reform::WidgetContext,
 	      Reform::GraphicContext
@@ -122,6 +124,8 @@ module R::Qt
 	def fail_on_errors value
 	  @fail_on_errors = value
 	end
+
+	alias failOnErrors fail_on_errors
 
 	signal :created
 

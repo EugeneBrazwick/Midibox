@@ -337,6 +337,25 @@ public:
   String check_string_type() const; // FORWARDED
 
   VALUE yield() const { return rb_yield(V); }
+  static VALUE yield(bool arg) { return rb_yield(arg ? Qtrue : Qfalse); }
+  static VALUE yield(int arg) { return rb_yield(INT2NUM(arg)); }
+  static VALUE yield(double arg) { return rb_yield(DBL2NUM(arg)); }
+  static VALUE yield(Fixnum arg); // FORWARDED
+  static VALUE yield(const char *arg) { return rb_yield(rb_str_new_cstr(arg)); }
+  static VALUE yield(VALUE arg) { return rb_yield(arg); }
+  static VALUE yield(VALUE arg1, VALUE arg2) 
+    {
+      return rb_yield_values(2, arg1, arg2);
+    }
+  static VALUE yield(VALUE arg1, VALUE arg2, VALUE arg3) 
+    {
+      return rb_yield_values(3, arg1, arg2, arg3);
+    }
+  static VALUE yield(VALUE arg1, VALUE arg2, VALUE arg3, VALUE arg4) 
+    {
+      return rb_yield_values(4, arg1, arg2, arg3, arg4);
+    }
+
   // statics
   static bool block_given() { return rb_block_given_p(); }
   static bool block_given_p() { return rb_block_given_p(); }

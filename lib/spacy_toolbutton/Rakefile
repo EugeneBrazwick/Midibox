@@ -1,0 +1,9 @@
+
+LIBRARY = '../reform/contrib/widgets/spacy_toolbutton.so'
+LIBS = %w[ -lQt5Widgets -lurqt -lurqtCore ]
+INCDIRS = %w[ ../urqt ../urqtCore ]
+LINKDIRS = []
+require_relative '../urqtCore/rake_ruby_so'
+
+task default: :buildlib
+

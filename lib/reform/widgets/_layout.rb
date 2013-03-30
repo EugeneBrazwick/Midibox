@@ -8,6 +8,8 @@ module R::Qt
       include Reform::WidgetContext
       include Able
 
+      @@sizeConstraints = nil
+
     public # methods of Layout
 
       # override
@@ -15,6 +17,7 @@ module R::Qt
 	parent.addLayout self
       end # parent=
 
+      attr_dynamic Symbol, :sizeConstraint
   end # class Layout
 
 end # module R::Qt

@@ -10,9 +10,18 @@ module R::Qt
 
       signal 'clicked(bool)'
 
+      def value arg = nil
+	return @value unless arg
+	@value = arg
+      end
+
     public # methods of AbstractButton
 
       attr_dynamic String, :text
+
+      def apply_model data
+	# ignore
+      end
 
       def setup hash = nil, &initblock
 	super

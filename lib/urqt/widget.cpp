@@ -17,6 +17,7 @@ This file contains the QWidget wrapper.
 #include <QtWidgets/QLayout>
 #include <QtGui/QResizeEvent>
 #include "widget.h"
+#include "font.h"
 #include "size.h" // cSizeWrap	  
 #include "layout.h" // cLayout
 #include "urqtCore/margins.h"
@@ -265,54 +266,65 @@ cWidget_enqueue_children(int argc, VALUE *argv, VALUE v_self)
   if (!layout)
     {
       //trace("no layout, revert to cObject_enqueue_children");
-      return self.super(v_queue);
+      self.super(v_queue);
     }
-  const QObjectList &children = self->children();
-  //trace1("#children = %d", children.count());
-  foreach (QObject *child, children)
+  else
     {
-      /* We must not add widgets WITHIN a layout, since they are virtually
-        parented to that layout.
-	However that is not the same as widgets WITH a layout!
-
-
-COMPLICATION: widgets may be nested multiple times:
-	      widget1 { vbox { hbox { vbox { widget2 }}}}
-    widget2 now has qtparent widget1
-
-      */
-      //trace("check for isWidgetType and layout");
-      const RPP::Object v_child = qt2v(child);
-      if (layout && child->isWidgetType())
+      const QObjectList &children = self->children();
+      //trace1("#children = %d", children.count());
+      foreach (QObject *child, children)
 	{
-	  if (!v_child.isNil())
+	  /* We must not add widgets WITHIN a layout, since they are virtually
+	    parented to that layout.
+	    However that is not the same as widgets WITH a layout!
+
+
+    COMPLICATION: widgets may be nested multiple times:
+		  widget1 { vbox { hbox { vbox { widget2 }}}}
+	widget2 now has qtparent widget1
+
+	  */
+	  //trace("check for isWidgetType and layout");
+	  const RPP::Object v_child = qt2v(child);
+	  if (layout && child->isWidgetType())
 	    {
-	      const RPP::Object parent = v_child.call("parent");
-	      if (parent.is_kind_of(cLayout))
+	      if (!v_child.isNil())
 		{
-		  //track1("located child %s in layout: SKIP!!", v_child);
-		  continue;
+		  const RPP::Object parent = v_child.call("parent");
+		  if (parent.is_kind_of(cLayout))
+		    {
+		      //track1("located child %s in layout: SKIP!!", v_child);
+		      continue;
+		    }
 		}
 	    }
-	}
-      if (yield)
-	{
-	  if (!v_child.isNil())
+	  if (yield)
 	    {
-	      //track1("YIELD child=%s", v_child);
-	      v_child.yield();
+	      if (!v_child.isNil())
+		{
+		  //track1("YIELD child=%s", v_child);
+		  v_child.yield();
+		}
+	    }
+	  else
+	    {
+	      trace("add child to v_queue");
+	      const RPP::Array queue = v_queue;
+	      if (v_child.isNil())
+		queue.push(Data_Wrap_Struct(child->isWidgetType() ? cSynthWidget : cSynthObject, 
+					    0, 0, child));
+	      else
+		queue.push(v_child);
 	    }
 	}
+    }
+  const RPP::Object font = self.iv("@font");
+  if (!font.isNil())
+    {
+      if (yield)
+	font.yield();
       else
-	{
-	  trace("add child to v_queue");
-	  const RPP::Array queue = v_queue;
-	  if (v_child.isNil())
-	    queue.push(Data_Wrap_Struct(child->isWidgetType() ? cSynthWidget : cSynthObject, 
-					0, 0, child));
-	  else
-	    queue.push(v_child);
-	}
+	RPP::Array(v_queue).push(font);
     }
   return Qnil;
 } // cWidget_enqueue_children
@@ -359,6 +371,41 @@ cWidget_contentsMargins_set(int argc, VALUE *argv, VALUE v_self)
   return Qnil;
 }
 
+/* FIXME:   
+ *    pen+brush are considered children.
+ *    I set @parent in cWidget_font_get in the font, so it 
+ *    is assumed that font objects are not shared to begin with.
+ *    This is all rather fuzzy.
+ *
+ */
+static VALUE
+cWidget_font_set(VALUE v_self, VALUE v_font)
+{
+  const RPP::QObject<QWidget> self = v_self;
+  const RPP::QFont font(v_font, RPP::UNSAFE);
+  self.iv_set("@font", font);
+  if (font.isNil())
+    self->setFont(QFont()); // default, I hope
+  else
+    self->setFont(font);
+  return v_font;
+}
+
+static VALUE
+cWidget_font_get(VALUE v_self)
+{
+  track2("%s::font_get, @font=%s", v_self, rb_iv_get(v_self, "@font"));
+  const RPP::QObject<QWidget> self = v_self;
+  RPP::QFont font(self.iv("@font"), RPP::UNSAFE);
+  if (font.isNil()) 
+    {
+      font = self->font();
+      font.iv_set("@parent", v_self);
+      self.iv_set("@font", font);
+    }
+  return font;
+}
+
 VALUE
 init_widget(RPP::Module mQt, RPP::Class cControl)
 {
@@ -382,6 +429,8 @@ init_widget(RPP::Module mQt, RPP::Class cControl)
 	 .define_method("layout", cWidget_layout)
 	 .define_method("layout=", cWidget_layout_set)
 	 .define_method("enqueue_children", cWidget_enqueue_children)
+	 .define_method("font_get", cWidget_font_get)
+	 .define_method("font=", cWidget_font_set)
 	 ;
   init_synthwidget(mQt, cWidget);
   return cWidget;

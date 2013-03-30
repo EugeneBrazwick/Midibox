@@ -87,6 +87,12 @@ BasicObject::call_with_block(const char *method, Arg1Method callback, Fixnum v_a
   return rb_block_call(V, rb_intern(method), 0, (VALUE *)0, RUBY_METHOD_FUNC(callback), v_arg); 
 }
 
+inline VALUE
+BasicObject::yield(Fixnum v_arg) 
+{
+  return rb_yield(VALUE(v_arg));
+}
+
 inline const Module &
 Module::define_const(const char *name, Fixnum val) const
 {

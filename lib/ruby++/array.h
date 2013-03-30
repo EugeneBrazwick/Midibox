@@ -52,6 +52,7 @@ public:
   enum ECreateSingleton { CreateSingleton};
 public:
   Array(): inherited(rb_ary_new()) {}
+  // initially nil:
   Array(E_SAFETY /*UNSAFE*/) {}
   // VERY BAD IDEA  Array(VALUE v_1): inherited(rb_ary_new3(1, v_1)) {}
   Array(VALUE v_1, ECreateSingleton): inherited(rb_ary_new3(1, v_1)) {}

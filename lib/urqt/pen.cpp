@@ -42,17 +42,7 @@ reattach(RPP::QPen self)
   track1("%s::reattach", self);
   const RPP::Object parent = self.iv("@parent");
   if (parent.isNil()) return;
-  // there is no virtual setPen in QGraphicsItem
-  if (parent.is_kind_of(cGraphicsLineItem))
-    {
-      const RPP::QGraphicsItem<QGraphicsLineItem> line = *parent;
-      line->setPen(*self);
-    }
-  else
-    {
-      const RPP::QGraphicsItem<QAbstractGraphicsShapeItem> shape = *parent;
-      shape->setPen(*self);
-    }
+  parent.call("pen=", self);
 }
 
 // This is in fact almost identical to cBrush_initialize

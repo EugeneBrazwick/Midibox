@@ -73,8 +73,7 @@ module R::Qt
       # This example shows that connector should NOT immediately fetch the required data.
       # However, my solution is now to revert the assigning of the brush to the brush constructor
       def brush *args, &block
-	arg0 = args[0]
-	return brush_get unless arg0 || block
+	return brush_get unless args[0] || block
 	#tag "calling Brush.new with parent #{self}"
 	Brush.new self, *args, &block
       end # brush
@@ -134,6 +133,9 @@ module R::Qt
 	end
       end
 
+      # THIS IS INCORRECT. Since 'nil' if brush= was never called
+      # But items have a default brush...
+      # And same for Pen and same for lineitem!
       def brush_get; @brush; end
       def pen_get; @pen; end
   end # class AbstractGraphicsShapeItem

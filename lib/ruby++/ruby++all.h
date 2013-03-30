@@ -18,6 +18,7 @@
 #include "ruby++/proc.h"
 #include "ruby++/bool.h"
 #include "ruby++/scan.h"
+#include "ruby++/regexp.h"
 
 #pragma interface
 

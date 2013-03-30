@@ -26,6 +26,21 @@ cGraphicsLineItem_pen_set(VALUE v_self, VALUE v_pen)
 }
 
 static VALUE
+cGraphicsLineItem_pen_get(VALUE v_self)
+{
+  const RPP::QGraphicsItem<QGraphicsLineItem> self = v_self;
+  RPP::QPen pen(self.iv("@pen"), RPP::UNSAFE);
+  if (pen.isNil()) 
+    {
+      pen = self->pen(); 
+      pen.iv_set("@parent", v_self);
+      self.iv_set("@pen", pen);
+      return pen;
+    }
+  return pen;
+}
+
+static VALUE
 cGraphicsLineItem_from_set(int argc, VALUE *argv, VALUE v_self)
 {
   const RPP::QGraphicsItem<QGraphicsLineItem> self = v_self;
@@ -71,6 +86,7 @@ init_lineitem(RPP::Module mQt, RPP::Class cGraphicsItem)
 		   .define_method("from=", cGraphicsLineItem_from_set)
 		   .define_method("from_get", cGraphicsLineItem_from_get)
 		   .define_method("pen=", cGraphicsLineItem_pen_set)
+		   .define_method("pen_get", cGraphicsLineItem_pen_get)
 		   ;
 }
 

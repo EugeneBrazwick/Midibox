@@ -79,7 +79,7 @@ module Reform  # aka R::EForm
 	end # createInstantiator
 
 	# Example:
-	# ReForm::registerControlClassProxy 'mywidget' 'contrib_widgets/mywidget.rb'
+	# ReForm::registerControlClassProxy 'mywidget' 'contrib/widgets/mywidget.rb'
 	# It will create a 'mywidget' method. to which the name and setupblock
 	# should be passed. So after this you can say
 	#           mywidget {
@@ -173,7 +173,8 @@ module Reform  # aka R::EForm
   public  # methods of Reform
 
     def self.createInstantiator file, klass
-      name = File.basename file, '.rb'
+      #tag "createInstantiator(#{file}, #{klass})"
+      name = File.basename(file).sub(/\.rb$|\.so$|\.cpp$/, '')
       for context in context4(klass)
 	context.createInstantiator name, klass
       end

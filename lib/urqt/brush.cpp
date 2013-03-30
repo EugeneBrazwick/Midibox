@@ -23,7 +23,6 @@ cBrush;
 void
 cBrush_free(QBrush *brush)
 {
-  traqt1("delete QBrush %p", brush);
   delete brush;
 }
 
@@ -47,7 +46,7 @@ reattach_brush(RPP::QBrush self)
 	     TO_CSTR(v_parent));
       trace2("parent.class=%s, parent=%p", rb_obj_classname(v_parent), parent);
       traqt1("%p::setBrush", parent);
-      parent->setBrush(*self);
+      v_parent.call("brush=", self);
     }
   trace("reattach_brush OK");
 } // reattach_brush
@@ -208,7 +207,7 @@ cBrush_color_get(VALUE v_self)
 } // cBrush_color_get
 
 void 
-init_brush(VALUE /*bogo*/)
+init_brush(RPP::Module mQt)
 {
   trace("init_brush");
   cBrush = mQt.define_class("Brush", cNoQtControl);

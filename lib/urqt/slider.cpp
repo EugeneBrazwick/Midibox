@@ -97,7 +97,7 @@ cAbstractSlider_orientation_set(VALUE v_self, VALUE v_or)
 static VALUE
 cAbstractSlider_orientation_get(VALUE v_self)
 {
-  RPP::QObject<QAbstractSlider> self = v_self;
+  const RPP::QObject<QAbstractSlider> self = v_self;
   switch (self->orientation())
     {
 #define QTORIENTATION_DO(sym, qtor) \

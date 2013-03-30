@@ -22,7 +22,8 @@ namespace R_Qt {
 
 RPP::Module 
 mQt,
-mR;
+mR,
+mReform;
 
 RPP::Class
 cSynthObject,
@@ -595,7 +596,7 @@ Init_liburqtCore()
   trace1("Init_liburqtCore, loaded=%d", loaded);
   if (loaded) return;
   init_qt(); // mR + mQt + cObject
-  const RPP::Module mReform = mR.define_module("EForm");
+  mReform = mR.define_module("EForm");
   mReform.define_function("tr", mReform_tr);
   eReform = mR.define_class("Error", rb_eRuntimeError);
   init_rvalue(); // assigns RVALUE_ID

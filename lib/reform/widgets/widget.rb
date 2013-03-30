@@ -45,6 +45,13 @@ module R::Qt
 	parent.addWidget self
       end # parent=
 
+      def font *args, &block
+	#tag "font(#{args.inspect})"
+	require_relative '../font'
+	return font_get unless args[0] || block
+	Font.new self, *args, &block
+      end
+
       #tag "setting up 'title' attr_dynamic"
       attr_dynamic String, :title
       attr_dynamic Size, :size, :minimumSize, :maximumSize

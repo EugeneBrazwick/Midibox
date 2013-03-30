@@ -103,9 +103,16 @@ task :build_urqt do
   end
 end
 
+desc 'build contrib Qt objects'
+task :build_contrib_Qt_libs do
+  Dir.chdir 'lib/spacy_toolbutton' do
+    ruby '-S', 'rake' 
+  end
+end
+
 # rdoc takes far longer than anything else
 desc 'build the required library bot not the documentation (use rdoc task)'
-task :default => [:build_rpp, :build_urqtCore, :build_urqt, 
+task :default => [:build_rpp, :build_urqtCore, :build_urqt, :build_contrib_Qt_libs,
 		  :build_alsamidi, :build_perlin] do
 end
 

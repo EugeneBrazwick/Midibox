@@ -12,7 +12,9 @@
 #include <QtWidgets/QGridLayout>
 #include "application.h"
 #include "widget.h"
+#include "urqtCore/qtflags_and_enums.h"
 #include "ruby++/array.h"
+#include "ruby++/hash.h"
 
 namespace R_Qt {
 
@@ -57,17 +59,87 @@ cGridLayout_columnCount_set(VALUE v_self, VALUE v_columnCount)
 {
   const RPP::QObject<QGridLayout> self = v_self;
   const RPP::Fixnum r = self.iv("@columnCount");
-  if (r.test()) rb_raise(rb_eNotImpError, "altering columnCount later on not supported yet");
   /* FIXME: this is symplistic.
    *
    * Later changes of columnCount are completely ignored since @columnCount is only 
    * used in setup...
    * We have to somehow re-add all widgets and layouts
    */
+  if (r.test()) rb_raise(rb_eNotImpError, "altering columnCount later on not supported yet");
   self.iv_set("@columnCount", v_columnCount); 
   return v_columnCount;
 }
 
+/* Notice that 'setup' will actually re-add them!!
+ *
+ * addWidget	widget
+ * addWidget    widget, row, col [, alignment]
+ * addWidget    widget, row, col, rowspan, colspan [, alignment]
+ */
+static VALUE
+cGridLayout_addWidget(int argc, VALUE *argv, VALUE v_self)
+{
+  const RPP::QObject<QGridLayout> self = v_self;
+  trace2("%s::addWidget, argc=%d", self.inspect(), argc);
+  RPP::QObject<QWidget> item(RPP::UNSAFE);
+  RPP::Fixnum row, col, rowspan, colspan;
+  RPP::Array alsyms(RPP::UNSAFE);
+  trace("scanning");
+  RPP::Scan scan(argc, argv);
+  scan.arg(item);
+  track1("adding %s", item);
+  scan.opts(row, col);	   // it is called 'illegally' somewhere
+  track2("row=%s, col=%s", row, col);
+  scan.opts(rowspan, colspan, alsyms);
+  if (row.isNil()) row = 1;
+  if (col.isNil()) col = 1;
+  track2("rowspan=%s, colspan=%s", rowspan, colspan);
+  if (rowspan.isArray()) // oops, must be alignment then
+    {
+      alsyms.assign(rowspan);
+      rowspan = Qnil;
+    }
+  const Qt::Alignment alignment = alsyms2qtalignment(alsyms);
+  if (rowspan.isNil())
+      self->addWidget(item, row, col, alignment);
+  else
+    {
+      track4("calling addWidget(%s, %s, %s, %s)", row, col, rowspan, colspan);
+      self->addWidget(item, row, col, rowspan, colspan, alignment);
+    }
+  item.iv_set("@parent", self);
+  return v_self;
+}
+
+static VALUE
+cGridLayout_addLayout(int argc, VALUE *argv, VALUE v_self)
+{
+  const RPP::QObject<QGridLayout> self = v_self;
+  RPP::QObject<QLayout> item(RPP::UNSAFE);
+  RPP::Fixnum row, col, rowspan, colspan;
+  RPP::Array alsyms(RPP::UNSAFE);
+  RPP::Scan(argc, argv).arg(item)
+		       .opts(row, col)
+		       .opts(rowspan, colspan, alsyms);
+  if (row.isNil()) row = 1;
+  if (col.isNil()) col = 1;
+  if (rowspan.isArray()) // oops, must be alignment then
+    {
+      alsyms.assign(rowspan);
+      rowspan = Qnil;
+    }
+  const Qt::Alignment alignment = alsyms2qtalignment(alsyms);
+  if (rowspan.isNil())
+    self->addLayout(item, row, col, alignment);
+  else
+    self->addLayout(item, row, col, rowspan, colspan, alignment);
+  item.iv_set("@parent", self);
+  return v_self;
+}
+
+/* TOO EARLY...
+ *
+ * controls are added to parents first, and then we call setup.
 #define GRIDLAYOUT_ADD(X) \
 static VALUE \
 cGridLayout_add##X(VALUE v_self, VALUE v_x) \
@@ -77,22 +149,31 @@ cGridLayout_add##X(VALUE v_self, VALUE v_x) \
   int currow = RPP::Fixnum(self.iv("@currow")); \
   const int currow_org = currow; \
   int curcol = RPP::Fixnum(self.iv("@curcol")); \
+  const int curcol_org = curcol; \
   const int columnCount = RPP::Fixnum(self.call("columnCount")); \
-  self->add##X(x, currow, curcol); \
-  if (++curcol == columnCount) \
+  const RPP::Array span = self.call("span"); \
+  track1("Applying span %s", span); \
+  const RPP::Object objspanc = span[0]; \
+  const int spanc = objspanc.isSymbol() \
+		    && RPP::Symbol(objspanc) == "all_remaining" ? (columnCount - curcol > 1 ? columnCount - curcol : 1) \
+								: objspanc.to_i(); \
+  const int spanr = RPP::Fixnum(span[1]); \
+  self->add##X(x, currow, curcol, spanr, spanc); \
+  curcol += spanc; \
+  if (curcol >= columnCount) \
     { \
       currow++; \
       curcol = 0; \
     } \
-  self.iv_set("@curcol", curcol); \
-  if (currow_org != currow) \
-    self.iv_set("@currow", currow); \
-  x.iv_set("@parent", self); /* see cLayout_addWidget */ \
+  if (curcol_org != curcol) self.iv_set("@curcol", curcol); \
+  if (currow_org != currow) self.iv_set("@currow", currow); \
+  x.iv_set("@parent", self); // see cLayout_addWidget 
   return v_self; \
 }
 
 GRIDLAYOUT_ADD(Widget)
 GRIDLAYOUT_ADD(Layout)
+*/
 
 static void
 init_gridlayout(RPP::Module mQt, RPP::Class cLayout)
@@ -157,13 +238,58 @@ cLayout_enqueue_children(int argc, VALUE *argv, VALUE v_self)
   return Qnil;
 } // cLayout_enqueue_children
 
+#define QTSIZECONSTRAINTS \
+      QTSIZECONSTRAINT_DO(default, DefaultConstraint) \
+      QTSIZECONSTRAINT_DO(fixedSize, FixedSize) \
+      QTSIZECONSTRAINT_DO(minimumSize, MinimumSize) \
+      QTSIZECONSTRAINT_DO(maximumSize, MaximumSize) \
+      QTSIZECONSTRAINT_DO(minAndMaxSize, MinAndMaxSize) \
+      QTSIZECONSTRAINT_DO(noConstraint, NoConstraint) \
+
+static VALUE
+cLayout_sizeConstraint_set(VALUE v_self, VALUE v_szconstraint)
+{
+  const RPP::QObject<QLayout> self = v_self;
+  self.check_frozen();
+  RPP::Dictionary syms(cLayout.cv("@@sizeConstraints"), RPP::VERYUNSAFE);
+  if (!syms.isHash())
+    {
+      syms = RPP::Dictionary();
+      cLayout.cv_set("@@sizeConstraints", syms);
+#define QTSIZECONSTRAINT_DO(sym, qtor) \
+      syms[#sym] = int(QLayout::Set##qtor);
+      QTSIZECONSTRAINTS
+      QTSIZECONSTRAINT_DO(none, NoConstraint)
+#undef QTSIZECONSTRAINT_DO
+    }
+  const RPP::Fixnum szconstraint = syms[v_szconstraint];
+  self->setSizeConstraint(QLayout::SizeConstraint(szconstraint.to_i()));
+  return v_szconstraint;
+}
+
+static VALUE
+cLayout_sizeConstraint_get(VALUE v_self)
+{
+  const RPP::QObject<QLayout> self = v_self;
+  switch (self->sizeConstraint())
+    {
+#define QTSIZECONSTRAINT_DO(sym, qtor) \
+      case QLayout::Set##qtor: return RPP::Symbol(#sym);
+      QTSIZECONSTRAINTS
+    }
+  rb_raise(rb_eRuntimeError, "Unhandled sizeconstraint %d", self->sizeConstraint());
+}
+
 void
 init_layout(RPP::Module mQt, RPP::Class cControl)
 {
   trace("init_layout");
   cLayout = mQt.define_class("Layout", cControl);
   cLayout.define_method("addWidget", cLayout_addWidget)
-	 .define_method("enqueue_children", cLayout_enqueue_children);
+	 .define_method("enqueue_children", cLayout_enqueue_children)
+	 .define_method("sizeConstraint_get", cLayout_sizeConstraint_get)
+	 .define_method("sizeConstraint=", cLayout_sizeConstraint_set)
+	 ;
   init_boxlayout(mQt, cLayout);
   init_gridlayout(mQt, cLayout);
 }

@@ -178,18 +178,21 @@ module R::Qt
 	  name = objectName and "#{self.class}:'#{name}'" or super
 	end
 
+	# call block for each direct child
 	def each_child &block
 	  return to_enum :each_child unless block
 	  #tag "calling #{self}.enqueue_children()"
 	  enqueue_children &block
 	end
 
+	# call block for the object itself and each direct child
 	def each_child_with_root &block
 	  return to_enum :each_child_with_root unless block
 	  yield self
 	  each_child &block
 	end
 
+	# call block for all children recursively
 	def each_sub
 	  return to_enum :each_sub unless block_given?
 	  queue = []
@@ -201,6 +204,7 @@ module R::Qt
 	  end
 	end
 
+	# call block for the object itself and all children recursively
 	def each_sub_with_root &block
 	  return to_enum :each_sub_with_root unless block
 	  yield self

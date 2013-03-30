@@ -15,6 +15,14 @@ module R::Qt
     public #methods of LineEdit
 
       attr_dynamic String, :text
+      attr_dynamic FalseClass, :readOnly
+      attr_dynamic Fixnum, :maxLength
+      attr_dynamic Array, :alignment   # array of symbolic flags
+
+      alias readOnly? readOnly
+      alias readonly? readOnly
+      alias readonly readOnly
+      alias readonly= readOnly=
 
       # override
       # Typically one can say  { edit text: { connector: :self } }

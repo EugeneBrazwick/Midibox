@@ -15,19 +15,6 @@ namespace R_Qt {
 
 extern RPP::Class cBrush;
 
-static inline void
-GetQBrush_noDecl(VALUE v_q, QBrush *&q)
-{
-#if defined(DEBUG)
-  if (!rb_obj_is_kind_of(v_q, cBrush))
-    rb_raise(rb_eTypeError, "SERIOUS PROGRAMMING ERROR: very bad cast from %s to QBrush",
-	     INSPECT(v_q));
-#endif // DEBUG
-  GET_STRUCT_NODECL(QBrush, q);
-}
-
-#define RQTDECLARE_BRUSH(var) QBrush *var; GetQBrush_noDecl(v_##var, var)
-
 extern void cBrush_free(QBrush *brush);
 
 static inline VALUE
@@ -36,7 +23,7 @@ cBrushWrap(QBrush *brush)
   return Data_Wrap_Struct(cBrush, 0, cBrush_free, brush);
 }
 
-extern void init_brush(VALUE mQt);
+extern void init_brush(RPP::Module mQt);
 
 } // namespace R_Qt 
 

@@ -65,5 +65,6 @@ extern std::istream &operator>>(std::istream &i, RGCGuardedValue &v);
  *	vX = v.value<RValue>();
  */
 Q_DECLARE_METATYPE(T_RVALUE);
+Q_DECLARE_METATYPE(T_RGCGUARDEDVALUE);
 
 #endif // _R_QT_RVALUE_H_

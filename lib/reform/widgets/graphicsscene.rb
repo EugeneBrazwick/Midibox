@@ -1,5 +1,4 @@
 
-require_relative '../control'
 require_relative '../context'
 
 module R::Qt

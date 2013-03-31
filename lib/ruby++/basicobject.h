@@ -190,7 +190,10 @@ public:
    * According to Eugene, the callback block always takes two arguments.
    * The first is the yielded value, the second is the last argument to this method.
    *
-   * Since it happens often that only a block is passed, I added some more variations with this condition.
+   * Since it happens often that only a block is passed, I added some more variations for that case.
+   *
+   * Any 'closure' stuff is simply absent.  To get it in, it must be passed manually, and this includes
+   * 'self'!
    */
   VALUE call_with_block(const char *method, Arg1Method callback, VALUE v_arg = Qnil) const
     {

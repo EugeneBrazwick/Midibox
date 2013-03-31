@@ -15,11 +15,11 @@ This file contains the QWidget wrapper.
 #include <QtCore/QQueue>
 #include <QtWidgets/QWidget>
 #include <QtWidgets/QLayout>
-#include <QtGui/QResizeEvent>
 #include "widget.h"
 #include "font.h"
 #include "size.h" // cSizeWrap	  
 #include "layout.h" // cLayout
+#include "guieventsignalbroker.moc.h"
 #include "urqtCore/margins.h"
 #include "ruby++/rppstring.h"
 #include "ruby++/array.h"
@@ -44,8 +44,7 @@ cWidget_show(VALUE v_self)
 
 /** :call-seq:
  *
- *	resize int
- *	resize int, int
+ *	resize QSize
  */
 static VALUE
 cWidget_resize(int argc, VALUE *argv, VALUE v_self)
@@ -74,7 +73,6 @@ cWidget_minimumSize_set(int argc, VALUE *argv, VALUE v_self)
 {
   const RPP::QObject<QWidget> self = v_self;
   self.check_frozen();
-  trace("cWidget_resize");
   self->setMinimumSize(RPP::QSize(argc, argv));
   return Qnil;
 }
@@ -90,8 +88,7 @@ cWidget_maximumSize_set(int argc, VALUE *argv, VALUE v_self)
 {
   const RPP::QObject<QWidget> self = v_self;
   self.check_frozen();
-  trace("cWidget_resize");
-  self->setMinimumSize(RPP::QSize(argc, argv));
+  self->setMaximumSize(RPP::QSize(argc, argv));
   return Qnil;
 }
 
@@ -132,98 +129,6 @@ cWidget_title_set(VALUE v_self, VALUE v_title)
   return v_title;
 } // Widget#title
 
-class EventSignalBroker: public QObject
-{
-private:
-  typedef QObject inherited;
-  // map event types to ruby callbacks
-  QHash<QEvent::Type, const char *>Events;
-protected:
-  override bool eventFilter(QObject *object, QEvent *event);
-public:
-  EventSignalBroker(QObject *parent);
-  void registerEvent(QEvent::Type tp, const char *method);
-}; // class EventFilter
-
-static const char 
-ESB_PropertyId[] = R_QT_INTERNAL_PROPERTY_PREFIX "EventSignalBroker";
-
-EventSignalBroker::EventSignalBroker(QObject *parent):
-inherited(parent)
-{
- //  parent->setProperty(ESB_PropertyId, this);
-}
-
-void 
-EventSignalBroker::registerEvent(QEvent::Type tp, const char *method)
-{
-  if (Events.contains(tp)) return;
-  // trace1("registerEvent %s", method);
-  switch (tp)
-    {
-    case QEvent::Resize:
-    case QEvent::Show:
-      Events[tp] = method;
-      if (Events[tp] != method) rb_raise(rb_eFatal, "QT IS BROKEN!!");
-      return;
-    default:
-      break;
-    }
-  rb_raise(rb_eNotImpError, "events of type %s cannot be brokered yet", method);
-}
-
-/* 
- * Broker the event.
- * IE, for all registered events we must emit the signal.
- * But this only needs to be done if object has a ruby wrapper.
- *
- * Must return inherited::eventFilter in all cases
- */
-bool 
-EventSignalBroker::eventFilter(QObject *object, QEvent *event)
-{
-  const QEvent::Type tp = event->type();
-  //trace1("eventFilter, received type '%d' <<<<<EVENT!!!!>>>>>", tp);
-  const RPP::QObject<QObject> v_object(object, RPP::UNSAFE);
-  if (v_object.test())
-    {
-      const char * const method = Events.value(tp);
-      if (method)
-	{
-	  const RPP::Symbol v_method = method;
-	  // if inspected or to_s then it works.
-	  // Otherwise it calls emit with a Proc with address 0x00000000000
-	  // using plain VALUE has the same result.
-	  //track2("call %s::emit(%s)", v_object, v_method);
-	  // unfortunately:
-	  switch (tp)
-	    {
-	    case QEvent::Resize:
-	      {
-		const QResizeEvent &ev_resize = *static_cast<QResizeEvent *>(event);
-		const QSize &sz = ev_resize.size();
-		v_object.call("emit", v_method, RPP::Fixnum(sz.width()), 
-			      RPP::Fixnum(sz.height()));
-		break;
-	      }
-	    case QEvent::Show:
-		trace1("calling rb_funcall(:emit), v_method = %p", &v_method);
-		// using call or rb_funcall has SAME weird result
-		v_object.call("emit", v_method);
-		break;
-	    default:
-		rb_raise(rb_eNotImpError, "events of type %s cannot be brokered yet", method);
-		break;
-	    }
-	}
-    }
-  else
-    {
-      trace1("Watched object %p is not a rb thing", object);
-    }
-  return inherited::eventFilter(object, event);
-}
-
 /** EVENT TRIGGERED SIGNAL
  * :call-seq:
  *    shown block
@@ -232,26 +137,7 @@ EventSignalBroker::eventFilter(QObject *object, QEvent *event)
 static VALUE
 cWidget_shown(int argc, VALUE *argv, VALUE v_self)
 {
-  // FIXME macro req.  EVENT_TRIGGERED_SIGNAL...
-  const RPP::QObject<QWidget> self = v_self;
-  EventSignalBroker *esb = 0;
-  QVariant v = self->property(ESB_PropertyId);
-  if (!v.isValid())
-    {
-      //trace("create the broker and cache it");
-      esb = new EventSignalBroker(self);
-      self->setProperty(ESB_PropertyId, QVariant(QMetaType::QObjectStar, esb));
-      self->installEventFilter(esb); // Eugene assumes Qt does not own it.
-    }
-  else
-      esb = static_cast<EventSignalBroker *>(v.value<QObject*>());
-  const char *const method = "shown";
-  esb->registerEvent(QEvent::Show, method);
-  VALUE v_args, v_block;
-  rb_scan_args(argc, argv, "*&", &v_args, &v_block);
-  //track4("Object.signal_impl(%s, %s, %s, %s)", v_self, RPP::Symbol(method), v_args, v_block);
-  cObject_signal_impl(v_self, method, v_args, v_block);
-  return Qnil;
+  return WidgetEventBroker::signal(QEvent::Show, "shown", argc, argv, v_self); 
 } // Widget#shown
 
 static VALUE

@@ -218,8 +218,8 @@ module R::Qt
 	  # Even more the block looks like: (#<Proc:0x00000000000000>)
 	  # BROKEN TypeError.raise "blocks (#{block.inspect}) cannot be passed to emit" if block_given?
 	  if Symbol === signal
-	    if @connections
-	      proxylist = @connections[signal]
+	    if @r_qt_connections
+	      proxylist = @r_qt_connections[signal]
 	      proxylist and proxylist.each do |proxy| 
 		#tag "#{proxy}.call(*#{args.inspect})"
 		proxy[*args] 
@@ -228,6 +228,15 @@ module R::Qt
 	    self
 	  else
 	    NotImplementedError.raise 'emitting qt-signals'
+	  end
+	end
+
+	def disconnect signal
+	  if Symbol === signal
+	    @r_qt_connections.delete(signal) if @r_qt_connections
+	    self
+	  else
+	    NotImplementedError.raise 'disconnecting qt-signals'
 	  end
 	end
 
@@ -350,16 +359,21 @@ module R::Qt
 	# Signal can be a Qt signal, or it can be any ruby symbol.
 	#
 	def self.signal *signals
-	  for signal in signals
-	    m = signal.to_s.sub(/\(.*/, '').to_sym # !
+	  signals.each do |signal|	# using 'for' causes a SEGV!!
+	    m = signal.to_s.sub /\(.*/, ''
+	    # signals like 'void f(int)' are WRONG. It must be 'f(int)'.
+	    NameError.raise "bad name for signal #{self}.#{m}" if m.include?(' ')
+	    m = m.to_sym
 	    #tag "define method :#{m} for signal '#{signal}'"
 	    if method_defined? m
 	      NameError.raise "the signal #{self}.#{m} is already defined as " +
 			      "#{instance_method(m).owner}.#{m}"
 	    end
 	    define_method m do |*args, &block|
-	      #tag "signal received. m=#{m.inspect}, signal=#{signal}, args=#{args.inspect}"
+	      #tag "signalmethod called. m=#{m.inspect}, signal=#{signal}, args=#{args.inspect}"
 	      #tag "block=#{block}"
+	      raise "err.....???" if m == :stateChanged
+	      #With a block 'connect', else 'emit'
 	      signal_implementation m, signal, args, block
 	    end
 	  end

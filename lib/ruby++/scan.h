@@ -44,7 +44,6 @@ public:
   ~Scan() { if (ArgC) rb_raise(rb_eArgError, "Scan: too many arguments (%d) given", OrgArgC); }
   Scan &arg(BasicObject &v1)
     {
-      trace1("arg, ArgC=%d", ArgC);
       if (ArgC <= 0)
 	rb_raise(rb_eArgError, "Scan: too few arguments (%d) given", OrgArgC);
       v1.assign(*ArgV, SAFE);
@@ -68,7 +67,6 @@ public:
     }
   Scan &tail_arg(BasicObject &v1)
     {
-      trace1("tail_arg, ArgC=%d", ArgC);
       if (GotOpt) rb_raise(rb_eFatal, "Scan: tail_arg[s]() must be given BEFORE opt[s]()");
       if (ArgC <= 0)
 	rb_raise(rb_eArgError, "Scan: too few arguments (%d) given", OrgArgC);
@@ -82,7 +80,6 @@ public:
     }
   Scan &opt(BasicObject &v1)
     {
-      trace1("arg, ArgC=%d", ArgC);
       if (GotSplat) rb_raise(rb_eFatal, "Scan: options are obviously nil after splat() is called");
       GotOpt = true;
       if (ArgC <= 0)

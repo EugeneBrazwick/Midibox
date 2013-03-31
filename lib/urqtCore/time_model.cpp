@@ -54,7 +54,7 @@ cTimer_timerType_get(VALUE v_self)
   rb_raise(rb_eRuntimeError, "Unhandled timertype %d", self->timerType());
 }
 
-static Qt::TimerType
+Qt::TimerType
 sym2timertype(VALUE v_sym)
 {
   RPP::Dictionary types(cTimer.cv("@@types"), RPP::VERYUNSAFE);

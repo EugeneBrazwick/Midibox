@@ -3,6 +3,7 @@
 #  Copyright (c) 2013 Eugene Brazwick
 
 require_relative 'control'
+require_relative 'context'
 
 module R::Qt
 
@@ -33,10 +34,12 @@ module R::Qt
   The whole system works through message passing and delegation.
 =end
   class DynamicAttribute < Control
+      include Reform::AnimationContext
+
     private # methods of DynamicAttribute
 
       def default_value
-	#tag "calculating default for #@klass"
+	#tag "#{self}, calculating default for #@klass::#@methodname"
 	if @klass.respond_to?(:new)
 	  @klass.new
 	else
@@ -69,6 +72,7 @@ module R::Qt
 	#tag "DynamicAttribute.new(#{parent}, #{klass}, :#{methodname}), options=#{options}"
 	super(parent) {}    # strange, but ruby WILL pass the initblock otherwise
 	@klass, @methodname, @options = klass, methodname, options
+	#tag "new #{self}::#{methodname}, assign da_value, using default_value"
 	self.da_value = default_value  # this must come first
 	#tag "#{self}:#{methodname}.setup(#{quickyhash.inspect})"
 	setup quickyhash, &initblock
@@ -77,12 +81,13 @@ module R::Qt
       end
 
       def da_value= v
-	#tag "value=(#{v.inspect})"
+	#tag "#{self}::setProperty(#{DynValProp}, #{v.inspect})"
 	setProperty DynValProp, v
+	#tag "property is now #{property(DynValProp).inspect}"
       end
 
       def da_value
-	#tag "value()"
+	#tag "#{self} da_value() returning property[#{DynValProp}] -> #{property(DynValProp)}"
 	property DynValProp
       end
 
@@ -118,13 +123,19 @@ module R::Qt
 
       # override
       def apply_dynamic_setter method, *args
-	#tag "#{self}::apply_dynamic_setter :#{method}(#{args.inspect})"
+	#tag "#{self}::apply_dynamic_setter :#{method}(#{args.inspect}), first get the current value"
         propval = da_value
-	#tag "#retrieved value #{propval.inspect}" 
+	#ag "#retrieved value #{propval.inspect}" 
         propval.send method.to_s + '=', *args
         #setProperty DynValProp, value2variant propval
         parent.send @methodname.to_s + '=', propval
       end # apply_dynamic_setter
 
-  end
-end
+      # PROBLEMATIC: the old code always caught DynamicPropertyChangeEvent.
+      # But now we would have to create a ObjectEventBroker on each DynamicAttribute.
+      # That would be bad.
+      # It is now done by PropertyAnimation.startValue=, but that has to erase
+      # all handlers on dynamicPropertyChanged. 
+      # And 'disconnect' is NIY!
+  end # class DynamicAttribute
+end # module R::Qt

@@ -89,7 +89,7 @@ hex2int(int hex)
 static VALUE
 cColor_initialize(int argc, VALUE *argv, VALUE v_self)
 {
-  trace("cColor_initialize");
+  trace1("cColor_initialize, argc=%d", argc);
   RPP::QColor self = v_self;
   VALUE v_colorsym, v_g, v_b, v_a;
   rb_scan_args(argc, argv, "04", &v_colorsym, &v_g, &v_b, &v_a);
@@ -102,7 +102,11 @@ cColor_initialize(int argc, VALUE *argv, VALUE v_self)
 	return self.call("setupQuickyhash", colorsym);
     case T_NIL:
 	if (rb_block_given_p())
-	  return self.instance_eval();
+	  {
+	    trace("instance_eval on block");
+	    return self.instance_eval();
+	  }
+	trace("default color assign");
 	*self = QColor();
 	return Qnil;
     case T_DATA:
@@ -259,6 +263,7 @@ cColor_free(QColor *color)
 static VALUE \
 cColor_##comp##_get(VALUE v_self) \
 { \
+  trace("QColor::" #comp "_get"); \
   return RPP::tp(RPP::QColor(v_self)->comp()); \
 } 
 

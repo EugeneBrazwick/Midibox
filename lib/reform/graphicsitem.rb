@@ -79,8 +79,7 @@ module R::Qt
       end # brush
 
       def pen *args, &block
-	arg0 = args[0]
-	return pen_get unless arg0 || block
+	return pen_get unless args[0] || block
 	#tag "calling Brush.new with parent #{self}"
 	Pen.new self, *args, &block
       end # pen
@@ -133,11 +132,6 @@ module R::Qt
 	end
       end
 
-      # THIS IS INCORRECT. Since 'nil' if brush= was never called
-      # But items have a default brush...
-      # And same for Pen and same for lineitem!
-      def brush_get; @brush; end
-      def pen_get; @pen; end
   end # class AbstractGraphicsShapeItem
 
   class SynthItem < GraphicsItem

@@ -8,6 +8,7 @@
 #include "application.h"
 #include "color.h"
 #include "urqtCore/size.h"
+#include "urqtCore/rvalue.h"
 #include "ruby++/rppstring.h"
 #include "ruby++/bool.h"
 #include "ruby++/numeric.h"

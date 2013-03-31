@@ -11,18 +11,6 @@ extern RPP::Class cPen;
 extern void init_pen(RPP::Module mQt);
 
 static inline void
-GetQPen_noDecl(VALUE v_q, QPen *&q)
-{
-#if defined(DEBUG)
-  if (!rb_obj_is_kind_of(v_q, cPen))
-    rb_raise(rb_eTypeError, "SERIOUS PROGRAMMING ERROR: very bad cast to QPen");
-#endif // DEBUG
-  GET_STRUCT_NODECL(QPen, q);
-}
-
-#define RQTDECLARE_PEN(var) QPen *var; GetQPen_noDecl(v_##var, var)
-
-static inline void
 cPen_free(QPen *pen)
 {
   delete pen;

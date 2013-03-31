@@ -42,10 +42,7 @@ reattach_brush(RPP::QBrush self)
     {
       RQTDECLARE_GI(QAbstractGraphicsShapeItem, parent);
       trace2("parent.class=%s, parent=%p", rb_obj_classname(v_parent), parent);
-      trace3("color_set, call setBrush %s (QBrush:%p) on parent %s", TO_CSTR(v_self), self, 
-	     TO_CSTR(v_parent));
       trace2("parent.class=%s, parent=%p", rb_obj_classname(v_parent), parent);
-      traqt1("%p::setBrush", parent);
       v_parent.call("brush=", self);
     }
   trace("reattach_brush OK");
@@ -153,8 +150,6 @@ cBrush_initialize(int argc, VALUE *argv, VALUE v_self)
 	track1("String %s", args);
 	const RPP::QColor color = cColor.new_instance(args);
 	trace3("v_color=%d,%d,%d", color->red(), color->green(), color->blue());
-	trace1("QColorptr = %p", color);
-	traqt("QBrush(QColor)");
 	*self = QBrush(*color);
 	trace3("self.color=%d,%d,%d", self->color().red(), self->color().green(),
 	       self->color().blue());
@@ -193,8 +188,6 @@ cBrush_color_set(VALUE v_self, VALUE v_data)
   trace4("color_set: v_self=%s, color=(%d,%d,%d)", INSPECT(v_self), color->red(), color->green(), color->blue());
   // INCORRECT self->setColor(*color);
   *self = QBrush(*color);
-  trace5("self=%p, brush.color=(%d,%d,%d,%d)", self,
-         self->color().red(), self->color().green(), self->color().blue(), self->color().alpha());
   reattach_brush(self);
   return v_data;
 } // cBrush_color_set

@@ -6,7 +6,8 @@
 
 #include <QtWidgets/QGraphicsItem>
 #include <typeinfo>
-#include "api_utils.h"
+#include "urqtCore/api_utils.h"
+#include "urqtCore/rvalue.h"
 
 #pragma interface
 

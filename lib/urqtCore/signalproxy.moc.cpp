@@ -1,11 +1,13 @@
 
 // This document adheres to the GNU coding standard
+// Copyright (c) 2013 Eugene Brazwick
+
 //#define TRACE
 
 #pragma implementation
 
 #include "signalproxy.moc.h"
-#include "object.h"
+#include "animation.h"
 #include "ruby++/proc.h"
 #include <QtCore/QMetaMethod>
 
@@ -29,6 +31,7 @@ namespace R_Qt {
  * QSignalProxy is a QObject and it becomes a child of 'parent'.
  *
  * Context:   Qt::Object.connect(signalstring, rubyproc)
+ * Not used at all if signal was a symbol!
  *
  */
 QSignalProxy::QSignalProxy(QObject *parent, const char *signalname, VALUE v_block):
@@ -38,8 +41,8 @@ QSig(QMetaObject::normalizedSignature(signalname)),
 Signal(QSig.data())
 {
   if (!parent) rb_raise(rb_eTypeError, "Bad parent");
-  traqt("QMetaObject::normalizedSignature");
-  traqt1("%s::metaObject", QTCLASS(parent));
+  trace2("new QSignalProxy for %s::%s", parent->metaObject()->className(), signalname);
+  trace2("this->%p, block = %s", this, INSPECT(v_block));
   const QMetaObject &meta_parent = *parent->metaObject();
   const char * const brop = strchr(Signal, '(');
   if (!brop) rb_raise(rb_eTypeError, "Bad signal '%s'", Signal);
@@ -73,7 +76,7 @@ static VALUE
 sp_handle_callback(VALUE /*v_yielded*/, VALUE v_arg)
 {
   track1("sp_handle_callback() arg=%s", v_arg);
-  // v_arg is ALWAYS an Array
+  // v_arg is ALWAYS an Array in our case
   const RPP::Array arg(v_arg, RPP::VERYUNSAFE);
   const RPP::Proc block = arg[0];
   const RPP::Array arg1 = arg[1];
@@ -84,7 +87,10 @@ sp_handle_callback(VALUE /*v_yielded*/, VALUE v_arg)
 void 
 QSignalProxy::handle_i(RPP::Array v_ary) const
 {
-  trace3("SIGNAL[%s].handle_i(%s) on block %s", Signal, v_ary.inspect(), INSPECT(block()));
+  // SEGV ?trace3("SIGNAL[%s].handle_i(%s) on block %s", Signal, v_ary.inspect(), INSPECT(block()));
+  track1("v_ary = %s", v_ary);
+  trace2("this=%p, Signal = '%s'", this, Signal);
+  track1("block = %s", block()); // SEGV
   mR.call_with_block("escue", sp_handle_callback, block(), v_ary);
 }
 
@@ -112,6 +118,17 @@ QSignalProxy::handle(int value) const
 {
   trace2("SIGNAL[%s].handle(int: %d)", Signal, value);
   handle_i(RPP::Array(value, RPP::Array::CreateSingleton));
+}
+
+void 
+QSignalProxy::handle(QAbstractAnimation::State old, QAbstractAnimation::State newstate) const
+{
+  trace3("SIGNAL[%s].handle(QAbstractAnimation::State: %d, "
+         "QAbstractAnimation::State: %d)", Signal, old, newstate);
+  const RPP::Array ary(QAbstractAnimation_State2Symbol(old), 
+		       QAbstractAnimation_State2Symbol(newstate));
+  track1("ary=%s", ary);
+  handle_i(ary);
 }
 
 } // namespace R_Qt

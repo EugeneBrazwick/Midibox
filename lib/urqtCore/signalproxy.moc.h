@@ -4,6 +4,7 @@
 
 #include <QtCore/QObject>
 #include <QtCore/QVariant>
+#include <QtCore/QAbstractAnimation>
 #include "rvalue.h"
 #include "ruby++/array.h"
 #include "object.h"
@@ -29,6 +30,7 @@ private slots:
   void handle(QObject *) const;
   void handle(bool) const;
   void handle(int) const;
+  void handle(QAbstractAnimation::State, QAbstractAnimation::State) const;
 public:
   QSignalProxy(QObject *parent, const char *signal, VALUE v_block);
 };

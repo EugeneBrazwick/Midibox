@@ -11,12 +11,15 @@
 #include "time_model.h"
 #include "margins.h"
 #include "size.h"
+#include "eventsignalbroker.moc.h"
+#include "core_app.h"
 #include "ruby++/array.h"
 #include "ruby++/hash.h"
 #include "ruby++/proc.h"
 #include "ruby++/bool.h"
 #include "object.h"
 #include "signalproxy.moc.h"
+#include "animation.h"
 
 namespace R_Qt {
 
@@ -427,10 +430,9 @@ cObject_enqueue_children(int argc, VALUE *argv, VALUE v_self)
 
 /** :call-seq:
  *	self connect(:symbol, proc)
- *	self connect(qt_signal_str, proc)
+ *	self connect('qt_signal_str()', proc)
  *
- * INTERNAL USE.   Simply use '	  signal 'timeout()' to create + connect to the Qt 'timeout' signal
- * See below.
+ * INTERNAL USE. AVOID. DOES NOT DO BLOCKS!
  *
  * The first one is ruby only.
  * The second one connects the Qt signal and is C only.
@@ -442,6 +444,11 @@ cObject_enqueue_children(int argc, VALUE *argv, VALUE v_self)
  * 1) declare the signal:	signal 'editingFinished()'
  * 2) connect it:		editingFinished do .... end
  * 3) emit it:			editingFinished
+ *
+ * With arguments:
+ * 1) declare the signal:	signal 'editingFinished(int)'
+ * 2) connect it:		editingFinished do |i| .... end
+ * 3) emit it:			editingFinished 23 
  */
 static VALUE 
 cObject_connect(VALUE v_self, VALUE v_signal, VALUE v_proc)
@@ -453,10 +460,11 @@ cObject_connect(VALUE v_self, VALUE v_signal, VALUE v_proc)
   track3("cObject_connect %s, %s, %s", self, signal, v_proc);
   if (signal.isSymbol())
     {
-      // ((@connections ||= {})[symbol] ||= []) << block
-      RPP::Hash connections(self.iv("@connections"), RPP::VERYUNSAFE);
+      trace("ruby signal");
+      // ((@r_qt_connections ||= {})[symbol] ||= []) << block
+      RPP::Hash connections(self.iv("@r_qt_connections"), RPP::VERYUNSAFE);
       if (!connections.isHash())
-	self.iv_set("@connections", connections = RPP::Hash());
+	self.iv_set("@r_qt_connections", connections = RPP::Hash());
       RPP::Array proxylist(connections[v_signal], RPP::VERYUNSAFE);
       if (!proxylist.isArray())
 	connections[signal] = proxylist = RPP::Array();
@@ -464,7 +472,7 @@ cObject_connect(VALUE v_self, VALUE v_signal, VALUE v_proc)
       return Qnil;
     }
   const char * const signalname = signal.to_s();
-  trace1("native Qt signal '%s'", signalname);
+  trace1("native Qt signal '%s', create QSignalProxy for it", signalname);
   new QSignalProxy(self, signalname, v_proc); 
   return v_self;
 }
@@ -481,7 +489,7 @@ static VALUE
 cObject_setProperty(VALUE v_self, VALUE v_name, VALUE v_value)
 {
   const RPP::QObject<QObject> self = v_self;
-  self->setProperty(RPP::String(v_name), QVariant::fromValue(RValue(v_value))); 
+  self->setProperty(RPP::String(v_name), v2qvar_unsafe(v_value));
   return v_value;
 }
 
@@ -490,6 +498,59 @@ cObject_property(VALUE v_self, VALUE v_name)
 {
   const RPP::QObject<QObject> self = v_self;
   return prop2v(self, RPP::String(v_name));
+}
+
+static VALUE
+cObject_childAdded(int argc, VALUE *argv, VALUE v_self)
+{
+  trace2("%s.childAdded, argc=%d", INSPECT(v_self), argc);
+  return ObjectEventBroker::signal(QEvent::ChildAdded, "childAdded", argc, argv, v_self);
+}
+
+static VALUE
+cObject_childRemoved(int argc, VALUE *argv, VALUE v_self)
+{
+  trace2("%s.childRemoved, argc=%d", INSPECT(v_self), argc);
+  return ObjectEventBroker::signal(QEvent::ChildRemoved, "childRemoved", argc, argv, v_self);
+}
+
+static VALUE
+cObject_childPolished(int argc, VALUE *argv, VALUE v_self)
+{
+  return ObjectEventBroker::signal(QEvent::ChildPolished, "childPolished", argc, argv, v_self);
+}
+
+static VALUE
+cObject_timerEvent(int argc, VALUE *argv, VALUE v_self)
+{
+  return ObjectEventBroker::signal(QEvent::Timer, "timerEvent", argc, argv, v_self);
+}
+
+static VALUE
+cObject_dynamicPropertyChanged(int argc, VALUE *argv, VALUE v_self)
+{
+  return ObjectEventBroker::signal(QEvent::DynamicPropertyChange, "dynamicPropertyChanged", 
+				   argc, argv, v_self);
+}
+
+static VALUE
+cObject_startTimer(int argc, VALUE *argv, VALUE v_self)
+{
+  const RPP::QObject<QObject> self = v_self;
+  RPP::Fixnum ms;
+  RPP::Symbol timertype(RPP::UNSAFE);
+  RPP::Scan(argc, argv).arg(ms).opt(timertype);
+  const int r = self->startTimer(ms, timertype.isNil() ? Qt::CoarseTimer
+						       : sym2timertype(timertype));
+  if (r == 0) rb_raise(cReformError, "the system is out of timers");
+  return RPP::Fixnum(r);
+}
+
+static VALUE
+cObject_killTimer(VALUE v_self, VALUE v_timerid)
+{
+  RPP::QObject<QObject>(v_self)->killTimer(RPP::Fixnum(v_timerid));
+  return v_self;
 }
 
 static VALUE
@@ -513,6 +574,14 @@ init_object()
 	 .define_method("takeOwnership", cObject_takeOwnership)
 	 .define_method("setProperty", cObject_setProperty)
 	 .define_method("property", cObject_property)
+	 .define_method("startTimer", cObject_startTimer)
+	 .define_method("killTimer", cObject_killTimer)
+	 // event handlers:
+	 .define_method("childAdded", cObject_childAdded)
+	 .define_method("childRemoved", cObject_childRemoved)
+	 .define_method("childPolished", cObject_childPolished)
+	 .define_method("timerEvent", cObject_timerEvent)
+	 .define_method("dynamicPropertyChanged", cObject_dynamicPropertyChanged)
 	 ;
   trace("init_object OK");
   return cObject;
@@ -606,6 +675,8 @@ Init_liburqtCore()
   init_synthobject(); // cSynthObject
   cModel = mQt.define_class("Model", cControl);
   init_time_model(mQt, cModel);
+  init_animation(mQt, cControl);
+  init_core_app(mQt, cControl);
   loaded = true;
   trace("Init_liburqtCore OK");
 }

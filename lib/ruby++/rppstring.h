@@ -15,7 +15,11 @@ class String: public Object
 private:
   typedef Object inherited;
 public:
+  // Creates an empty string (dynamic allocation required)
   String(): inherited(rb_str_new_cstr("")) {}
+  // In case the string is going to be overwritten anyway, the next constructor
+  // is more efficient. Since nil.to_s is still "" it should actually work fine.
+  String(E_SAFETY /*must be UNSAFE*/): inherited(Qnil) {}
   String(VALUE v): inherited(v) 
     {
     }
@@ -50,7 +54,8 @@ public:
 	rb_raise(rb_eTypeError, "attempt to cast %s to a Symbol", inspect());
     }
   Symbol(const char *cstr): inherited(ID2SYM(rb_intern(cstr))) {}
-  Symbol(): Symbol("nil") {}
+  Symbol(E_SAFETY unsafe): Symbol(Qnil, unsafe) {}
+  Symbol(): Symbol(Qnil, UNSAFE) {}
   ID to_id() const { return SYM2ID(V); }
   bool operator==(const char *other) const { return to_id() == rb_intern(other); } 
   bool operator!=(const char *other) const { return to_id() != rb_intern(other); } 

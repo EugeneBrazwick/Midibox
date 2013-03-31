@@ -34,7 +34,6 @@ void
 cRectF_free(QRectF *rect)
 {
   trace1("cRectF_free(%p)", rect);
-  traqt1("delete QRectF %p", rect);
   delete rect;
 }
 
@@ -117,7 +116,6 @@ cGraphicsItem_mark(QGraphicsItem *item)
     }
   for (int i = 0; i < R_QT_GI_KEY_COUNT; i++)
     {
-      traqt1("QGraphicsItem::data(%d)", i);
       const QVariant &var = item->data(i);
       trace2("i=%d (0:VALUE, 1:objectName), var=%s", i, qString2cstr(var.toString()));
       if (var.canConvert<RValue>()) // might be corrupted??
@@ -134,7 +132,6 @@ VALUE item2v(QGraphicsItem *i)
   if (!rvalue.isValid()) return Qnil;
   const RValue &rv = rvalue.value<RValue>();
   trace2("item2v(%p) -> rv %p", i, &rv);
-  trace2("item2v(%p) -> VALUE = %p", i, (void *)rv.v());
   /* THIS IS CALLED BY _mark routines and hence, we may only peek.
    * INSPECT will try to modify memory though....
   trace2("item2v(%p) -> INSPECT -> %s", i, INSPECT(rv)); 
@@ -152,7 +149,6 @@ zombify(QGraphicsItem *item)
       trace("zombify child");
       ZOMBIFY(v_item);
     }
-  traqt("QGraphicsItem::childItems");
   const QList<QGraphicsItem*> &children = item->childItems();
   foreach (QGraphicsItem *child, children) 
     zombify(child);
@@ -179,9 +175,7 @@ cGraphicsItem_delete(VALUE v_self)
   trace1("cGraphicsItem_delete, zombified=%d", IS_ZOMBIFIED(v_self));
   if (IS_ZOMBIFIED(v_self)) return Qnil;
   const RPP::QGraphicsItem<QGraphicsItem> self = v_self;
-  trace1("DELETE QGraphicsItem %p", self);
   zombify(self);
-  traqt1("delete QGraphicsItem(%p)", self);
   delete &self;
   return Qnil;
 }
@@ -224,7 +218,6 @@ cGraphicsItem_parent_get(VALUE v_self)
   const RPP::QGraphicsItem<QGraphicsItem> self = v_self;
   const RPP::Object parent = self.iv("@parent");
   if (parent.test()) return parent;
-  traqt("QGraphicsItem::parentItem");
   return RPP::QGraphicsItem<QGraphicsItem>(self->parentItem(), RPP::UNSAFE); // can be nil
 }
 
@@ -236,8 +229,6 @@ cGraphicsItem_enqueue_children(int argc, VALUE *argv, VALUE v_self)
   trace("cGraphicsItem_enqueue_children");
   track2("%s::enqueue_children(%s)", v_self, v_queue);
   const RPP::QGraphicsItem<QGraphicsItem> self = v_self;
-  trace1("self = %p", self);
-  trace2("self = %p, parentItem = %p, calling childItems()", self, self->parentItem());
   const QList<QGraphicsItem*> &children = self->childItems();
   trace1("#children = %d", children.count());
   const bool yield = NIL_P(v_queue);
@@ -326,6 +317,7 @@ cAbstractGraphicsShapeItem_pen_get(VALUE v_self)
 static VALUE
 cAbstractGraphicsShapeItem_brush_get(VALUE v_self)
 {
+  track1("%s::brush()", v_self);
   const RPP::QGraphicsItem<QAbstractGraphicsShapeItem> self = v_self;
   RPP::QBrush brush(self.iv("@brush"), RPP::UNSAFE);
   if (brush.isNil()) 

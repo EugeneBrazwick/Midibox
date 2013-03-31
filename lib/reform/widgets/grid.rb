@@ -15,7 +15,8 @@ module R::Qt
 	#tag "#{self.class}::setup, cc = #{columnCount}"
 	col, row = 0, 0
 	ncols = columnCount
-	each_child.select { |c| Layout::Able === c }.each do |control|
+	each_child do |control|
+	  next unless Layout::Able === control
 	  c, r = col, row
 	  spanc, spanr = control.span
 	  spanc = [1, ncols - c].max if spanc == :all_remaining

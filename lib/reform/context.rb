@@ -1,6 +1,6 @@
 
 #STDERR.puts "loading liburqt.so"
-require_relative 'liburqt'
+# ILLEGAL SINCE REQUIRED IN CORE.   require_relative 'liburqt'
 require_relative 'control'
 
 module R
@@ -151,12 +151,13 @@ module Reform  # aka R::EForm
     end # module ActionContext
 
     # this tells us which controls are added where.
+    # Example: widget-constructors (like 'label', 'button') become methods inside WidgetContext
     # But a class can then 'include' the contexts to use.
     Contexts = { R::Qt::Widget=>[WidgetContext], 
 		 R::Qt::Model=>[ModelContext],
 		 R::Qt::Object=>[ModelContext],
 		 R::Qt::GraphicsItem=>[GraphicContext],
-		 R::Qt::Animation=>[AnimationContext],
+		 R::Qt::AbstractAnimation=>[AnimationContext],
 		 R::Qt::AbstractState=>[StateContext],
 		 R::Qt::Menu=>[MenuContext],
 		 R::Qt::AbstractAction=>[ActionContext],

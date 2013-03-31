@@ -251,7 +251,7 @@ static VALUE
 cSize_scaled(int argc, VALUE *argv, VALUE v_self)
 {
   trace1("cSize_scaled, argc=%d", argc);
-  RPP::Symbol v_ar;
+  RPP::Symbol v_ar(RPP::UNSAFE);
   RPP::Scan scan(argc, argv);
   scan.tail_arg(v_ar);
   int width, height;
@@ -537,7 +537,7 @@ cSizeF_to_s(VALUE v_self)
 static VALUE
 cSizeF_scaled(int argc, VALUE *argv, VALUE v_self)
 {
-  RPP::Symbol v_ar;
+  RPP::Symbol v_ar(RPP::UNSAFE);
   RPP::Scan scan(argc, argv);
   scan.tail_arg(v_ar);
   double width, height;

@@ -1,15 +1,18 @@
 
 #  Copyright (c) 2013 Eugene Brazwick
 
-require_relative 'r'
-require_relative 'control'    # for attr_dynamic
+require_relative 'core_app'
 require_relative 'context'
+require_relative 'liburqt'
 
 module Reform
 
   private # methods of EForm
 
   # scan given dir for fixed set of subdirectories. Each maps to a context by hash.
+  # +hash+ is a mapping from dir to klass. The klass is passed
+  # to registerClassProxy and should be the key inside the Contexts array.
+  #
   # each file not starting with '_' is supposed to be a pluging and it
   # added as a method to the proper context.
   # symlinks will cause 'alias' to be used.
@@ -56,7 +59,8 @@ module Reform
       for dir in dirs
 #         tag "Calling internalize #{dir}"
 	internalize dir, widgets: R::Qt::Widget, graphics: R::Qt::GraphicsItem,
-			 models: R::Qt::Model, any: R::Qt::Control
+			 models: R::Qt::Model, any: R::Qt::Control,
+			 animations: R::Qt::AbstractAnimation
       end
     end # internalize_dir
 
@@ -65,19 +69,7 @@ module Reform
     # create a Qt application, read the plugins, execute the block
     # in the context of the Qt::Application 
     def self.app quickyhash = nil, &block
-      R::Qt::Application.new.scope do |app|
-	begin
-	  # note that app is identical to $app
-	  #tag "__FILE__ = #{__FILE__}"
-	  internalize_dir '.', 'contrib'
-	  #tag "calling #{app}.setup" 
-	  app.setup quickyhash, &block 
-	  app.execute
-	ensure
-	  #tag "calling cleanup"
-	  app.cleanup
-	end
-      end # scope
+      app_i R::Qt::Application, quickyhash, &block
     end # app
 
     # delegator. see Instantiator::registerControlClassProxy
@@ -94,76 +86,75 @@ end # module Reform
 
 module R::Qt
 
-    @@alignmentflags = nil
+  @@alignmentflags = nil
 
-    class Application < Control
-      include Reform::ModelContext, Reform::WidgetContext,
-	      Reform::GraphicContext
+  class Application < CoreApplication
+    include Reform::ModelContext, Reform::WidgetContext,
+	    Reform::GraphicContext
 
-      private # methods of Application
+    private # methods of Application
 
-	def initialize 
-	  super
-	  @toplevel_widgets = []
-	  @quit = false
-	  $app = self
-	end
+      def initialize 
+	super
+	@toplevel_widgets = []
+	@autostart_anims = true
+      end
 
-	# run (show) first widget defined.
-        # if a model is set, propagate it
-	# It is bad to do nothing, if there is no widget available (shown)
-        # then Qt will just hang about.
-        # returns toplevel widget.
-	def setupForms
-	  #tag "setupForms, children=#{children}"
-	  top = @toplevel_widgets[0] and top.show
-	  #tag "located top: #{top}"
-	  top
-	end # setupForms
- 
-	def fail_on_errors value
-	  @fail_on_errors = value
-	end
+      # run (show) first widget defined.
+      # if a model is set, propagate it
+      # It is bad to do nothing, if there is no widget available (shown)
+      # then Qt will just hang about.
+      # returns toplevel widget.
+      def setupForms
+	#tag "setupForms, children=#{children}"
+	top = @toplevel_widgets[0] and top.show
+	#tag "located top: #{top}"
+	top
+      end # setupForms
 
-	alias failOnErrors fail_on_errors
+      def fail_on_errors value
+	@fail_on_errors = value
+      end
 
-	signal :created
+      def autostart_anims value
+	@autostart_anims = value
+      end
 
-      public # methods of Application
+      alias failOnErrors fail_on_errors
 
-	# override
-	def enqueue_children queue = nil
-	  super
-	  @toplevel_widgets.each { |wdgt| queue and queue.push wdgt or yield wdgt }
-	end
+    public # methods of Application
 
-	def quit?; @quit; end
+      # override
+      def enqueue_children queue = nil
+	super
+	@toplevel_widgets.each { |wdgt| queue and queue.push wdgt or yield wdgt }
+      end
 
-	# you cannot say:    attr :fail_on_errors?
-	def fail_on_errors?; @fail_on_errors; end
+      def load_plugins?; true; end
 
-	# override, kind of
-	def addWidget widget
-	  @toplevel_widgets << widget
-	  #tag  "#{widget}.@parent := self"
-	  widget.instance_variable_set :@parent, self
-	end # addWidget
+      # you cannot say:    attr :fail_on_errors?
+      def fail_on_errors?; @fail_on_errors; end
+      def autostart_anims?; @autostart_anims; end
 
-	## setup + Qt eventloop start
-	def execute
-	  if setupForms 
-	    created
-	    exec
-	  end
-	end #  execute
+      # override, kind of
+      def addWidget widget
+	@toplevel_widgets << widget
+	#tag  "#{widget}.@parent := self"
+	widget.instance_variable_set :@parent, self
+      end # addWidget
 
-	## delete the toplevel widgets and the global $app variable
-	def cleanup
-	  # tag "Application::cleanup, #toplevel_widgets = #{@toplevel_widgets.length}"
-	  @toplevel_widgets.each(&:delete)
-	  $app = nil
-	end
-    end # class Application
+      ## setup + Qt eventloop start
+      def execute
+	super if setupForms 
+      end #  execute
+
+      ## delete the toplevel widgets and the global $app variable
+      def cleanup
+	# tag "Application::cleanup, #toplevel_widgets = #{@toplevel_widgets.length}"
+	@toplevel_widgets.each(&:delete)
+	super
+      end
+  end # class Application
 end # module R::Qt
 
 if __FILE__ == $0

@@ -6,7 +6,6 @@
 
 #include <QtCore/QObject>
 #include <QtCore/QVariant>
-#include "rvalue.h"
 #include "ruby++/dataobject.h"
 
 #if defined(TRACE_QT_API)
@@ -94,6 +93,7 @@ An example would be the GraphicsItem classes.
 // the next name is used for dynamic values
 #define R_QT_DYNVALUE_PROPERTYID R_QT_INTERNAL_PROPERTY_PREFIX "dynvalue"
 
+/* DANGEROUS.  VALUE is not guarded from GC
 static inline QVariant 
 v2qvar(const VALUE &v)
 {
@@ -105,6 +105,14 @@ qvar2v(const QVariant &v)
 {
   return v.isValid() ? VALUE(v.value<RValue>()) : Qnil;
 }
+*/
+
+extern QVariant v2qvar_unsafe(VALUE v);
+extern VALUE qvar2v_unsafe(const QVariant &v);
+
+// This converts scalars and strings to C++ versions, and otherwise uses a GC-guarded RValue
+extern QVariant v2qvar_safe(VALUE v);
+extern VALUE qvar2v_safe(const QVariant &v);
 
 // Stores v inside its own q object and returns that object. 
 // AVOID!
@@ -114,7 +122,7 @@ v2qt(VALUE v_q)
 {
   track1("v2qt(%s)", v_q);
   GET_STRUCT(QObject, q);
-  q->setProperty(R_QT_RVALUE_PROPERTYID, v2qvar(v_q));
+  q->setProperty(R_QT_RVALUE_PROPERTYID, v2qvar_unsafe(v_q));
   return q;
 } // v2qt
 
@@ -123,7 +131,7 @@ v2qt(VALUE v_q)
 static inline VALUE
 prop2v(const QObject *q, const char *id)
 {
-  return qvar2v(q->property(id));
+  return qvar2v_unsafe(q->property(id));
 }
 
 // INTERNAL, use RPP::QObject<QClass>(q)
@@ -162,13 +170,21 @@ static inline const char *qString2cstr(const QString &s)
   return s.toUtf8().data();
 }
 
+static inline const char *qByteArray2cstr(const QByteArray &s)
+{
+  return s.constData();
+}
+
+
 // qString2v makes a new rb string and sets the encoding to utf-8
 extern VALUE qString2v(const QString &s);
+extern VALUE qByteArray2v(const QByteArray &s); // similar
 // qString2v_nil is like qString2v but returns nil for ""
 extern VALUE qString2v_nil(const QString &s);
 
 // v2QString converts a ruby String to a QString.
 static inline QString v2QString(VALUE v) { return QString(StringValueCStr(v)); }
+static inline QByteArray v2QByteArray(VALUE v) { return QByteArray(StringValueCStr(v)); }
 
 /*
 inline RPP::String qString2rpp(const QString &s)
